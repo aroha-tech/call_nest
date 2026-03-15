@@ -1,0 +1,54 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.header {
+  margin-bottom: $space-5;
+}
+
+.breadcrumbs {
+  margin-bottom: $space-2;
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+
+  @include sm {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: $space-4;
+  }
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: $line-height-tight;
+
+  @include md {
+    font-size: $font-size-xl;
+  }
+}
+
+.description {
+  font-size: $font-size-sm;
+  color: var(--color-text-tertiary);
+  margin: $space-1 0 0;
+}
+
+.actions {
+  display: flex;
+  gap: $space-2;
+  flex-shrink: 0;
+}

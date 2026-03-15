@@ -1,0 +1,104 @@
+import express from 'express';
+import cors from 'cors';
+import authRoutes from './routes/auth.js';
+import { errorHandler } from './middleware/errorHandler.js';
+import { env } from './config/env.js';
+import { initRedis } from './config/redis.js';
+import { tenantResolver } from './middleware/tenantResolver.js';
+
+// Super Admin routes
+import industriesRoutes from './routes/superAdmin/industries.js';
+import dispoTypesMasterRoutes from './routes/superAdmin/dispoTypesMaster.js';
+import dispoActionsMasterRoutes from './routes/superAdmin/dispoActionsMaster.js';
+import contactStatusMasterRoutes from './routes/superAdmin/contactStatusMaster.js';
+import contactTemperatureMasterRoutes from './routes/superAdmin/contactTemperatureMaster.js';
+import defaultDispositionsRoutes from './routes/superAdmin/defaultDispositions.js';
+import defaultDialingSetsRoutes from './routes/superAdmin/defaultDialingSets.js';
+import defaultDialingSetDispositionsRoutes from './routes/superAdmin/defaultDialingSetDispositions.js';
+import defaultDispositionActionsMapRoutes from './routes/superAdmin/defaultDispositionActionsMap.js';
+import templateVariablesAdminRoutes from './routes/superAdmin/templateVariables.js';
+
+// Tenant routes
+import dialingSetsRoutes from './routes/tenant/dialingSets.js';
+import dispositionsRoutes from './routes/tenant/dispositions.js';
+import dialingSetDispositionsRoutes from './routes/tenant/dialingSetDispositions.js';
+import dispositionActionsMapRoutes from './routes/tenant/dispositionActionsMap.js';
+import emailTemplatesRoutes from './routes/tenant/emailTemplates.js';
+import whatsappTemplatesRoutes from './routes/tenant/whatsappTemplates.js';
+import callScriptsRoutes from './routes/tenant/callScripts.js';
+import whatsappModuleRoutes from './routes/tenant/whatsapp.js';
+import whatsappWebhookRoutes from './routes/whatsappWebhook.js';
+import emailModuleRoutes from './routes/tenant/email.js';
+import templateVariablesRoutes from './routes/templateVariables.js';
+
+const app = express();
+
+// Middleware
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // Twilio status callbacks use form-encoded body
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ 
+    ok: true, 
+    timestamp: new Date().toISOString(),
+    environment: env.nodeEnv,
+  });
+});
+
+// Public WhatsApp webhook (before tenantResolver so ngrok/Twilio host doesn't get 404)
+app.use('/api/whatsapp/webhook', whatsappWebhookRoutes);
+
+// Resolve tenant/platform context from subdomain for all API routes
+app.use(tenantResolver);
+
+// Auth routes
+app.use('/api/auth', authRoutes);
+
+// Template variables (system-level, any authenticated user)
+app.use('/api/template-variables', templateVariablesRoutes);
+
+// Super Admin routes (platform admin only)
+app.use('/api/admin/industries', industriesRoutes);
+app.use('/api/admin/dispo-types', dispoTypesMasterRoutes);
+app.use('/api/admin/dispo-actions', dispoActionsMasterRoutes);
+app.use('/api/admin/contact-statuses', contactStatusMasterRoutes);
+app.use('/api/admin/contact-temperatures', contactTemperatureMasterRoutes);
+app.use('/api/admin/default-dispositions', defaultDispositionsRoutes);
+app.use('/api/admin/default-dialing-sets', defaultDialingSetsRoutes);
+app.use('/api/admin/default-dialing-set-dispositions', defaultDialingSetDispositionsRoutes);
+app.use('/api/admin/default-disposition-actions', defaultDispositionActionsMapRoutes);
+app.use('/api/admin/template-variables', templateVariablesAdminRoutes);
+
+// Tenant routes (tenant users only)
+app.use('/api/tenant/dialing-sets', dialingSetsRoutes);
+app.use('/api/tenant/dispositions', dispositionsRoutes);
+app.use('/api/tenant/dialing-set-dispositions', dialingSetDispositionsRoutes);
+app.use('/api/tenant/disposition-actions', dispositionActionsMapRoutes);
+app.use('/api/tenant/email-templates', emailTemplatesRoutes);
+app.use('/api/tenant/whatsapp-templates', whatsappTemplatesRoutes);
+app.use('/api/tenant/call-scripts', callScriptsRoutes);
+app.use('/api/tenant/whatsapp', whatsappModuleRoutes);
+app.use('/api/tenant/email', emailModuleRoutes);
+
+// Error handler (must be last)
+app.use(errorHandler);
+
+// Start server (ensure Redis is initialized first, but do not block startup on failure)
+const port = env.port;
+
+async function start() {
+  try {
+    await initRedis();
+  } catch (err) {
+    console.error('Failed to connect to Redis. Continuing without cache layer.', err);
+  }
+
+  app.listen(port, () => {
+    console.log(`Call Nest API listening on port ${port}`);
+    console.log(`Environment: ${env.nodeEnv}`);
+  });
+}
+
+start();

@@ -1,0 +1,119 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+// Import Inter font
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: $font-size-base;
+  line-height: $line-height-normal;
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-body);
+  min-height: 100vh;
+  @include custom-scrollbar;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+// Links
+a {
+  color: var(--color-primary-400);
+  text-decoration: none;
+  transition: color $transition-fast;
+
+  &:hover {
+    color: var(--color-primary-300);
+  }
+}
+
+// Buttons reset
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+// Form elements
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+// Code
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 2px 6px;
+  background: var(--color-bg-muted);
+  border-radius: $radius-xs;
+  color: var(--color-text-secondary);
+}
+
+// Selection
+::selection {
+  background: var(--color-primary-600);
+  color: white;
+}
+
+// Focus outline for keyboard navigation
+:focus-visible {
+  @include focus-ring;
+}
+
+// Placeholder
+::placeholder {
+  color: var(--color-input-placeholder);
+  opacity: 1;
+}
+
+// Remove number input spinners
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+// Smooth scroll for anchor links
+html:focus-within {
+  scroll-behavior: smooth;
+}
+
+// Reduced motion
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

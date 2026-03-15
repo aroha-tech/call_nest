@@ -1,0 +1,57 @@
+# Schema & Seed File Conventions
+
+## When Creating New Tables
+
+Always place table SQL files in the correct domain folder:
+
+| Domain | Location | Example |
+|--------|----------|---------|
+| Master tables (global) | `server/schema/disposition/` | `industries.sql`, `dispo_types_master.sql` |
+| Tenant tables | `server/schema/disposition/` | `dispositions.sql`, `dialing_sets.sql` |
+| User/Auth tables | `server/schema/user/` | `user.sql`, `refresh_token.sql` |
+| RBAC tables | `server/schema/rbac/` | `role.sql`, `permission.sql` |
+| Contact tables | `server/schema/contact/` | (future) |
+| New domains | `server/schema/<domain>/` | Create new folder |
+
+**After creating a table**, update the relevant `run_all.sql` if it exists.
+
+## When Creating Seed Data
+
+Always place seed files in the correct subfolder:
+
+| Seed Type | Location |
+|-----------|----------|
+| System/Platform data | `server/schema/seeds/01_system/` |
+| RBAC (permissions, roles) | `server/schema/seeds/02_rbac/` |
+| Master reference data | `server/schema/seeds/03_master/` |
+| New seed categories | `server/schema/seeds/0X_<category>/` |
+
+**After creating a seed file**, update `server/schema/seeds/run_all_seeds.sql` to include it.
+
+## When Creating Migrations
+
+Place migration files in `server/schema/migrations/` with naming:
+- `001_description.sql`, `002_description.sql`, etc.
+
+## Table Schema Requirements
+
+All master tables must include:
+- `is_active TINYINT(1) NOT NULL DEFAULT 1`
+- `is_deleted TINYINT(1) NOT NULL DEFAULT 0`
+- `deleted_at TIMESTAMP NULL DEFAULT NULL`
+- `created_by`, `updated_by` (foreign keys to users)
+- `created_at`, `updated_at` timestamps
+
+All tenant tables must include:
+- `tenant_id BIGINT UNSIGNED NOT NULL`
+- `is_deleted TINYINT(1) NOT NULL DEFAULT 0`
+- `deleted_at TIMESTAMP NULL DEFAULT NULL`
+
+## Checklist for New Features
+
+When adding a new feature with database tables:
+1. ✅ Create table schema in correct folder
+2. ✅ Update `run_all.sql` if exists
+3. ✅ Create seed data if needed
+4. ✅ Update `run_all_seeds.sql`
+5. ✅ Create migration if altering existing tables

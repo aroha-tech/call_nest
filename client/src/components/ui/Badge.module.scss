@@ -1,0 +1,50 @@
+@use '../../styles/variables' as *;
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-weight: $font-weight-medium;
+  border-radius: $radius-xs;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.sm {
+  padding: 2px 6px;
+  font-size: $font-size-2xs;
+}
+
+.md {
+  padding: 3px 8px;
+  font-size: $font-size-xs;
+}
+
+.default {
+  background: var(--color-bg-muted);
+  color: var(--color-text-secondary);
+}
+
+.primary {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--color-primary-400);
+}
+
+.success {
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+}
+
+.warning {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+}
+
+.danger {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+.muted {
+  background: var(--color-bg-muted);
+  color: var(--color-text-tertiary);
+}

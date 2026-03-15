@@ -1,0 +1,66 @@
+/* Resizable container: drag bottom edge to extend height */
+.editorResizeWrap {
+  min-height: 280px;
+  height: 320px;
+  max-height: 80vh;
+  resize: vertical;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.editorWrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+
+  :global(.quill) {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  :global(.ql-toolbar) {
+    flex-shrink: 0;
+    border: none;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+  }
+
+  :global(.ql-container) {
+    flex: 1;
+    border: none;
+    font-size: 0.9375rem;
+    min-height: 0;
+  }
+
+  :global(.ql-editor) {
+    min-height: 220px;
+    color: #1e293b;
+
+    &.ql-blank::before {
+      color: #94a3b8;
+    }
+  }
+}
+
+.quillEditor {
+  :global(.ql-toolbar .ql-stroke) {
+    stroke: #cbd5e1;
+  }
+  :global(.ql-toolbar .ql-fill) {
+    fill: #64748b;
+  }
+  :global(.ql-toolbar button:hover .ql-stroke) {
+    stroke: #3b82f6;
+  }
+  :global(.ql-toolbar button:hover .ql-fill) {
+    fill: #3b82f6;
+  }
+}

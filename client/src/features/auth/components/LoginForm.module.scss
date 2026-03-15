@@ -1,0 +1,43 @@
+@use '../../../styles/variables' as *;
+
+.card {
+  width: 100%;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+}
+
+.title {
+  margin: 0 0 $space-1;
+  font-size: $font-size-xl;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  text-align: center;
+}
+
+.alert {
+  margin: 0;
+}
+
+.submit {
+  margin-top: $space-2;
+}
+
+.footer {
+  margin: 0;
+  font-size: $font-size-sm;
+  color: var(--color-text-tertiary);
+  text-align: center;
+
+  a {
+    font-weight: $font-weight-medium;
+    color: var(--color-primary-400);
+    
+    &:hover {
+      color: var(--color-primary-300);
+    }
+  }
+}

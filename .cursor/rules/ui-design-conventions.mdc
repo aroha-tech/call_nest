@@ -1,0 +1,51 @@
+---
+description: UI design conventions - fluid responsive layouts
+globs: "**/*.{scss,css,module.scss}"
+alwaysApply: false
+---
+
+# UI Design Conventions
+
+## Fluid Responsive Layouts
+
+Content should **fill available screen space** and adapt to all screen sizes. Never use fixed max-widths that make content look sparse on larger monitors.
+
+```scss
+// ❌ BAD - Fixed max-width leaves empty space on large screens
+.page {
+  max-width: 1000px;
+}
+
+// ✅ GOOD - Fluid width fills available space
+.page {
+  width: 100%;
+}
+```
+
+## Responsive Approach
+
+- Use `width: 100%` for containers and content areas
+- Tables should stretch to fill available width
+- Use responsive padding that scales with viewport (smaller on mobile, larger on desktop)
+- Split-view panels can have fixed widths for sidebars, but main content should be fluid
+
+```scss
+// ✅ GOOD - Responsive padding
+.content {
+  padding: $space-4;  // 16px mobile
+
+  @include md {
+    padding: $space-5;  // 20px tablet
+  }
+
+  @include lg {
+    padding: $space-6;  // 24px desktop
+  }
+}
+```
+
+## Component Sizing
+
+- Inputs/buttons: Use consistent heights (32-34px for compact UI)
+- Search inputs: Full width on mobile, max-width on larger screens
+- Tables: Always `width: 100%`, let columns distribute naturally

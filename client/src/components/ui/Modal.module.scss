@@ -1,0 +1,131 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: $space-4;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 150ms ease;
+
+  @include sm {
+    padding: $space-6;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal {
+  background: var(--color-bg-elevated);
+  border-radius: $radius-lg;
+  border: 1px solid var(--color-border);
+  box-shadow: $shadow-xl;
+  max-height: calc(100vh - #{$space-8});
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 200ms ease;
+  @include custom-scrollbar;
+
+  &.sm {
+    width: 100%;
+    max-width: 380px;
+  }
+
+  &.md {
+    width: 100%;
+    max-width: 480px;
+  }
+
+  &.lg {
+    width: 100%;
+    max-width: 600px;
+  }
+
+  &.xl {
+    width: 100%;
+    max-width: 800px;
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-3;
+  padding: $space-4 $space-5;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: $radius-sm;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all $transition-fast;
+  font-size: $font-size-sm;
+
+  &:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+  }
+}
+
+.body {
+  padding: $space-5;
+  overflow-y: auto;
+  flex: 1;
+  @include custom-scrollbar;
+}
+
+.footer {
+  padding: $space-4 $space-5;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.footerContent {
+  display: flex;
+  justify-content: flex-end;
+  gap: $space-2;
+}
+
+.confirmMessage {
+  color: var(--color-text-secondary);
+  font-size: $font-size-sm;
+  margin: 0;
+  line-height: $line-height-relaxed;
+}

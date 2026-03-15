@@ -1,0 +1,304 @@
+import { useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useTenant } from '../context/TenantContext';
+import { usePermissions } from './usePermission';
+import { useAppSelector } from '../app/hooks';
+import { selectRoleId } from '../features/auth/authSelectors';
+import { useEmailModuleEnabled } from './useEmailModuleEnabled';
+import { PERMISSIONS } from '../utils/permissionUtils';
+
+/**
+ * Super Admin (Platform Admin) navigation items.
+ */
+const PLATFORM_NAV_ITEMS = [
+  { key: 'dashboard', label: 'Dashboard', path: '/' },
+  { key: 'tenants', label: 'Tenants', path: '/admin/tenants' },
+  { key: 'users', label: 'Users', path: '/admin/users' },
+  {
+    key: 'masters',
+    label: 'System Masters',
+    children: [
+      { key: 'industries', label: 'Industries', path: '/admin/masters/industries' },
+      { key: 'dispo-types', label: 'Dispo Types', path: '/admin/masters/dispo-types' },
+      { key: 'actions', label: 'Actions', path: '/admin/masters/actions' },
+      { key: 'contact-statuses', label: 'Contact Statuses', path: '/admin/masters/contact-statuses' },
+      { key: 'temperatures', label: 'Temperatures', path: '/admin/masters/temperatures' },
+      { key: 'template-variables', label: 'Template Variables', path: '/admin/masters/template-variables' },
+    ],
+  },
+  {
+    key: 'dialer-workflow',
+    label: 'Dialer Workflow',
+    children: [
+      { key: 'default-dispositions', label: 'Default Dispositions', path: '/admin/workflow/default-dispositions' },
+      { key: 'default-dialing-sets', label: 'Default Dialing Sets', path: '/admin/workflow/default-dialing-sets' },
+    ],
+  },
+];
+
+/**
+ * Tenant Admin navigation items.
+ */
+const TENANT_ADMIN_NAV_ITEMS = [
+  { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW },
+  { key: 'leads', label: 'Leads', path: '/leads', permission: PERMISSIONS.LEADS_READ },
+  { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
+  { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
+  { key: 'activities', label: 'Activities', path: '/activities', permission: PERMISSIONS.DIAL_EXECUTE },
+  { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
+  {
+    key: 'dialer-workflow',
+    label: 'Dialer Workflow',
+    permission: PERMISSIONS.DISPOSITIONS_MANAGE,
+    children: [
+      { key: 'dispositions', label: 'Dispositions', path: '/workflow/dispositions', permission: PERMISSIONS.DISPOSITIONS_MANAGE },
+      { key: 'dialing-sets', label: 'Dialing Sets', path: '/workflow/dialing-sets', permission: PERMISSIONS.DISPOSITIONS_MANAGE },
+    ],
+  },
+  {
+    key: 'dialer-resources',
+    label: 'Dialer Resources',
+    permission: PERMISSIONS.SETTINGS_MANAGE,
+    children: [
+      { key: 'dialer-scripts', label: 'Dialer Scripts', path: '/resources/dialer-scripts', permission: PERMISSIONS.SETTINGS_MANAGE },
+    ],
+  },
+  {
+    key: 'whatsapp',
+    label: 'WhatsApp',
+    permission: PERMISSIONS.SETTINGS_MANAGE,
+    children: [
+      { key: 'whatsapp-accounts', label: 'Accounts', path: '/whatsapp/accounts', permission: PERMISSIONS.SETTINGS_MANAGE },
+      { key: 'whatsapp-templates', label: 'Templates', path: '/whatsapp/templates', permission: PERMISSIONS.SETTINGS_MANAGE },
+      { key: 'whatsapp-messages', label: 'Messages', path: '/whatsapp/messages', permission: PERMISSIONS.SETTINGS_MANAGE },
+      { key: 'whatsapp-logs', label: 'API Logs', path: '/whatsapp/logs', permission: PERMISSIONS.SETTINGS_MANAGE },
+    ],
+  },
+  {
+    key: 'email',
+    label: 'Email',
+    permission: PERMISSIONS.SETTINGS_MANAGE,
+    children: [
+      { key: 'email-sent', label: 'Sent', path: '/email/sent', permission: PERMISSIONS.SETTINGS_MANAGE },
+      { key: 'email-templates', label: 'Templates', path: '/email/templates', permission: PERMISSIONS.SETTINGS_MANAGE },
+      { key: 'email-accounts', label: 'Accounts', path: '/email/accounts', permission: PERMISSIONS.SETTINGS_MANAGE },
+    ],
+  },
+  { key: 'settings', label: 'Settings', path: '/settings', permission: PERMISSIONS.SETTINGS_MANAGE },
+  { key: 'users', label: 'Users', path: '/users', permission: PERMISSIONS.USERS_MANAGE },
+];
+
+/**
+ * Manager navigation items.
+ */
+const MANAGER_NAV_ITEMS = [
+  { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW },
+  { key: 'leads', label: 'Leads', path: '/leads', permission: PERMISSIONS.LEADS_READ },
+  { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
+  { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
+  { key: 'activities', label: 'Activities', path: '/activities', permission: PERMISSIONS.DIAL_EXECUTE },
+  { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
+  {
+    key: 'dialer-workflow',
+    label: 'Dialer Workflow',
+    permission: PERMISSIONS.DISPOSITIONS_MANAGE,
+    children: [
+      { key: 'dispositions', label: 'Dispositions', path: '/workflow/dispositions', permission: PERMISSIONS.DISPOSITIONS_MANAGE },
+      { key: 'dialing-sets', label: 'Dialing Sets', path: '/workflow/dialing-sets', permission: PERMISSIONS.DISPOSITIONS_MANAGE },
+    ],
+  },
+  {
+    key: 'dialer-resources',
+    label: 'Dialer Resources',
+    permission: PERMISSIONS.SETTINGS_MANAGE,
+    children: [
+      { key: 'dialer-scripts', label: 'Dialer Scripts', path: '/resources/dialer-scripts', permission: PERMISSIONS.SETTINGS_MANAGE },
+    ],
+  },
+  {
+    key: 'whatsapp',
+    label: 'WhatsApp',
+    permission: PERMISSIONS.SETTINGS_MANAGE,
+    children: [
+      { key: 'whatsapp-accounts', label: 'Accounts', path: '/whatsapp/accounts', permission: PERMISSIONS.SETTINGS_MANAGE },
+      { key: 'whatsapp-templates', label: 'Templates', path: '/whatsapp/templates', permission: PERMISSIONS.SETTINGS_MANAGE },
+      { key: 'whatsapp-messages', label: 'Messages', path: '/whatsapp/messages', permission: PERMISSIONS.SETTINGS_MANAGE },
+      { key: 'whatsapp-logs', label: 'API Logs', path: '/whatsapp/logs', permission: PERMISSIONS.SETTINGS_MANAGE },
+    ],
+  },
+  {
+    key: 'email',
+    label: 'Email',
+    permission: PERMISSIONS.SETTINGS_MANAGE,
+    children: [
+      { key: 'email-sent', label: 'Sent', path: '/email/sent', permission: PERMISSIONS.SETTINGS_MANAGE },
+      { key: 'email-templates', label: 'Templates', path: '/email/templates', permission: PERMISSIONS.SETTINGS_MANAGE },
+      { key: 'email-accounts', label: 'Accounts', path: '/email/accounts', permission: PERMISSIONS.SETTINGS_MANAGE },
+    ],
+  },
+];
+
+/**
+ * Agent navigation items.
+ */
+const AGENT_NAV_ITEMS = [
+  { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW },
+  { key: 'leads', label: 'Leads', path: '/leads', permission: PERMISSIONS.LEADS_READ },
+  { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
+  { key: 'activities', label: 'Activities', path: '/activities', permission: PERMISSIONS.DIAL_EXECUTE },
+  {
+    key: 'dialer-workflow',
+    label: 'Dialer Workflow',
+    children: [
+      { key: 'dispositions', label: 'Dispositions', path: '/workflow/dispositions' },
+      { key: 'dialing-sets', label: 'Dialing Sets', path: '/workflow/dialing-sets' },
+    ],
+  },
+  {
+    key: 'dialer-resources',
+    label: 'Dialer Resources',
+    children: [
+      { key: 'dialer-scripts', label: 'Dialer Scripts', path: '/resources/dialer-scripts' },
+    ],
+  },
+  {
+    key: 'whatsapp',
+    label: 'WhatsApp',
+    children: [
+      { key: 'whatsapp-accounts', label: 'Accounts', path: '/whatsapp/accounts' },
+      { key: 'whatsapp-templates', label: 'Templates', path: '/whatsapp/templates' },
+      { key: 'whatsapp-messages', label: 'Messages', path: '/whatsapp/messages' },
+      { key: 'whatsapp-logs', label: 'API Logs', path: '/whatsapp/logs' },
+    ],
+  },
+  {
+    key: 'email',
+    label: 'Email',
+    children: [
+      { key: 'email-sent', label: 'Sent', path: '/email/sent' },
+      { key: 'email-templates', label: 'Templates', path: '/email/templates' },
+      { key: 'email-accounts', label: 'Accounts', path: '/email/accounts' },
+    ],
+  },
+];
+
+/**
+ * Role IDs mapping.
+ */
+const ROLE_IDS = {
+  SUPER_ADMIN: 1,
+  TENANT_ADMIN: 2,
+  MANAGER: 3,
+  AGENT: 4,
+};
+
+/**
+ * Filter navigation items recursively based on permissions.
+ */
+function filterNavItems(items, can, isPlatformAdmin) {
+  return items
+    .map((item) => {
+      if (isPlatformAdmin) {
+        if (item.children) {
+          return { ...item, children: filterNavItems(item.children, can, isPlatformAdmin) };
+        }
+        return item;
+      }
+
+      if (!item.permission || can(item.permission)) {
+        if (item.children) {
+          const filteredChildren = filterNavItems(item.children, can, isPlatformAdmin);
+          if (filteredChildren.length > 0) {
+            return { ...item, children: filteredChildren };
+          }
+          return null;
+        }
+        return item;
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+
+/**
+ * Find active key from nested navigation items.
+ */
+function findActiveKey(items, pathname) {
+  for (const item of items) {
+    if (item.children) {
+      for (const child of item.children) {
+        if (child.path === pathname || (child.path !== '/' && pathname.startsWith(child.path))) {
+          return { parentKey: item.key, childKey: child.key };
+        }
+      }
+    } else if (item.path === '/' ? pathname === '/' : pathname.startsWith(item.path)) {
+      return { parentKey: null, childKey: item.key };
+    }
+  }
+  return { parentKey: null, childKey: 'dashboard' };
+}
+
+/**
+ * Get navigation items based on user role.
+ */
+function getNavItemsByRole(roleId, isPlatform, isPlatformAdmin) {
+  if (isPlatform && isPlatformAdmin) {
+    return PLATFORM_NAV_ITEMS;
+  }
+
+  switch (roleId) {
+    case ROLE_IDS.TENANT_ADMIN:
+      return TENANT_ADMIN_NAV_ITEMS;
+    case ROLE_IDS.MANAGER:
+      return MANAGER_NAV_ITEMS;
+    case ROLE_IDS.AGENT:
+      return AGENT_NAV_ITEMS;
+    default:
+      return AGENT_NAV_ITEMS;
+  }
+}
+
+/**
+ * Sales-first navigation model with permission-based filtering.
+ * - Only shows menu items the user has permission to access.
+ * - Platform admins see admin-specific navigation.
+ * - Supports nested navigation with children (tabs).
+ * - Provides a simple API for sidebar/topbar menu components.
+ */
+export function useSalesNavigation() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { tenantSlug, isPlatform } = useTenant();
+  const { can, isPlatformAdmin } = usePermissions();
+  const roleId = useAppSelector(selectRoleId);
+  const { emailModuleEnabled } = useEmailModuleEnabled();
+
+  const items = useMemo(() => {
+    const baseItems = getNavItemsByRole(roleId, isPlatform, isPlatformAdmin);
+    let list = filterNavItems(baseItems, can, isPlatformAdmin);
+    if (emailModuleEnabled === false) {
+      list = list.filter((item) => item.key !== 'email');
+    }
+    return list;
+  }, [roleId, isPlatform, isPlatformAdmin, can, emailModuleEnabled]);
+
+  const { activeKey, activeParentKey } = useMemo(() => {
+    const { parentKey, childKey } = findActiveKey(items, location.pathname);
+    return { activeKey: childKey, activeParentKey: parentKey };
+  }, [items, location.pathname]);
+
+  function goTo(path) {
+    navigate(path);
+  }
+
+  return {
+    items,
+    activeKey,
+    activeParentKey,
+    goTo,
+    tenantSlug,
+    isPlatform,
+    isPlatformAdmin,
+  };
+}
+

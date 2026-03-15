@@ -1,0 +1,105 @@
+@use '../../../styles/variables' as *;
+
+.card {
+  width: 100%;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+}
+
+.title {
+  margin: 0;
+  font-size: $font-size-xl;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  text-align: center;
+}
+
+.subtitle {
+  font-size: $font-size-sm;
+  color: var(--color-text-tertiary);
+  text-align: center;
+  margin: 0 0 $space-2;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+}
+
+.sectionTitle {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.row {
+  display: flex;
+  gap: $space-3;
+  
+  > * {
+    flex: 1;
+  }
+}
+
+.passwordBlock {
+  display: flex;
+  flex-direction: column;
+  gap: $space-1;
+}
+
+.strength {
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+}
+
+.strengthLabel {
+  color: var(--color-text-tertiary);
+}
+
+.weak {
+  color: var(--color-danger);
+}
+
+.fair {
+  color: var(--color-warning);
+}
+
+.good {
+  color: var(--color-info);
+}
+
+.strong {
+  color: var(--color-success);
+}
+
+.alert {
+  margin: 0;
+}
+
+.submit {
+  margin-top: $space-2;
+}
+
+.footer {
+  margin: 0;
+  font-size: $font-size-sm;
+  color: var(--color-text-tertiary);
+  text-align: center;
+
+  a {
+    font-weight: $font-weight-medium;
+    color: var(--color-primary-400);
+    
+    &:hover {
+      color: var(--color-primary-300);
+    }
+  }
+}

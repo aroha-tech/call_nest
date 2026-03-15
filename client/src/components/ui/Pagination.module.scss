@@ -1,0 +1,77 @@
+@use '../../styles/variables' as *;
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: $space-3;
+  padding: $space-3 0;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: $space-3;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: $space-4;
+}
+
+.info {
+  font-size: $font-size-sm;
+  color: var(--color-text-tertiary);
+}
+
+.limitSelect {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  
+  label {
+    font-size: $font-size-sm;
+    color: var(--color-text-tertiary);
+  }
+}
+
+.select {
+  padding: $space-1 $space-2;
+  font-size: $font-size-sm;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-sm;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  
+  &:hover {
+    border-color: var(--color-border-hover);
+  }
+  
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.15);
+  }
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+}
+
+.page {
+  font-size: $font-size-sm;
+  color: var(--color-text-secondary);
+  padding: 0 $space-2;
+}
+
+@media (max-width: $bp-sm) {
+  .pagination {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .left {
+    flex-wrap: wrap;
+  }
+}

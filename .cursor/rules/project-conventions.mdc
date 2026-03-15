@@ -1,0 +1,79 @@
+---
+description: Call Nest — stack, structure, and file organization
+alwaysApply: true
+---
+
+# Call Nest — Project Conventions
+
+## Stack
+- **Frontend**: React | **Backend**: Node + Express | **Database**: MySQL
+
+## File organization — by domain (feature)
+
+Put files in **domain folders** so we can easily track data and related code.
+
+### Schema
+- **Contact-related** → `server/schema/contact/` (e.g. `contact.sql`, migrations)
+- **Disposition-related** → `server/schema/disposition/` (e.g. `disposition.sql`, migrations)
+- **Other domains** → `server/schema/<domain>/` (e.g. `user`, `call`, etc.)
+
+Same idea elsewhere: group by domain (contact, disposition, user, call) instead of only by type (all schemas in one flat folder).
+
+## Multi-tenancy — Application-Level Enforcement
+
+**DO NOT use DB-level isolation** (views, row-level security). Use application-level enforcement:
+
+1. **tenant_id in every table** — all tenant-scoped tables must have `tenant_id BIGINT UNSIGNED NOT NULL`
+2. **Middleware guard** — enforce tenant context from JWT/auth; attach `req.tenantId` to requests
+3. **Query helpers** — never allow raw SQL without tenant filter; always include `WHERE tenant_id = ?`
+4. **Composite indexes** — `(tenant_id, id)`, `(tenant_id, email)`, etc. for query performance
+5. **Super admin exception** — super admin (`role='super_admin'`, `tenant_id=1`) can access all tenants
+
+**Pattern:**
+- Middleware extracts `tenant_id` from JWT/user context
+- All service queries automatically filter by `tenant_id`
+- Super admin bypasses tenant filter (can query across tenants)
+
+## List/Table UX — Active and Inactive (same everywhere)
+
+Use the **same UX** for any list/table that has an active/inactive status (e.g. Super Admin masters, Call Scripts, Dispositions, Default Dispositions):
+
+1. **One dedicated button per row** — Show either **Activate** (▶️, variant `success`) or **Deactivate** (⏸️, variant `warning`) depending on current status. Do **not** use a single toggle control (e.g. one icon that flips).
+2. **Confirmation modal** — Clicking Activate or Deactivate opens a **ConfirmModal** (“Activate [Item]” / “Deactivate [Item]”) with a short explanation; on confirm, call the API then refetch the list.
+3. **Filter checkbox** — Use the label **“Show inactive”** (not “Include inactive”) for the checkbox that includes inactive items in the list.
+4. **Edit form** — In Create/Edit modals, keep the **Active** checkbox as-is so users can set or change status when creating or editing the record. List-row Activate/Deactivate is in addition to that.
+
+Apply this pattern consistently in: Super Admin master tables (via `MasterCRUDPage`), Call Scripts, Tenant Dispositions, Default Dispositions, and any future list that has active/inactive.
+
+## List pagination and search
+
+For any list/table with server-side data (messages, logs, etc.) use the **same pattern** as the rest of the project:
+
+1. **Search** — Use `SearchInput` from `components/ui/SearchInput`: `value={searchQuery}`, `onSearch={(v) => { setSearchQuery(v); setPage(1); }}`, placeholder e.g. "Search... (press Enter)".
+2. **Pagination** — Use `Pagination` from `components/ui/Pagination`: 1-based `page`, `totalPages`, `total`, `limit`, `onPageChange`, `onLimitChange` (optional). Backend: `limit` + `offset` where `offset = (page - 1) * limit`; return `{ data: array, total }`.
+3. **State** — Hold `searchQuery`, `page` (1-based), and optionally `limit`. Reset `page` to 1 when filters or search change.
+
+See: `MasterCRUDPage.jsx`, `WhatsAppMessagesPage.jsx`, `WhatsAppLogsPage.jsx`.
+
+## Migrations — MySQL command line
+
+When adding or referencing SQL migrations, **always give a direct command** the user can paste and run in the MySQL command line:
+
+1. **From project root**, start MySQL and run a migration file:
+   ```bash
+   mysql -u root -p call_nest
+   ```
+   Then inside MySQL:
+   ```sql
+   source server/schema/migrations/004_call_scripts_is_default.sql
+   ```
+   Or from the shell in one go (replace user/pass/db as needed):
+   ```bash
+   mysql -u root -p call_nest < server/schema/migrations/004_call_scripts_is_default.sql
+   ```
+
+2. Alternatively provide **paste-ready SQL** (after `USE your_database;`) so the user can run it directly in the MySQL CLI.
+
+## Principles
+- Professional structure, simple and efficient
+- Minimal complexity, more functionality

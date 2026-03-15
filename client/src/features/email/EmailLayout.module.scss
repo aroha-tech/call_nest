@@ -1,0 +1,97 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.wrapper {
+  display: flex;
+  height: 100%;
+  min-height: calc(100vh - 120px);
+}
+
+.sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  background: var(--color-bg-elevated);
+  border-right: 1px solid var(--color-border);
+  padding: 16px 0;
+  display: none;
+
+  // Show sidebar on small screens and up; hide only on very small/mobile
+  @include sm {
+    display: block;
+  }
+}
+
+.sidebarTitle {
+  font-weight: 600;
+  font-size: 1rem;
+  padding: 0 16px 12px;
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 8px;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navItem,
+.navItemActive {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  text-decoration: none;
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+  transition: background 0.15s;
+
+  &:hover {
+    background: var(--color-bg-hover);
+  }
+}
+
+.navItemActive {
+  background: rgba(99, 102, 241, 0.18);
+  color: var(--color-primary-500);
+  font-weight: 500;
+}
+
+.navIcon {
+  font-size: 1.1rem;
+}
+
+.mobileNav {
+  display: flex;
+  gap: $space-2;
+  margin-bottom: $space-4;
+
+  @include sm {
+    display: none;
+  }
+}
+
+.mobileNavButton {
+  flex: 1;
+  border-radius: $radius-md;
+  padding: 6px 10px;
+  font-size: $font-size-sm;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+
+  &.active {
+    background: rgba(99, 102, 241, 0.18);
+    color: var(--color-primary-500);
+    border-color: var(--color-primary-500);
+  }
+}
+
+.main {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  background: transparent;
+}

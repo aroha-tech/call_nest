@@ -1,0 +1,67 @@
+@use '../../styles/variables' as *;
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
+  cursor: pointer;
+  user-select: none;
+
+  &.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.checkmark {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-sm;
+  background: var(--color-surface-secondary);
+  transition: all $transition-fast;
+
+  &::after {
+    content: '';
+    position: absolute;
+    display: none;
+    left: 5px;
+    top: 2px;
+    width: 4px;
+    height: 8px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  .input:checked + & {
+    background: var(--color-primary-500);
+    border-color: var(--color-primary-500);
+
+    &::after {
+      display: block;
+    }
+  }
+
+  .input:focus + & {
+    box-shadow: 0 0 0 2px var(--color-primary-500-alpha);
+  }
+
+  .input:disabled + & {
+    background: var(--color-surface-tertiary);
+    border-color: var(--color-border);
+  }
+}
+
+.label {
+  font-size: $font-size-sm;
+  color: var(--color-text-secondary);
+}

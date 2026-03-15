@@ -1,0 +1,90 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: $radius-sm;
+  cursor: pointer;
+  transition: all $transition-fast;
+  flex-shrink: 0;
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.sm {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+}
+
+.md {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+}
+
+.lg {
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
+}
+
+.ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+
+  &:hover:not(:disabled) {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+  }
+}
+
+.subtle {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+
+  &:hover:not(:disabled) {
+    background: var(--color-bg-muted);
+    color: var(--color-text-primary);
+  }
+}
+
+.danger {
+  background: transparent;
+  color: var(--color-text-muted);
+
+  &:hover:not(:disabled) {
+    background: var(--color-danger-subtle);
+    color: var(--color-danger);
+  }
+}
+
+.warning {
+  background: transparent;
+  color: var(--color-text-muted);
+
+  &:hover:not(:disabled) {
+    background: var(--color-warning-subtle, #fef3c7);
+    color: var(--color-warning, #d97706);
+  }
+}
+
+.success {
+  background: transparent;
+  color: var(--color-text-muted);
+
+  &:hover:not(:disabled) {
+    background: var(--color-success-subtle, #d1fae5);
+    color: var(--color-success, #059669);
+  }
+}

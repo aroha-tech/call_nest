@@ -1,0 +1,56 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+}
+
+.tabList {
+  display: flex;
+  gap: $space-1;
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+  @include hide-scrollbar;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  padding: $space-2 $space-3;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: var(--color-text-tertiary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all $transition-fast;
+  margin-bottom: -1px;
+  height: 40px;
+
+  &:hover:not(:disabled) {
+    color: var(--color-text-secondary);
+  }
+
+  &.active {
+    color: var(--color-primary-400);
+    border-bottom-color: var(--color-primary-500);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.panel {
+  padding-top: $space-5;
+  animation: fadeIn 150ms ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

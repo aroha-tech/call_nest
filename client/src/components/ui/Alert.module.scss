@@ -1,0 +1,46 @@
+@use '../../styles/variables' as *;
+
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: $space-2;
+  padding: $space-3 $space-4;
+  border-radius: $radius-sm;
+  font-size: $font-size-sm;
+  line-height: $line-height-normal;
+  margin-bottom: $space-4;
+}
+
+.info {
+  background: var(--color-info-subtle);
+  color: var(--color-info);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.success {
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.warning {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.error {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.title {
+  font-weight: $font-weight-semibold;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.body {
+  flex: 1;
+}

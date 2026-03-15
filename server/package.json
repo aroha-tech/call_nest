@@ -1,0 +1,25 @@
+{
+  "name": "call-nest-server",
+  "version": "1.0.0",
+  "description": "Call Nest API — calling + CRM backend",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "start": "nodemon src/app.js",
+    "dev": "node --watch src/app.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "google-auth-library": "^10.6.1",
+    "googleapis": "^171.4.0",
+    "jsonwebtoken": "^9.0.3",
+    "mysql2": "^3.17.1",
+    "nodemailer": "^6.10.1",
+    "nodemon": "^3.1.14",
+    "redis": "^4.7.1",
+    "uuid": "^11.1.0"
+  }
+}

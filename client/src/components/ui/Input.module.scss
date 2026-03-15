@@ -1,0 +1,84 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: $space-1;
+}
+
+.label {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  color: var(--color-text-secondary);
+  margin-bottom: 2px;
+}
+
+.inputWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input {
+  width: 100%;
+  height: 34px;
+  padding: 0 $space-3;
+  font-size: $font-size-sm;
+  color: var(--color-text-primary);
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-input-border);
+  border-radius: $radius-sm;
+  transition: all $transition-fast;
+
+  &::placeholder {
+    color: var(--color-input-placeholder);
+  }
+
+  &:hover:not(:disabled):not(:focus) {
+    border-color: var(--color-input-border-hover);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-input-border-focus);
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &.hasError {
+    border-color: var(--color-danger);
+
+    &:focus {
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+    }
+  }
+
+  &.hasSuffix {
+    padding-right: $space-10;
+  }
+}
+
+.suffix {
+  position: absolute;
+  right: $space-2;
+  display: flex;
+  align-items: center;
+  color: var(--color-text-muted);
+}
+
+.error {
+  font-size: $font-size-xs;
+  color: var(--color-danger);
+  margin-top: 2px;
+}
+
+.hint {
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
