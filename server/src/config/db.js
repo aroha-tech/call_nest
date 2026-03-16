@@ -1,6 +1,20 @@
 import mysql from 'mysql2/promise';
 import { env } from './env.js';
 
+// Optional SSL configuration (required for TiDB Serverless and other TLS-only hosts)
+// Enable SSL automatically for TiDB Cloud hosts, or when DB_SSL=true is set.
+const needsSsl =
+  process.env.DB_SSL === 'true' ||
+  (env.db.host && env.db.host.includes('tidbcloud.com'));
+
+const sslOptions = needsSsl
+  ? {
+      // Use default system CAs; TiDB Cloud uses a public CA (Let's Encrypt)
+      minVersion: 'TLSv1.2',
+      rejectUnauthorized: true,
+    }
+  : undefined;
+
 // Support both DATABASE_URL and individual connection params
 const pool = mysql.createPool({
   host: env.db.host,
@@ -11,6 +25,7 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  ...(sslOptions && { ssl: sslOptions }),
 });
 
 /**
