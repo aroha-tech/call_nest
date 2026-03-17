@@ -192,6 +192,30 @@ export function EmailAccountsPage() {
     }
   };
 
+  const handleReconnect = async (row) => {
+    const provider = (row.provider || '').toLowerCase();
+    if (provider !== 'gmail' && provider !== 'outlook') return;
+    setOauthError(null);
+    setOauthLoading(provider);
+    try {
+      const res =
+        provider === 'gmail'
+          ? await emailAccountsAPI.getOAuthGoogleUrl()
+          : await emailAccountsAPI.getOAuthOutlookUrl();
+      const url = res.data?.url;
+      if (url) window.location.href = url;
+      else setOauthError('Could not get sign-in URL');
+    } catch (err) {
+      setOauthError(
+        err.response?.data?.error ||
+          err.message ||
+          'Failed to start sign-in'
+      );
+    } finally {
+      setOauthLoading(null);
+    }
+  };
+
   if (loading && !accounts?.length) {
     return (
       <div className={styles.page}>
@@ -266,6 +290,16 @@ export function EmailAccountsPage() {
                 </TableCell>
                 <TableCell align="center">
                   <div className={styles.actions}>
+                    {(row.provider === 'gmail' || row.provider === 'outlook') && (
+                      <IconButton
+                        size="sm"
+                        title="Reconnect / Re-authorize"
+                        onClick={() => handleReconnect(row)}
+                        disabled={!!oauthLoading}
+                      >
+                        🔄
+                      </IconButton>
+                    )}
                     {row.status === 'inactive' ? (
                       <IconButton size="sm" variant="success" title="Activate" onClick={() => setConfirmAction({ id: row.id, action: 'activate', name: row.account_name || row.email_address })}>▶️</IconButton>
                     ) : (

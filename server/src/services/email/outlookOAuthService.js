@@ -5,13 +5,16 @@
 import { env } from '../../config/env.js';
 import { encodeState } from './oauthState.js';
 
+// OAuth scopes for Outlook via Microsoft Graph + basic profile.
+// IMPORTANT: You cannot mix Graph scopes (Mail.Send) with legacy Outlook
+// resource scopes (IMAP/SMTP). To avoid AADSTS70011 \"scopes not compatible\",
+// we request only Graph + OpenID scopes here.
 const SCOPES = [
   'offline_access',
   'openid',
   'profile',
   'email',
-  'https://outlook.office365.com/IMAP.AccessAsUser.All',
-  'https://outlook.office365.com/SMTP.Send',
+  'Mail.Send',
 ];
 
 function getRedirectUri() {
@@ -63,6 +66,7 @@ export async function exchangeCodeForTokens(code) {
     code,
     redirect_uri: getRedirectUri(),
     grant_type: 'authorization_code',
+    scope: SCOPES.join(' '),
   });
   try {
     const res = await fetch(TOKEN_URL, {
@@ -99,5 +103,51 @@ export async function exchangeCodeForTokens(code) {
     };
   } catch (err) {
     return { error: err.message || 'Failed to exchange code for tokens' };
+  }
+}
+
+/**
+ * Refresh access token using refresh_token (v2.0 endpoint).
+ * @param {string} refreshToken
+ * @returns {Promise<{ access_token: string, refresh_token?: string, expires_at?: number } | { error: string }>}
+ */
+export async function refreshAccessToken(refreshToken) {
+  if (!env.microsoftClientId || !env.microsoftClientSecret) {
+    return { error: 'Microsoft OAuth is not configured' };
+  }
+  if (!refreshToken) {
+    return { error: 'Missing refresh token' };
+  }
+  const body = new URLSearchParams({
+    client_id: env.microsoftClientId,
+    client_secret: env.microsoftClientSecret,
+    refresh_token: refreshToken,
+    redirect_uri: getRedirectUri(),
+    grant_type: 'refresh_token',
+    scope: SCOPES.join(' '),
+  });
+  try {
+    const res = await fetch(TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return {
+        error: data.error_description || data.error || `HTTP ${res.status}`,
+      };
+    }
+    const expires_in = data.expires_in;
+    const expires_at = expires_in
+      ? Math.floor(Date.now() / 1000) + Number(expires_in)
+      : null;
+    return {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at,
+    };
+  } catch (err) {
+    return { error: err.message || 'Failed to refresh access token' };
   }
 }

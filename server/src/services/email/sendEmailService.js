@@ -7,6 +7,7 @@ import { env } from '../../config/env.js';
 import * as emailAccountService from '../tenant/emailAccountService.js';
 import * as emailMessageService from '../tenant/emailMessageService.js';
 import * as emailTemplateService from '../tenant/emailTemplateService.js';
+import * as outlookOAuth from './outlookOAuthService.js';
 
 /**
  * Build transporter for the given account (SMTP or OAuth2).
@@ -65,6 +66,104 @@ function getTransporter(account) {
 function applyTemplateVariables(text, variables = {}) {
   if (!text || typeof text !== 'string') return text;
   return text.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? `{{${key}}}`);
+}
+
+function toRecipientArray(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  return String(value)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+async function sendViaMicrosoftGraph(account, mail) {
+  if (!account.access_token) {
+    throw new Error('Email account is configured for Outlook OAuth but has no access token');
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const expiresAtSec = account.token_expires_at
+    ? Math.floor(new Date(account.token_expires_at).getTime() / 1000)
+    : null;
+
+  // Refresh token if expired (or about to expire within 60s)
+  if (expiresAtSec && expiresAtSec <= nowSec + 60 && account.refresh_token) {
+    const refreshed = await outlookOAuth.refreshAccessToken(account.refresh_token);
+    if (refreshed?.error) {
+      throw new Error(refreshed.error);
+    }
+    await emailAccountService.update(
+      account.tenant_id,
+      account.id,
+      {
+        access_token: refreshed.access_token,
+        refresh_token: refreshed.refresh_token || account.refresh_token,
+        token_expires_at: refreshed.expires_at
+          ? new Date(refreshed.expires_at * 1000)
+          : null,
+      },
+      // If you later want full audit attribution, pass the current userId down into sendEmail().
+      undefined
+    );
+    account.access_token = refreshed.access_token;
+    if (refreshed.refresh_token) account.refresh_token = refreshed.refresh_token;
+    account.token_expires_at = refreshed.expires_at
+      ? new Date(refreshed.expires_at * 1000)
+      : account.token_expires_at;
+  }
+
+  const toRecipients = toRecipientArray(mail.to).map((address) => ({
+    emailAddress: { address },
+  }));
+  const ccRecipients = toRecipientArray(mail.cc).map((address) => ({
+    emailAddress: { address },
+  }));
+  const bccRecipients = toRecipientArray(mail.bcc).map((address) => ({
+    emailAddress: { address },
+  }));
+
+  const contentType = mail.html ? 'HTML' : 'Text';
+  const content = mail.html || mail.text || '';
+
+  const graphMessage = {
+    subject: mail.subject || '',
+    body: { contentType, content },
+    toRecipients,
+    ...(ccRecipients.length ? { ccRecipients } : {}),
+    ...(bccRecipients.length ? { bccRecipients } : {}),
+  };
+
+  if (Array.isArray(mail.attachments) && mail.attachments.length) {
+    graphMessage.attachments = mail.attachments.map((a) => {
+      const isBuffer = a.content && typeof a.content !== 'string' && Buffer.isBuffer(a.content);
+      const contentBytes = isBuffer ? a.content.toString('base64') : String(a.content || '');
+      return {
+        '@odata.type': '#microsoft.graph.fileAttachment',
+        name: a.filename,
+        contentType: a.contentType || 'application/octet-stream',
+        contentBytes,
+      };
+    });
+  }
+
+  const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${account.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ message: graphMessage, saveToSentItems: true }),
+  });
+
+  if (!res.ok) {
+    let details = '';
+    try {
+      const data = await res.json();
+      details = data?.error?.message ? ` ${data.error.message}` : '';
+    } catch (_) {}
+    throw new Error(`Microsoft Graph sendMail failed (HTTP ${res.status}).${details}`.trim());
+  }
 }
 
 /**
@@ -126,8 +225,6 @@ export async function sendEmail(tenantId, payload, createdBy) {
     ? `"${account.display_name}" <${account.email_address}>`
     : account.email_address;
 
-  const transporter = getTransporter(account);
-
   const mailOptions = {
     from: fromDisplay,
     to: Array.isArray(to) ? to.join(', ') : to,
@@ -143,7 +240,14 @@ export async function sendEmail(tenantId, payload, createdBy) {
     })),
   };
 
-  const info = await transporter.sendMail(mailOptions);
+  let messageId = null;
+  if ((account.provider || '').toLowerCase() === 'outlook') {
+    await sendViaMicrosoftGraph(account, mailOptions);
+  } else {
+    const transporter = getTransporter(account);
+    const info = await transporter.sendMail(mailOptions);
+    messageId = info.messageId || null;
+  }
 
   const threadId = `thread-${Date.now()}`;
 
@@ -153,7 +257,7 @@ export async function sendEmail(tenantId, payload, createdBy) {
       email_account_id: account.id,
       contact_id: contact_id || null,
       thread_id: threadId,
-      message_id_header: info.messageId || null,
+      message_id_header: messageId,
       direction: 'outbound',
       status: 'sent',
       from_email: account.email_address,
