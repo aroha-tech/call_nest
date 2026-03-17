@@ -1,0 +1,84 @@
+@use '../styles/variables' as *;
+
+.wrapper {
+  padding: $space-4;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: $space-4;
+  margin-bottom: $space-4;
+}
+
+.tenantSelect {
+  min-width: 200px;
+}
+
+.search {
+  max-width: 280px;
+}
+
+.error {
+  color: var(--color-text-danger, #dc2626);
+  margin-bottom: $space-3;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: $space-8;
+}
+
+.pagination {
+  margin-top: $space-3;
+  font-size: $font-size-sm;
+  color: var(--color-text-muted);
+}
+
+.formSection {
+  margin-bottom: $space-6;
+
+  &:last-of-type {
+    margin-bottom: 0;
+  }
+}
+
+.formSectionTitle {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-secondary);
+  margin: 0 0 $space-3;
+  padding-bottom: $space-2;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.formSection > * + * {
+  margin-top: $space-3;
+}
+
+.formError {
+  color: var(--color-danger);
+  font-size: $font-size-sm;
+  margin-top: $space-2;
+}
+
+.form > * + * {
+  margin-top: $space-4;
+}
+
+.locked {
+  color: var(--color-warning);
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+}
+
+.notLocked {
+  color: var(--color-text-muted);
+  font-size: $font-size-xs;
+}
+
+.dateCell {
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+}

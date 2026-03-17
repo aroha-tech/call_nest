@@ -86,16 +86,38 @@ export function platformAuthMiddleware(req, res, next) {
 /**
  * Tenant auth middleware
  * - Only for {tenant}.<domain> (req.tenant is set by tenantResolver)
+ * - In dev with no subdomain, req.tenant may be null; then we resolve from JWT tenant_id
  * - Tenant users MUST have tenantId
  * - Rejects cross-tenant access (req.user.tenantId must match req.tenant.id)
  * - Platform admins are not allowed to call tenant APIs
  */
-export function tenantAuthMiddleware(req, res, next) {
+export async function tenantAuthMiddleware(req, res, next) {
   try {
     attachUserFromJwt(req);
   } catch (err) {
     const status = err.status || 401;
     return res.status(status).json({ error: err.message || 'Invalid or expired token' });
+  }
+
+  // In dev (no subdomain), tenantResolver leaves req.tenant null; resolve from user's tenant_id
+  if ((!req.tenant || !req.tenant.id) && req.user?.tenantId != null) {
+    try {
+      const rows = await query(
+        `SELECT id, name, slug, is_enabled, is_deleted
+         FROM tenants WHERE id = ? AND is_deleted = 0 LIMIT 1`,
+        [req.user.tenantId]
+      );
+      const tenant = rows?.[0];
+      if (tenant) {
+        if (!tenant.is_enabled) {
+          return res.status(403).json({ error: 'Tenant account is disabled' });
+        }
+        req.tenant = { id: tenant.id, slug: tenant.slug, name: tenant.name };
+      }
+    } catch (err) {
+      console.error('Tenant resolve from user:', err);
+      return res.status(500).json({ error: 'Failed to resolve tenant' });
+    }
   }
 
   if (!req.tenant || !req.tenant.id) {

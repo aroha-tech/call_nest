@@ -17,6 +17,9 @@ import defaultDialingSetsRoutes from './routes/superAdmin/defaultDialingSets.js'
 import defaultDialingSetDispositionsRoutes from './routes/superAdmin/defaultDialingSetDispositions.js';
 import defaultDispositionActionsMapRoutes from './routes/superAdmin/defaultDispositionActionsMap.js';
 import templateVariablesAdminRoutes from './routes/superAdmin/templateVariables.js';
+import tenantsAdminRoutes from './routes/superAdmin/tenants.js';
+import platformUsersAdminRoutes from './routes/superAdmin/platformUsers.js';
+import dashboardAdminRoutes from './routes/superAdmin/dashboard.js';
 
 // Tenant routes
 import dialingSetsRoutes from './routes/tenant/dialingSets.js';
@@ -26,6 +29,7 @@ import dispositionActionsMapRoutes from './routes/tenant/dispositionActionsMap.j
 import emailTemplatesRoutes from './routes/tenant/emailTemplates.js';
 import whatsappTemplatesRoutes from './routes/tenant/whatsappTemplates.js';
 import callScriptsRoutes from './routes/tenant/callScripts.js';
+import tenantUsersRoutes from './routes/tenant/users.js';
 import whatsappModuleRoutes from './routes/tenant/whatsapp.js';
 import whatsappWebhookRoutes from './routes/whatsappWebhook.js';
 import emailModuleRoutes from './routes/tenant/email.js';
@@ -70,6 +74,9 @@ app.use('/api/admin/default-dialing-sets', defaultDialingSetsRoutes);
 app.use('/api/admin/default-dialing-set-dispositions', defaultDialingSetDispositionsRoutes);
 app.use('/api/admin/default-disposition-actions', defaultDispositionActionsMapRoutes);
 app.use('/api/admin/template-variables', templateVariablesAdminRoutes);
+app.use('/api/admin/tenants', tenantsAdminRoutes);
+app.use('/api/admin/users', platformUsersAdminRoutes);
+app.use('/api/admin/dashboard', dashboardAdminRoutes);
 
 // Tenant routes (tenant users only)
 app.use('/api/tenant/dialing-sets', dialingSetsRoutes);
@@ -79,6 +86,7 @@ app.use('/api/tenant/disposition-actions', dispositionActionsMapRoutes);
 app.use('/api/tenant/email-templates', emailTemplatesRoutes);
 app.use('/api/tenant/whatsapp-templates', whatsappTemplatesRoutes);
 app.use('/api/tenant/call-scripts', callScriptsRoutes);
+app.use('/api/tenant/users', tenantUsersRoutes);
 app.use('/api/tenant/whatsapp', whatsappModuleRoutes);
 app.use('/api/tenant/email', emailModuleRoutes);
 

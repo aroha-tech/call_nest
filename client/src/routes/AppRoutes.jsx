@@ -7,6 +7,10 @@ import { AppShellLayout } from '../layouts/AppShellLayout';
 import { LoginPage } from '../features/auth/pages/LoginPage';
 import { RegisterPage } from '../features/auth/pages/RegisterPage';
 import { HomePage } from '../pages/HomePage';
+import { PlatformDashboardPage } from '../pages/PlatformDashboardPage';
+import { TenantsPage } from '../pages/TenantsPage';
+import { UsersPage } from '../pages/UsersPage';
+import { TenantUsersPage } from '../pages/TenantUsersPage';
 import { UnauthorizedPage } from '../pages/UnauthorizedPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
 import { CallScriptsPage } from '../features/callScripts/CallScriptsPage';
@@ -336,7 +340,7 @@ function TenantRoutes() {
         element={
           <ProtectedRoute permission={PERMISSIONS.USERS_MANAGE}>
             <AppShellLayout>
-              <PlaceholderPage title="Users" />
+              <TenantUsersPage />
             </AppShellLayout>
           </ProtectedRoute>
         }
@@ -380,7 +384,27 @@ function PlatformRoutes() {
         element={
           <ProtectedRoute>
             <AppShellLayout>
-              <HomePage />
+              <PlatformDashboardPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/tenants"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <TenantsPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/users"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <UsersPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

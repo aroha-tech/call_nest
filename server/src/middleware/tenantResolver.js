@@ -34,31 +34,11 @@ export async function tenantResolver(req, res, next) {
       return next();
     }
 
-    // Tenant APIs in development: bind to first non-platform tenant
+    // Tenant APIs in development: leave req.tenant null; tenantAuthMiddleware
+    // will resolve it from the authenticated user's tenant_id so the correct
+    // tenant is used for newly created tenants (not just the first one in DB).
     if (req.path.startsWith('/api/tenant/')) {
-      try {
-        const rows = await query(
-          `SELECT id, name, slug, is_enabled, is_deleted
-           FROM tenants
-           WHERE slug <> 'platform' AND is_deleted = 0 AND (is_enabled = 1 OR is_enabled IS NULL)
-           ORDER BY id ASC
-           LIMIT 1`
-        );
-
-        const tenant = rows[0];
-
-        if (!tenant) {
-          return res.status(404).json({ error: 'Tenant not found (dev default)' });
-        }
-
-        req.tenant = {
-          id: tenant.id,
-          slug: tenant.slug,
-          name: tenant.name,
-        };
-      } catch (err) {
-        return next(err);
-      }
+      return next();
     }
 
     return next();

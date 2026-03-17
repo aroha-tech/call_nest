@@ -1,0 +1,91 @@
+@use '../styles/variables' as *;
+
+.wrapper {
+  padding: $space-4;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: $space-4;
+  margin-bottom: $space-4;
+}
+
+.search {
+  max-width: 280px;
+}
+
+.error {
+  color: var(--color-text-danger, #dc2626);
+  margin-bottom: $space-3;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: $space-8;
+}
+
+.pagination {
+  margin-top: $space-3;
+  font-size: $font-size-sm;
+  color: var(--color-text-muted);
+}
+
+.formError {
+  color: var(--color-text-danger, #dc2626);
+  font-size: $font-size-sm;
+  margin-top: $space-2;
+}
+
+.formSection {
+  margin-bottom: $space-6;
+
+  &:last-of-type {
+    margin-bottom: 0;
+  }
+}
+
+.formSectionTitle {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-secondary);
+  margin: 0 0 $space-3;
+  padding-bottom: $space-2;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.formSectionHint {
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  margin: -$space-2 0 $space-3;
+}
+
+.formSection > * + * {
+  margin-top: $space-3;
+}
+
+.form > * + * {
+  margin-top: $space-4;
+}
+
+.moduleOn {
+  color: var(--color-success);
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+}
+
+.moduleOff {
+  color: var(--color-text-muted);
+  font-size: $font-size-xs;
+}
+
+.userCountLink {
+  color: var(--color-primary, #2563eb);
+  text-decoration: none;
+  font-weight: $font-weight-medium;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

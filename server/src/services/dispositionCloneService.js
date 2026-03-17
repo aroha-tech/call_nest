@@ -60,7 +60,8 @@ export async function cloneDefaultsForTenant(tenantId, industryId, createdBy = n
   // Create a map of default_disposition_id -> new tenant disposition_id
   const dispositionIdMap = new Map();
 
-  // Step 4: Clone all dispositions (including actions JSON and is_connected)
+  // Step 4: Clone all dispositions (including actions JSON and is_connected).
+  // contact_status_id and contact_temperature_id are nullable in dispositions; pass through as-is.
   for (const defaultDispo of defaultDispositions) {
     const newDispoId = uuidv4();
     const actionsJson =
@@ -80,8 +81,8 @@ export async function cloneDefaultsForTenant(tenantId, industryId, createdBy = n
         newDispoId,
         tenantId,
         defaultDispo.dispo_type_id,
-        defaultDispo.contact_status_id,
-        defaultDispo.contact_temperature_id,
+        defaultDispo.contact_status_id ?? null,
+        defaultDispo.contact_temperature_id ?? null,
         defaultDispo.name,
         defaultDispo.code,
         defaultDispo.next_action ?? null,

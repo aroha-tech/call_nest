@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useTenant } from '../context/TenantContext';
 import { usePermissions } from './usePermission';
 import { useAppSelector } from '../app/hooks';
-import { selectRoleId } from '../features/auth/authSelectors';
+import { selectUser } from '../features/auth/authSelectors';
 import { useEmailModuleEnabled } from './useEmailModuleEnabled';
 import { PERMISSIONS } from '../utils/permissionUtils';
 
@@ -41,6 +41,7 @@ const PLATFORM_NAV_ITEMS = [
  */
 const TENANT_ADMIN_NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW },
+  { key: 'users', label: 'Users', path: '/users', permission: PERMISSIONS.USERS_MANAGE },
   { key: 'leads', label: 'Leads', path: '/leads', permission: PERMISSIONS.LEADS_READ },
   { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
   { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
@@ -85,7 +86,6 @@ const TENANT_ADMIN_NAV_ITEMS = [
     ],
   },
   { key: 'settings', label: 'Settings', path: '/settings', permission: PERMISSIONS.SETTINGS_MANAGE },
-  { key: 'users', label: 'Users', path: '/users', permission: PERMISSIONS.USERS_MANAGE },
 ];
 
 /**
@@ -98,6 +98,7 @@ const MANAGER_NAV_ITEMS = [
   { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
   { key: 'activities', label: 'Activities', path: '/activities', permission: PERMISSIONS.DIAL_EXECUTE },
   { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
+  { key: 'users', label: 'Users', path: '/users', permission: PERMISSIONS.USERS_MANAGE },
   {
     key: 'dialer-workflow',
     label: 'Dialer Workflow',
@@ -182,14 +183,11 @@ const AGENT_NAV_ITEMS = [
   },
 ];
 
-/**
- * Role IDs mapping.
- */
-const ROLE_IDS = {
-  SUPER_ADMIN: 1,
-  TENANT_ADMIN: 2,
-  MANAGER: 3,
-  AGENT: 4,
+/** Role names for tenant nav (role IDs are per-tenant, so we use role name). */
+const ROLE_NAMES = {
+  ADMIN: 'admin',
+  MANAGER: 'manager',
+  AGENT: 'agent',
 };
 
 /**
@@ -240,18 +238,19 @@ function findActiveKey(items, pathname) {
 
 /**
  * Get navigation items based on user role.
+ * Uses role name (not role ID) so tenant admins from any tenant see admin nav.
  */
-function getNavItemsByRole(roleId, isPlatform, isPlatformAdmin) {
+function getNavItemsByRole(roleName, isPlatform, isPlatformAdmin) {
   if (isPlatform && isPlatformAdmin) {
     return PLATFORM_NAV_ITEMS;
   }
 
-  switch (roleId) {
-    case ROLE_IDS.TENANT_ADMIN:
+  switch (roleName) {
+    case ROLE_NAMES.ADMIN:
       return TENANT_ADMIN_NAV_ITEMS;
-    case ROLE_IDS.MANAGER:
+    case ROLE_NAMES.MANAGER:
       return MANAGER_NAV_ITEMS;
-    case ROLE_IDS.AGENT:
+    case ROLE_NAMES.AGENT:
       return AGENT_NAV_ITEMS;
     default:
       return AGENT_NAV_ITEMS;
@@ -270,17 +269,18 @@ export function useSalesNavigation() {
   const location = useLocation();
   const { tenantSlug, isPlatform } = useTenant();
   const { can, isPlatformAdmin } = usePermissions();
-  const roleId = useAppSelector(selectRoleId);
+  const user = useAppSelector(selectUser);
+  const roleName = user?.role ?? 'agent';
   const { emailModuleEnabled } = useEmailModuleEnabled();
 
   const items = useMemo(() => {
-    const baseItems = getNavItemsByRole(roleId, isPlatform, isPlatformAdmin);
+    const baseItems = getNavItemsByRole(roleName, isPlatform, isPlatformAdmin);
     let list = filterNavItems(baseItems, can, isPlatformAdmin);
     if (emailModuleEnabled === false) {
       list = list.filter((item) => item.key !== 'email');
     }
     return list;
-  }, [roleId, isPlatform, isPlatformAdmin, can, emailModuleEnabled]);
+  }, [roleName, isPlatform, isPlatformAdmin, can, emailModuleEnabled]);
 
   const { activeKey, activeParentKey } = useMemo(() => {
     const { parentKey, childKey } = findActiveKey(items, location.pathname);
