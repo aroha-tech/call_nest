@@ -33,6 +33,10 @@ import { EmailLayout } from '../features/email/EmailLayout';
 import { EmailSentPage } from '../features/email/EmailSentPage';
 import { EmailTemplatesPage } from '../features/email/EmailTemplatesPage';
 import { EmailAccountsPage } from '../features/email/EmailAccountsPage';
+import { ContactsPage } from '../features/contacts/ContactsPage';
+import { ContactCustomFieldsPage } from '../features/contacts/ContactCustomFieldsPage';
+import { ContactFormPage } from '../features/contacts/ContactFormPage';
+import { ContactImportPage } from '../features/contacts/ContactImportPage';
 import { useEmailModuleEnabled } from '../hooks/useEmailModuleEnabled';
 
 /**
@@ -280,7 +284,37 @@ function TenantRoutes() {
         element={
           <ProtectedRoute permission={PERMISSIONS.LEADS_READ}>
             <AppShellLayout>
-              <PlaceholderPage title="Leads" />
+              <ContactsPage type="lead" />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/leads/import"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.LEADS_CREATE}>
+            <AppShellLayout>
+              <ContactImportPage type="lead" />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/leads/new"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.LEADS_CREATE}>
+            <AppShellLayout>
+              <ContactFormPage defaultType="lead" />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/leads/:id"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.LEADS_READ}>
+            <AppShellLayout>
+              <ContactFormPage defaultType="lead" />
             </AppShellLayout>
           </ProtectedRoute>
         }
@@ -290,7 +324,37 @@ function TenantRoutes() {
         element={
           <ProtectedRoute permission={PERMISSIONS.CONTACTS_READ}>
             <AppShellLayout>
-              <PlaceholderPage title="Contacts" />
+              <ContactsPage type="contact" />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/contacts/import"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.CONTACTS_CREATE}>
+            <AppShellLayout>
+              <ContactImportPage type="contact" />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/contacts/new"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.CONTACTS_CREATE}>
+            <AppShellLayout>
+              <ContactFormPage defaultType="contact" />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/contacts/:id"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.CONTACTS_READ}>
+            <AppShellLayout>
+              <ContactFormPage defaultType="contact" />
             </AppShellLayout>
           </ProtectedRoute>
         }
@@ -331,6 +395,16 @@ function TenantRoutes() {
           <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
             <AppShellLayout>
               <PlaceholderPage title="Settings" />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/contact-fields"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+            <AppShellLayout>
+              <ContactCustomFieldsPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

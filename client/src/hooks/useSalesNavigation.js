@@ -85,7 +85,16 @@ const TENANT_ADMIN_NAV_ITEMS = [
       { key: 'email-accounts', label: 'Accounts', path: '/email/accounts', permission: PERMISSIONS.SETTINGS_MANAGE },
     ],
   },
-  { key: 'settings', label: 'Settings', path: '/settings', permission: PERMISSIONS.SETTINGS_MANAGE },
+  {
+    key: 'settings',
+    label: 'Settings',
+    path: '/settings',
+    permission: PERMISSIONS.SETTINGS_MANAGE,
+    children: [
+      { key: 'settings-main', label: 'General', path: '/settings', permission: PERMISSIONS.SETTINGS_MANAGE },
+      { key: 'contact-fields', label: 'Contact Fields', path: '/settings/contact-fields', permission: PERMISSIONS.SETTINGS_MANAGE },
+    ],
+  },
 ];
 
 /**

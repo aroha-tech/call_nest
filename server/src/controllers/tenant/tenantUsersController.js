@@ -41,7 +41,7 @@ export async function create(req, res, next) {
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant context required' });
     }
-    const { email, password, name, role } = req.body;
+    const { email, password, name, role, manager_id } = req.body;
     if (!email || !password || !role) {
       return res.status(400).json({ error: 'email, password, and role are required' });
     }
@@ -53,6 +53,7 @@ export async function create(req, res, next) {
       password,
       name: name?.trim() || null,
       role,
+      manager_id: manager_id ?? null,
     });
     res.status(201).json({ data: user });
   } catch (err) {
@@ -66,12 +67,13 @@ export async function update(req, res, next) {
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant context required' });
     }
-    const { name, role, is_enabled, password } = req.body;
+    const { name, role, is_enabled, password, manager_id } = req.body;
     const user = await tenantUsersService.update(req.params.id, tenantId, {
       name,
       role,
       is_enabled,
       password: password || undefined,
+      manager_id: manager_id !== undefined ? manager_id : undefined,
     });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });

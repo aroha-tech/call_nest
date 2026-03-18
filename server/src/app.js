@@ -29,7 +29,10 @@ import dispositionActionsMapRoutes from './routes/tenant/dispositionActionsMap.j
 import emailTemplatesRoutes from './routes/tenant/emailTemplates.js';
 import whatsappTemplatesRoutes from './routes/tenant/whatsappTemplates.js';
 import callScriptsRoutes from './routes/tenant/callScripts.js';
+import contactsRoutes from './routes/tenant/contacts.js';
+import contactCustomFieldsRoutes from './routes/tenant/contactCustomFields.js';
 import tenantUsersRoutes from './routes/tenant/users.js';
+import campaignsRoutes from './routes/tenant/campaigns.js';
 import whatsappModuleRoutes from './routes/tenant/whatsapp.js';
 import whatsappWebhookRoutes from './routes/whatsappWebhook.js';
 import emailModuleRoutes from './routes/tenant/email.js';
@@ -87,8 +90,11 @@ app.use('/api/tenant/email-templates', emailTemplatesRoutes);
 app.use('/api/tenant/whatsapp-templates', whatsappTemplatesRoutes);
 app.use('/api/tenant/call-scripts', callScriptsRoutes);
 app.use('/api/tenant/users', tenantUsersRoutes);
+app.use('/api/tenant/campaigns', campaignsRoutes);
 app.use('/api/tenant/whatsapp', whatsappModuleRoutes);
 app.use('/api/tenant/email', emailModuleRoutes);
+app.use('/api/tenant/contacts', contactsRoutes);
+app.use('/api/tenant/contact-custom-fields', contactCustomFieldsRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);

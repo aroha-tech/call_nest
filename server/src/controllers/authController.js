@@ -1,5 +1,6 @@
 
 import * as authService from '../services/authService.js';
+import { query } from '../config/db.js';
 
 /**
  * Register a new tenant (company) with admin
@@ -92,7 +93,7 @@ export async function login(req, res, next) {
  */
 export async function registerAgent(req, res, next) {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name, manager_id } = req.body;
     const tenantId = req.tenant?.id;
     const userRole = req.user.role;
     
@@ -117,6 +118,16 @@ export async function registerAgent(req, res, next) {
     }
     
     const agent = await authService.registerUser(email, password, name, tenantId, 'agent');
+
+    // Persist agent->manager relationship only if provided
+    if (manager_id !== undefined) {
+      await query(
+        `UPDATE users
+         SET manager_id = ?
+         WHERE id = ? AND tenant_id = ? AND role = 'agent' AND is_deleted = 0`,
+        [manager_id ?? null, agent.id, tenantId]
+      );
+    }
     
     res.status(201).json({
       message: 'Agent registered successfully',

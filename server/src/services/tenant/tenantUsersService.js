@@ -34,7 +34,8 @@ export async function findAll(tenantId, { search = '', includeDisabled = false, 
   const total = countRow.total;
 
   const data = await query(
-    `SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.role_id, u.is_enabled, u.created_at, u.last_login_at
+    `SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.role_id, u.manager_id,
+            u.is_enabled, u.created_at, u.last_login_at
      FROM users u
      ${whereSQL}
      ORDER BY u.role ASC, u.email ASC
@@ -55,7 +56,8 @@ export async function findAll(tenantId, { search = '', includeDisabled = false, 
 
 export async function findById(id, tenantId) {
   const [row] = await query(
-    `SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.role_id, u.is_enabled, u.created_at, u.last_login_at
+    `SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.role_id, u.manager_id,
+            u.is_enabled, u.created_at, u.last_login_at
      FROM users u
      WHERE u.id = ? AND u.tenant_id = ? AND u.is_deleted = 0 AND u.is_platform_admin = 0`,
     [id, tenantId]
@@ -66,8 +68,31 @@ export async function findById(id, tenantId) {
 /**
  * Create user in the current tenant (admin, manager, or agent). Only tenant admin/manager can call.
  */
-export async function create(tenantId, { email, password, name, role }) {
+export async function create(tenantId, { email, password, name, role, manager_id = null }) {
   const user = await registerUser(email, password, name, tenantId, role);
+
+  if (role === 'agent') {
+    // If manager_id is provided, validate it. Otherwise keep NULL.
+    if (manager_id) {
+      const [managerRow] = await query(
+        `SELECT id FROM users
+         WHERE id = ? AND tenant_id = ? AND role = 'manager' AND is_deleted = 0`,
+        [manager_id, tenantId]
+      );
+
+      if (!managerRow) {
+        const err = new Error('Invalid manager_id for this tenant');
+        err.status = 400;
+        throw err;
+      }
+
+      await query(
+        'UPDATE users SET manager_id = ? WHERE id = ? AND tenant_id = ?',
+        [manager_id, user.id, tenantId]
+      );
+    }
+  }
+
   return findById(user.id, tenantId);
 }
 
@@ -78,7 +103,7 @@ export async function update(id, tenantId, payload) {
   const existing = await findById(id, tenantId);
   if (!existing) return null;
 
-  const { name, role, is_enabled, password } = payload;
+  const { name, role, is_enabled, password, manager_id } = payload;
 
   const updates = [];
   const params = [];
@@ -98,6 +123,34 @@ export async function update(id, tenantId, payload) {
     const roleId = roleRecord?.id ?? null;
     updates.push('role = ?, role_id = ?');
     params.push(role, roleId);
+  }
+
+  if (manager_id !== undefined) {
+    // Only allow setting manager_id for agents; managers/admins ignore it.
+    const effectiveRole = role ?? existing.role;
+    if (effectiveRole === 'agent') {
+      if (manager_id === null || manager_id === '') {
+        // Allow clearing manager assignment.
+        updates.push('manager_id = NULL');
+      } else {
+        const [managerRow] = await query(
+          `SELECT id FROM users
+           WHERE id = ? AND tenant_id = ? AND role = 'manager' AND is_deleted = 0`,
+          [manager_id, tenantId]
+        );
+
+        if (!managerRow) {
+          const err = new Error('Invalid manager_id for this tenant');
+          err.status = 400;
+          throw err;
+        }
+
+        updates.push('manager_id = ?');
+        params.push(manager_id);
+      }
+    } else {
+      updates.push('manager_id = NULL');
+    }
   }
 
   if (password && String(password).trim()) {

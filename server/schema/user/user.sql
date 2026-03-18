@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(255) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   role ENUM('super_admin', 'admin', 'manager', 'agent') NULL,
+  manager_id BIGINT UNSIGNED NULL,
   name VARCHAR(255) NULL,
   is_platform_admin TINYINT(1) NOT NULL DEFAULT 0,
   is_enabled TINYINT(1) NOT NULL DEFAULT 1,
@@ -29,12 +30,14 @@ CREATE TABLE IF NOT EXISTS users (
     ),
 
   FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE RESTRICT,
+  FOREIGN KEY (manager_id) REFERENCES users(id) ON DELETE SET NULL,
 
   UNIQUE KEY uk_user_email_per_tenant (tenant_id, email),
   UNIQUE KEY uk_platform_admin_email (email, is_platform_admin),
 
   INDEX idx_users_tenant (tenant_id),
   INDEX idx_users_tenant_id_id (tenant_id, id),
+  INDEX idx_users_manager_id (manager_id),
   INDEX idx_users_email (email),
   INDEX idx_users_deleted (is_deleted),
   INDEX idx_users_deleted_at (deleted_at),
