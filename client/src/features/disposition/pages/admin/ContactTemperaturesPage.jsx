@@ -3,15 +3,30 @@ import { MasterCRUDPage } from '../../components/MasterCRUDPage';
 import { useContactTemperatures } from '../../hooks/useMasterData';
 import { StatusBadge } from '../../../../components/ui/Badge';
 
+const fmtDate = (v) =>
+  v ? new Date(v).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '—';
+
 const columns = [
-  { key: 'name', label: 'Name' },
-  { key: 'code', label: 'Code', width: '150px' },
+  { key: 'name', label: 'Name', width: '16%' },
+  { key: 'code', label: 'Code', width: '140px' },
   { key: 'priority_order', label: 'Priority', width: '80px' },
   {
     key: 'is_active',
     label: 'Status',
     width: '100px',
     render: (value) => <StatusBadge isActive={value === 1} />,
+  },
+  {
+    key: 'created_at',
+    label: 'Created',
+    width: '120px',
+    render: (v) => fmtDate(v),
+  },
+  {
+    key: 'updated_at',
+    label: 'Updated',
+    width: '120px',
+    render: (v) => fmtDate(v),
   },
 ];
 

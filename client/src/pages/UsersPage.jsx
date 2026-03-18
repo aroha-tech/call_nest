@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
@@ -18,6 +18,11 @@ import { SearchInput } from '../components/ui/SearchInput';
 import { Spinner } from '../components/ui/Spinner';
 import { StatusBadge } from '../components/ui/Badge';
 import { IconButton } from '../components/ui/IconButton';
+import { Pagination, PaginationPageSize } from '../components/ui/Pagination';
+import { Alert } from '../components/ui/Alert';
+import { EmptyState } from '../components/ui/EmptyState';
+import listStyles from '../components/admin/adminDataList.module.scss';
+import { FilterBar } from '../components/admin/FilterBar';
 import { usersAPI, tenantsAPI } from '../services/adminAPI';
 import { useMutation } from '../hooks/useAsyncData';
 import styles from './UsersPage.module.scss';
@@ -39,7 +44,7 @@ function formatDate(iso) {
 }
 
 export function UsersPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const tenantIdFromUrl = searchParams.get('tenantId') || '';
 
   const [users, setUsers] = useState([]);
@@ -48,6 +53,7 @@ export function UsersPage() {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [tenantFilter, setTenantFilter] = useState(tenantIdFromUrl);
+  const [tenantDraft, setTenantDraft] = useState(tenantIdFromUrl);
   const [showDisabled, setShowDisabled] = useState(false);
   const [tenantOptions, setTenantOptions] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -63,6 +69,7 @@ export function UsersPage() {
     new_password: '',
   });
   const [formErrors, setFormErrors] = useState({});
+  const fetchedOnceRef = useRef(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -82,6 +89,7 @@ export function UsersPage() {
       setUsers([]);
     } finally {
       setLoading(false);
+      fetchedOnceRef.current = true;
     }
   }, [tenantFilter, search, showDisabled, pagination.page, pagination.limit]);
 
@@ -89,12 +97,26 @@ export function UsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
-  // Sync tenant filter from URL when navigating with ?tenantId=
   useEffect(() => {
-    if (tenantIdFromUrl && tenantIdFromUrl !== tenantFilter) {
+    if (tenantIdFromUrl) {
       setTenantFilter(tenantIdFromUrl);
+      setTenantDraft(tenantIdFromUrl);
+      setPagination((p) => ({ ...p, page: 1 }));
     }
   }, [tenantIdFromUrl]);
+
+  const handleSearch = useCallback((value) => {
+    setSearch(value);
+    setPagination((p) => ({ ...p, page: 1 }));
+  }, []);
+
+  const handlePageChange = useCallback((next) => {
+    setPagination((p) => ({ ...p, page: next }));
+  }, []);
+
+  const handleLimitChange = useCallback((next) => {
+    setPagination((p) => ({ ...p, limit: next, page: 1 }));
+  }, []);
 
   useEffect(() => {
     tenantsAPI
@@ -196,88 +218,145 @@ export function UsersPage() {
 
   const isLocked = (u) => u.account_locked_until && new Date(u.account_locked_until) > new Date();
 
+  if (loading && !fetchedOnceRef.current) {
+    return (
+      <div className={styles.wrapper}>
+        <div className={listStyles.page}>
+          <PageHeader
+            title="Users"
+            description="Manage platform users across tenants"
+            actions={
+              <Button variant="primary" onClick={openCreate}>
+                Add User
+              </Button>
+            }
+          />
+          <div className={listStyles.loadingInitial}>
+            <Spinner size="lg" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.wrapper}>
-      <PageHeader
-        title="Users"
-        description="Manage platform users across tenants"
-        actions={
-          <Button variant="primary" onClick={openCreate}>
-            Add User
-          </Button>
-        }
-      />
-
-      <div className={styles.toolbar}>
-        <Select
-          options={tenantOptions}
-          value={tenantFilter}
-          onChange={(e) => setTenantFilter(e.target.value)}
-          className={styles.tenantSelect}
+      <div className={listStyles.page}>
+        <PageHeader
+          title="Users"
+          description="Manage platform users across tenants"
+          actions={
+            <Button variant="primary" onClick={openCreate}>
+              Add User
+            </Button>
+          }
         />
-        <SearchInput
-          placeholder="Search by email or name..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className={styles.search}
-        />
-        <Checkbox
-          label="Include disabled"
-          checked={showDisabled}
-          onChange={(e) => setShowDisabled(e.target.checked)}
-        />
-      </div>
 
-      {error && <div className={styles.error}>{error}</div>}
+        {error && <Alert variant="error">{error}</Alert>}
 
-      {loading ? (
-        <div className={styles.loading}>
-          <Spinner size="lg" />
-        </div>
-      ) : (
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>Email</TableHeaderCell>
-              <TableHeaderCell>Name</TableHeaderCell>
-              <TableHeaderCell>Tenant</TableHeaderCell>
-              <TableHeaderCell>Role</TableHeaderCell>
-              <TableHeaderCell width="90px">Status</TableHeaderCell>
-              <TableHeaderCell width="80px">Locked</TableHeaderCell>
-              <TableHeaderCell width="120px">Last login</TableHeaderCell>
-              <TableHeaderCell width="80px" align="right" />
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {users.map((u) => (
-              <TableRow key={u.id}>
-                <TableCell>{u.email}</TableCell>
-                <TableCell>{u.name || '—'}</TableCell>
-                <TableCell>{u.tenant_name ? `${u.tenant_name} (${u.tenant_slug})` : u.is_platform_admin ? 'Platform' : '—'}</TableCell>
-                <TableCell>{u.role || '—'}</TableCell>
-                <TableCell>
-                  <StatusBadge isActive={!!u.is_enabled} />
-                </TableCell>
-                <TableCell>
-                  <span className={isLocked(u) ? styles.locked : styles.notLocked}>
-                    {isLocked(u) ? 'Locked' : '—'}
-                  </span>
-                </TableCell>
-                <TableCell className={styles.dateCell}>{formatDate(u.last_login_at)}</TableCell>
-                <TableCell align="right">
-                  <IconButton title="Edit" onClick={() => openEdit(u)} size="sm">✏️</IconButton>
-                </TableCell>
+        <FilterBar
+          onApply={() => {
+            setTenantFilter(tenantDraft);
+            setPagination((p) => ({ ...p, page: 1 }));
+          }}
+          onReset={() => {
+            setTenantDraft('');
+            setTenantFilter('');
+            setPagination((p) => ({ ...p, page: 1 }));
+          }}
+        >
+          <Select
+            label="Tenant"
+            options={tenantOptions}
+            value={tenantDraft}
+            onChange={(e) => setTenantDraft(e.target.value)}
+            className={styles.tenantSelect}
+          />
+        </FilterBar>
+
+        <div className={listStyles.tableCard}>
+          <div className={listStyles.tableCardToolbarTop}>
+            <div className={listStyles.tableCardToolbarLeft}>
+              <PaginationPageSize limit={pagination.limit} onLimitChange={handleLimitChange} />
+              <Checkbox
+                label="Include disabled"
+                checked={showDisabled}
+                onChange={(e) => {
+                  setShowDisabled(e.target.checked);
+                  setPagination((p) => ({ ...p, page: 1 }));
+                }}
+              />
+            </div>
+            <SearchInput
+              value={search}
+              onSearch={handleSearch}
+              placeholder="Search by email or name... (press Enter)"
+              className={listStyles.searchInToolbar}
+            />
+          </div>
+          {users.length === 0 && !loading ? (
+            <div className={listStyles.tableCardEmpty}>
+              <EmptyState
+                icon="👤"
+                title={search || showDisabled || tenantFilter ? 'No users found' : 'No users yet'}
+                description="Try a different search, tenant filter, or add a user."
+                action={openCreate}
+                actionLabel="Add User"
+              />
+            </div>
+          ) : (
+            <div className={listStyles.tableCardBody}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableHeaderCell>Email</TableHeaderCell>
+                <TableHeaderCell>Name</TableHeaderCell>
+                <TableHeaderCell>Tenant</TableHeaderCell>
+                <TableHeaderCell>Role</TableHeaderCell>
+                <TableHeaderCell width="90px">Status</TableHeaderCell>
+                <TableHeaderCell width="80px">Locked</TableHeaderCell>
+                <TableHeaderCell width="120px">Last login</TableHeaderCell>
+                <TableHeaderCell width="80px" align="right" />
               </TableRow>
+            </TableHead>
+            <TableBody>
+              {users.map((u) => (
+                <TableRow key={u.id}>
+                  <TableCell>{u.email}</TableCell>
+                  <TableCell>{u.name || '—'}</TableCell>
+                  <TableCell>{u.tenant_name ? `${u.tenant_name} (${u.tenant_slug})` : u.is_platform_admin ? 'Platform' : '—'}</TableCell>
+                  <TableCell>{u.role || '—'}</TableCell>
+                  <TableCell>
+                    <StatusBadge isActive={!!u.is_enabled} />
+                  </TableCell>
+                  <TableCell>
+                    <span className={isLocked(u) ? styles.locked : styles.notLocked}>
+                      {isLocked(u) ? 'Locked' : '—'}
+                    </span>
+                  </TableCell>
+                  <TableCell className={styles.dateCell}>{formatDate(u.last_login_at)}</TableCell>
+                  <TableCell align="right">
+                    <IconButton title="Edit" onClick={() => openEdit(u)} size="sm">✏️</IconButton>
+                  </TableCell>
+                </TableRow>
             ))}
           </TableBody>
         </Table>
-      )}
-
-      {pagination.totalPages > 1 && (
-        <div className={styles.pagination}>
-          Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
+            </div>
+          )}
+          <div className={listStyles.tableCardFooterPagination}>
+            <Pagination
+              page={pagination.page}
+              totalPages={Math.max(1, pagination.totalPages || 1)}
+              total={pagination.total}
+              limit={pagination.limit}
+              onPageChange={handlePageChange}
+              onLimitChange={handleLimitChange}
+              hidePageSize
+            />
+          </div>
         </div>
-      )}
+      </div>
 
       <Modal
         isOpen={modalOpen}

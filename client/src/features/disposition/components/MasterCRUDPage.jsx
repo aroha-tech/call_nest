@@ -9,11 +9,12 @@ import { IconButton } from '../../../components/ui/IconButton';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { Spinner } from '../../../components/ui/Spinner';
 import { Alert } from '../../../components/ui/Alert';
-import { Pagination } from '../../../components/ui/Pagination';
+import { Pagination, PaginationPageSize } from '../../../components/ui/Pagination';
 import { Checkbox } from '../../../components/ui/Checkbox';
 import { Badge } from '../../../components/ui/Badge';
 import { Select } from '../../../components/ui/Select';
 import styles from './MasterCRUDPage.module.scss';
+import listStyles from '../../../components/admin/adminDataList.module.scss';
 
 export function MasterCRUDPage({
   title,
@@ -152,6 +153,15 @@ export function MasterCRUDPage({
         ),
       }];
 
+  const columnsWithoutWidth = columnsWithStatus.filter((c) => !c.width).length;
+  const defaultFlexPct =
+    columnsWithoutWidth > 0
+      ? Math.min(26, Math.max(12, Math.floor(48 / columnsWithoutWidth)))
+      : 0;
+  const columnsForTable = columnsWithStatus.map((col) =>
+    col.width ? col : { ...col, width: `${defaultFlexPct}%` }
+  );
+
   return (
     <div className={styles.page}>
       <PageHeader
@@ -162,84 +172,100 @@ export function MasterCRUDPage({
 
       {error && <Alert variant="error">{error}</Alert>}
 
-      <div className={styles.toolbar}>
-        <SearchInput
-          value={search}
-          onSearch={handleSearch}
-          placeholder="Search... (press Enter)"
-        />
-        {onShowInactiveChange && (
-          <Checkbox
-            label="Show Inactive"
-            checked={showInactive}
-            onChange={(e) => onShowInactiveChange(e.target.checked)}
+      <div className={listStyles.tableCard}>
+        <div className={listStyles.tableCardToolbarTop}>
+          <div className={listStyles.tableCardToolbarLeft}>
+            {pagination && (
+              <PaginationPageSize
+                limit={pagination.limit}
+                onLimitChange={onLimitChange}
+              />
+            )}
+            {onShowInactiveChange && (
+              <Checkbox
+                label="Show inactive"
+                checked={!!showInactive}
+                onChange={(e) => onShowInactiveChange(e.target.checked)}
+              />
+            )}
+          </div>
+          <SearchInput
+            value={search}
+            onSearch={handleSearch}
+            placeholder="Search... (press Enter)"
+            className={listStyles.searchInToolbar}
           />
+        </div>
+        {data.length === 0 ? (
+          <div className={listStyles.tableCardEmpty}>
+            <EmptyState
+              icon={emptyIcon}
+              title={search ? 'No results found' : emptyTitle}
+              description={search ? 'Try a different search term.' : emptyDescription}
+              action={!search ? openCreateModal : undefined}
+              actionLabel={!search ? 'Add New' : undefined}
+            />
+          </div>
+        ) : (
+          <div className={listStyles.tableCardBody}>
+            <Table variant="adminList">
+              <TableHead>
+                <TableRow>
+                  {columnsForTable.map((col) => (
+                    <TableHeaderCell key={col.key} width={col.width}>
+                      {col.label}
+                    </TableHeaderCell>
+                  ))}
+                  <TableHeaderCell width="140px" align="center">Actions</TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data.map((item) => (
+                  <TableRow key={item.id}>
+                    {columnsForTable.map((col) => (
+                      <TableCell key={col.key} width={col.width}>
+                        {col.render ? col.render(item[col.key], item) : item[col.key]}
+                      </TableCell>
+                    ))}
+                    <TableCell align="center">
+                      <div className={styles.actions}>
+                        <IconButton title="Edit" onClick={() => openEditModal(item)}>
+                          ✏️
+                        </IconButton>
+                        {onToggleActive && (
+                          <IconButton
+                            title={item.is_active === 1 ? 'Deactivate' : 'Activate'}
+                            variant={item.is_active === 1 ? 'warning' : 'success'}
+                            onClick={() => setToggleItem(item)}
+                          >
+                            {item.is_active === 1 ? '⏸️' : '▶️'}
+                          </IconButton>
+                        )}
+                        <IconButton title="Delete" variant="danger" onClick={() => setDeleteItem(item)}>
+                          🗑️
+                        </IconButton>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        {pagination && (
+          <div className={listStyles.tableCardFooterPagination}>
+            <Pagination
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              total={pagination.total}
+              limit={pagination.limit}
+              onPageChange={onPageChange}
+              onLimitChange={onLimitChange}
+              hidePageSize
+            />
+          </div>
         )}
       </div>
-
-      {pagination && (
-        <Pagination
-          page={pagination.page}
-          totalPages={pagination.totalPages}
-          total={pagination.total}
-          limit={pagination.limit}
-          onPageChange={onPageChange}
-          onLimitChange={onLimitChange}
-        />
-      )}
-
-      {data.length === 0 ? (
-        <EmptyState
-          icon={emptyIcon}
-          title={search ? 'No results found' : emptyTitle}
-          description={search ? 'Try a different search term.' : emptyDescription}
-          action={!search ? openCreateModal : undefined}
-          actionLabel={!search ? 'Add New' : undefined}
-        />
-      ) : (
-        <Table>
-          <TableHead>
-            <TableRow>
-              {columnsWithStatus.map((col) => (
-                <TableHeaderCell key={col.key} width={col.width}>
-                  {col.label}
-                </TableHeaderCell>
-              ))}
-              <TableHeaderCell width="140px" align="center">Actions</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {data.map((item) => (
-              <TableRow key={item.id}>
-                {columnsWithStatus.map((col) => (
-                  <TableCell key={col.key}>
-                    {col.render ? col.render(item[col.key], item) : item[col.key]}
-                  </TableCell>
-                ))}
-                <TableCell align="center">
-                  <div className={styles.actions}>
-                    <IconButton title="Edit" onClick={() => openEditModal(item)}>
-                      ✏️
-                    </IconButton>
-                    {onToggleActive && (
-                      <IconButton
-                        title={item.is_active === 1 ? 'Deactivate' : 'Activate'}
-                        variant={item.is_active === 1 ? 'warning' : 'success'}
-                        onClick={() => setToggleItem(item)}
-                      >
-                        {item.is_active === 1 ? '⏸️' : '▶️'}
-                      </IconButton>
-                    )}
-                    <IconButton title="Delete" variant="danger" onClick={() => setDeleteItem(item)}>
-                      🗑️
-                    </IconButton>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
 
       <Modal
         isOpen={showModal}

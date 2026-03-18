@@ -11,7 +11,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { Spinner } from '../../components/ui/Spinner';
 import { Alert } from '../../components/ui/Alert';
 import { StatusBadge, Badge } from '../../components/ui/Badge';
-import { Pagination } from '../../components/ui/Pagination';
+import { Pagination, PaginationPageSize } from '../../components/ui/Pagination';
 import { VariableSelector } from '../../components/VariableSelector';
 import { callScriptsAPI } from '../../services/dispositionAPI';
 import { useMutation } from '../../hooks/useAsyncData';
@@ -20,6 +20,7 @@ import { renderPreview, linkify, linkifyHtml, stripHtml, DEFAULT_PREVIEW_DATA } 
 import { templateVariablesAPI } from '../../services/templateVariablesAPI';
 import { ScriptBodyEditor } from './ScriptBodyEditor';
 import styles from './CallScriptsPage.module.scss';
+import listStyles from '../../components/admin/adminDataList.module.scss';
 
 const defaultPagination = { page: 1, limit: 10, total: 0, totalPages: 1 };
 
@@ -72,10 +73,6 @@ export function CallScriptsPage() {
 
   const handleSearch = useCallback((v) => {
     setSearch(v);
-    setPage(1);
-  }, []);
-  const handleShowInactiveChange = useCallback((checked) => {
-    setShowInactive(checked);
     setPage(1);
   }, []);
   const handlePageChange = useCallback((newPage) => setPage(newPage), []);
@@ -223,30 +220,102 @@ export function CallScriptsPage() {
 
       {error && <Alert variant="error">{error}</Alert>}
 
-      <div className={styles.toolbar}>
-        <SearchInput
-          value={search}
-          onSearch={handleSearch}
-          placeholder="Search by script name... (press Enter)"
-        />
-        <Checkbox
-          label="Show inactive"
-          checked={showInactive}
-          onChange={(e) => handleShowInactiveChange(e.target.checked)}
-        />
-      </div>
-
-      {scripts.length === 0 && !loading ? (
-        <EmptyState
-          icon="📜"
-          title={search || showInactive ? 'No results found' : 'No call scripts yet'}
-          description={search || showInactive ? 'Try a different search or clear filters.' : 'Add a script to guide agents during calls. Use variables for dynamic content.'}
-          action={!search && !showInactive ? openCreate : undefined}
-          actionLabel="Add Script"
-        />
-      ) : (
-        <>
-          {pagination && (
+      <div className={listStyles.tableCard}>
+        <div className={listStyles.tableCardToolbarTop}>
+          <div className={listStyles.tableCardToolbarLeft}>
+            <PaginationPageSize limit={pagination.limit} onLimitChange={handleLimitChange} />
+            <Checkbox
+              label="Show inactive"
+              checked={showInactive}
+              onChange={(e) => {
+                setShowInactive(e.target.checked);
+                setPage(1);
+              }}
+            />
+          </div>
+          <SearchInput
+            value={search}
+            onSearch={handleSearch}
+            placeholder="Search by script name... (press Enter)"
+            className={listStyles.searchInToolbar}
+          />
+        </div>
+        {scripts.length === 0 && !loading ? (
+          <div className={listStyles.tableCardEmpty}>
+            <EmptyState
+              icon="📜"
+              title={search || showInactive ? 'No results found' : 'No call scripts yet'}
+              description={search || showInactive ? 'Try a different search or clear filters.' : 'Add a script to guide agents during calls. Use variables for dynamic content.'}
+              action={!search && !showInactive ? openCreate : undefined}
+              actionLabel="Add Script"
+            />
+          </div>
+        ) : (
+          <div className={listStyles.tableCardBody}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>Script Name</TableHeaderCell>
+                  <TableHeaderCell>Variables</TableHeaderCell>
+                  <TableHeaderCell width="80px">Default</TableHeaderCell>
+                  <TableHeaderCell width="100px">Status</TableHeaderCell>
+                  <TableHeaderCell width="180px" align="center">Actions</TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {scripts.map((script) => (
+                  <TableRow key={script.id}>
+                    <TableCell>{script.script_name}</TableCell>
+                    <TableCell>
+                      {Array.isArray(script.variables_used) && script.variables_used.length > 0
+                        ? script.variables_used.join(', ')
+                        : '—'}
+                    </TableCell>
+                    <TableCell>
+                      {script.is_default === 1 ? (
+                        <Badge variant="primary" size="sm">Default</Badge>
+                      ) : (
+                        '—'
+                      )}
+                    </TableCell>
+                    <TableCell><StatusBadge isActive={script.status === 1} /></TableCell>
+                    <TableCell align="center">
+                      <div className={styles.actions}>
+                        <IconButton
+                          title={script.is_default === 1 ? 'Default script' : 'Set as default'}
+                          variant="subtle"
+                          onClick={() => script.is_default !== 1 && handleSetDefault(script)}
+                          disabled={updateMutation.loading || script.is_default === 1}
+                        >
+                          {script.is_default === 1 ? '★' : '☆'}
+                        </IconButton>
+                        <IconButton title="Edit" onClick={() => openEdit(script)}>✏️</IconButton>
+                        <IconButton
+                          title={script.status === 1 ? 'Deactivate' : 'Activate'}
+                          variant={script.status === 1 ? 'warning' : 'success'}
+                          onClick={() => setToggleTarget(script)}
+                          disabled={toggleLoading}
+                        >
+                          {script.status === 1 ? '⏸️' : '▶️'}
+                        </IconButton>
+                        <IconButton
+                          title={script.is_default === 1 ? 'Default script cannot be deleted' : 'Delete'}
+                          variant="danger"
+                          onClick={() => setDeleteTarget(script)}
+                          disabled={script.is_default === 1}
+                        >
+                          🗑️
+                        </IconButton>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        {pagination && (
+          <div className={listStyles.tableCardFooterPagination}>
             <Pagination
               page={pagination.page}
               totalPages={pagination.totalPages}
@@ -254,71 +323,11 @@ export function CallScriptsPage() {
               limit={pagination.limit}
               onPageChange={handlePageChange}
               onLimitChange={handleLimitChange}
-              className={styles.pagination}
+              hidePageSize
             />
-          )}
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Script Name</TableHeaderCell>
-                <TableHeaderCell>Variables</TableHeaderCell>
-                <TableHeaderCell width="80px">Default</TableHeaderCell>
-                <TableHeaderCell width="100px">Status</TableHeaderCell>
-                <TableHeaderCell width="180px" align="center">Actions</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {scripts.map((script) => (
-                <TableRow key={script.id}>
-                  <TableCell>{script.script_name}</TableCell>
-                  <TableCell>
-                    {Array.isArray(script.variables_used) && script.variables_used.length > 0
-                      ? script.variables_used.join(', ')
-                      : '—'}
-                  </TableCell>
-                  <TableCell>
-                    {script.is_default === 1 ? (
-                      <Badge variant="primary" size="sm">Default</Badge>
-                    ) : (
-                      '—'
-                    )}
-                  </TableCell>
-                  <TableCell><StatusBadge isActive={script.status === 1} /></TableCell>
-                  <TableCell align="center">
-                    <div className={styles.actions}>
-                      <IconButton
-                        title={script.is_default === 1 ? 'Default script' : 'Set as default'}
-                        variant="subtle"
-                        onClick={() => script.is_default !== 1 && handleSetDefault(script)}
-                        disabled={updateMutation.loading || script.is_default === 1}
-                      >
-                        {script.is_default === 1 ? '★' : '☆'}
-                      </IconButton>
-                      <IconButton title="Edit" onClick={() => openEdit(script)}>✏️</IconButton>
-                      <IconButton
-                        title={script.status === 1 ? 'Deactivate' : 'Activate'}
-                        variant={script.status === 1 ? 'warning' : 'success'}
-                        onClick={() => setToggleTarget(script)}
-                        disabled={toggleLoading}
-                      >
-                        {script.status === 1 ? '⏸️' : '▶️'}
-                      </IconButton>
-                      <IconButton
-                        title={script.is_default === 1 ? 'Default script cannot be deleted' : 'Delete'}
-                        variant="danger"
-                        onClick={() => setDeleteTarget(script)}
-                        disabled={script.is_default === 1}
-                      >
-                        🗑️
-                      </IconButton>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </>
-      )}
+          </div>
+        )}
+      </div>
 
       <Modal
         isOpen={showModal}

@@ -16,6 +16,32 @@
   font-size: $font-size-sm;
 }
 
+/** Master / admin data lists: columns stay aligned, no giant gap before narrow cols */
+.tableAdminList {
+  table-layout: fixed;
+}
+
+.wrapperAdminList {
+  width: 100%;
+}
+
+.tableAdminList .cell:not(:last-child),
+.tableAdminList .headerCell:not(:last-child) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 0; /* lets fixed-layout + % widths shrink correctly */
+}
+
+.tableAdminList .cell:last-child,
+.tableAdminList .headerCell:last-child {
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
 .thead {
   background: var(--color-bg-subtle);
 }

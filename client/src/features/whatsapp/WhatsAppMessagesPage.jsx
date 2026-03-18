@@ -10,10 +10,12 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { SearchInput } from '../../components/ui/SearchInput';
-import { Pagination } from '../../components/ui/Pagination';
+import { Pagination, PaginationPageSize } from '../../components/ui/Pagination';
 import { whatsappMessagesAPI, whatsappSendAPI, whatsappTemplatesAPI, whatsappAccountsAPI, whatsappSettingsAPI } from '../../services/whatsappAPI';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
+import listStyles from '../../components/admin/adminDataList.module.scss';
+import { FilterBar } from '../../components/admin/FilterBar';
 
 const STATUS_VARIANTS = {
   pending: 'muted',
@@ -88,25 +90,28 @@ function buildPreviewText(bodyText, paramValues) {
 const PAGE_SIZE = 20;
 
 export function WhatsAppMessagesPage() {
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [appliedStatus, setAppliedStatus] = useState('all');
+  const [appliedAccount, setAppliedAccount] = useState('__all__');
+  const [appliedTemplate, setAppliedTemplate] = useState('all');
+  const [draftStatus, setDraftStatus] = useState('all');
+  const [draftAccount, setDraftAccount] = useState('__all__');
+  const [draftTemplate, setDraftTemplate] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [accountFilter, setAccountFilter] = useState('__all__');
-  const [templateFilter, setTemplateFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(PAGE_SIZE);
   const fetchMessages = useCallback(
     () =>
       whatsappMessagesAPI.getAll({
-        status: statusFilter === 'all' ? undefined : statusFilter,
-        whatsapp_account_id: accountFilter === '__all__' ? undefined : accountFilter,
-        template_id: templateFilter === 'all' ? undefined : templateFilter,
+        status: appliedStatus === 'all' ? undefined : appliedStatus,
+        whatsapp_account_id: appliedAccount === '__all__' ? undefined : appliedAccount,
+        template_id: appliedTemplate === 'all' ? undefined : appliedTemplate,
         search: searchQuery || undefined,
         limit,
         offset: (page - 1) * limit,
       }),
-    [statusFilter, accountFilter, templateFilter, searchQuery, page, limit]
+    [appliedStatus, appliedAccount, appliedTemplate, searchQuery, page, limit]
   );
-  const { data: messagesResponse, loading, error, refetch } = useAsyncData(fetchMessages, [statusFilter, accountFilter, templateFilter, searchQuery, page, limit], {
+  const { data: messagesResponse, loading, error, refetch } = useAsyncData(fetchMessages, [appliedStatus, appliedAccount, appliedTemplate, searchQuery, page, limit], {
     transform: (res) => res?.data ?? { data: [], total: 0 },
   });
   const messages = messagesResponse?.data ?? [];
@@ -324,11 +329,27 @@ export function WhatsAppMessagesPage() {
 
       {error && <Alert variant="error">{error}</Alert>}
 
-      <div className={styles.toolbar} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
+      <FilterBar
+        onApply={() => {
+          setAppliedStatus(draftStatus);
+          setAppliedAccount(draftAccount);
+          setAppliedTemplate(draftTemplate);
+          setPage(1);
+        }}
+        onReset={() => {
+          setDraftStatus('all');
+          setDraftAccount('__all__');
+          setDraftTemplate('all');
+          setAppliedStatus('all');
+          setAppliedAccount('__all__');
+          setAppliedTemplate('all');
+          setPage(1);
+        }}
+      >
         <Select
           label="Status"
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+          value={draftStatus}
+          onChange={(e) => setDraftStatus(e.target.value)}
           options={[
             { value: 'all', label: 'All' },
             { value: 'pending', label: 'Pending' },
@@ -340,8 +361,11 @@ export function WhatsAppMessagesPage() {
         />
         <Select
           label="Account"
-          value={accountFilter}
-          onChange={(e) => { setAccountFilter(e.target.value); setPage(1); }}
+          value={draftAccount}
+          onChange={(e) => {
+            setDraftAccount(e.target.value);
+            setDraftTemplate('all');
+          }}
           options={[
             { value: '__all__', label: 'All accounts' },
             ...accountOptions,
@@ -349,16 +373,16 @@ export function WhatsAppMessagesPage() {
         />
         <Select
           label="Template"
-          value={templateFilter}
-          onChange={(e) => { setTemplateFilter(e.target.value); setPage(1); }}
+          value={draftTemplate}
+          onChange={(e) => setDraftTemplate(e.target.value)}
           options={[
             { value: 'all', label: 'All templates' },
             ...(templates || [])
               .filter((t) =>
-                accountFilter === '__all__'
+                draftAccount === '__all__'
                   ? true
                   : t.whatsapp_account_id &&
-                    String(t.whatsapp_account_id) === accountFilter
+                    String(t.whatsapp_account_id) === draftAccount
               )
               .map((t) => ({
                 value: String(t.id),
@@ -366,62 +390,72 @@ export function WhatsAppMessagesPage() {
               })),
           ]}
         />
-        <SearchInput
-          value={searchQuery}
-          onSearch={handleSearch}
-          placeholder="Search phone, text, or provider ID (press Enter)"
-        />
+      </FilterBar>
+
+      <div className={listStyles.tableCard}>
+        <div className={listStyles.tableCardToolbarTop}>
+          <PaginationPageSize limit={limit} onLimitChange={(newLimit) => { setLimit(newLimit); setPage(1); }} />
+          <SearchInput
+            value={searchQuery}
+            onSearch={handleSearch}
+            placeholder="Search phone, text, or provider ID (press Enter)"
+            className={listStyles.searchInToolbar}
+          />
+        </div>
+        {!messages?.length ? (
+          <div className={listStyles.tableCardEmpty}>
+            <EmptyState
+              icon="💬"
+              title="No messages yet"
+              description="Send a template message to get started."
+              action={() => openSend()}
+              actionLabel="Send message"
+            />
+          </div>
+        ) : (
+          <div className={listStyles.tableCardBody}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>Phone</TableHeaderCell>
+                  <TableHeaderCell>Template</TableHeaderCell>
+                  <TableHeaderCell>Status</TableHeaderCell>
+                  <TableHeaderCell>Sent at</TableHeaderCell>
+                  <TableHeaderCell>Created</TableHeaderCell>
+                  <TableHeaderCell width="80px" align="center">Details</TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {messages.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{row.phone || '—'}</TableCell>
+                    <TableCell>{row.template_name ? row.template_name : (row.message_text ? '(Text)' : '—')}</TableCell>
+                    <TableCell>
+                      <Badge variant={STATUS_VARIANTS[row.status] || 'muted'}>{row.status}</Badge>
+                    </TableCell>
+                    <TableCell>{row.sent_at ? new Date(row.sent_at).toLocaleString() : '—'}</TableCell>
+                    <TableCell>{row.created_at ? new Date(row.created_at).toLocaleString() : '—'}</TableCell>
+                    <TableCell align="center">
+                      <Button size="sm" variant="ghost" onClick={() => setSelectedMessage(row)}>Details</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        <div className={listStyles.tableCardFooterPagination}>
+          <Pagination
+            page={page}
+            totalPages={Math.max(1, totalPages)}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+            onLimitChange={(newLimit) => { setLimit(newLimit); setPage(1); }}
+            hidePageSize
+          />
+        </div>
       </div>
-
-      {total > 0 && (
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          total={total}
-          limit={limit}
-          onPageChange={setPage}
-          onLimitChange={(newLimit) => { setLimit(newLimit); setPage(1); }}
-        />
-      )}
-
-      {!messages?.length ? (
-        <EmptyState
-          icon="💬"
-          title="No messages yet"
-          description="Send a template message to get started."
-          action={() => openSend()}
-          actionLabel="Send message"
-        />
-      ) : (
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>Phone</TableHeaderCell>
-              <TableHeaderCell>Template</TableHeaderCell>
-              <TableHeaderCell>Status</TableHeaderCell>
-              <TableHeaderCell>Sent at</TableHeaderCell>
-              <TableHeaderCell>Created</TableHeaderCell>
-              <TableHeaderCell width="80px" align="center">Details</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {messages.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell>{row.phone || '—'}</TableCell>
-                <TableCell>{row.template_name ? row.template_name : (row.message_text ? '(Text)' : '—')}</TableCell>
-                <TableCell>
-                  <Badge variant={STATUS_VARIANTS[row.status] || 'muted'}>{row.status}</Badge>
-                </TableCell>
-                <TableCell>{row.sent_at ? new Date(row.sent_at).toLocaleString() : '—'}</TableCell>
-                <TableCell>{row.created_at ? new Date(row.created_at).toLocaleString() : '—'}</TableCell>
-                <TableCell align="center">
-                  <Button size="sm" variant="ghost" onClick={() => setSelectedMessage(row)}>Details</Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
 
       <Modal
         isOpen={!!selectedMessage}

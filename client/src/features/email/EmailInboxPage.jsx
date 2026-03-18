@@ -8,12 +8,13 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { SearchInput } from '../../components/ui/SearchInput';
-import { Pagination } from '../../components/ui/Pagination';
+import { Pagination, PaginationPageSize } from '../../components/ui/Pagination';
 import { Select } from '../../components/ui/Select';
 import { Input } from '../../components/ui/Input';
 import { emailMessagesAPI, emailAccountsAPI, emailTemplatesAPI, emailSendAPI } from '../../services/emailAPI';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
+import listStyles from '../../components/admin/adminDataList.module.scss';
 
 const PAGE_SIZE = 20;
 
@@ -110,59 +111,66 @@ export function EmailInboxPage() {
 
       {error && <Alert variant="error">{error}</Alert>}
 
-      <div className={styles.toolbar} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
-        <SearchInput
-          value={searchQuery}
-          onSearch={handleSearch}
-          placeholder="Search from, to, subject (press Enter)"
-        />
+      <div className={listStyles.tableCard}>
+        <div className={listStyles.tableCardToolbarTop}>
+          <PaginationPageSize limit={limit} onLimitChange={(l) => { setLimit(l); setPage(1); }} />
+          <SearchInput
+            value={searchQuery}
+            onSearch={handleSearch}
+            placeholder="Search from, to, subject (press Enter)"
+            className={listStyles.searchInToolbar}
+          />
+        </div>
+        {!messages?.length ? (
+          <div className={listStyles.tableCardEmpty}>
+            <EmptyState
+              icon="📥"
+              title="No emails in inbox"
+              description="Received emails will appear here. Use Compose to send."
+              action={openCompose}
+              actionLabel="Compose"
+            />
+          </div>
+        ) : (
+          <div className={listStyles.tableCardBody}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>From</TableHeaderCell>
+                  <TableHeaderCell>To</TableHeaderCell>
+                  <TableHeaderCell>Subject</TableHeaderCell>
+                  <TableHeaderCell>Date</TableHeaderCell>
+                  <TableHeaderCell width="80px">Open</TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {messages.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.from_email || '—'}</TableCell>
+                    <TableCell style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.to_email || '—'}</TableCell>
+                    <TableCell style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.subject || '—'}</TableCell>
+                    <TableCell>{row.received_at ? new Date(row.received_at).toLocaleString() : (row.created_at ? new Date(row.created_at).toLocaleString() : '—')}</TableCell>
+                    <TableCell>
+                      <Button size="sm" variant="ghost" onClick={() => setSelectedMessage(row)}>Open</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        <div className={listStyles.tableCardFooterPagination}>
+          <Pagination
+            page={page}
+            totalPages={Math.max(1, totalPages)}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+            onLimitChange={(l) => { setLimit(l); setPage(1); }}
+            hidePageSize
+          />
+        </div>
       </div>
-
-      {total > 0 && (
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          total={total}
-          limit={limit}
-          onPageChange={setPage}
-          onLimitChange={(l) => { setLimit(l); setPage(1); }}
-        />
-      )}
-
-      {!messages?.length ? (
-        <EmptyState
-          icon="📥"
-          title="No emails in inbox"
-          description="Received emails will appear here. Use Compose to send."
-          action={openCompose}
-          actionLabel="Compose"
-        />
-      ) : (
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>From</TableHeaderCell>
-              <TableHeaderCell>To</TableHeaderCell>
-              <TableHeaderCell>Subject</TableHeaderCell>
-              <TableHeaderCell>Date</TableHeaderCell>
-              <TableHeaderCell width="80px">Open</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {messages.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.from_email || '—'}</TableCell>
-                <TableCell style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.to_email || '—'}</TableCell>
-                <TableCell style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.subject || '—'}</TableCell>
-                <TableCell>{row.received_at ? new Date(row.received_at).toLocaleString() : (row.created_at ? new Date(row.created_at).toLocaleString() : '—')}</TableCell>
-                <TableCell>
-                  <Button size="sm" variant="ghost" onClick={() => setSelectedMessage(row)}>Open</Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
 
       <Modal
         isOpen={!!selectedMessage}

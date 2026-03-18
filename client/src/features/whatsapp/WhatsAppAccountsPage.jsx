@@ -14,6 +14,7 @@ import { Checkbox } from '../../components/ui/Checkbox';
 import { whatsappAccountsAPI } from '../../services/whatsappAPI';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
+import listStyles from '../../components/admin/adminDataList.module.scss';
 
 const PROVIDER_OPTIONS = [
   { value: 'meta', label: 'Meta Cloud API' },
@@ -279,7 +280,7 @@ export function WhatsAppAccountsPage() {
 
       {error && <Alert variant="error">{error}</Alert>}
 
-      <div className={styles.toolbar}>
+      <div className={listStyles.tableToolbarCheckboxOnly}>
         <Checkbox
           id="show-inactive-accounts"
           label="Show inactive"

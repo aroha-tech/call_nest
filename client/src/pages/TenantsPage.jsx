@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
@@ -18,6 +18,10 @@ import { SearchInput } from '../components/ui/SearchInput';
 import { Spinner } from '../components/ui/Spinner';
 import { StatusBadge } from '../components/ui/Badge';
 import { IconButton } from '../components/ui/IconButton';
+import { Pagination, PaginationPageSize } from '../components/ui/Pagination';
+import { Alert } from '../components/ui/Alert';
+import { EmptyState } from '../components/ui/EmptyState';
+import listStyles from '../components/admin/adminDataList.module.scss';
 import { tenantsAPI } from '../services/adminAPI';
 import { industriesAPI } from '../services/dispositionAPI';
 import { useMutation } from '../hooks/useAsyncData';
@@ -51,6 +55,7 @@ export function TenantsPage() {
   const [form, setForm] = useState(defaultForm);
   const [formErrors, setFormErrors] = useState({});
   const [industryOptions, setIndustryOptions] = useState([]);
+  const fetchedOnceRef = useRef(false);
 
   const fetchTenants = useCallback(async () => {
     setLoading(true);
@@ -69,12 +74,26 @@ export function TenantsPage() {
       setTenants([]);
     } finally {
       setLoading(false);
+      fetchedOnceRef.current = true;
     }
   }, [search, showDisabled, pagination.page, pagination.limit]);
 
   useEffect(() => {
     fetchTenants();
   }, [fetchTenants]);
+
+  const handleSearch = useCallback((value) => {
+    setSearch(value);
+    setPagination((p) => ({ ...p, page: 1 }));
+  }, []);
+
+  const handlePageChange = useCallback((next) => {
+    setPagination((p) => ({ ...p, page: next }));
+  }, []);
+
+  const handleLimitChange = useCallback((next) => {
+    setPagination((p) => ({ ...p, limit: next, page: 1 }));
+  }, []);
 
   useEffect(() => {
     industriesAPI
@@ -168,92 +187,139 @@ export function TenantsPage() {
     }
   };
 
+  if (loading && !fetchedOnceRef.current) {
+    return (
+      <div className={styles.wrapper}>
+        <div className={listStyles.page}>
+          <PageHeader
+            title="Tenants"
+            description="Manage platform tenants and module access"
+            actions={
+              <Button variant="primary" onClick={openCreate}>
+                Add Tenant
+              </Button>
+            }
+          />
+          <div className={listStyles.loadingInitial}>
+            <Spinner size="lg" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.wrapper}>
-      <PageHeader
-        title="Tenants"
-        description="Manage platform tenants and module access"
-        actions={
-          <Button variant="primary" onClick={openCreate}>
-            Add Tenant
-          </Button>
-        }
-      />
-
-      <div className={styles.toolbar}>
-        <SearchInput
-          placeholder="Search tenants..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className={styles.search}
+      <div className={listStyles.page}>
+        <PageHeader
+          title="Tenants"
+          description="Manage platform tenants and module access"
+          actions={
+            <Button variant="primary" onClick={openCreate}>
+              Add Tenant
+            </Button>
+          }
         />
-        <Checkbox
-          label="Include disabled"
-          checked={showDisabled}
-          onChange={(e) => setShowDisabled(e.target.checked)}
-        />
-      </div>
 
-      {error && <div className={styles.error}>{error}</div>}
+        {error && <Alert variant="error">{error}</Alert>}
 
-      {loading ? (
-        <div className={styles.loading}>
-          <Spinner size="lg" />
-        </div>
-      ) : (
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>Name</TableHeaderCell>
-              <TableHeaderCell>Slug</TableHeaderCell>
-              <TableHeaderCell>Industry</TableHeaderCell>
-              <TableHeaderCell width="90px">Users</TableHeaderCell>
-              <TableHeaderCell width="90px">Status</TableHeaderCell>
-              <TableHeaderCell width="90px">WhatsApp</TableHeaderCell>
-              <TableHeaderCell width="90px">Email</TableHeaderCell>
-              <TableHeaderCell width="80px" align="right" />
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {tenants.map((t) => (
-              <TableRow key={t.id}>
-                <TableCell>{t.name}</TableCell>
-                <TableCell>{t.slug}</TableCell>
-                <TableCell>{industryOptions.find((o) => o.value === t.industry_id)?.label || '—'}</TableCell>
-                <TableCell>
-                  <Link to={`/admin/users?tenantId=${t.id}`} className={styles.userCountLink}>
-                    {t.user_count ?? 0}
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  <StatusBadge isActive={!!t.is_enabled} />
-                </TableCell>
-                <TableCell>
-                  <span className={t.whatsapp_module_enabled ? styles.moduleOn : styles.moduleOff}>
-                    {t.whatsapp_module_enabled ? 'On' : 'Off'}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <span className={t.email_module_enabled ? styles.moduleOn : styles.moduleOff}>
-                    {t.email_module_enabled ? 'On' : 'Off'}
-                  </span>
-                </TableCell>
-                <TableCell align="right">
-                  {t.id !== 1 && (
-                    <IconButton title="Edit" onClick={() => openEdit(t)} size="sm">✏️</IconButton>
-                  )}
-                </TableCell>
+        <div className={listStyles.tableCard}>
+          <div className={listStyles.tableCardToolbarTop}>
+            <div className={listStyles.tableCardToolbarLeft}>
+              <PaginationPageSize limit={pagination.limit} onLimitChange={handleLimitChange} />
+              <Checkbox
+                label="Include disabled"
+                checked={showDisabled}
+                onChange={(e) => {
+                  setShowDisabled(e.target.checked);
+                  setPagination((p) => ({ ...p, page: 1 }));
+                }}
+              />
+            </div>
+            <SearchInput
+              value={search}
+              onSearch={handleSearch}
+              placeholder="Search tenants... (press Enter)"
+              className={listStyles.searchInToolbar}
+            />
+          </div>
+          {tenants.length === 0 && !loading ? (
+            <div className={listStyles.tableCardEmpty}>
+              <EmptyState
+                icon="🏢"
+                title={search || showDisabled ? 'No tenants found' : 'No tenants yet'}
+                description={
+                  search || showDisabled
+                    ? 'Try a different search or clear filters.'
+                    : 'Add a tenant to onboard a new organization.'
+                }
+                action={!search && !showDisabled ? openCreate : undefined}
+                actionLabel="Add Tenant"
+              />
+            </div>
+          ) : (
+            <div className={listStyles.tableCardBody}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableHeaderCell>Name</TableHeaderCell>
+                <TableHeaderCell>Slug</TableHeaderCell>
+                <TableHeaderCell>Industry</TableHeaderCell>
+                <TableHeaderCell width="90px">Users</TableHeaderCell>
+                <TableHeaderCell width="90px">Status</TableHeaderCell>
+                <TableHeaderCell width="90px">WhatsApp</TableHeaderCell>
+                <TableHeaderCell width="90px">Email</TableHeaderCell>
+                <TableHeaderCell width="80px" align="right" />
               </TableRow>
+            </TableHead>
+            <TableBody>
+              {tenants.map((t) => (
+                <TableRow key={t.id}>
+                  <TableCell>{t.name}</TableCell>
+                  <TableCell>{t.slug}</TableCell>
+                  <TableCell>{industryOptions.find((o) => o.value === t.industry_id)?.label || '—'}</TableCell>
+                  <TableCell>
+                    <Link to={`/admin/users?tenantId=${t.id}`} className={styles.userCountLink}>
+                      {t.user_count ?? 0}
+                    </Link>
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge isActive={!!t.is_enabled} />
+                  </TableCell>
+                  <TableCell>
+                    <span className={t.whatsapp_module_enabled ? styles.moduleOn : styles.moduleOff}>
+                      {t.whatsapp_module_enabled ? 'On' : 'Off'}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className={t.email_module_enabled ? styles.moduleOn : styles.moduleOff}>
+                      {t.email_module_enabled ? 'On' : 'Off'}
+                    </span>
+                  </TableCell>
+                  <TableCell align="right">
+                    {t.id !== 1 && (
+                      <IconButton title="Edit" onClick={() => openEdit(t)} size="sm">✏️</IconButton>
+                    )}
+                  </TableCell>
+                </TableRow>
             ))}
           </TableBody>
         </Table>
-      )}
-
-      {pagination.totalPages > 1 && (
-        <div className={styles.pagination}>
-          Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
+            </div>
+          )}
+          <div className={listStyles.tableCardFooterPagination}>
+            <Pagination
+              page={pagination.page}
+              totalPages={Math.max(1, pagination.totalPages || 1)}
+              total={pagination.total}
+              limit={pagination.limit}
+              onPageChange={handlePageChange}
+              onLimitChange={handleLimitChange}
+              hidePageSize
+            />
+          </div>
         </div>
-      )}
+      </div>
 
       <Modal
         isOpen={modalOpen}

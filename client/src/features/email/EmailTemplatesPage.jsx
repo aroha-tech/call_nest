@@ -19,15 +19,25 @@ import { renderPreview, linkify, linkifyHtml, stripHtml, DEFAULT_PREVIEW_DATA } 
 import { ScriptBodyEditor } from '../callScripts/ScriptBodyEditor';
 import { VariableSelector } from '../../components/VariableSelector';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
+import listStyles from '../../components/admin/adminDataList.module.scss';
+import { FilterBar } from '../../components/admin/FilterBar';
 
 export function EmailTemplatesPage() {
   const [showInactive, setShowInactive] = useState(false);
-  const [selectedAccountId, setSelectedAccountId] = useState('__all__');
+  const [appliedAccountId, setAppliedAccountId] = useState('__all__');
+  const [draftAccountId, setDraftAccountId] = useState('__all__');
   const fetchFn = useCallback(
-    () => emailTemplatesAPI.getAll(showInactive, selectedAccountId === '__all__' ? undefined : selectedAccountId),
-    [showInactive, selectedAccountId]
+    () =>
+      emailTemplatesAPI.getAll(
+        showInactive,
+        appliedAccountId === '__all__' ? undefined : appliedAccountId
+      ),
+    [showInactive, appliedAccountId]
   );
-  const { data: templates, loading, error, refetch } = useAsyncData(fetchFn, [showInactive, selectedAccountId]);
+  const { data: templates, loading, error, refetch } = useAsyncData(fetchFn, [
+    showInactive,
+    appliedAccountId,
+  ]);
 
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -184,16 +194,25 @@ export function EmailTemplatesPage() {
 
       {error && <Alert variant="error">{error}</Alert>}
 
-      <div className={styles.toolbar}>
+      <FilterBar
+        onApply={() => setAppliedAccountId(draftAccountId)}
+        onReset={() => {
+          setDraftAccountId('__all__');
+          setAppliedAccountId('__all__');
+        }}
+      >
         <Select
           label="Account"
-          value={selectedAccountId}
-          onChange={(e) => setSelectedAccountId(e.target.value)}
+          value={draftAccountId}
+          onChange={(e) => setDraftAccountId(e.target.value)}
           options={[
             { value: '__all__', label: 'All accounts' },
             ...(accounts || []).map((a) => ({ value: String(a.id), label: a.email_address })),
           ]}
         />
+      </FilterBar>
+
+      <div className={listStyles.tableToolbarCheckboxOnly}>
         <Checkbox
           id="show-inactive-email-templates"
           label="Show inactive"
@@ -211,6 +230,7 @@ export function EmailTemplatesPage() {
           actionLabel="Add Template"
         />
       ) : (
+        <div className={listStyles.tableScrollAreaNatural}>
         <Table>
           <TableHead>
             <TableRow>
@@ -245,6 +265,7 @@ export function EmailTemplatesPage() {
             ))}
           </TableBody>
         </Table>
+        </div>
       )}
 
       <Modal

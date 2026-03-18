@@ -12,8 +12,8 @@ const MODULE_OPTIONS = [
 ];
 
 const columns = [
-  { key: 'variable_key', label: 'Variable Key' },
-  { key: 'variable_label', label: 'Label' },
+  { key: 'variable_key', label: 'Variable Key', width: '18%' },
+  { key: 'variable_label', label: 'Label', width: '22%' },
   { key: 'module', label: 'Module', width: '100px' },
   {
     key: 'is_active',

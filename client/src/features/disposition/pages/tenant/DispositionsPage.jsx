@@ -12,7 +12,7 @@ import { IconButton } from '../../../../components/ui/IconButton';
 import { EmptyState } from '../../../../components/ui/EmptyState';
 import { Spinner } from '../../../../components/ui/Spinner';
 import { Alert } from '../../../../components/ui/Alert';
-import { Pagination } from '../../../../components/ui/Pagination';
+import { Pagination, PaginationPageSize } from '../../../../components/ui/Pagination';
 import { useDispositions } from '../../hooks/useTenantData';
 import { useEmailTemplatesOptions, useWhatsappTemplatesOptions } from '../../hooks/useTenantData';
 import { 
@@ -24,6 +24,7 @@ import {
 } from '../../hooks/useMasterData';
 import { NEXT_ACTION_OPTIONS, getNextActionLabel } from '../../constants';
 import styles from '../../components/MasterCRUDPage.module.scss';
+import listStyles from '../../../../components/admin/adminDataList.module.scss';
 
 const ACTION_CODES_REQUIRING_EMAIL_TEMPLATE = ['send_email'];
 const ACTION_CODES_REQUIRING_WHATSAPP_TEMPLATE = ['send_whatsapp'];
@@ -76,10 +77,6 @@ export function DispositionsPage() {
   const [formErrors, setFormErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
 
-  const handleShowInactiveChange = useCallback((checked) => {
-    setShowInactive(checked);
-    setPage(1);
-  }, []);
   const handlePageChange = useCallback((newPage) => setPage(newPage), []);
   const handleLimitChange = useCallback((newLimit) => {
     setLimit(newLimit);
@@ -313,40 +310,38 @@ export function DispositionsPage() {
 
       {error && <Alert variant="error">{error}</Alert>}
 
-      <div className={styles.toolbar}>
-        <SearchInput
-          value={search}
-          onSearch={(v) => { setSearch(v); setPage(1); }}
-          placeholder="Search... (press Enter)"
-        />
-        <Checkbox
-          label="Show inactive"
-          checked={showInactive}
-          onChange={(e) => handleShowInactiveChange(e.target.checked)}
-        />
-      </div>
-
-      {dispositions.length === 0 && !loading ? (
-        <EmptyState
-          icon="📋"
-          title={search || showInactive ? 'No results found' : 'No dispositions yet'}
-          description={search || showInactive ? 'Try a different search or clear filters.' : 'Create dispositions or import from industry templates (only when you have none).'}
-          action={hasNoDispositions ? () => setShowCloneModal(true) : undefined}
-          actionLabel="Import from Template"
-        />
-      ) : (
-        <>
-        {pagination && (
-          <Pagination
-            page={pagination.page}
-            totalPages={pagination.totalPages}
-            total={pagination.total}
-            limit={pagination.limit}
-            onPageChange={handlePageChange}
-            onLimitChange={handleLimitChange}
-            className={styles.pagination}
+      <div className={listStyles.tableCard}>
+        <div className={listStyles.tableCardToolbarTop}>
+          <div className={listStyles.tableCardToolbarLeft}>
+            <PaginationPageSize limit={pagination.limit} onLimitChange={handleLimitChange} />
+            <Checkbox
+              label="Show inactive"
+              checked={showInactive}
+              onChange={(e) => {
+                setShowInactive(e.target.checked);
+                setPage(1);
+              }}
+            />
+          </div>
+          <SearchInput
+            value={search}
+            onSearch={(v) => { setSearch(v); setPage(1); }}
+            placeholder="Search... (press Enter)"
+            className={listStyles.searchInToolbar}
           />
-        )}
+        </div>
+        {dispositions.length === 0 && !loading ? (
+          <div className={listStyles.tableCardEmpty}>
+            <EmptyState
+              icon="📋"
+              title={search || showInactive ? 'No results found' : 'No dispositions yet'}
+              description={search || showInactive ? 'Try a different search or clear filters.' : 'Create dispositions or import from industry templates (only when you have none).'}
+              action={hasNoDispositions ? () => setShowCloneModal(true) : undefined}
+              actionLabel="Import from Template"
+            />
+          </div>
+        ) : (
+          <div className={listStyles.tableCardBody}>
         <Table>
           <TableHead>
             <TableRow>
@@ -403,8 +398,22 @@ export function DispositionsPage() {
             ))}
           </TableBody>
         </Table>
-        </>
-      )}
+          </div>
+        )}
+        {pagination && (
+          <div className={listStyles.tableCardFooterPagination}>
+            <Pagination
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              total={pagination.total}
+              limit={pagination.limit}
+              onPageChange={handlePageChange}
+              onLimitChange={handleLimitChange}
+              hidePageSize
+            />
+          </div>
+        )}
+      </div>
 
       {/* Create/Edit Modal */}
       <Modal

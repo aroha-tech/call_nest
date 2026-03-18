@@ -14,6 +14,7 @@ import { Checkbox } from '../../components/ui/Checkbox';
 import { emailAccountsAPI } from '../../services/emailAPI';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
+import listStyles from '../../components/admin/adminDataList.module.scss';
 
 const PROVIDER_OPTIONS = [
   { value: 'smtp', label: 'SMTP (Custom)' },
@@ -247,7 +248,7 @@ export function EmailAccountsPage() {
       {oauthError && <Alert variant="error">{oauthError}</Alert>}
       {error && <Alert variant="error">{error}</Alert>}
 
-      <div className={styles.toolbar}>
+      <div className={listStyles.tableToolbarCheckboxOnly}>
         <Checkbox
           id="show-inactive-email-accounts"
           label="Show inactive"
@@ -265,6 +266,7 @@ export function EmailAccountsPage() {
           actionLabel="Add Account"
         />
       ) : (
+        <div className={listStyles.tableScrollAreaNatural}>
         <Table>
           <TableHead>
             <TableRow>
@@ -313,6 +315,7 @@ export function EmailAccountsPage() {
             ))}
           </TableBody>
         </Table>
+        </div>
       )}
 
       <Modal

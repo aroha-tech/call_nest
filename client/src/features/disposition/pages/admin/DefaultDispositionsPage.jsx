@@ -12,7 +12,7 @@ import { IconButton } from '../../../../components/ui/IconButton';
 import { EmptyState } from '../../../../components/ui/EmptyState';
 import { Spinner } from '../../../../components/ui/Spinner';
 import { Alert } from '../../../../components/ui/Alert';
-import { Pagination } from '../../../../components/ui/Pagination';
+import { Pagination, PaginationPageSize } from '../../../../components/ui/Pagination';
 import { useDefaultDispositions } from '../../hooks/useDefaultData';
 import { 
   useIndustriesOptions, 
@@ -23,9 +23,12 @@ import {
 } from '../../hooks/useMasterData';
 import { NEXT_ACTION_OPTIONS, getNextActionLabel } from '../../constants';
 import styles from '../../components/MasterCRUDPage.module.scss';
+import listStyles from '../../../../components/admin/adminDataList.module.scss';
+import { FilterBar } from '../../../../components/admin/FilterBar';
 
 export function DefaultDispositionsPage() {
-  const [selectedIndustry, setSelectedIndustry] = useState('__all__');
+  const [appliedIndustry, setAppliedIndustry] = useState('__all__');
+  const [draftIndustry, setDraftIndustry] = useState('__all__');
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [page, setPage] = useState(1);
@@ -37,7 +40,7 @@ export function DefaultDispositionsPage() {
   const { data: contactTemperatures = [] } = useContactTemperaturesOptions();
   const { data: dispoActions = [] } = useDispoActionsOptions();
 
-  const industryIdParam = selectedIndustry === '__all__' ? null : (selectedIndustry || undefined);
+  const industryIdParam = appliedIndustry === '__all__' ? null : (appliedIndustry || undefined);
 
   const {
     defaultDispositions,
@@ -60,10 +63,6 @@ export function DefaultDispositionsPage() {
   const [formErrors, setFormErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
 
-  const handleShowInactiveChange = useCallback((checked) => {
-    setShowInactive(checked);
-    setPage(1);
-  }, []);
   const handlePageChange = useCallback((newPage) => setPage(newPage), []);
   const handleLimitChange = useCallback((newLimit) => {
     setLimit(newLimit);
@@ -85,6 +84,12 @@ export function DefaultDispositionsPage() {
     { value: '__all__', label: 'All Industries (Global)' },
     ...industries.map((i) => ({ value: i.id, label: i.name }))
   ];
+  /** Empty / __global__ → industry_id null (applies to all industries) */
+  const GLOBAL_INDUSTRY_VALUE = '__global__';
+  const industryFormOptions = [
+    { value: GLOBAL_INDUSTRY_VALUE, label: 'All industries (global)' },
+    ...industries.map((i) => ({ value: i.id, label: i.name })),
+  ];
   const dispoTypeOptions = dispoTypes.map((d) => ({ value: d.id, label: d.name }));
   const statusOptions = contactStatuses.map((c) => ({ value: c.id, label: c.name }));
   const tempOptions = contactTemperatures.map((c) => ({ value: c.id, label: c.name }));
@@ -93,13 +98,13 @@ export function DefaultDispositionsPage() {
   const getActionById = (actionId) => dispoActions.find(a => a.id === actionId);
 
   const openCreateModal = () => {
-    if (!selectedIndustry) {
-      alert('Please select an industry first');
-      return;
-    }
+    const initialIndustry =
+      appliedIndustry && appliedIndustry !== '__all__'
+        ? appliedIndustry
+        : GLOBAL_INDUSTRY_VALUE;
     setEditingItem(null);
     setFormData({
-      industry_id: selectedIndustry === '__all__' ? null : selectedIndustry,
+      industry_id: initialIndustry,
       dispo_type_id: '',
       contact_status_id: '',
       contact_temperature_id: '',
@@ -126,7 +131,7 @@ export function DefaultDispositionsPage() {
       }
     }
     setFormData({
-      industry_id: item.industry_id,
+      industry_id: item.industry_id || GLOBAL_INDUSTRY_VALUE,
       dispo_type_id: item.dispo_type_id,
       contact_status_id: item.contact_status_id || '',
       contact_temperature_id: item.contact_temperature_id || '',
@@ -179,8 +184,13 @@ export function DefaultDispositionsPage() {
     }
 
     const validActions = (formData.actions || []).filter(a => a.action_id);
+    const industryId =
+      !formData.industry_id || formData.industry_id === GLOBAL_INDUSTRY_VALUE
+        ? null
+        : formData.industry_id;
     const submitData = {
       ...formData,
+      industry_id: industryId,
       contact_status_id: formData.contact_status_id || null,
       contact_temperature_id: formData.contact_temperature_id || null,
       next_action: formData.next_action || null,
@@ -233,111 +243,142 @@ export function DefaultDispositionsPage() {
         title="Default Dispositions"
         description="Disposition templates that can be cloned by tenants"
         actions={
-          <Button onClick={openCreateModal} disabled={!selectedIndustry}>
-            + Add Disposition
-          </Button>
+          <Button onClick={openCreateModal}>+ Add Disposition</Button>
         }
       />
 
       {error && <Alert variant="error">{error}</Alert>}
 
-      <div className={styles.toolbar}>
+      <FilterBar
+        onApply={() => {
+          setAppliedIndustry(draftIndustry);
+          setPage(1);
+        }}
+        onReset={() => {
+          setDraftIndustry('__all__');
+          setAppliedIndustry('__all__');
+          setPage(1);
+        }}
+      >
         <Select
-          value={selectedIndustry}
-          onChange={(e) => setSelectedIndustry(e.target.value)}
+          value={draftIndustry}
+          onChange={(e) => setDraftIndustry(e.target.value)}
           options={industryOptions}
           placeholder="Select Industry"
           className={styles.industrySelect}
         />
-        <SearchInput
-          value={search}
-          onSearch={(v) => { setSearch(v); setPage(1); }}
-          placeholder="Search... (press Enter)"
-        />
-        <Checkbox
-          label="Show inactive"
-          checked={showInactive}
-          onChange={(e) => handleShowInactiveChange(e.target.checked)}
-        />
-      </div>
+      </FilterBar>
 
-      {!selectedIndustry ? (
+      {!appliedIndustry ? (
         <EmptyState
           icon="🏭"
           title="Select an Industry"
           description="Choose an industry to view and manage its default dispositions."
         />
-      ) : loading ? (
-        <div className={styles.loading}><Spinner size="lg" /></div>
-      ) : defaultDispositions.length === 0 ? (
-        <EmptyState
-          icon="📋"
-          title={search ? 'No results found' : 'No dispositions yet'}
-          description={search ? 'Try a different search.' : 'Create default dispositions for this industry.'}
-          action={!search ? openCreateModal : undefined}
-          actionLabel="Add Disposition"
-        />
       ) : (
-        <>
-        <Pagination
-          page={pagination?.page ?? 1}
-          totalPages={pagination?.totalPages ?? 1}
-          total={pagination?.total ?? 0}
-          limit={limit}
-          onPageChange={handlePageChange}
-          onLimitChange={handleLimitChange}
-          className={styles.pagination}
-        />
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>Name</TableHeaderCell>
-              <TableHeaderCell width="120px">Code</TableHeaderCell>
-              <TableHeaderCell width="100px">Type</TableHeaderCell>
-              <TableHeaderCell width="110px">Next Action</TableHeaderCell>
-              <TableHeaderCell width="90px">Connected</TableHeaderCell>
-              <TableHeaderCell>Actions</TableHeaderCell>
-              <TableHeaderCell width="80px">Active</TableHeaderCell>
-              <TableHeaderCell width="100px" align="center">Manage</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {defaultDispositions.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>{item.name}</TableCell>
-                <TableCell><code>{item.code}</code></TableCell>
-                <TableCell><Badge variant="primary">{item.dispo_type_name}</Badge></TableCell>
-                <TableCell>{getNextActionLabel(item.next_action)}</TableCell>
-                <TableCell>
-                  <Badge variant={item.is_connected === 1 ? 'success' : 'muted'}>
-                    {item.is_connected === 1 ? 'Yes' : 'No'}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-                    {getActionsDisplay(item)}
-                  </span>
-                </TableCell>
-                <TableCell><StatusBadge isActive={item.is_active === 1} /></TableCell>
-                <TableCell align="center">
-                  <div className={styles.actions}>
-                    <IconButton title="Edit" onClick={() => openEditModal(item)}>✏️</IconButton>
-                    <IconButton
-                      title={item.is_active === 1 ? 'Deactivate' : 'Activate'}
-                      variant={item.is_active === 1 ? 'warning' : 'success'}
-                      onClick={() => setToggleItem(item)}
-                      disabled={toggleLoading}
-                    >
-                      {item.is_active === 1 ? '⏸️' : '▶️'}
-                    </IconButton>
-                    <IconButton title="Delete" variant="danger" onClick={() => { setDeleteItem(item); setDeleteError(null); }}>🗑️</IconButton>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        </>
+        <div className={listStyles.tableCard}>
+          <div className={listStyles.tableCardToolbarTop}>
+            <div className={listStyles.tableCardToolbarLeft}>
+              <PaginationPageSize limit={limit} onLimitChange={handleLimitChange} />
+              <Checkbox
+                label="Show inactive"
+                checked={showInactive}
+                onChange={(e) => {
+                  setShowInactive(e.target.checked);
+                  setPage(1);
+                }}
+              />
+            </div>
+            <SearchInput
+              value={search}
+              onSearch={(v) => { setSearch(v); setPage(1); }}
+              placeholder="Search... (press Enter)"
+              className={listStyles.searchInToolbar}
+            />
+          </div>
+          {loading ? (
+            <div className={listStyles.tableCardEmpty}>
+              <div className={styles.loading}><Spinner size="lg" /></div>
+            </div>
+          ) : defaultDispositions.length === 0 ? (
+            <div className={listStyles.tableCardEmpty}>
+              <EmptyState
+                icon="📋"
+                title={search ? 'No results found' : 'No dispositions yet'}
+                description={search ? 'Try a different search.' : 'Create default dispositions for this industry.'}
+                action={!search ? openCreateModal : undefined}
+                actionLabel="Add Disposition"
+              />
+            </div>
+          ) : (
+            <div className={listStyles.tableCardBody}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell>Name</TableHeaderCell>
+                    <TableHeaderCell width="140px">Industry</TableHeaderCell>
+                    <TableHeaderCell width="120px">Code</TableHeaderCell>
+                    <TableHeaderCell width="100px">Type</TableHeaderCell>
+                    <TableHeaderCell width="110px">Next Action</TableHeaderCell>
+                    <TableHeaderCell width="90px">Connected</TableHeaderCell>
+                    <TableHeaderCell>Actions</TableHeaderCell>
+                    <TableHeaderCell width="80px">Active</TableHeaderCell>
+                    <TableHeaderCell width="100px" align="center">Manage</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {defaultDispositions.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{item.name}</TableCell>
+                      <TableCell>
+                        {item.industry_name || (item.industry_id ? '—' : 'Global')}
+                      </TableCell>
+                      <TableCell><code>{item.code}</code></TableCell>
+                      <TableCell><Badge variant="primary">{item.dispo_type_name}</Badge></TableCell>
+                      <TableCell>{getNextActionLabel(item.next_action)}</TableCell>
+                      <TableCell>
+                        <Badge variant={item.is_connected === 1 ? 'success' : 'muted'}>
+                          {item.is_connected === 1 ? 'Yes' : 'No'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                          {getActionsDisplay(item)}
+                        </span>
+                      </TableCell>
+                      <TableCell><StatusBadge isActive={item.is_active === 1} /></TableCell>
+                      <TableCell align="center">
+                        <div className={styles.actions}>
+                          <IconButton title="Edit" onClick={() => openEditModal(item)}>✏️</IconButton>
+                          <IconButton
+                            title={item.is_active === 1 ? 'Deactivate' : 'Activate'}
+                            variant={item.is_active === 1 ? 'warning' : 'success'}
+                            onClick={() => setToggleItem(item)}
+                            disabled={toggleLoading}
+                          >
+                            {item.is_active === 1 ? '⏸️' : '▶️'}
+                          </IconButton>
+                          <IconButton title="Delete" variant="danger" onClick={() => { setDeleteItem(item); setDeleteError(null); }}>🗑️</IconButton>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          <div className={listStyles.tableCardFooterPagination}>
+            <Pagination
+              page={pagination?.page ?? 1}
+              totalPages={pagination?.totalPages ?? 1}
+              total={pagination?.total ?? 0}
+              limit={limit}
+              onPageChange={handlePageChange}
+              onLimitChange={handleLimitChange}
+              hidePageSize
+            />
+          </div>
+        </div>
       )}
 
       {/* Create/Edit Modal */}
@@ -360,6 +401,13 @@ export function DefaultDispositionsPage() {
           
           {/* Form Grid - 2 columns on desktop, 1 on mobile */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+            <Select
+              label="Industry scope"
+              value={formData.industry_id || GLOBAL_INDUSTRY_VALUE}
+              onChange={(e) => setFormData({ ...formData, industry_id: e.target.value })}
+              options={industryFormOptions}
+              error={formErrors.industry_id}
+            />
             <Input
               label="Name"
               value={formData.name || ''}

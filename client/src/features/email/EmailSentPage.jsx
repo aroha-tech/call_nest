@@ -7,7 +7,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { Spinner } from '../../components/ui/Spinner';
 import { Alert } from '../../components/ui/Alert';
 import { SearchInput } from '../../components/ui/SearchInput';
-import { Pagination } from '../../components/ui/Pagination';
+import { Pagination, PaginationPageSize } from '../../components/ui/Pagination';
 import { Select } from '../../components/ui/Select';
 import { Input } from '../../components/ui/Input';
 import { emailMessagesAPI, emailAccountsAPI, emailTemplatesAPI, emailSendAPI } from '../../services/emailAPI';
@@ -19,6 +19,8 @@ import { renderPreview, linkify, linkifyHtml, DEFAULT_PREVIEW_DATA } from '../..
 import { ScriptBodyEditor } from '../callScripts/ScriptBodyEditor';
 import { VariableSelector } from '../../components/VariableSelector';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
+import listStyles from '../../components/admin/adminDataList.module.scss';
+import { FilterBar } from '../../components/admin/FilterBar';
 
 const PAGE_SIZE = 20;
 
@@ -27,8 +29,10 @@ const TEMPLATE_ALL_VALUE = 'all';
 
 export function EmailSentPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedAccountId, setSelectedAccountId] = useState(ACCOUNT_ALL_VALUE);
-  const [selectedTemplateId, setSelectedTemplateId] = useState(TEMPLATE_ALL_VALUE);
+  const [appliedAccountId, setAppliedAccountId] = useState(ACCOUNT_ALL_VALUE);
+  const [appliedTemplateId, setAppliedTemplateId] = useState(TEMPLATE_ALL_VALUE);
+  const [draftAccountId, setDraftAccountId] = useState(ACCOUNT_ALL_VALUE);
+  const [draftTemplateId, setDraftTemplateId] = useState(TEMPLATE_ALL_VALUE);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(PAGE_SIZE);
   const fetchMessages = useCallback(
@@ -36,14 +40,14 @@ export function EmailSentPage() {
       
       emailMessagesAPI.getAll({
         folder: 'sent',
-        email_account_id: selectedAccountId === ACCOUNT_ALL_VALUE ? undefined : selectedAccountId,
+        email_account_id: appliedAccountId === ACCOUNT_ALL_VALUE ? undefined : appliedAccountId,
         search: searchQuery || undefined,
         limit,
         offset: (page - 1) * limit,
       }),
-    [searchQuery, page, limit, selectedAccountId]
+    [searchQuery, page, limit, appliedAccountId]
   );
-  const { data: response, loading, error, refetch } = useAsyncData(fetchMessages, [searchQuery, page, limit], {
+  const { data: response, loading, error, refetch } = useAsyncData(fetchMessages, [searchQuery, page, limit, appliedAccountId], {
     transform: (res) => res?.data ?? { data: [], total: 0 },
   });
   const messages = response?.data ?? [];
@@ -167,12 +171,13 @@ export function EmailSentPage() {
 
   const templateFilterOptions = useMemo(
     () => {
-      const base = selectedAccountId
-        ? templateOptions.filter((t) => String(t.email_account_id) === selectedAccountId)
-        : templateOptions;
+      const base =
+        draftAccountId && draftAccountId !== ACCOUNT_ALL_VALUE
+          ? templateOptions.filter((t) => String(t.email_account_id) === draftAccountId)
+          : templateOptions;
       return base.map((t) => ({ value: t.value, label: t.label }));
     },
-    [templateOptions, selectedAccountId]
+    [templateOptions, draftAccountId]
   );
 
   const previewSample = previewSampleData || DEFAULT_PREVIEW_DATA;
@@ -188,15 +193,15 @@ export function EmailSentPage() {
   const filteredMessages = useMemo(
     () =>
       messages.filter((m) => {
-        if (selectedAccountId !== ACCOUNT_ALL_VALUE && String(m.email_account_id) !== selectedAccountId) {
+        if (appliedAccountId !== ACCOUNT_ALL_VALUE && String(m.email_account_id) !== appliedAccountId) {
           return false;
         }
-        if (selectedTemplateId !== TEMPLATE_ALL_VALUE && String(m.template_id || '') !== selectedTemplateId) {
+        if (appliedTemplateId !== TEMPLATE_ALL_VALUE && String(m.template_id || '') !== appliedTemplateId) {
           return false;
         }
         return true;
       }),
-    [messages, selectedAccountId, selectedTemplateId]
+    [messages, appliedAccountId, appliedTemplateId]
   );
 
   if (loading && !messages.length && page === 1) {
@@ -218,49 +223,62 @@ export function EmailSentPage() {
 
       {error && <Alert variant="error">{error}</Alert>}
 
-      <div className={styles.toolbar} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
+      <FilterBar
+        onApply={() => {
+          setAppliedAccountId(draftAccountId);
+          setAppliedTemplateId(draftTemplateId);
+          setPage(1);
+        }}
+        onReset={() => {
+          setDraftAccountId(ACCOUNT_ALL_VALUE);
+          setDraftTemplateId(TEMPLATE_ALL_VALUE);
+          setAppliedAccountId(ACCOUNT_ALL_VALUE);
+          setAppliedTemplateId(TEMPLATE_ALL_VALUE);
+          setPage(1);
+        }}
+      >
         <Select
           label="Account"
-          value={selectedAccountId}
-          onChange={(e) => { setSelectedAccountId(e.target.value); setPage(1); }}
+          value={draftAccountId}
+          onChange={(e) => {
+            setDraftAccountId(e.target.value);
+            setDraftTemplateId(TEMPLATE_ALL_VALUE);
+          }}
           options={[{ value: ACCOUNT_ALL_VALUE, label: 'All accounts' }, ...accountOptions]}
         />
         <Select
           label="Template"
-          value={selectedTemplateId}
-          onChange={(e) => { setSelectedTemplateId(e.target.value); setPage(1); }}
+          value={draftTemplateId}
+          onChange={(e) => setDraftTemplateId(e.target.value)}
           options={[
             { value: TEMPLATE_ALL_VALUE, label: 'All templates' },
             ...templateFilterOptions,
           ]}
         />
-        <SearchInput
-          value={searchQuery}
-          onSearch={handleSearch}
-          placeholder="Search to, subject (press Enter)"
-        />
-      </div>
+      </FilterBar>
 
-      {total > 0 && (
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          total={total}
-          limit={limit}
-          onPageChange={setPage}
-          onLimitChange={(l) => { setLimit(l); setPage(1); }}
-        />
-      )}
-
-      {!filteredMessages?.length ? (
-        <EmptyState
-          icon="📤"
-          title="No sent emails"
-          description="Sent emails will appear here."
-          action={openCompose}
-          actionLabel="Compose"
-        />
-      ) : (
+      <div className={listStyles.tableCard}>
+        <div className={listStyles.tableCardToolbarTop}>
+          <PaginationPageSize limit={limit} onLimitChange={(l) => { setLimit(l); setPage(1); }} />
+          <SearchInput
+            value={searchQuery}
+            onSearch={handleSearch}
+            placeholder="Search to, subject (press Enter)"
+            className={listStyles.searchInToolbar}
+          />
+        </div>
+        {!filteredMessages?.length ? (
+          <div className={listStyles.tableCardEmpty}>
+            <EmptyState
+              icon="📤"
+              title="No sent emails"
+              description="Sent emails will appear here."
+              action={openCompose}
+              actionLabel="Compose"
+            />
+          </div>
+        ) : (
+          <div className={listStyles.tableCardBody}>
         <Table>
           <TableHead>
             <TableRow>
@@ -287,7 +305,20 @@ export function EmailSentPage() {
             ))}
           </TableBody>
         </Table>
-      )}
+          </div>
+        )}
+        <div className={listStyles.tableCardFooterPagination}>
+          <Pagination
+            page={page}
+            totalPages={Math.max(1, totalPages)}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+            onLimitChange={(l) => { setLimit(l); setPage(1); }}
+            hidePageSize
+          />
+        </div>
+      </div>
 
       <Modal
         isOpen={!!selectedMessage}

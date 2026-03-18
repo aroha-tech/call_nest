@@ -1,10 +1,11 @@
 import React from 'react';
 import styles from './Table.module.scss';
 
-export function Table({ children, className = '' }) {
+export function Table({ children, className = '', variant = 'default' }) {
+  const admin = variant === 'adminList';
   return (
-    <div className={`${styles.wrapper} ${className}`}>
-      <table className={styles.table}>{children}</table>
+    <div className={`${styles.wrapper} ${admin ? styles.wrapperAdminList : ''} ${className}`}>
+      <table className={`${styles.table} ${admin ? styles.tableAdminList : ''}`}>{children}</table>
     </div>
   );
 }

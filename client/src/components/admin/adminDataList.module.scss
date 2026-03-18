@@ -1,0 +1,193 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+/**
+ * List page layout: page scope (header + filters) → table card (data → search → pagination).
+ */
+.page {
+  width: 100%;
+}
+
+/** Filters / dropdowns — outside the table card (page scope) */
+.filterScope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-4;
+  align-items: flex-end;
+  margin-bottom: $space-4;
+}
+
+/** Filters row: dropdowns left, Apply / Reset right */
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: $space-4;
+  margin-bottom: $space-4;
+  padding: $space-4;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-lg;
+}
+
+.filterBarFields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-4 $space-6;
+  align-items: flex-end;
+  flex: 1;
+  min-width: min(100%, 240px);
+}
+
+.filterBarActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-3;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/** Rows + checkbox group (left of search in table toolbar) */
+.tableCardToolbarLeft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $space-4;
+}
+
+/** Strip above table when only checkbox (no search) */
+.tableToolbarCheckboxOnly {
+  display: flex;
+  align-items: center;
+  padding: $space-3 $space-4;
+  margin-bottom: $space-3;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-md;
+}
+
+/** Card: toolbar → fixed-height scroll body → pagination (footer never jumps) */
+.tableCard {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-lg;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/**
+ * Fixed height from viewport only — not from row count. So 6 rows or 20 rows:
+ * same box size; extra rows scroll inside; pagination stays under the same spot.
+ */
+@mixin admin-table-scroll {
+  /* ~10 dense rows + header; avoids large empty band under short lists */
+  --admin-table-body-h: clamp(320px, calc(100vh - 268px), 560px);
+  height: var(--admin-table-body-h);
+  min-height: var(--admin-table-body-h);
+  max-height: var(--admin-table-body-h);
+  flex: 0 0 var(--admin-table-body-h);
+  overflow: auto;
+  @include custom-scrollbar;
+
+  /* Table wraps in a div — scroll on this parent, not inner wrapper */
+  & > :first-child {
+    overflow: visible !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--color-bg-subtle);
+    box-shadow: 0 1px 0 var(--color-border-subtle);
+  }
+}
+
+.tableCardBody {
+  @include admin-table-scroll;
+}
+
+/** Same scroll behavior for pages without full tableCard (email accounts, WA templates, …) */
+.tableScrollArea {
+  @include admin-table-scroll;
+  margin-top: $space-4;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-lg;
+  background: var(--color-bg-surface);
+}
+
+/** No pagination: table height follows content (no fixed band) */
+.tableScrollAreaNatural {
+  width: 100%;
+  margin-top: $space-4;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-lg;
+  background: var(--color-bg-surface);
+  overflow-x: auto;
+  @include custom-scrollbar;
+
+  & > :first-child {
+    overflow: visible !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+}
+
+.tableCardEmpty {
+  padding: $space-8 $space-4;
+}
+
+/** Search + rows per page — above table */
+.tableCardToolbarTop {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-3;
+  padding: $space-3 $space-4;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-subtle);
+}
+
+.tableCardToolbarTopSearch {
+  flex: 1;
+  min-width: 200px;
+  max-width: 420px;
+  margin-left: auto;
+}
+
+.searchInToolbar {
+  width: 100%;
+  max-width: 420px;
+  margin-left: auto;
+}
+
+.tableCardFooterPagination {
+  flex-shrink: 0;
+  border-top: 1px solid var(--color-border-subtle);
+  padding: $space-4 $space-5;
+  background: var(--color-bg-subtle);
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+
+  > div {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+.loadingInitial {
+  display: flex;
+  justify-content: center;
+  padding: $space-12;
+}

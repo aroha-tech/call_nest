@@ -3,15 +3,30 @@ import { MasterCRUDPage } from '../../components/MasterCRUDPage';
 import { useDispoActions } from '../../hooks/useMasterData';
 import { StatusBadge } from '../../../../components/ui/Badge';
 
+const fmtDate = (v) =>
+  v ? new Date(v).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '—';
+
 const columns = [
-  { key: 'name', label: 'Name' },
-  { key: 'code', label: 'Code', width: '150px' },
-  { key: 'description', label: 'Description' },
+  { key: 'name', label: 'Name', width: '14%' },
+  { key: 'code', label: 'Code', width: '130px' },
+  { key: 'description', label: 'Description', width: '20%' },
   {
     key: 'is_active',
     label: 'Status',
     width: '100px',
     render: (value) => <StatusBadge isActive={value === 1} />,
+  },
+  {
+    key: 'created_at',
+    label: 'Created',
+    width: '118px',
+    render: (v) => fmtDate(v),
+  },
+  {
+    key: 'updated_at',
+    label: 'Updated',
+    width: '118px',
+    render: (v) => fmtDate(v),
   },
 ];
 

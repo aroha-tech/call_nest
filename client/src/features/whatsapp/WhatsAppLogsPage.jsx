@@ -9,10 +9,11 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { SearchInput } from '../../components/ui/SearchInput';
-import { Pagination } from '../../components/ui/Pagination';
+import { Pagination, PaginationPageSize } from '../../components/ui/Pagination';
 import { whatsappLogsAPI, whatsappAccountsAPI, whatsappSettingsAPI } from '../../services/whatsappAPI';
 import { useAsyncData } from '../../hooks/useAsyncData';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
+import listStyles from '../../components/admin/adminDataList.module.scss';
 
 const LOGS_PAGE_SIZE = 20;
 
@@ -111,67 +112,74 @@ export function WhatsAppLogsPage() {
 
       {error && <Alert variant="error">{error}</Alert>}
 
-      <div className={styles.toolbar} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
-        <SearchInput
-          value={searchQuery}
-          onSearch={handleSearch}
-          placeholder="Search endpoint, error, request/response (press Enter)"
-        />
+      <div className={listStyles.tableCard}>
+        <div className={listStyles.tableCardToolbarTop}>
+          <PaginationPageSize limit={limit} onLimitChange={(newLimit) => { setLimit(newLimit); setPage(1); }} />
+          <SearchInput
+            value={searchQuery}
+            onSearch={handleSearch}
+            placeholder="Search endpoint, error, request/response (press Enter)"
+            className={listStyles.searchInToolbar}
+          />
+        </div>
+        {!logs?.length ? (
+          <div className={listStyles.tableCardEmpty}>
+            <EmptyState
+              icon="📋"
+              title="No API logs"
+              description="Logs appear here when you send messages or sync templates."
+            />
+          </div>
+        ) : (
+          <div className={listStyles.tableCardBody}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>Time</TableHeaderCell>
+                  <TableHeaderCell>Direction</TableHeaderCell>
+                  <TableHeaderCell>Method</TableHeaderCell>
+                  <TableHeaderCell>Status</TableHeaderCell>
+                  <TableHeaderCell>Account</TableHeaderCell>
+                  <TableHeaderCell width="80px" align="center">View</TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {logs.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{row.created_at ? new Date(row.created_at).toLocaleString() : '—'}</TableCell>
+                    <TableCell>{row.direction || 'outbound'}</TableCell>
+                    <TableCell>{row.method || '—'}</TableCell>
+                    <TableCell>
+                      {row.response_status != null ? (
+                        <Badge variant={row.response_status >= 400 ? 'danger' : 'success'}>
+                          {row.response_status}
+                        </Badge>
+                      ) : (
+                        '—'
+                      )}
+                    </TableCell>
+                    <TableCell>{row.account_phone || '—'}</TableCell>
+                    <TableCell align="center">
+                      <Button size="sm" variant="ghost" onClick={() => setSelectedLog(row)}>Details</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        <div className={listStyles.tableCardFooterPagination}>
+          <Pagination
+            page={page}
+            totalPages={Math.max(1, totalPages)}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+            onLimitChange={(newLimit) => { setLimit(newLimit); setPage(1); }}
+            hidePageSize
+          />
+        </div>
       </div>
-
-      {total > 0 && (
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          total={total}
-          limit={limit}
-          onPageChange={setPage}
-          onLimitChange={(newLimit) => { setLimit(newLimit); setPage(1); }}
-        />
-      )}
-
-      {!logs?.length ? (
-        <EmptyState
-          icon="📋"
-          title="No API logs"
-          description="Logs appear here when you send messages or sync templates."
-        />
-      ) : (
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>Time</TableHeaderCell>
-              <TableHeaderCell>Direction</TableHeaderCell>
-              <TableHeaderCell>Method</TableHeaderCell>
-              <TableHeaderCell>Status</TableHeaderCell>
-              <TableHeaderCell>Account</TableHeaderCell>
-              <TableHeaderCell width="80px" align="center">View</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {logs.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell>{row.created_at ? new Date(row.created_at).toLocaleString() : '—'}</TableCell>
-                <TableCell>{row.direction || 'outbound'}</TableCell>
-                <TableCell>{row.method || '—'}</TableCell>
-                <TableCell>
-                  {row.response_status != null ? (
-                    <Badge variant={row.response_status >= 400 ? 'danger' : 'success'}>
-                      {row.response_status}
-                    </Badge>
-                  ) : (
-                    '—'
-                  )}
-                </TableCell>
-                <TableCell>{row.account_phone || '—'}</TableCell>
-                <TableCell align="center">
-                  <Button size="sm" variant="ghost" onClick={() => setSelectedLog(row)}>Details</Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
 
       <Modal
         isOpen={!!selectedLog}

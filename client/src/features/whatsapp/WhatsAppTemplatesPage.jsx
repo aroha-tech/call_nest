@@ -14,6 +14,8 @@ import { Checkbox } from '../../components/ui/Checkbox';
 import { whatsappTemplatesAPI, whatsappAccountsAPI, whatsappSettingsAPI } from '../../services/whatsappAPI';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
+import listStyles from '../../components/admin/adminDataList.module.scss';
+import { FilterBar } from '../../components/admin/FilterBar';
 
 const COMPONENT_TYPES = [
   { value: 'HEADER', label: 'HEADER' },
@@ -59,12 +61,20 @@ const TEMPLATE_LANGUAGES = [
 
 export function WhatsAppTemplatesPage() {
   const [showInactive, setShowInactive] = useState(false);
-  const [accountFilter, setAccountFilter] = useState('__all__');
+  const [appliedAccount, setAppliedAccount] = useState('__all__');
+  const [draftAccount, setDraftAccount] = useState('__all__');
   const fetchTemplates = useCallback(
-    () => whatsappTemplatesAPI.getAll(showInactive, accountFilter === '__all__' ? null : accountFilter),
-    [showInactive, accountFilter]
+    () =>
+      whatsappTemplatesAPI.getAll(
+        showInactive,
+        appliedAccount === '__all__' ? null : appliedAccount
+      ),
+    [showInactive, appliedAccount]
   );
-  const { data: templates, loading, error, refetch } = useAsyncData(fetchTemplates, [showInactive]);
+  const { data: templates, loading, error, refetch } = useAsyncData(fetchTemplates, [
+    showInactive,
+    appliedAccount,
+  ]);
   const fetchAccounts = useCallback(() => whatsappAccountsAPI.getAll(true), []);
   const { data: accounts } = useAsyncData(fetchAccounts, []);
 
@@ -372,21 +382,30 @@ export function WhatsAppTemplatesPage() {
       {error && <Alert variant="error">{error}</Alert>}
       {editLoadError && <Alert variant="error">{editLoadError}</Alert>}
 
-      <div className={styles.toolbar} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
+      <FilterBar
+        onApply={() => setAppliedAccount(draftAccount)}
+        onReset={() => {
+          setDraftAccount('__all__');
+          setAppliedAccount('__all__');
+        }}
+      >
+        <Select
+          label="Account"
+          value={draftAccount}
+          onChange={(e) => setDraftAccount(e.target.value)}
+          options={[
+            { value: '__all__', label: 'All accounts' },
+            ...(accountOptions || []),
+          ]}
+        />
+      </FilterBar>
+
+      <div className={listStyles.tableToolbarCheckboxOnly}>
         <Checkbox
           id="show-inactive-templates"
           label="Show inactive"
           checked={showInactive}
           onChange={(e) => setShowInactive(e.target.checked)}
-        />
-        <Select
-          label="Account"
-          value={accountFilter}
-          onChange={(e) => { setAccountFilter(e.target.value); }}
-          options={[
-            { value: '__all__', label: 'All accounts' },
-            ...(accountOptions || []),
-          ]}
         />
       </div>
 
@@ -399,6 +418,7 @@ export function WhatsAppTemplatesPage() {
           actionLabel="Add Template"
         />
       ) : (
+        <div className={listStyles.tableScrollAreaNatural}>
         <Table>
           <TableHead>
             <TableRow>
@@ -437,6 +457,7 @@ export function WhatsAppTemplatesPage() {
             ))}
           </TableBody>
         </Table>
+        </div>
       )}
 
       <Modal
