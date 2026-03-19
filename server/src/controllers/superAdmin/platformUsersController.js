@@ -8,7 +8,18 @@ export async function getAll(req, res, next) {
       include_disabled,
       page = '1',
       limit = '20',
+      role,
+      filter_manager_id,
     } = req.query;
+
+    const roleFilter =
+      role && ['admin', 'manager', 'agent'].includes(String(role)) ? String(role) : undefined;
+    let filterManagerId;
+    if (filter_manager_id === 'unassigned') {
+      filterManagerId = 'unassigned';
+    } else if (filter_manager_id != null && filter_manager_id !== '' && filter_manager_id !== '__all__') {
+      filterManagerId = filter_manager_id;
+    }
 
     const result = await platformUsersService.findAll({
       tenant_id: tenant_id || undefined,
@@ -16,6 +27,8 @@ export async function getAll(req, res, next) {
       includeDisabled: include_disabled === 'true',
       page: parseInt(page, 10),
       limit: parseInt(limit, 10),
+      role: roleFilter,
+      filterManagerId,
     });
 
     res.json(result);

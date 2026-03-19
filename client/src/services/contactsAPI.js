@@ -2,8 +2,22 @@ import { axiosInstance } from './axiosInstance';
 
 const BASE = '/api/tenant/contacts';
 
+function contactFilterParam(v) {
+  if (v === undefined || v === null || v === '' || v === '__all__') return undefined;
+  if (v === 'unassigned') return 'unassigned';
+  return v;
+}
+
 export const contactsAPI = {
-  getAll: ({ search, page = 1, limit = 20, type, status_id } = {}) =>
+  getAll: ({
+    search,
+    page = 1,
+    limit = 20,
+    type,
+    status_id,
+    filter_manager_id,
+    filter_assigned_user_id,
+  } = {}) =>
     axiosInstance.get(`${BASE}`, {
       params: {
         search: search || undefined,
@@ -11,6 +25,8 @@ export const contactsAPI = {
         limit,
         type: type || undefined,
         status_id: status_id || undefined,
+        filter_manager_id: contactFilterParam(filter_manager_id),
+        filter_assigned_user_id: contactFilterParam(filter_assigned_user_id),
       },
     }),
 
@@ -30,13 +46,22 @@ export const contactsAPI = {
   getContactCustomFields: (contactId) =>
     axiosInstance.get(`${BASE}/${contactId}/custom-fields`),
 
-  exportCsv: ({ search, type, status_id, include_custom_fields = true } = {}) =>
+  exportCsv: ({
+    search,
+    type,
+    status_id,
+    include_custom_fields = true,
+    filter_manager_id,
+    filter_assigned_user_id,
+  } = {}) =>
     axiosInstance.get(`${BASE}/export/csv`, {
       params: {
         search: search || undefined,
         type: type || undefined,
         status_id: status_id || undefined,
         include_custom_fields: include_custom_fields ? '1' : '0',
+        filter_manager_id: contactFilterParam(filter_manager_id),
+        filter_assigned_user_id: contactFilterParam(filter_assigned_user_id),
       },
       responseType: 'blob',
     }),

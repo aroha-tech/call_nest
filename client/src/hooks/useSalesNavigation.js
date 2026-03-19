@@ -41,8 +41,14 @@ const PLATFORM_NAV_ITEMS = [
  */
 const TENANT_ADMIN_NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW },
-  { key: 'users', label: 'Users', path: '/users', permission: PERMISSIONS.USERS_MANAGE },
+  { key: 'users', label: 'Users', path: '/users', permissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM] },
   { key: 'leads', label: 'Leads', path: '/leads', permission: PERMISSIONS.LEADS_READ },
+  {
+    key: 'campaigns',
+    label: 'Campaigns',
+    path: '/campaigns',
+    permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
+  },
   { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
   { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
   { key: 'activities', label: 'Activities', path: '/activities', permission: PERMISSIONS.DIAL_EXECUTE },
@@ -103,11 +109,17 @@ const TENANT_ADMIN_NAV_ITEMS = [
 const MANAGER_NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW },
   { key: 'leads', label: 'Leads', path: '/leads', permission: PERMISSIONS.LEADS_READ },
+  {
+    key: 'campaigns',
+    label: 'Campaigns',
+    path: '/campaigns',
+    permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
+  },
   { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
   { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
   { key: 'activities', label: 'Activities', path: '/activities', permission: PERMISSIONS.DIAL_EXECUTE },
   { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
-  { key: 'users', label: 'Users', path: '/users', permission: PERMISSIONS.USERS_MANAGE },
+  { key: 'users', label: 'My team', path: '/users', permissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM] },
   {
     key: 'dialer-workflow',
     label: 'Dialer Workflow',
@@ -154,6 +166,12 @@ const MANAGER_NAV_ITEMS = [
 const AGENT_NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW },
   { key: 'leads', label: 'Leads', path: '/leads', permission: PERMISSIONS.LEADS_READ },
+  {
+    key: 'campaigns',
+    label: 'Campaigns',
+    path: '/campaigns',
+    permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
+  },
   { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
   { key: 'activities', label: 'Activities', path: '/activities', permission: PERMISSIONS.DIAL_EXECUTE },
   {
@@ -212,7 +230,17 @@ function filterNavItems(items, can, isPlatformAdmin) {
         return item;
       }
 
-      if (!item.permission || can(item.permission)) {
+      const allowedByPermission = (() => {
+        if (item.permissions?.length) {
+          return item.permissions.some((p) => can(p));
+        }
+        if (item.permission) {
+          return can(item.permission);
+        }
+        return true;
+      })();
+
+      if (allowedByPermission) {
         if (item.children) {
           const filteredChildren = filterNavItems(item.children, can, isPlatformAdmin);
           if (filteredChildren.length > 0) {

@@ -7,7 +7,6 @@ import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } fro
 import { Modal, ConfirmModal, ModalFooter } from '../../components/ui/Modal';
 import { IconButton } from '../../components/ui/IconButton';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { Spinner } from '../../components/ui/Spinner';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Checkbox } from '../../components/ui/Checkbox';
@@ -15,6 +14,8 @@ import { whatsappAccountsAPI } from '../../services/whatsappAPI';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
+import { useTableLoadingState } from '../../hooks/useTableLoadingState';
+import { TableDataRegion } from '../../components/admin/TableDataRegion';
 
 const PROVIDER_OPTIONS = [
   { value: 'meta', label: 'Meta Cloud API' },
@@ -69,6 +70,7 @@ export function WhatsAppAccountsPage() {
     [showInactive]
   );
   const { data: accounts, loading, error, refetch } = useAsyncData(fetchFn, [showInactive]);
+  const { hasCompletedInitialFetch } = useTableLoadingState(loading);
 
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -261,15 +263,6 @@ export function WhatsAppAccountsPage() {
   const fields =
     provider === 'manual' ? [] : PROVIDER_FIELDS[provider] || PROVIDER_FIELDS.meta;
 
-  if (loading && (!accounts || accounts.length === 0)) {
-    return (
-      <div className={styles.page}>
-        <PageHeader title="WhatsApp Accounts" />
-        <div className={styles.loading}><Spinner size="lg" /></div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.page}>
       <PageHeader
@@ -289,16 +282,17 @@ export function WhatsAppAccountsPage() {
         />
       </div>
 
-      {!accounts?.length ? (
-        <EmptyState
-          icon="📱"
-          title="No WhatsApp accounts"
-          description="Add an account to connect your WhatsApp Business API."
-          action={openCreate}
-          actionLabel="Add Account"
-        />
-      ) : (
-        <Table>
+      <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        {!accounts?.length ? (
+          <EmptyState
+            icon="📱"
+            title="No WhatsApp accounts"
+            description="Add an account to connect your WhatsApp Business API."
+            action={openCreate}
+            actionLabel="Add Account"
+          />
+        ) : (
+          <Table>
           <TableHead>
             <TableRow>
               <TableHeaderCell>Account</TableHeaderCell>
@@ -339,7 +333,8 @@ export function WhatsAppAccountsPage() {
             ))}
           </TableBody>
         </Table>
-      )}
+        )}
+      </TableDataRegion>
 
       <Modal
         isOpen={showModal}

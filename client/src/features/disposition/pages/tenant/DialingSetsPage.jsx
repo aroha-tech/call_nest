@@ -9,9 +9,10 @@ import { Modal, ConfirmModal, ModalFooter } from '../../../../components/ui/Moda
 import { StatusBadge, Badge } from '../../../../components/ui/Badge';
 import { IconButton } from '../../../../components/ui/IconButton';
 import { EmptyState } from '../../../../components/ui/EmptyState';
-import { Spinner } from '../../../../components/ui/Spinner';
 import { Alert } from '../../../../components/ui/Alert';
 import { useDialingSets, useDialingSetDispositions, useDispositions } from '../../hooks/useTenantData';
+import { useTableLoadingState } from '../../../../hooks/useTableLoadingState';
+import { TableDataRegion } from '../../../../components/admin/TableDataRegion';
 import styles from '../../components/MasterCRUDPage.module.scss';
 
 export function DialingSetsPage() {
@@ -25,6 +26,8 @@ export function DialingSetsPage() {
     delete: deleteFn,
     setDefault,
   } = useDialingSets(true);
+
+  const { hasCompletedInitialFetch } = useTableLoadingState(loading);
 
   const { dispositions: allDispositions } = useDispositions();
 
@@ -145,15 +148,6 @@ export function DialingSetsPage() {
     refetchDispositions();
   };
 
-  if (loading && dialingSets.length === 0) {
-    return (
-      <div className={styles.page}>
-        <PageHeader title="Dialing Sets" />
-        <div className={styles.loading}><Spinner size="lg" /></div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.page}>
       <PageHeader
@@ -168,6 +162,7 @@ export function DialingSetsPage() {
         <SearchInput value={search} onSearch={(v) => setSearch(v)} placeholder="Search... (press Enter)" />
       </div>
 
+      <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
       <div className={styles.splitView}>
         <div className={styles.listPanel}>
           <h3 className={styles.panelTitle}>Dialing Sets</h3>
@@ -251,6 +246,7 @@ export function DialingSetsPage() {
           )}
         </div>
       </div>
+      </TableDataRegion>
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingItem ? 'Edit Dialing Set' : 'Create Dialing Set'} footer={
         <ModalFooter>

@@ -8,7 +8,6 @@ import { Modal, ConfirmModal, ModalFooter } from '../../components/ui/Modal';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { IconButton } from '../../components/ui/IconButton';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { Spinner } from '../../components/ui/Spinner';
 import { Alert } from '../../components/ui/Alert';
 import { StatusBadge, Badge } from '../../components/ui/Badge';
 import { Pagination, PaginationPageSize } from '../../components/ui/Pagination';
@@ -21,6 +20,8 @@ import { templateVariablesAPI } from '../../services/templateVariablesAPI';
 import { ScriptBodyEditor } from './ScriptBodyEditor';
 import styles from './CallScriptsPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
+import { useTableLoadingState } from '../../hooks/useTableLoadingState';
+import { TableDataRegion } from '../../components/admin/TableDataRegion';
 
 const defaultPagination = { page: 1, limit: 10, total: 0, totalPages: 1 };
 
@@ -70,6 +71,8 @@ export function CallScriptsPage() {
   useEffect(() => {
     fetchScripts();
   }, [fetchScripts]);
+
+  const { hasCompletedInitialFetch } = useTableLoadingState(loading);
 
   const handleSearch = useCallback((v) => {
     setSearch(v);
@@ -199,17 +202,6 @@ export function CallScriptsPage() {
   const previewHtml = isHtml ? linkifyHtml(previewRendered) : linkify(previewRendered);
   const previewText = previewRendered;
 
-  if (loading && scripts.length === 0) {
-    return (
-      <div className={styles.page}>
-        <PageHeader title="Call Scripts" description="Guided conversation scripts for agents during calls." />
-        <div className={styles.loading}>
-          <Spinner size="lg" />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.page}>
       <PageHeader
@@ -240,18 +232,19 @@ export function CallScriptsPage() {
             className={listStyles.searchInToolbar}
           />
         </div>
-        {scripts.length === 0 && !loading ? (
-          <div className={listStyles.tableCardEmpty}>
-            <EmptyState
-              icon="📜"
-              title={search || showInactive ? 'No results found' : 'No call scripts yet'}
-              description={search || showInactive ? 'Try a different search or clear filters.' : 'Add a script to guide agents during calls. Use variables for dynamic content.'}
-              action={!search && !showInactive ? openCreate : undefined}
-              actionLabel="Add Script"
-            />
-          </div>
-        ) : (
-          <div className={listStyles.tableCardBody}>
+        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+          {scripts.length === 0 ? (
+            <div className={listStyles.tableCardEmpty}>
+              <EmptyState
+                icon="📜"
+                title={search || showInactive ? 'No results found' : 'No call scripts yet'}
+                description={search || showInactive ? 'Try a different search or clear filters.' : 'Add a script to guide agents during calls. Use variables for dynamic content.'}
+                action={!search && !showInactive ? openCreate : undefined}
+                actionLabel="Add Script"
+              />
+            </div>
+          ) : (
+            <div className={listStyles.tableCardBody}>
             <Table>
               <TableHead>
                 <TableRow>
@@ -312,8 +305,9 @@ export function CallScriptsPage() {
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
+            </div>
+          )}
+        </TableDataRegion>
         {pagination && (
           <div className={listStyles.tableCardFooterPagination}>
             <Pagination

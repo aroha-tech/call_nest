@@ -1,14 +1,16 @@
 import { Router } from 'express';
 import * as tenantUsersController from '../../controllers/tenant/tenantUsersController.js';
-import { tenantAuthMiddleware } from '../../middleware/auth.js';
+import { tenantAuthMiddleware, requirePermission } from '../../middleware/auth.js';
 
 const router = Router();
 
 router.use(tenantAuthMiddleware);
 
-router.get('/', tenantUsersController.getAll);
-router.get('/:id', tenantUsersController.getById);
-router.post('/', tenantUsersController.create);
-router.put('/:id', tenantUsersController.update);
+const usersAccess = requirePermission(['users.manage', 'users.team']);
+
+router.get('/', usersAccess, tenantUsersController.getAll);
+router.get('/:id', usersAccess, tenantUsersController.getById);
+router.post('/', usersAccess, tenantUsersController.create);
+router.put('/:id', usersAccess, tenantUsersController.update);
 
 export default router;

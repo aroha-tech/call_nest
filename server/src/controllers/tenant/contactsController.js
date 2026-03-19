@@ -1,6 +1,20 @@
 import * as contactsService from '../../services/tenant/contactsService.js';
 import * as contactCustomFieldsService from '../../services/tenant/contactCustomFieldsService.js';
 
+/** Query: omit / empty = no filter; unassigned = pool / no agent; else positive int user id */
+function parseContactListFilterParam(raw) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return undefined;
+  const s = String(raw).trim().toLowerCase();
+  if (s === 'unassigned') return 'unassigned';
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) {
+    const err = new Error('Invalid filter_manager_id or filter_assigned_user_id');
+    err.status = 400;
+    throw err;
+  }
+  return n;
+}
+
 export async function list(req, res, next) {
   try {
     const tenantId = req.tenant?.id;
@@ -10,12 +24,17 @@ export async function list(req, res, next) {
 
     const { search = '', page = '1', limit = '20', type, status_id } = req.query;
 
+    const filterManagerId = parseContactListFilterParam(req.query.filter_manager_id);
+    const filterAssignedUserId = parseContactListFilterParam(req.query.filter_assigned_user_id);
+
     const result = await contactsService.listContacts(tenantId, req.user, {
       search,
       page: parseInt(page, 10),
       limit: parseInt(limit, 10),
       type: type || undefined,
       statusId: status_id || undefined,
+      filterManagerId,
+      filterAssignedUserId,
     });
 
     res.json(result);
@@ -179,11 +198,16 @@ export async function exportCsv(req, res, next) {
 
     const { search = '', type, status_id, include_custom_fields = '1' } = req.query;
 
+    const filterManagerId = parseContactListFilterParam(req.query.filter_manager_id);
+    const filterAssignedUserId = parseContactListFilterParam(req.query.filter_assigned_user_id);
+
     const csv = await contactsService.exportContactsCsv(tenantId, req.user, {
       search,
       type: type || undefined,
       statusId: status_id || undefined,
       includeCustomFields: include_custom_fields !== '0',
+      filterManagerId,
+      filterAssignedUserId,
     });
 
     const filename = `${type === 'contact' ? 'contacts' : type === 'lead' ? 'leads' : 'contacts'}_export_${new Date()

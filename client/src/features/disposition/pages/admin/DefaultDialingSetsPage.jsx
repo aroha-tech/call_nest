@@ -9,11 +9,12 @@ import { Modal, ConfirmModal, ModalFooter } from '../../../../components/ui/Moda
 import { StatusBadge, Badge } from '../../../../components/ui/Badge';
 import { IconButton } from '../../../../components/ui/IconButton';
 import { EmptyState } from '../../../../components/ui/EmptyState';
-import { Spinner } from '../../../../components/ui/Spinner';
 import { Alert } from '../../../../components/ui/Alert';
 import { useDefaultDialingSets, useDefaultDialingSetDispositions, useDefaultDispositions } from '../../hooks/useDefaultData';
 import { useIndustriesOptions } from '../../hooks/useMasterData';
 import styles from '../../components/MasterCRUDPage.module.scss';
+import { useTableLoadingState } from '../../../../hooks/useTableLoadingState';
+import { TableDataRegion } from '../../../../components/admin/TableDataRegion';
 
 export function DefaultDialingSetsPage() {
   const [selectedIndustry, setSelectedIndustry] = useState('__all__');
@@ -32,6 +33,8 @@ export function DefaultDialingSetsPage() {
     update,
     delete: deleteFn,
   } = useDefaultDialingSets(industryIdParam, true);
+
+  const { hasCompletedInitialFetch } = useTableLoadingState(loading);
 
   const { defaultDispositions } = useDefaultDispositions(industryIdParam);
   
@@ -183,9 +186,8 @@ export function DefaultDialingSetsPage() {
 
       {!selectedIndustry ? (
         <EmptyState icon="🏭" title="Select an Industry" description="Choose an industry to manage its dialing sets." />
-      ) : loading ? (
-        <div className={styles.loading}><Spinner size="lg" /></div>
       ) : (
+        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
         <div className={styles.splitView}>
           <div className={styles.listPanel}>
             <h3 className={styles.panelTitle}>Dialing Sets</h3>
@@ -259,6 +261,7 @@ export function DefaultDialingSetsPage() {
             )}
           </div>
         </div>
+        </TableDataRegion>
       )}
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingItem ? 'Edit Dialing Set' : 'Create Dialing Set'} footer={

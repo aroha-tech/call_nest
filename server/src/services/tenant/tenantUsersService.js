@@ -2,11 +2,45 @@ import bcrypt from 'bcryptjs';
 import { query } from '../../config/db.js';
 import { registerUser } from '../authService.js';
 import { getRoleByTenantAndName } from '../rbacService.js';
+import { syncContactsManagerForAgent } from './contactsService.js';
+
+const USER_SELECT = `u.id, u.tenant_id, u.email, u.name, u.role, u.role_id, u.manager_id,
+            u.is_enabled, u.created_at, u.last_login_at,
+            mgr.name AS manager_name, mgr.email AS manager_email`;
+
+const USER_JOIN = `FROM users u
+     LEFT JOIN users mgr ON mgr.id = u.manager_id AND mgr.tenant_id = u.tenant_id AND mgr.is_deleted = 0`;
 
 /**
- * List users for the current tenant only (company admin).
+ * Raw row from DB (no manager scope).
  */
-export async function findAll(tenantId, { search = '', includeDisabled = false, page = 1, limit = 20 } = {}) {
+async function fetchUserRowUnscoped(id, tenantId) {
+  const [row] = await query(
+    `SELECT ${USER_SELECT} ${USER_JOIN}
+     WHERE u.id = ? AND u.tenant_id = ? AND u.is_deleted = 0 AND u.is_platform_admin = 0`,
+    [id, tenantId]
+  );
+  return row || null;
+}
+
+/**
+ * Manager may see: self, agents on their team, and unassigned agents (manager_id IS NULL).
+ */
+function managerCanSeeUserRow(actingUser, row) {
+  if (!row || actingUser?.role !== 'manager') return true;
+  if (Number(row.id) === Number(actingUser.id)) return true;
+  if (row.role !== 'agent') return false;
+  return row.manager_id == null || Number(row.manager_id) === Number(actingUser.id);
+}
+
+/**
+ * List users for the current tenant. Managers see a scoped list for team management.
+ */
+export async function findAll(
+  tenantId,
+  actingUser,
+  { search = '', includeDisabled = false, page = 1, limit = 20, role: roleFilter, filterManagerId } = {}
+) {
   const pageNum = parseInt(page, 10) || 1;
   const limitNum = Math.min(parseInt(limit, 10) || 20, 100);
   const offset = (pageNum - 1) * limitNum;
@@ -15,6 +49,13 @@ export async function findAll(tenantId, { search = '', includeDisabled = false, 
 
   const whereClauses = ['u.is_deleted = 0', 'u.tenant_id = ?', 'u.is_platform_admin = 0'];
   const params = [tenantId];
+
+  if (actingUser?.role === 'manager') {
+    whereClauses.push(
+      '((u.id = ?) OR (u.role = ? AND (u.manager_id IS NULL OR u.manager_id = ?)))'
+    );
+    params.push(actingUser.id, 'agent', actingUser.id);
+  }
 
   if (!includeDisabled) {
     whereClauses.push('u.is_enabled = 1');
@@ -25,18 +66,52 @@ export async function findAll(tenantId, { search = '', includeDisabled = false, 
     params.push(`%${search}%`, `%${search}%`);
   }
 
+  /** Tenant admins only: narrow by role and/or agent reporting line. */
+  if (actingUser?.role === 'admin') {
+    const hasRoleFilter = roleFilter && ['admin', 'manager', 'agent'].includes(roleFilter);
+    if (hasRoleFilter) {
+      whereClauses.push('u.role = ?');
+      params.push(roleFilter);
+    }
+    /**
+     * manager_id only applies to agents. If role is admin or manager, ignore reports-to (else every
+     * manager matched (role <> 'agent') and the filter looked broken).
+     * - All roles: keep admins/managers visible, narrow agents by manager_id.
+     * - Role agent only: strict match on manager_id.
+     */
+    const managerFilterActive =
+      filterManagerId === 'unassigned' ||
+      (filterManagerId != null && filterManagerId !== '' && filterManagerId !== '__all__');
+    if (managerFilterActive && (!hasRoleFilter || roleFilter === 'agent')) {
+      if (filterManagerId === 'unassigned') {
+        if (!hasRoleFilter) {
+          whereClauses.push('(u.role <> ? OR u.manager_id IS NULL)');
+          params.push('agent');
+        } else {
+          whereClauses.push('u.manager_id IS NULL');
+        }
+      } else {
+        const mid = Number(filterManagerId);
+        if (!Number.isNaN(mid)) {
+          if (!hasRoleFilter) {
+            whereClauses.push('(u.role <> ? OR u.manager_id = ?)');
+            params.push('agent', mid);
+          } else {
+            whereClauses.push('u.manager_id = ?');
+            params.push(mid);
+          }
+        }
+      }
+    }
+  }
+
   const whereSQL = `WHERE ${whereClauses.join(' AND ')}`;
 
-  const [countRow] = await query(
-    `SELECT COUNT(*) AS total FROM users u ${whereSQL}`,
-    params
-  );
+  const [countRow] = await query(`SELECT COUNT(*) AS total FROM users u ${whereSQL}`, params);
   const total = countRow.total;
 
   const data = await query(
-    `SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.role_id, u.manager_id,
-            u.is_enabled, u.created_at, u.last_login_at
-     FROM users u
+    `SELECT ${USER_SELECT} ${USER_JOIN}
      ${whereSQL}
      ORDER BY u.role ASC, u.email ASC
      LIMIT ${limitInt} OFFSET ${offsetInt}`,
@@ -54,30 +129,37 @@ export async function findAll(tenantId, { search = '', includeDisabled = false, 
   };
 }
 
-export async function findById(id, tenantId) {
-  const [row] = await query(
-    `SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.role_id, u.manager_id,
-            u.is_enabled, u.created_at, u.last_login_at
-     FROM users u
-     WHERE u.id = ? AND u.tenant_id = ? AND u.is_deleted = 0 AND u.is_platform_admin = 0`,
-    [id, tenantId]
-  );
-  return row || null;
+export async function findById(id, tenantId, actingUser) {
+  const row = await fetchUserRowUnscoped(id, tenantId);
+  if (!row) return null;
+  if (!managerCanSeeUserRow(actingUser, row)) return null;
+  return row;
 }
 
 /**
- * Create user in the current tenant (admin, manager, or agent). Only tenant admin/manager can call.
+ * Create user in the current tenant.
  */
-export async function create(tenantId, { email, password, name, role, manager_id = null }) {
+export async function create(tenantId, actingUser, { email, password, name, role, manager_id = null }) {
+  let effectiveManagerId = manager_id;
+
+  if (actingUser?.role === 'manager') {
+    if (role !== 'agent') {
+      const err = new Error('Managers can only create agents');
+      err.status = 403;
+      throw err;
+    }
+    effectiveManagerId = actingUser.id;
+  }
+
   const user = await registerUser(email, password, name, tenantId, role);
 
   if (role === 'agent') {
-    // If manager_id is provided, validate it. Otherwise keep NULL.
-    if (manager_id) {
+    const mid = effectiveManagerId ? Number(effectiveManagerId) : null;
+    if (mid) {
       const [managerRow] = await query(
         `SELECT id FROM users
          WHERE id = ? AND tenant_id = ? AND role = 'manager' AND is_deleted = 0`,
-        [manager_id, tenantId]
+        [mid, tenantId]
       );
 
       if (!managerRow) {
@@ -86,24 +168,56 @@ export async function create(tenantId, { email, password, name, role, manager_id
         throw err;
       }
 
-      await query(
-        'UPDATE users SET manager_id = ? WHERE id = ? AND tenant_id = ?',
-        [manager_id, user.id, tenantId]
-      );
+      await query('UPDATE users SET manager_id = ? WHERE id = ? AND tenant_id = ?', [mid, user.id, tenantId]);
     }
   }
 
-  return findById(user.id, tenantId);
+  return findById(user.id, tenantId, actingUser);
 }
 
 /**
- * Update user. User must belong to tenant. Accepts: name, role, is_enabled, password.
+ * Update user. Managers may only manage agents on / off their team (and their own profile basics).
  */
-export async function update(id, tenantId, payload) {
-  const existing = await findById(id, tenantId);
+export async function update(id, tenantId, actingUser, payload) {
+  const existing = await findById(id, tenantId, actingUser);
   if (!existing) return null;
 
   const { name, role, is_enabled, password, manager_id } = payload;
+
+  if (actingUser?.role === 'manager') {
+    const isSelf = Number(existing.id) === Number(actingUser.id);
+    if (isSelf) {
+      if (role !== undefined) {
+        const err = new Error('Managers cannot change their own role');
+        err.status = 403;
+        throw err;
+      }
+      if (manager_id !== undefined) {
+        const err = new Error('Cannot set manager_id on a manager account');
+        err.status = 403;
+        throw err;
+      }
+    } else if (existing.role === 'agent') {
+      if (role !== undefined && role !== 'agent') {
+        const err = new Error('Managers cannot change an agent into another role');
+        err.status = 403;
+        throw err;
+      }
+      if (manager_id !== undefined) {
+        const cleared = manager_id === null || manager_id === '';
+        const midNum = cleared ? null : Number(manager_id);
+        if (midNum != null && midNum !== Number(actingUser.id)) {
+          const err = new Error('Managers can only assign agents to their own team or unassign (pool)');
+          err.status = 403;
+          throw err;
+        }
+      }
+    } else {
+      const err = new Error('Managers can only edit their own profile or agents on their team');
+      err.status = 403;
+      throw err;
+    }
+  }
 
   const updates = [];
   const params = [];
@@ -126,11 +240,9 @@ export async function update(id, tenantId, payload) {
   }
 
   if (manager_id !== undefined) {
-    // Only allow setting manager_id for agents; managers/admins ignore it.
     const effectiveRole = role ?? existing.role;
     if (effectiveRole === 'agent') {
       if (manager_id === null || manager_id === '') {
-        // Allow clearing manager assignment.
         updates.push('manager_id = NULL');
       } else {
         const [managerRow] = await query(
@@ -162,5 +274,13 @@ export async function update(id, tenantId, payload) {
   if (updates.length === 0) return existing;
   params.push(id);
   await query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
-  return findById(id, tenantId);
+
+  const finalRole = role !== undefined ? role : existing.role;
+  if (manager_id !== undefined && finalRole === 'agent') {
+    const newMid =
+      manager_id === null || manager_id === '' ? null : Number(manager_id);
+    await syncContactsManagerForAgent(tenantId, id, newMid, actingUser?.id ?? null);
+  }
+
+  return findById(id, tenantId, actingUser);
 }

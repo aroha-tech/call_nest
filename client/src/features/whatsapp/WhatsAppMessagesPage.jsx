@@ -6,7 +6,6 @@ import { Select } from '../../components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { Modal, ModalFooter } from '../../components/ui/Modal';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { Spinner } from '../../components/ui/Spinner';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { SearchInput } from '../../components/ui/SearchInput';
@@ -16,6 +15,8 @@ import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { FilterBar } from '../../components/admin/FilterBar';
+import { useTableLoadingState } from '../../hooks/useTableLoadingState';
+import { TableDataRegion } from '../../components/admin/TableDataRegion';
 
 const STATUS_VARIANTS = {
   pending: 'muted',
@@ -117,6 +118,7 @@ export function WhatsAppMessagesPage() {
   const messages = messagesResponse?.data ?? [];
   const total = messagesResponse?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / limit));
+  const { hasCompletedInitialFetch } = useTableLoadingState(loading);
   const handleSearch = (value) => {
     setSearchQuery(value || '');
     setPage(1);
@@ -310,15 +312,6 @@ export function WhatsAppMessagesPage() {
     ? buildFullPreviewText(selectedTemplateDetail, sendForm.bodyParamValues)
     : '';
 
-  if (loading && (!messages || messages.length === 0) && page === 1 && !searchQuery) {
-    return (
-      <div className={styles.page}>
-        <PageHeader title="WhatsApp Messages" />
-        <div className={styles.loading}><Spinner size="lg" /></div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.page}>
       <PageHeader
@@ -402,18 +395,19 @@ export function WhatsAppMessagesPage() {
             className={listStyles.searchInToolbar}
           />
         </div>
-        {!messages?.length ? (
-          <div className={listStyles.tableCardEmpty}>
-            <EmptyState
-              icon="💬"
-              title="No messages yet"
-              description="Send a template message to get started."
-              action={() => openSend()}
-              actionLabel="Send message"
-            />
-          </div>
-        ) : (
-          <div className={listStyles.tableCardBody}>
+        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+          {!messages?.length ? (
+            <div className={listStyles.tableCardEmpty}>
+              <EmptyState
+                icon="💬"
+                title="No messages yet"
+                description="Send a template message to get started."
+                action={() => openSend()}
+                actionLabel="Send message"
+              />
+            </div>
+          ) : (
+            <div className={listStyles.tableCardBody}>
             <Table>
               <TableHead>
                 <TableRow>
@@ -442,8 +436,9 @@ export function WhatsAppMessagesPage() {
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
+            </div>
+          )}
+        </TableDataRegion>
         <div className={listStyles.tableCardFooterPagination}>
           <Pagination
             page={page}

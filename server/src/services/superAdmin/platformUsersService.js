@@ -7,7 +7,15 @@ import { getRoleByTenantAndName } from '../rbacService.js';
  * List users for platform admin (paginated).
  * Optional filter by tenant_id. Includes both platform admins (tenant_id NULL) and tenant users.
  */
-export async function findAll({ tenant_id, search = '', includeDisabled = false, page = 1, limit = 20 } = {}) {
+export async function findAll({
+  tenant_id,
+  search = '',
+  includeDisabled = false,
+  page = 1,
+  limit = 20,
+  role: roleFilter,
+  filterManagerId,
+} = {}) {
   const pageNum = parseInt(page, 10) || 1;
   const limitNum = Math.min(parseInt(limit, 10) || 20, 100);
   const offset = (pageNum - 1) * limitNum;
@@ -31,6 +39,37 @@ export async function findAll({ tenant_id, search = '', includeDisabled = false,
     params.push(`%${search}%`, `%${search}%`);
   }
 
+  const hasRoleFilter = roleFilter && ['admin', 'manager', 'agent'].includes(roleFilter);
+  if (hasRoleFilter) {
+    whereClauses.push('u.role = ?');
+    params.push(roleFilter);
+  }
+
+  const managerFilterActive =
+    filterManagerId === 'unassigned' ||
+    (filterManagerId != null && filterManagerId !== '' && filterManagerId !== '__all__');
+  if (managerFilterActive && (!hasRoleFilter || roleFilter === 'agent')) {
+    if (filterManagerId === 'unassigned') {
+      if (!hasRoleFilter) {
+        whereClauses.push('(u.role <> ? OR u.manager_id IS NULL)');
+        params.push('agent');
+      } else {
+        whereClauses.push('u.manager_id IS NULL');
+      }
+    } else {
+      const mid = Number(filterManagerId);
+      if (!Number.isNaN(mid)) {
+        if (!hasRoleFilter) {
+          whereClauses.push('(u.role <> ? OR u.manager_id = ?)');
+          params.push('agent', mid);
+        } else {
+          whereClauses.push('u.manager_id = ?');
+          params.push(mid);
+        }
+      }
+    }
+  }
+
   const whereSQL = `WHERE ${whereClauses.join(' AND ')}`;
 
   const [countRow] = await query(
@@ -40,7 +79,7 @@ export async function findAll({ tenant_id, search = '', includeDisabled = false,
   const total = countRow.total;
 
   const data = await query(
-    `SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.role_id, u.is_enabled, u.is_platform_admin,
+    `SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.role_id, u.manager_id, u.is_enabled, u.is_platform_admin,
             u.created_at, u.last_login_at,
             t.name AS tenant_name, t.slug AS tenant_slug
      FROM users u

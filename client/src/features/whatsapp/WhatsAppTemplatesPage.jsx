@@ -7,7 +7,6 @@ import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } fro
 import { Modal, ConfirmModal, ModalFooter } from '../../components/ui/Modal';
 import { IconButton } from '../../components/ui/IconButton';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { Spinner } from '../../components/ui/Spinner';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Checkbox } from '../../components/ui/Checkbox';
@@ -16,6 +15,8 @@ import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { FilterBar } from '../../components/admin/FilterBar';
+import { useTableLoadingState } from '../../hooks/useTableLoadingState';
+import { TableDataRegion } from '../../components/admin/TableDataRegion';
 
 const COMPONENT_TYPES = [
   { value: 'HEADER', label: 'HEADER' },
@@ -75,6 +76,7 @@ export function WhatsAppTemplatesPage() {
     showInactive,
     appliedAccount,
   ]);
+  const { hasCompletedInitialFetch } = useTableLoadingState(loading);
   const fetchAccounts = useCallback(() => whatsappAccountsAPI.getAll(true), []);
   const { data: accounts } = useAsyncData(fetchAccounts, []);
 
@@ -355,15 +357,6 @@ export function WhatsAppTemplatesPage() {
     .map((a) => ({ value: String(a.id), label: `${a.phone_number} (${a.provider || 'meta'})` }));
   const isMetaAccount = selectedAccount?.provider?.toLowerCase() === 'meta';
 
-  if (loading && (!templates || templates.length === 0)) {
-    return (
-      <div className={styles.page}>
-        <PageHeader title="WhatsApp Templates" />
-        <div className={styles.loading}><Spinner size="lg" /></div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.page}>
       <PageHeader
@@ -409,16 +402,17 @@ export function WhatsAppTemplatesPage() {
         />
       </div>
 
-      {!templates?.length ? (
-        <EmptyState
-          icon="📄"
-          title="No WhatsApp templates"
-          description="Add a template to send template messages."
-          action={openCreate}
-          actionLabel="Add Template"
-        />
-      ) : (
-        <div className={listStyles.tableScrollAreaNatural}>
+      <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        {!templates?.length ? (
+          <EmptyState
+            icon="📄"
+            title="No WhatsApp templates"
+            description="Add a template to send template messages."
+            action={openCreate}
+            actionLabel="Add Template"
+          />
+        ) : (
+          <div className={listStyles.tableScrollAreaNatural}>
         <Table>
           <TableHead>
             <TableRow>
@@ -457,8 +451,9 @@ export function WhatsAppTemplatesPage() {
             ))}
           </TableBody>
         </Table>
-        </div>
-      )}
+          </div>
+        )}
+      </TableDataRegion>
 
       <Modal
         isOpen={showModal}

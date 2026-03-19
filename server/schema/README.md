@@ -72,6 +72,10 @@ SOURCE D:/own_software/call_nest/server/schema/migrations/001_tenant_industry.sq
 SOURCE D:/own_software/call_nest/server/schema/migrations/002_master_soft_delete.sql;
 ```
 
+## Audit columns (new tables)
+
+All new business/tenant tables MUST include `created_by`, `updated_by`, `deleted_by`, `created_at`, `updated_at`, `deleted_at` (see `../.cursor/rules/database-audit-fields.mdc`). APIs should set user ids on create/update/soft-delete and filter lists with `deleted_at IS NULL`.
+
 ## Table Summary
 
 ### Core Tables

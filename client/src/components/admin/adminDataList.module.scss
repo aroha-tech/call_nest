@@ -56,6 +56,30 @@
   gap: $space-4;
 }
 
+/** Bulk assign slot: same row as search — fixed min-height avoids layout jump when selection changes */
+.bulkToolbarSlot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $space-3;
+  min-height: 40px;
+  flex: 1;
+  min-width: 0;
+}
+
+.bulkToolbarHint {
+  font-size: 13px;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.45));
+  user-select: none;
+  white-space: nowrap;
+}
+
+.bulkSelectionCount {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
 /** Strip above table when only checkbox (no search) */
 .tableToolbarCheckboxOnly {
   display: flex;
@@ -142,6 +166,34 @@
 
 .tableCardEmpty {
   padding: $space-8 $space-4;
+}
+
+/** List/table data band: inner loading only (search, filters, pagination refetch) */
+.tableDataRegion {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: clamp(320px, calc(100vh - 268px), 560px);
+}
+
+.tableRefreshingOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--color-bg-surface, #fff) 78%, transparent);
+  pointer-events: auto;
+}
+
+.firstLoadSpinnerWrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: clamp(320px, calc(100vh - 268px), 560px);
 }
 
 /** Search + rows per page — above table */

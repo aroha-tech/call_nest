@@ -4,7 +4,6 @@ import { Button } from '../../components/ui/Button';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { Modal, ModalFooter } from '../../components/ui/Modal';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { Spinner } from '../../components/ui/Spinner';
 import { Alert } from '../../components/ui/Alert';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { Pagination, PaginationPageSize } from '../../components/ui/Pagination';
@@ -21,6 +20,8 @@ import { VariableSelector } from '../../components/VariableSelector';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { FilterBar } from '../../components/admin/FilterBar';
+import { useTableLoadingState } from '../../hooks/useTableLoadingState';
+import { TableDataRegion } from '../../components/admin/TableDataRegion';
 
 const PAGE_SIZE = 20;
 
@@ -53,6 +54,7 @@ export function EmailSentPage() {
   const messages = response?.data ?? [];
   const total = response?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / limit));
+  const { hasCompletedInitialFetch } = useTableLoadingState(loading);
 
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [showCompose, setShowCompose] = useState(false);
@@ -204,15 +206,6 @@ export function EmailSentPage() {
     [messages, appliedAccountId, appliedTemplateId]
   );
 
-  if (loading && !messages.length && page === 1) {
-    return (
-      <div className={styles.page}>
-        <PageHeader title="Sent" />
-        <div className={styles.loading}><Spinner size="lg" /></div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.page}>
       <PageHeader
@@ -267,18 +260,19 @@ export function EmailSentPage() {
             className={listStyles.searchInToolbar}
           />
         </div>
-        {!filteredMessages?.length ? (
-          <div className={listStyles.tableCardEmpty}>
-            <EmptyState
-              icon="📤"
-              title="No sent emails"
-              description="Sent emails will appear here."
-              action={openCompose}
-              actionLabel="Compose"
-            />
-          </div>
-        ) : (
-          <div className={listStyles.tableCardBody}>
+        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+          {!filteredMessages?.length ? (
+            <div className={listStyles.tableCardEmpty}>
+              <EmptyState
+                icon="📤"
+                title="No sent emails"
+                description="Sent emails will appear here."
+                action={openCompose}
+                actionLabel="Compose"
+              />
+            </div>
+          ) : (
+            <div className={listStyles.tableCardBody}>
         <Table>
           <TableHead>
             <TableRow>
@@ -305,8 +299,9 @@ export function EmailSentPage() {
             ))}
           </TableBody>
         </Table>
-          </div>
-        )}
+            </div>
+          )}
+        </TableDataRegion>
         <div className={listStyles.tableCardFooterPagination}>
           <Pagination
             page={page}

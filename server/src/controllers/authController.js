@@ -1,6 +1,7 @@
 
 import * as authService from '../services/authService.js';
 import { query } from '../config/db.js';
+import { syncContactsManagerForAgent } from '../services/tenant/contactsService.js';
 
 /**
  * Register a new tenant (company) with admin
@@ -121,12 +122,14 @@ export async function registerAgent(req, res, next) {
 
     // Persist agent->manager relationship only if provided
     if (manager_id !== undefined) {
+      const mid = manager_id ?? null;
       await query(
         `UPDATE users
          SET manager_id = ?
          WHERE id = ? AND tenant_id = ? AND role = 'agent' AND is_deleted = 0`,
-        [manager_id ?? null, agent.id, tenantId]
+        [mid, agent.id, tenantId]
       );
+      await syncContactsManagerForAgent(tenantId, agent.id, mid, req.user?.id ?? null);
     }
     
     res.status(201).json({

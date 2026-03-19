@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useAppSelector } from '../../app/hooks';
+import { selectUser } from '../../features/auth/authSelectors';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -7,6 +9,8 @@ import { Select } from '../../components/ui/Select';
 import { Alert } from '../../components/ui/Alert';
 import { Spinner } from '../../components/ui/Spinner';
 import { contactsAPI } from '../../services/contactsAPI';
+import { tenantUsersAPI } from '../../services/tenantUsersAPI';
+import { campaignsAPI } from '../../services/campaignsAPI';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 
 const PHONE_LABEL_OPTIONS = [
@@ -48,12 +52,16 @@ export function ContactFormPage({ defaultType }) {
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
+  const authUser = useAppSelector(selectUser);
+  const role = authUser?.role ?? 'agent';
 
   const id = params.id;
   const isNew = !id || id === 'new';
   const type = defaultType; // 'lead' or 'contact' from route wrapper
 
   const [customFields, setCustomFields] = useState([]);
+  const [tenantUsers, setTenantUsers] = useState([]);
+  const [campaignList, setCampaignList] = useState([]);
   const [loadingCustomFields, setLoadingCustomFields] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [formErrors, setFormErrors] = useState({});
@@ -66,6 +74,9 @@ export function ContactFormPage({ defaultType }) {
     email: '',
     phones: [{ country_code: DEFAULT_COUNTRY_CODE, number: '', label: 'mobile', is_primary: true }],
     customValuesMap: {},
+    manager_id: '',
+    assigned_user_id: '',
+    campaign_id: '',
   });
 
   function splitPhoneE164(value) {
@@ -114,6 +125,30 @@ export function ContactFormPage({ defaultType }) {
     fetchCustomFields();
   }, [fetchCustomFields]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (role !== 'admin' && role !== 'manager') return;
+    (async () => {
+      try {
+        const [uRes, cRes] = await Promise.all([
+          tenantUsersAPI.getAll({ page: 1, limit: 500, includeDisabled: false }),
+          campaignsAPI.list().catch(() => ({ data: { data: [] } })),
+        ]);
+        if (cancelled) return;
+        setTenantUsers(uRes?.data?.data ?? []);
+        setCampaignList(cRes?.data?.data ?? []);
+      } catch {
+        if (!cancelled) {
+          setTenantUsers([]);
+          setCampaignList([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [role]);
+
   // Load contact into form when editing
   useEffect(() => {
     if (!contact || isNew) return;
@@ -137,6 +172,9 @@ export function ContactFormPage({ defaultType }) {
       email: contact.email ?? '',
       phones: mappedPhones,
       customValuesMap: prev.customValuesMap || {},
+      manager_id: contact.manager_id != null ? String(contact.manager_id) : '',
+      assigned_user_id: contact.assigned_user_id != null ? String(contact.assigned_user_id) : '',
+      campaign_id: contact.campaign_id != null ? String(contact.campaign_id) : '',
     }));
   }, [contact, isNew]);
 
@@ -188,6 +226,93 @@ export function ContactFormPage({ defaultType }) {
     return PHONE_LABEL_OPTIONS.filter((o) => !used.has(o.value));
   }, [formData.phones]);
 
+  const managerSelectOptions = useMemo(
+    () =>
+      tenantUsers
+        .filter((u) => u.role === 'manager')
+        .map((u) => ({ value: String(u.id), label: u.name || u.email || `#${u.id}` }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [tenantUsers]
+  );
+
+  /** Agents allowed for the current manager selection (admin: scoped by manager_id; manager: own team only). */
+  const agentsAllowedForManager = useMemo(() => {
+    let agents = tenantUsers.filter((u) => u.role === 'agent');
+    if (role === 'manager' && authUser?.id) {
+      return agents.filter((u) => Number(u.manager_id) === Number(authUser.id));
+    }
+    if (role === 'admin') {
+      const mid = formData.manager_id ? Number(formData.manager_id) : null;
+      if (mid) {
+        return agents.filter((u) => Number(u.manager_id) === mid);
+      }
+      return agents;
+    }
+    return agents;
+  }, [tenantUsers, role, authUser?.id, formData.manager_id]);
+
+  const agentSelectOptions = useMemo(() => {
+    const base = agentsAllowedForManager
+      .map((u) => ({ value: String(u.id), label: u.name || u.email || `#${u.id}` }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    const aid = formData.assigned_user_id ? String(formData.assigned_user_id) : '';
+    if (!aid) return base;
+    const inList = base.some((o) => o.value === aid);
+    if (inList) return base;
+    const u = tenantUsers.find((x) => x.role === 'agent' && String(x.id) === aid);
+    if (u) {
+      return [
+        {
+          value: aid,
+          label: `${u.name || u.email || `#${u.id}`} (current — not under selected manager)`,
+        },
+        ...base,
+      ];
+    }
+    return base;
+  }, [agentsAllowedForManager, formData.assigned_user_id, tenantUsers]);
+
+  // Admin: when a specific manager is chosen, drop the agent if they are not on that team.
+  useEffect(() => {
+    if (role !== 'admin') return;
+    const aid = formData.assigned_user_id;
+    if (!aid) return;
+    const mid = formData.manager_id ? Number(formData.manager_id) : null;
+    if (mid == null) return;
+    const agent = tenantUsers.find((u) => u.role === 'agent' && String(u.id) === String(aid));
+    if (!agent) return;
+    if (Number(agent.manager_id) !== mid) {
+      setFormData((p) => ({ ...p, assigned_user_id: '' }));
+    }
+  }, [role, formData.manager_id, formData.assigned_user_id, tenantUsers]);
+
+  // Admin: unassigned pool + pick agent → set owning manager from that agent (matches bulk assign / server rules).
+  useEffect(() => {
+    if (role !== 'admin') return;
+    if (formData.manager_id) return;
+    const aid = formData.assigned_user_id;
+    if (!aid) return;
+    if (tenantUsers.length === 0) return;
+    const agent = tenantUsers.find((u) => u.role === 'agent' && String(u.id) === String(aid));
+    if (!agent) return;
+    const agentMgr = agent.manager_id != null ? String(agent.manager_id) : '';
+    setFormData((p) => {
+      if (p.manager_id) return p;
+      if ((p.assigned_user_id ? String(p.assigned_user_id) : '') !== String(aid)) return p;
+      if ((agentMgr || '') === (p.manager_id || '')) return p;
+      return { ...p, manager_id: agentMgr };
+    });
+  }, [role, formData.manager_id, formData.assigned_user_id, tenantUsers]);
+
+  const campaignSelectOptions = useMemo(
+    () =>
+      (campaignList || []).map((c) => ({
+        value: String(c.id),
+        label: c.name || `#${c.id}`,
+      })),
+    [campaignList]
+  );
+
   const buildSubmitPayload = () => {
     const phones = (formData.phones || []).map((p) => {
       const cc = String(p.country_code || DEFAULT_COUNTRY_CODE).trim();
@@ -211,7 +336,7 @@ export function ContactFormPage({ defaultType }) {
       })
       .filter(Boolean);
 
-    return {
+    const base = {
       type,
       display_name: formData.display_name,
       first_name: formData.first_name || null,
@@ -220,6 +345,30 @@ export function ContactFormPage({ defaultType }) {
       phones,
       custom_fields,
     };
+
+    if (role === 'admin' && isNew) {
+      if (formData.manager_id) base.manager_id = Number(formData.manager_id);
+      if (formData.assigned_user_id) base.assigned_user_id = Number(formData.assigned_user_id);
+      if (formData.campaign_id) base.campaign_id = Number(formData.campaign_id);
+    }
+
+    if (!isNew && (role === 'admin' || role === 'manager')) {
+      if (role === 'admin') {
+        base.manager_id = formData.manager_id ? Number(formData.manager_id) : null;
+      }
+      base.assigned_user_id = formData.assigned_user_id ? Number(formData.assigned_user_id) : null;
+      base.campaign_id = formData.campaign_id ? Number(formData.campaign_id) : null;
+      if (
+        role === 'manager' &&
+        contact?.manager_id == null &&
+        base.assigned_user_id != null &&
+        authUser?.id
+      ) {
+        base.manager_id = Number(authUser.id);
+      }
+    }
+
+    return base;
   };
 
   const validate = () => {
@@ -336,6 +485,85 @@ export function ContactFormPage({ defaultType }) {
             onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
           />
         </div>
+
+        {role === 'admin' && isNew ? (
+          <div
+            style={{
+              marginTop: 8,
+              paddingTop: 12,
+              borderTop: '1px solid var(--border-subtle)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}
+          >
+            <div style={{ fontWeight: 600 }}>Ownership (optional)</div>
+            <Select
+              label="Manager"
+              value={formData.manager_id}
+              onChange={(e) => setFormData((p) => ({ ...p, manager_id: e.target.value }))}
+              placeholder="— None —"
+              options={[{ value: '', label: '— None —' }, ...managerSelectOptions]}
+            />
+            <Select
+              label="Assigned agent"
+              value={formData.assigned_user_id}
+              onChange={(e) => setFormData((p) => ({ ...p, assigned_user_id: e.target.value }))}
+              placeholder="— None —"
+              options={[{ value: '', label: '— None —' }, ...agentSelectOptions]}
+            />
+            <Select
+              label="Campaign"
+              value={formData.campaign_id}
+              onChange={(e) => setFormData((p) => ({ ...p, campaign_id: e.target.value }))}
+              placeholder="— None —"
+              options={[{ value: '', label: '— None —' }, ...campaignSelectOptions]}
+            />
+          </div>
+        ) : null}
+
+        {!isNew && (role === 'admin' || role === 'manager') ? (
+          <div
+            style={{
+              marginTop: 8,
+              paddingTop: 12,
+              borderTop: '1px solid var(--border-subtle)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}
+          >
+            <div style={{ fontWeight: 600 }}>Assign / unassign</div>
+            <p style={{ margin: 0, fontSize: 13, opacity: 0.85 }}>
+              {role === 'manager'
+                ? 'Assign to an agent on your team, or clear agent. Unassigned pool records get your manager id when you assign an agent.'
+                : 'Set manager (or leave empty for unassigned pool), agent, and static campaign.'}
+            </p>
+            {role === 'admin' ? (
+              <Select
+                label="Manager"
+                value={formData.manager_id}
+                onChange={(e) => setFormData((p) => ({ ...p, manager_id: e.target.value }))}
+                placeholder="— Unassigned pool —"
+                options={[{ value: '', label: '— Unassigned pool —' }, ...managerSelectOptions]}
+              />
+            ) : null}
+            <Select
+              label="Assigned agent"
+              value={formData.assigned_user_id}
+              onChange={(e) => setFormData((p) => ({ ...p, assigned_user_id: e.target.value }))}
+              placeholder="— Unassigned —"
+              options={[{ value: '', label: '— Unassigned —' }, ...agentSelectOptions]}
+            />
+            <Select
+              label="Campaign"
+              value={formData.campaign_id}
+              onChange={(e) => setFormData((p) => ({ ...p, campaign_id: e.target.value }))}
+              placeholder="— None —"
+              options={[{ value: '', label: '— None —' }, ...campaignSelectOptions]}
+            />
+          </div>
+        ) : null}
 
         <div style={{ marginTop: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

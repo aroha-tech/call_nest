@@ -18,6 +18,13 @@ function parseFiltersJSON(filtersJson) {
   }
 }
 
+/** Nullable FK like contacts.manager_id */
+function normalizeManagerId(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export async function createCampaign(tenantId, user, payload) {
   if (user.role !== 'admin') {
     const err = new Error('Only admin can create campaigns');
@@ -45,35 +52,46 @@ export async function createCampaign(tenantId, user, payload) {
     throw err;
   }
 
-  if (!manager_id) {
-    const err = new Error('manager_id is required');
+  const statusNorm = String(status || 'active').toLowerCase();
+  if (!['active', 'paused'].includes(statusNorm)) {
+    const err = new Error('status must be active or paused');
     err.status = 400;
     throw err;
   }
 
-  const [managerRow] = await query(
-    `SELECT id FROM users
-     WHERE id = ? AND tenant_id = ? AND role = 'manager' AND is_deleted = 0 LIMIT 1`,
-    [manager_id, tenantId]
-  );
+  const resolvedManagerId = normalizeManagerId(manager_id);
+  if (resolvedManagerId != null) {
+    const [managerRow] = await query(
+      `SELECT id FROM users
+       WHERE id = ? AND tenant_id = ? AND role = 'manager' AND is_deleted = 0 LIMIT 1`,
+      [resolvedManagerId, tenantId]
+    );
 
-  if (!managerRow) {
-    const err = new Error('Invalid manager_id');
-    err.status = 400;
-    throw err;
+    if (!managerRow) {
+      const err = new Error('Invalid manager_id');
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  let filtersStored = filters_json ?? null;
+  if (type === 'filter') {
+    const parsed = parseFiltersJSON(filters_json);
+    filtersStored = Object.keys(parsed).length ? JSON.stringify(parsed) : '{}';
   }
 
   const result = await query(
-    `INSERT INTO campaigns (tenant_id, name, type, manager_id, created_by, filters_json, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO campaigns (tenant_id, name, type, manager_id, created_by, updated_by, filters_json, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
       String(name).trim(),
       type,
-      manager_id,
+      resolvedManagerId,
       user.id,
-      filters_json ?? null,
-      status,
+      user.id,
+      filtersStored,
+      statusNorm,
     ]
   );
 
@@ -85,11 +103,63 @@ export async function createCampaign(tenantId, user, payload) {
   return campaign;
 }
 
+/**
+ * Single campaign by id (admin: any; manager: own campaigns; agent: visible campaigns only).
+ */
+export async function getCampaign(tenantId, user, campaignId) {
+  const id = Number(campaignId);
+  if (!id) return null;
+
+  if (user.role === 'admin') {
+    const [row] = await query(
+      `SELECT * FROM campaigns WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1`,
+      [id, tenantId]
+    );
+    return row || null;
+  }
+
+  if (user.role === 'manager') {
+    const [row] = await query(
+      `SELECT * FROM campaigns
+       WHERE id = ? AND tenant_id = ? AND manager_id = ? AND deleted_at IS NULL
+       LIMIT 1`,
+      [id, tenantId, user.id]
+    );
+    return row || null;
+  }
+
+  const managerId = await getUserManagerId(tenantId, user.id);
+  if (!managerId) return null;
+
+  const [row] = await query(
+    `SELECT c.*
+     FROM campaigns c
+     WHERE c.id = ? AND c.tenant_id = ?
+       AND (c.manager_id IS NULL OR c.manager_id = ?)
+       AND c.deleted_at IS NULL
+       AND (
+         c.type = 'filter'
+         OR (
+           c.type = 'static'
+           AND EXISTS (
+             SELECT 1 FROM contacts ct
+             WHERE ct.tenant_id = c.tenant_id
+               AND ct.campaign_id = c.id
+               AND ct.assigned_user_id = ?
+           )
+         )
+       )
+     LIMIT 1`,
+    [id, tenantId, managerId, user.id]
+  );
+  return row || null;
+}
+
 export async function listCampaigns(tenantId, user) {
   if (user.role === 'admin') {
     return query(
       `SELECT * FROM campaigns
-       WHERE tenant_id = ? AND status IN ('active','paused')
+       WHERE tenant_id = ? AND deleted_at IS NULL AND status IN ('active','paused')
        ORDER BY created_at DESC`,
       [tenantId]
     );
@@ -98,7 +168,7 @@ export async function listCampaigns(tenantId, user) {
   if (user.role === 'manager') {
     return query(
       `SELECT * FROM campaigns
-       WHERE tenant_id = ? AND manager_id = ?
+       WHERE tenant_id = ? AND manager_id = ? AND deleted_at IS NULL
        ORDER BY created_at DESC`,
       [tenantId, user.id]
     );
@@ -112,7 +182,8 @@ export async function listCampaigns(tenantId, user) {
     `SELECT c.*
      FROM campaigns c
      WHERE c.tenant_id = ?
-       AND c.manager_id = ?
+       AND (c.manager_id IS NULL OR c.manager_id = ?)
+       AND c.deleted_at IS NULL
        AND (
          c.type = 'filter'
          OR (
@@ -138,7 +209,7 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
   }
 
   const campaign = await query(
-    `SELECT * FROM campaigns WHERE id = ? AND tenant_id = ? LIMIT 1`,
+    `SELECT * FROM campaigns WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1`,
     [campaignId, tenantId]
   );
 
@@ -161,27 +232,69 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
     params.push(name);
   }
   if (type !== undefined) {
+    if (!['static', 'filter'].includes(type)) {
+      const err = new Error('type must be static or filter');
+      err.status = 400;
+      throw err;
+    }
     updates.push('type = ?');
     params.push(type);
   }
   if (manager_id !== undefined) {
+    const resolved = normalizeManagerId(manager_id);
+    if (resolved != null) {
+      const [mgr] = await query(
+        `SELECT id FROM users
+         WHERE id = ? AND tenant_id = ? AND role = 'manager' AND is_deleted = 0 LIMIT 1`,
+        [resolved, tenantId]
+      );
+      if (!mgr) {
+        const err = new Error('Invalid manager_id');
+        err.status = 400;
+        throw err;
+      }
+    }
     updates.push('manager_id = ?');
-    params.push(manager_id);
+    params.push(resolved);
   }
   if (filters_json !== undefined) {
+    const nextType = type !== undefined ? type : existing.type;
+    let toStore = filters_json;
+    if (nextType === 'filter') {
+      const parsed = parseFiltersJSON(filters_json);
+      toStore = Object.keys(parsed).length ? JSON.stringify(parsed) : '{}';
+    } else if (nextType === 'static') {
+      toStore = null;
+    }
     updates.push('filters_json = ?');
-    params.push(filters_json);
+    params.push(toStore);
   }
   if (status !== undefined) {
+    const st = String(status).toLowerCase();
+    if (!['active', 'paused'].includes(st)) {
+      const err = new Error('status must be active or paused');
+      err.status = 400;
+      throw err;
+    }
     updates.push('status = ?');
-    params.push(status);
+    params.push(st);
+  }
+
+  if (type === 'static' && filters_json === undefined) {
+    updates.push('filters_json = ?');
+    params.push(null);
+  } else if (type === 'filter' && filters_json === undefined) {
+    updates.push('filters_json = ?');
+    params.push(existing.filters_json ? existing.filters_json : '{}');
   }
 
   // Apply update
   if (updates.length > 0) {
+    updates.push('updated_by = ?');
+    params.push(user.id);
     params.push(campaignId, tenantId);
     await query(
-      `UPDATE campaigns SET ${updates.join(', ')} WHERE id = ? AND tenant_id = ?`,
+      `UPDATE campaigns SET ${updates.join(', ')} WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
       params
     );
   }
@@ -189,14 +302,17 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
   // Scenario 10: reassign campaign manager => reassign static campaign leads
   // We keep contacts.campaign_id unchanged, but move leads to the new manager's team.
   const updated = await query(
-    `SELECT * FROM campaigns WHERE id = ? AND tenant_id = ? LIMIT 1`,
+    `SELECT * FROM campaigns WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1`,
     [campaignId, tenantId]
   );
   const updatedCampaign = updated?.[0];
 
-  const managerChanged = (manager_id !== undefined && Number(manager_id) !== Number(existing.manager_id));
+  const managerChanged =
+    manager_id !== undefined &&
+    normalizeManagerId(manager_id) !== normalizeManagerId(existing.manager_id);
+
   if (managerChanged && updatedCampaign?.type === 'static') {
-    // prevent cross-team agent visibility: clear assigned_user_id
+    // Realign contacts with campaign manager (null = unassigned pool); clear agents on change.
     await query(
       `UPDATE contacts
        SET manager_id = ?, assigned_user_id = NULL
@@ -206,6 +322,39 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
   }
 
   return updatedCampaign;
+}
+
+/**
+ * Soft-delete campaign (admin only). Sets deleted_at / deleted_by; lists exclude deleted rows.
+ */
+export async function softDeleteCampaign(tenantId, user, campaignId) {
+  if (user.role !== 'admin') {
+    const err = new Error('Only admin can delete campaigns');
+    err.status = 403;
+    throw err;
+  }
+
+  const id = Number(campaignId);
+  if (!id) return null;
+
+  const [existing] = await query(
+    `SELECT * FROM campaigns WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1`,
+    [id, tenantId]
+  );
+  if (!existing) return null;
+
+  await query(
+    `UPDATE campaigns
+     SET deleted_at = CURRENT_TIMESTAMP, deleted_by = ?, updated_by = ?
+     WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
+    [user.id, user.id, id, tenantId]
+  );
+
+  const [row] = await query(
+    `SELECT * FROM campaigns WHERE id = ? AND tenant_id = ? LIMIT 1`,
+    [id, tenantId]
+  );
+  return row || null;
 }
 
 export async function openCampaignForAgent(tenantId, user, campaignId, { page = 1, limit = 20, search = '' } = {}) {
@@ -224,7 +373,8 @@ export async function openCampaignForAgent(tenantId, user, campaignId, { page = 
 
   const [campaign] = await query(
     `SELECT * FROM campaigns
-     WHERE id = ? AND tenant_id = ? AND manager_id = ? AND status = 'active'
+     WHERE id = ? AND tenant_id = ? AND status = 'active' AND deleted_at IS NULL
+       AND (manager_id IS NULL OR manager_id = ?)
      LIMIT 1`,
     [campaignId, tenantId, agentManagerId]
   );

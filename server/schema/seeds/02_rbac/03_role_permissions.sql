@@ -44,7 +44,8 @@ WHERE r.name = 'manager'
     'leads.read',
     'leads.update',
     'dial.monitor',
-    'reports.view'
+    'reports.view',
+    'users.team'
   );
 
 -- AGENT ROLE: Basic dialing and contact access

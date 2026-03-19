@@ -203,6 +203,7 @@ async function mapSystemRolePermissions(tenantId) {
       'leads.read', 'leads.update',
       'dial.monitor',
       'reports.view',
+      'users.team',
     ],
     agent: [
       'dashboard.view',

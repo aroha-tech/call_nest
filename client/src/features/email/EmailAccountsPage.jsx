@@ -7,7 +7,6 @@ import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } fro
 import { Modal, ConfirmModal, ModalFooter } from '../../components/ui/Modal';
 import { IconButton } from '../../components/ui/IconButton';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { Spinner } from '../../components/ui/Spinner';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Checkbox } from '../../components/ui/Checkbox';
@@ -15,6 +14,8 @@ import { emailAccountsAPI } from '../../services/emailAPI';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
+import { useTableLoadingState } from '../../hooks/useTableLoadingState';
+import { TableDataRegion } from '../../components/admin/TableDataRegion';
 
 const PROVIDER_OPTIONS = [
   { value: 'smtp', label: 'SMTP (Custom)' },
@@ -42,6 +43,7 @@ export function EmailAccountsPage() {
     [showInactive]
   );
   const { data: accounts, loading, error, refetch } = useAsyncData(fetchFn, [showInactive]);
+  const { hasCompletedInitialFetch } = useTableLoadingState(loading);
 
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -217,15 +219,6 @@ export function EmailAccountsPage() {
     }
   };
 
-  if (loading && !accounts?.length) {
-    return (
-      <div className={styles.page}>
-        <PageHeader title="Email Accounts" />
-        <div className={styles.loading}><Spinner size="lg" /></div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.page}>
       <PageHeader
@@ -257,16 +250,17 @@ export function EmailAccountsPage() {
         />
       </div>
 
-      {!accounts?.length ? (
-        <EmptyState
-          icon="✉️"
-          title="No email accounts"
-          description="Add an account to send and receive email."
-          action={openCreate}
-          actionLabel="Add Account"
-        />
-      ) : (
-        <div className={listStyles.tableScrollAreaNatural}>
+      <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        {!accounts?.length ? (
+          <EmptyState
+            icon="✉️"
+            title="No email accounts"
+            description="Add an account to send and receive email."
+            action={openCreate}
+            actionLabel="Add Account"
+          />
+        ) : (
+          <div className={listStyles.tableScrollAreaNatural}>
         <Table>
           <TableHead>
             <TableRow>
@@ -315,8 +309,9 @@ export function EmailAccountsPage() {
             ))}
           </TableBody>
         </Table>
-        </div>
-      )}
+          </div>
+        )}
+      </TableDataRegion>
 
       <Modal
         isOpen={showModal}

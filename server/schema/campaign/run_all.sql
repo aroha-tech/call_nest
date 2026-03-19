@@ -13,7 +13,7 @@ SELECT '======================================' AS '';
 SELECT '' AS '';
 SELECT '--- [01] Campaign Tables ---' AS '';
 
-SOURCE D:/own_software/call_nest/server/schema/campaign/01_campaigns.sql;
+SOURCE ./01_campaigns.sql;
 
 SELECT '' AS '';
 SELECT '======================================' AS '';

@@ -10,7 +10,6 @@ import { Modal, ConfirmModal, ModalFooter } from '../../../../components/ui/Moda
 import { StatusBadge, Badge } from '../../../../components/ui/Badge';
 import { IconButton } from '../../../../components/ui/IconButton';
 import { EmptyState } from '../../../../components/ui/EmptyState';
-import { Spinner } from '../../../../components/ui/Spinner';
 import { Alert } from '../../../../components/ui/Alert';
 import { Pagination, PaginationPageSize } from '../../../../components/ui/Pagination';
 import { useDefaultDispositions } from '../../hooks/useDefaultData';
@@ -25,6 +24,8 @@ import { NEXT_ACTION_OPTIONS, getNextActionLabel } from '../../constants';
 import styles from '../../components/MasterCRUDPage.module.scss';
 import listStyles from '../../../../components/admin/adminDataList.module.scss';
 import { FilterBar } from '../../../../components/admin/FilterBar';
+import { useTableLoadingState } from '../../../../hooks/useTableLoadingState';
+import { TableDataRegion } from '../../../../components/admin/TableDataRegion';
 
 export function DefaultDispositionsPage() {
   const [appliedIndustry, setAppliedIndustry] = useState('__all__');
@@ -52,6 +53,8 @@ export function DefaultDispositionsPage() {
     update,
     delete: deleteFn,
   } = useDefaultDispositions(industryIdParam, { search, includeInactive: showInactive, page, limit });
+
+  const { hasCompletedInitialFetch } = useTableLoadingState(loading);
 
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -296,22 +299,19 @@ export function DefaultDispositionsPage() {
               className={listStyles.searchInToolbar}
             />
           </div>
-          {loading ? (
-            <div className={listStyles.tableCardEmpty}>
-              <div className={styles.loading}><Spinner size="lg" /></div>
-            </div>
-          ) : defaultDispositions.length === 0 ? (
-            <div className={listStyles.tableCardEmpty}>
-              <EmptyState
-                icon="📋"
-                title={search ? 'No results found' : 'No dispositions yet'}
-                description={search ? 'Try a different search.' : 'Create default dispositions for this industry.'}
-                action={!search ? openCreateModal : undefined}
-                actionLabel="Add Disposition"
-              />
-            </div>
-          ) : (
-            <div className={listStyles.tableCardBody}>
+          <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+            {defaultDispositions.length === 0 ? (
+              <div className={listStyles.tableCardEmpty}>
+                <EmptyState
+                  icon="📋"
+                  title={search ? 'No results found' : 'No dispositions yet'}
+                  description={search ? 'Try a different search.' : 'Create default dispositions for this industry.'}
+                  action={!search ? openCreateModal : undefined}
+                  actionLabel="Add Disposition"
+                />
+              </div>
+            ) : (
+              <div className={listStyles.tableCardBody}>
               <Table>
                 <TableHead>
                   <TableRow>
@@ -365,8 +365,9 @@ export function DefaultDispositionsPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
-          )}
+              </div>
+            )}
+          </TableDataRegion>
           <div className={listStyles.tableCardFooterPagination}>
             <Pagination
               page={pagination?.page ?? 1}

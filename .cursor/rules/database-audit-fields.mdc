@@ -1,0 +1,36 @@
+---
+description: Mandatory audit columns on every new MySQL table (Call Nest CRM)
+globs: "**/schema/**/*.sql"
+alwaysApply: false
+---
+
+# Database tables — mandatory audit fields
+
+Every **new** tenant-scoped or business table MUST include these columns (same pattern as `contacts`):
+
+| Column | Type | Notes |
+|--------|------|--------|
+| `created_by` | `BIGINT UNSIGNED NULL` | FK → `users(id)` `ON DELETE SET NULL` |
+| `updated_by` | `BIGINT UNSIGNED NULL` | FK → `users(id)` `ON DELETE SET NULL` |
+| `deleted_by` | `BIGINT UNSIGNED NULL` | FK → `users(id)` `ON DELETE SET NULL` (soft delete actor) |
+| `created_at` | `TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP` | |
+| `updated_at` | `TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP` | |
+| `deleted_at` | `TIMESTAMP NULL DEFAULT NULL` | Soft delete; all list/get queries filter `deleted_at IS NULL` |
+
+## Indexes
+
+- Add `INDEX idx_<table>_deleted_at (tenant_id, deleted_at)` (or equivalent tenant scope) for filtered lists.
+
+## Application layer
+
+- **INSERT**: set `created_by` and `updated_by` to the authenticated user id when known.
+- **UPDATE**: always set `updated_by` = current user id on any change.
+- **Soft delete**: set `deleted_at = NOW()`, `deleted_by` = current user id (never hard-delete business rows unless a dedicated purge job).
+- **SELECT**: default lists exclude `WHERE deleted_at IS NULL`.
+
+## Migrations
+
+- New installs: include columns in `CREATE TABLE`.
+- Existing DBs: add a numbered file under `server/schema/migrations/` with `ALTER TABLE` (document in `migrations/README.md`).
+
+Platform-only tables (e.g. `users` without full audit) may differ — follow the closest existing pattern in-repo.

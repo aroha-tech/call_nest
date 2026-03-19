@@ -23,6 +23,11 @@ Schema migrations for upgrading existing Call Nest databases.
 | `016_email_accounts_soft_delete.sql` | Add is_deleted, deleted_at to email_accounts (skip if 011 was run with columns already in CREATE) |
 | `017_whatsapp_accounts_soft_delete.sql` | Add is_deleted, deleted_at to whatsapp_accounts (skip if 005 was run with columns already in CREATE) |
 | `018_tenant_email_module_flags.sql` | tenants: email_module_enabled (hide entire email module when 0), email_automation_enabled (future use) |
+| `019_users_password_changed_at.sql` | users: password_changed_at |
+| `020_campaigns.sql` | campaigns (static / filter; full audit columns in CREATE) |
+| `021_campaigns_audit_columns.sql` | campaigns: add `updated_by`, `deleted_at`, `deleted_by` + FKs (skip if 020 already defined them) |
+| `022_contacts_deleted_by.sql` | contacts: `deleted_by`, `deleted_source` + FK (for soft delete) |
+| `023_users_team_permission.sql` | permission `users.team` + grant to manager role (team user assign) |
 
 ## Usage
 

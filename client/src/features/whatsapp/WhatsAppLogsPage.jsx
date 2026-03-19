@@ -14,6 +14,8 @@ import { whatsappLogsAPI, whatsappAccountsAPI, whatsappSettingsAPI } from '../..
 import { useAsyncData } from '../../hooks/useAsyncData';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
+import { useTableLoadingState } from '../../hooks/useTableLoadingState';
+import { TableDataRegion } from '../../components/admin/TableDataRegion';
 
 const LOGS_PAGE_SIZE = 20;
 
@@ -62,6 +64,7 @@ export function WhatsAppLogsPage() {
   const logs = logsResponse?.data ?? [];
   const total = logsResponse?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / limit));
+  const { hasCompletedInitialFetch } = useTableLoadingState(loading);
   const handleSearch = (value) => {
     setSearchQuery(value || '');
     setPage(1);
@@ -94,15 +97,6 @@ export function WhatsAppLogsPage() {
     );
   }
 
-  if (loading && (!logs || logs.length === 0) && page === 1 && !searchQuery) {
-    return (
-      <div className={styles.page}>
-        <PageHeader title="WhatsApp API Logs" />
-        <div className={styles.loading}><Spinner size="lg" /></div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.page}>
       <PageHeader
@@ -122,16 +116,17 @@ export function WhatsAppLogsPage() {
             className={listStyles.searchInToolbar}
           />
         </div>
-        {!logs?.length ? (
-          <div className={listStyles.tableCardEmpty}>
-            <EmptyState
-              icon="📋"
-              title="No API logs"
-              description="Logs appear here when you send messages or sync templates."
-            />
-          </div>
-        ) : (
-          <div className={listStyles.tableCardBody}>
+        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+          {!logs?.length ? (
+            <div className={listStyles.tableCardEmpty}>
+              <EmptyState
+                icon="📋"
+                title="No API logs"
+                description="Logs appear here when you send messages or sync templates."
+              />
+            </div>
+          ) : (
+            <div className={listStyles.tableCardBody}>
             <Table>
               <TableHead>
                 <TableRow>
@@ -166,8 +161,9 @@ export function WhatsAppLogsPage() {
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
+            </div>
+          )}
+        </TableDataRegion>
         <div className={listStyles.tableCardFooterPagination}>
           <Pagination
             page={page}

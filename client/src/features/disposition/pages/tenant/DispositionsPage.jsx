@@ -10,7 +10,6 @@ import { Modal, ConfirmModal, ModalFooter } from '../../../../components/ui/Moda
 import { StatusBadge, Badge } from '../../../../components/ui/Badge';
 import { IconButton } from '../../../../components/ui/IconButton';
 import { EmptyState } from '../../../../components/ui/EmptyState';
-import { Spinner } from '../../../../components/ui/Spinner';
 import { Alert } from '../../../../components/ui/Alert';
 import { Pagination, PaginationPageSize } from '../../../../components/ui/Pagination';
 import { useDispositions } from '../../hooks/useTenantData';
@@ -25,6 +24,8 @@ import {
 import { NEXT_ACTION_OPTIONS, getNextActionLabel } from '../../constants';
 import styles from '../../components/MasterCRUDPage.module.scss';
 import listStyles from '../../../../components/admin/adminDataList.module.scss';
+import { useTableLoadingState } from '../../../../hooks/useTableLoadingState';
+import { TableDataRegion } from '../../../../components/admin/TableDataRegion';
 
 const ACTION_CODES_REQUIRING_EMAIL_TEMPLATE = ['send_email'];
 const ACTION_CODES_REQUIRING_WHATSAPP_TEMPLATE = ['send_whatsapp'];
@@ -46,6 +47,8 @@ export function DispositionsPage() {
     delete: deleteFn,
     cloneFromIndustry,
   } = useDispositions({ search, includeInactive: showInactive, page, limit });
+
+  const { hasCompletedInitialFetch } = useTableLoadingState(loading);
 
   const { data: dispoTypes = [] } = useDispoTypesOptions();
   const { data: contactStatuses = [] } = useContactStatusesOptions();
@@ -282,15 +285,6 @@ export function DispositionsPage() {
     }
   };
 
-  if (loading && dispositions.length === 0) {
-    return (
-      <div className={styles.page}>
-        <PageHeader title="Dispositions" />
-        <div className={styles.loading}><Spinner size="lg" /></div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.page}>
       <PageHeader
@@ -330,18 +324,19 @@ export function DispositionsPage() {
             className={listStyles.searchInToolbar}
           />
         </div>
-        {dispositions.length === 0 && !loading ? (
-          <div className={listStyles.tableCardEmpty}>
-            <EmptyState
-              icon="📋"
-              title={search || showInactive ? 'No results found' : 'No dispositions yet'}
-              description={search || showInactive ? 'Try a different search or clear filters.' : 'Create dispositions or import from industry templates (only when you have none).'}
-              action={hasNoDispositions ? () => setShowCloneModal(true) : undefined}
-              actionLabel="Import from Template"
-            />
-          </div>
-        ) : (
-          <div className={listStyles.tableCardBody}>
+        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+          {dispositions.length === 0 ? (
+            <div className={listStyles.tableCardEmpty}>
+              <EmptyState
+                icon="📋"
+                title={search || showInactive ? 'No results found' : 'No dispositions yet'}
+                description={search || showInactive ? 'Try a different search or clear filters.' : 'Create dispositions or import from industry templates (only when you have none).'}
+                action={hasNoDispositions ? () => setShowCloneModal(true) : undefined}
+                actionLabel="Import from Template"
+              />
+            </div>
+          ) : (
+            <div className={listStyles.tableCardBody}>
         <Table>
           <TableHead>
             <TableRow>
@@ -398,8 +393,9 @@ export function DispositionsPage() {
             ))}
           </TableBody>
         </Table>
-          </div>
-        )}
+            </div>
+          )}
+        </TableDataRegion>
         {pagination && (
           <div className={listStyles.tableCardFooterPagination}>
             <Pagination

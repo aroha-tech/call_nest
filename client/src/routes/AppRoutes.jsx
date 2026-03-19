@@ -37,6 +37,8 @@ import { ContactsPage } from '../features/contacts/ContactsPage';
 import { ContactCustomFieldsPage } from '../features/contacts/ContactCustomFieldsPage';
 import { ContactFormPage } from '../features/contacts/ContactFormPage';
 import { ContactImportPage } from '../features/contacts/ContactImportPage';
+import { CampaignsPage } from '../features/campaigns/CampaignsPage';
+import { CampaignOpenPage } from '../features/campaigns/CampaignOpenPage';
 import { useEmailModuleEnabled } from '../hooks/useEmailModuleEnabled';
 
 /**
@@ -330,6 +332,26 @@ function TenantRoutes() {
         }
       />
       <Route
+        path="/campaigns"
+        element={
+          <ProtectedRoute permissions={[PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ]}>
+            <AppShellLayout>
+              <CampaignsPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/campaigns/:id/open"
+        element={
+          <ProtectedRoute permissions={[PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ]}>
+            <AppShellLayout>
+              <CampaignOpenPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/contacts/import"
         element={
           <ProtectedRoute permission={PERMISSIONS.CONTACTS_CREATE}>
@@ -412,7 +434,7 @@ function TenantRoutes() {
       <Route
         path="/users"
         element={
-          <ProtectedRoute permission={PERMISSIONS.USERS_MANAGE}>
+          <ProtectedRoute permissions={[PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM]}>
             <AppShellLayout>
               <TenantUsersPage />
             </AppShellLayout>

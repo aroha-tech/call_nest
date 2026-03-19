@@ -77,6 +77,8 @@ export const PERMISSIONS = {
 
   // User management
   USERS_MANAGE: 'users.manage',
+  /** Managers: list team + pool agents, assign/unassign to own team */
+  USERS_TEAM: 'users.team',
 
   // Pipelines
   PIPELINES_MANAGE: 'pipelines.manage',

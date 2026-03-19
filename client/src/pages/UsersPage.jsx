@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
@@ -15,7 +15,6 @@ import {
 } from '../components/ui/Table';
 import { Modal, ModalFooter } from '../components/ui/Modal';
 import { SearchInput } from '../components/ui/SearchInput';
-import { Spinner } from '../components/ui/Spinner';
 import { StatusBadge } from '../components/ui/Badge';
 import { IconButton } from '../components/ui/IconButton';
 import { Pagination, PaginationPageSize } from '../components/ui/Pagination';
@@ -25,12 +24,21 @@ import listStyles from '../components/admin/adminDataList.module.scss';
 import { FilterBar } from '../components/admin/FilterBar';
 import { usersAPI, tenantsAPI } from '../services/adminAPI';
 import { useMutation } from '../hooks/useAsyncData';
+import { useTableLoadingState } from '../hooks/useTableLoadingState';
+import { TableDataRegion } from '../components/admin/TableDataRegion';
 import styles from './UsersPage.module.scss';
+
+const FILTER_ALL = '__all__';
 
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
   { value: 'manager', label: 'Manager' },
   { value: 'agent', label: 'Agent' },
+];
+
+const ROLE_FILTER_OPTIONS = [
+  { value: FILTER_ALL, label: 'All roles' },
+  ...ROLE_OPTIONS,
 ];
 
 function formatDate(iso) {
@@ -54,6 +62,11 @@ export function UsersPage() {
   const [search, setSearch] = useState('');
   const [tenantFilter, setTenantFilter] = useState(tenantIdFromUrl);
   const [tenantDraft, setTenantDraft] = useState(tenantIdFromUrl);
+  const [draftRoleFilter, setDraftRoleFilter] = useState(FILTER_ALL);
+  const [appliedRoleFilter, setAppliedRoleFilter] = useState(FILTER_ALL);
+  const [draftManagerFilter, setDraftManagerFilter] = useState(FILTER_ALL);
+  const [appliedManagerFilter, setAppliedManagerFilter] = useState(FILTER_ALL);
+  const [managersForFilter, setManagersForFilter] = useState([]);
   const [showDisabled, setShowDisabled] = useState(false);
   const [tenantOptions, setTenantOptions] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -69,7 +82,6 @@ export function UsersPage() {
     new_password: '',
   });
   const [formErrors, setFormErrors] = useState({});
-  const fetchedOnceRef = useRef(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -81,6 +93,8 @@ export function UsersPage() {
         includeDisabled: showDisabled,
         page: pagination.page,
         limit: pagination.limit,
+        role: appliedRoleFilter !== FILTER_ALL ? appliedRoleFilter : undefined,
+        filterManagerId: appliedManagerFilter !== FILTER_ALL ? appliedManagerFilter : undefined,
       });
       setUsers(res.data?.data || []);
       setPagination(res.data?.pagination || { page: 1, limit: 20, total: 0, totalPages: 0 });
@@ -89,9 +103,18 @@ export function UsersPage() {
       setUsers([]);
     } finally {
       setLoading(false);
-      fetchedOnceRef.current = true;
     }
-  }, [tenantFilter, search, showDisabled, pagination.page, pagination.limit]);
+  }, [
+    tenantFilter,
+    search,
+    showDisabled,
+    pagination.page,
+    pagination.limit,
+    appliedRoleFilter,
+    appliedManagerFilter,
+  ]);
+
+  const { hasCompletedInitialFetch } = useTableLoadingState(loading);
 
   useEffect(() => {
     fetchUsers();
@@ -126,6 +149,13 @@ export function UsersPage() {
         setTenantOptions([{ value: '', label: 'All tenants' }, ...list.map((t) => ({ value: String(t.id), label: `${t.name} (${t.slug})` }))]);
       })
       .catch(() => setTenantOptions([{ value: '', label: 'All tenants' }]));
+  }, []);
+
+  useEffect(() => {
+    usersAPI
+      .getAll({ limit: 500, role: 'manager' })
+      .then((res) => setManagersForFilter(res.data?.data || []))
+      .catch(() => setManagersForFilter([]));
   }, []);
 
   const createMutation = useMutation((data) => usersAPI.create(data));
@@ -218,26 +248,17 @@ export function UsersPage() {
 
   const isLocked = (u) => u.account_locked_until && new Date(u.account_locked_until) > new Date();
 
-  if (loading && !fetchedOnceRef.current) {
-    return (
-      <div className={styles.wrapper}>
-        <div className={listStyles.page}>
-          <PageHeader
-            title="Users"
-            description="Manage platform users across tenants"
-            actions={
-              <Button variant="primary" onClick={openCreate}>
-                Add User
-              </Button>
-            }
-          />
-          <div className={listStyles.loadingInitial}>
-            <Spinner size="lg" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const managerFilterOptions = [
+    { value: FILTER_ALL, label: 'All managers' },
+    { value: 'unassigned', label: 'Unassigned pool' },
+    ...managersForFilter.map((m) => ({
+      value: String(m.id),
+      label: `${m.name || m.email || `#${m.id}`}${m.tenant_name ? ` · ${m.tenant_name}` : ''}`,
+    })),
+  ];
+
+  const hasActiveUserFilters =
+    appliedRoleFilter !== FILTER_ALL || appliedManagerFilter !== FILTER_ALL;
 
   return (
     <div className={styles.wrapper}>
@@ -257,11 +278,21 @@ export function UsersPage() {
         <FilterBar
           onApply={() => {
             setTenantFilter(tenantDraft);
+            setAppliedRoleFilter(draftRoleFilter);
+            setAppliedManagerFilter(
+              draftRoleFilter === 'manager' || draftRoleFilter === 'admin'
+                ? FILTER_ALL
+                : draftManagerFilter
+            );
             setPagination((p) => ({ ...p, page: 1 }));
           }}
           onReset={() => {
             setTenantDraft('');
             setTenantFilter('');
+            setDraftRoleFilter(FILTER_ALL);
+            setAppliedRoleFilter(FILTER_ALL);
+            setDraftManagerFilter(FILTER_ALL);
+            setAppliedManagerFilter(FILTER_ALL);
             setPagination((p) => ({ ...p, page: 1 }));
           }}
         >
@@ -271,6 +302,27 @@ export function UsersPage() {
             value={tenantDraft}
             onChange={(e) => setTenantDraft(e.target.value)}
             className={styles.tenantSelect}
+          />
+          <Select
+            label="Role"
+            value={draftRoleFilter}
+            onChange={(e) => {
+              const v = e.target.value;
+              setDraftRoleFilter(v);
+              if (v === 'manager' || v === 'admin') {
+                setDraftManagerFilter(FILTER_ALL);
+              }
+            }}
+            options={ROLE_FILTER_OPTIONS}
+            className={styles.filterSelect}
+          />
+          <Select
+            label="Reports to (agents)"
+            value={draftManagerFilter}
+            onChange={(e) => setDraftManagerFilter(e.target.value)}
+            options={managerFilterOptions}
+            className={styles.filterSelect}
+            disabled={draftRoleFilter === 'manager' || draftRoleFilter === 'admin'}
           />
         </FilterBar>
 
@@ -294,18 +346,23 @@ export function UsersPage() {
               className={listStyles.searchInToolbar}
             />
           </div>
-          {users.length === 0 && !loading ? (
-            <div className={listStyles.tableCardEmpty}>
-              <EmptyState
-                icon="👤"
-                title={search || showDisabled || tenantFilter ? 'No users found' : 'No users yet'}
-                description="Try a different search, tenant filter, or add a user."
-                action={openCreate}
-                actionLabel="Add User"
-              />
-            </div>
-          ) : (
-            <div className={listStyles.tableCardBody}>
+          <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+            {users.length === 0 ? (
+              <div className={listStyles.tableCardEmpty}>
+                <EmptyState
+                  icon="👤"
+                  title={
+                    search || showDisabled || tenantFilter || hasActiveUserFilters
+                      ? 'No users found'
+                      : 'No users yet'
+                  }
+                  description="Try a different search, filters, or add a user."
+                  action={openCreate}
+                  actionLabel="Add User"
+                />
+              </div>
+            ) : (
+              <div className={listStyles.tableCardBody}>
           <Table>
             <TableHead>
               <TableRow>
@@ -342,8 +399,9 @@ export function UsersPage() {
             ))}
           </TableBody>
         </Table>
-            </div>
-          )}
+              </div>
+            )}
+          </TableDataRegion>
           <div className={listStyles.tableCardFooterPagination}>
             <Pagination
               page={pagination.page}

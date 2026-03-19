@@ -1,9 +1,7 @@
 -- ============================================
--- Campaigns Table (Per Tenant)
--- Supports:
--- - static: store campaign_id on contacts
--- - filter: contacts are fetched dynamically via filters_json
--- Audit: same mandatory fields as contacts (see .cursor/rules/database-audit-fields.mdc)
+-- Migration 020: campaigns table
+-- Run if API returns ER_NO_SUCH_TABLE for `campaigns`.
+-- Includes full audit columns (created_by, updated_by, deleted_at, deleted_by).
 -- ============================================
 
 CREATE TABLE IF NOT EXISTS campaigns (

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
@@ -15,7 +15,6 @@ import {
 } from '../components/ui/Table';
 import { Modal, ModalFooter } from '../components/ui/Modal';
 import { SearchInput } from '../components/ui/SearchInput';
-import { Spinner } from '../components/ui/Spinner';
 import { StatusBadge } from '../components/ui/Badge';
 import { IconButton } from '../components/ui/IconButton';
 import { Pagination, PaginationPageSize } from '../components/ui/Pagination';
@@ -25,6 +24,8 @@ import listStyles from '../components/admin/adminDataList.module.scss';
 import { tenantsAPI } from '../services/adminAPI';
 import { industriesAPI } from '../services/dispositionAPI';
 import { useMutation } from '../hooks/useAsyncData';
+import { useTableLoadingState } from '../hooks/useTableLoadingState';
+import { TableDataRegion } from '../components/admin/TableDataRegion';
 import styles from './TenantsPage.module.scss';
 
 const defaultForm = () => ({
@@ -55,7 +56,6 @@ export function TenantsPage() {
   const [form, setForm] = useState(defaultForm);
   const [formErrors, setFormErrors] = useState({});
   const [industryOptions, setIndustryOptions] = useState([]);
-  const fetchedOnceRef = useRef(false);
 
   const fetchTenants = useCallback(async () => {
     setLoading(true);
@@ -74,9 +74,10 @@ export function TenantsPage() {
       setTenants([]);
     } finally {
       setLoading(false);
-      fetchedOnceRef.current = true;
     }
   }, [search, showDisabled, pagination.page, pagination.limit]);
+
+  const { hasCompletedInitialFetch } = useTableLoadingState(loading);
 
   useEffect(() => {
     fetchTenants();
@@ -187,27 +188,6 @@ export function TenantsPage() {
     }
   };
 
-  if (loading && !fetchedOnceRef.current) {
-    return (
-      <div className={styles.wrapper}>
-        <div className={listStyles.page}>
-          <PageHeader
-            title="Tenants"
-            description="Manage platform tenants and module access"
-            actions={
-              <Button variant="primary" onClick={openCreate}>
-                Add Tenant
-              </Button>
-            }
-          />
-          <div className={listStyles.loadingInitial}>
-            <Spinner size="lg" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.wrapper}>
       <div className={listStyles.page}>
@@ -243,22 +223,23 @@ export function TenantsPage() {
               className={listStyles.searchInToolbar}
             />
           </div>
-          {tenants.length === 0 && !loading ? (
-            <div className={listStyles.tableCardEmpty}>
-              <EmptyState
-                icon="🏢"
-                title={search || showDisabled ? 'No tenants found' : 'No tenants yet'}
-                description={
-                  search || showDisabled
-                    ? 'Try a different search or clear filters.'
-                    : 'Add a tenant to onboard a new organization.'
-                }
-                action={!search && !showDisabled ? openCreate : undefined}
-                actionLabel="Add Tenant"
-              />
-            </div>
-          ) : (
-            <div className={listStyles.tableCardBody}>
+          <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+            {tenants.length === 0 ? (
+              <div className={listStyles.tableCardEmpty}>
+                <EmptyState
+                  icon="🏢"
+                  title={search || showDisabled ? 'No tenants found' : 'No tenants yet'}
+                  description={
+                    search || showDisabled
+                      ? 'Try a different search or clear filters.'
+                      : 'Add a tenant to onboard a new organization.'
+                  }
+                  action={!search && !showDisabled ? openCreate : undefined}
+                  actionLabel="Add Tenant"
+                />
+              </div>
+            ) : (
+              <div className={listStyles.tableCardBody}>
           <Table>
             <TableHead>
               <TableRow>
@@ -305,8 +286,9 @@ export function TenantsPage() {
             ))}
           </TableBody>
         </Table>
-            </div>
-          )}
+              </div>
+            )}
+          </TableDataRegion>
           <div className={listStyles.tableCardFooterPagination}>
             <Pagination
               page={pagination.page}

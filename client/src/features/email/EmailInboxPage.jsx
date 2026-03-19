@@ -4,7 +4,6 @@ import { Button } from '../../components/ui/Button';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { Modal, ModalFooter } from '../../components/ui/Modal';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { Spinner } from '../../components/ui/Spinner';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { SearchInput } from '../../components/ui/SearchInput';
@@ -15,6 +14,8 @@ import { emailMessagesAPI, emailAccountsAPI, emailTemplatesAPI, emailSendAPI } f
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
+import { useTableLoadingState } from '../../hooks/useTableLoadingState';
+import { TableDataRegion } from '../../components/admin/TableDataRegion';
 
 const PAGE_SIZE = 20;
 
@@ -38,6 +39,7 @@ export function EmailInboxPage() {
   const messages = response?.data ?? [];
   const total = response?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / limit));
+  const { hasCompletedInitialFetch } = useTableLoadingState(loading);
 
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [showCompose, setShowCompose] = useState(false);
@@ -92,15 +94,6 @@ export function EmailInboxPage() {
   const accountOptions = (accounts || []).map((a) => ({ value: String(a.id), label: a.email_address }));
   const templateOptions = (templates || []).map((t) => ({ value: String(t.id), label: t.name }));
 
-  if (loading && !messages.length && page === 1) {
-    return (
-      <div className={styles.page}>
-        <PageHeader title="Inbox" />
-        <div className={styles.loading}><Spinner size="lg" /></div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.page}>
       <PageHeader
@@ -121,18 +114,19 @@ export function EmailInboxPage() {
             className={listStyles.searchInToolbar}
           />
         </div>
-        {!messages?.length ? (
-          <div className={listStyles.tableCardEmpty}>
-            <EmptyState
-              icon="📥"
-              title="No emails in inbox"
-              description="Received emails will appear here. Use Compose to send."
-              action={openCompose}
-              actionLabel="Compose"
-            />
-          </div>
-        ) : (
-          <div className={listStyles.tableCardBody}>
+        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+          {!messages?.length ? (
+            <div className={listStyles.tableCardEmpty}>
+              <EmptyState
+                icon="📥"
+                title="No emails in inbox"
+                description="Received emails will appear here. Use Compose to send."
+                action={openCompose}
+                actionLabel="Compose"
+              />
+            </div>
+          ) : (
+            <div className={listStyles.tableCardBody}>
             <Table>
               <TableHead>
                 <TableRow>
@@ -157,8 +151,9 @@ export function EmailInboxPage() {
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
+            </div>
+          )}
+        </TableDataRegion>
         <div className={listStyles.tableCardFooterPagination}>
           <Pagination
             page={page}

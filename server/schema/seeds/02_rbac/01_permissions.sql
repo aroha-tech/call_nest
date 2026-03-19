@@ -29,6 +29,7 @@ INSERT IGNORE INTO permissions (code, description) VALUES
 
   -- User management
   ('users.manage', 'Manage users (create, update, disable)'),
+  ('users.team', 'Manage agents on your team (assign to team / unassign)'),
 
   -- Pipeline management
   ('pipelines.manage', 'Manage sales pipelines and stages'),

@@ -30,7 +30,107 @@ function buildOwnershipWhere(user) {
   return { whereSQL: clauses.join(' AND '), params };
 }
 
-export async function listContacts(tenantId, user, { search = '', page = 1, limit = 20, type, statusId } = {}) {
+/**
+ * Optional list/export filters. Values: undefined (omit), 'unassigned', or positive user id (number).
+ * Agents ignore; managers only their team + valid agents; admins validated against tenant users.
+ */
+async function applyContactListFilters(tenantId, user, whereClauses, params, { filterManagerId, filterAssignedUserId }) {
+  if (user.role === 'agent') {
+    return;
+  }
+
+  if (user.role === 'manager') {
+    if (filterManagerId !== undefined && filterManagerId !== 'unassigned') {
+      if (Number(filterManagerId) !== Number(user.id)) {
+        const err = new Error('Managers can only filter within their team');
+        err.status = 403;
+        throw err;
+      }
+    }
+    if (filterManagerId === 'unassigned') {
+      const err = new Error('Managers cannot filter by unassigned pool');
+      err.status = 403;
+      throw err;
+    }
+
+    if (filterAssignedUserId !== undefined && filterAssignedUserId !== 'unassigned') {
+      const [ag] = await query(
+        `SELECT id FROM users
+         WHERE id = ? AND tenant_id = ? AND role = 'agent' AND is_deleted = 0 AND manager_id = ?
+         LIMIT 1`,
+        [filterAssignedUserId, tenantId, user.id]
+      );
+      if (!ag) {
+        const err = new Error('Invalid agent filter');
+        err.status = 403;
+        throw err;
+      }
+      whereClauses.push('c.assigned_user_id = ?');
+      params.push(Number(filterAssignedUserId));
+    } else if (filterAssignedUserId === 'unassigned') {
+      whereClauses.push('c.assigned_user_id IS NULL');
+    }
+    return;
+  }
+
+  if (user.role === 'admin') {
+    if (filterManagerId === 'unassigned') {
+      whereClauses.push('c.manager_id IS NULL');
+    } else if (filterManagerId !== undefined) {
+      const [m] = await query(
+        `SELECT id FROM users
+         WHERE id = ? AND tenant_id = ? AND role = 'manager' AND is_deleted = 0
+         LIMIT 1`,
+        [filterManagerId, tenantId]
+      );
+      if (!m) {
+        const err = new Error('Invalid manager filter');
+        err.status = 400;
+        throw err;
+      }
+      whereClauses.push('c.manager_id = ?');
+      params.push(Number(filterManagerId));
+    }
+
+    if (filterAssignedUserId === 'unassigned') {
+      whereClauses.push('c.assigned_user_id IS NULL');
+    } else if (filterAssignedUserId !== undefined) {
+      const [ag] = await query(
+        `SELECT id FROM users
+         WHERE id = ? AND tenant_id = ? AND role = 'agent' AND is_deleted = 0
+         LIMIT 1`,
+        [filterAssignedUserId, tenantId]
+      );
+      if (!ag) {
+        const err = new Error('Invalid agent filter');
+        err.status = 400;
+        throw err;
+      }
+      whereClauses.push('c.assigned_user_id = ?');
+      params.push(Number(filterAssignedUserId));
+    }
+  }
+}
+
+/**
+ * When an agent's `users.manager_id` changes, set `contacts.manager_id` on every non-deleted row
+ * assigned to that agent so team visibility matches (manager list + reporting).
+ */
+export async function syncContactsManagerForAgent(tenantId, agentUserId, newManagerId, updatedByUserId = null) {
+  const mid = newManagerId === undefined || newManagerId === '' ? null : Number(newManagerId);
+  await query(
+    `UPDATE contacts
+     SET manager_id = ?, updated_by = ?
+     WHERE tenant_id = ? AND assigned_user_id = ? AND deleted_at IS NULL`,
+    [mid, updatedByUserId, tenantId, agentUserId]
+  );
+}
+
+export async function listContacts(
+  tenantId,
+  user,
+  { search = '', page = 1, limit = 20, type, statusId, filterManagerId, filterAssignedUserId } = {}
+) {
   const pageNum = parseInt(page, 10) || 1;
   const limitNum = Math.min(parseInt(limit, 10) || 20, 100);
   const offset = (pageNum - 1) * limitNum;
@@ -55,6 +155,11 @@ export async function listContacts(tenantId, user, { search = '', page = 1, limi
     params.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
 
+  await applyContactListFilters(tenantId, user, whereClauses, params, {
+    filterManagerId,
+    filterAssignedUserId,
+  });
+
   const finalWhere = `WHERE ${whereClauses.join(' AND ')}`;
 
   const [countRow] = await query(
@@ -77,6 +182,8 @@ export async function listContacts(tenantId, user, { search = '', page = 1, limi
         c.source,
         c.manager_id,
         c.assigned_user_id,
+        mgr.name AS manager_name,
+        ag.name AS assigned_user_name,
         c.status_id,
         c.campaign_id,
         c.primary_phone_id,
@@ -88,6 +195,10 @@ export async function listContacts(tenantId, user, { search = '', page = 1, limi
      FROM contacts c
      LEFT JOIN contact_phones p
        ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id
+     LEFT JOIN users mgr
+       ON mgr.id = c.manager_id AND mgr.tenant_id = c.tenant_id AND mgr.is_deleted = 0
+     LEFT JOIN users ag
+       ON ag.id = c.assigned_user_id AND ag.tenant_id = c.tenant_id AND ag.is_deleted = 0
      ${finalWhere}
      ORDER BY c.created_at DESC
      LIMIT ${limitInt} OFFSET ${offsetInt}`,
@@ -282,6 +393,105 @@ export async function createContact(tenantId, user, payload) {
   return getContactById(contactId, tenantId, user);
 }
 
+function normalizeOptionalUserId(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+async function fetchUserBrief(tenantId, userId) {
+  const [row] = await query(
+    `SELECT id, role, manager_id FROM users
+     WHERE id = ? AND tenant_id = ? AND is_deleted = 0 LIMIT 1`,
+    [userId, tenantId]
+  );
+  return row || null;
+}
+
+/**
+ * Enforce CRM ownership rules on PATCH (scenarios 6–8).
+ */
+async function assertCanChangeContactOwnership(tenantId, user, payload, existing) {
+  const { manager_id, assigned_user_id } = payload;
+
+  if (user.role === 'admin') {
+    if (manager_id !== undefined && manager_id !== null && manager_id !== '') {
+      const mid = normalizeOptionalUserId(manager_id);
+      if (mid != null) {
+        const [mgr] = await query(
+          `SELECT id FROM users
+           WHERE id = ? AND tenant_id = ? AND role = 'manager' AND is_deleted = 0 LIMIT 1`,
+          [mid, tenantId]
+        );
+        if (!mgr) {
+          const err = new Error('Invalid manager_id');
+          err.status = 400;
+          throw err;
+        }
+      }
+    }
+    if (assigned_user_id !== undefined && assigned_user_id !== null && assigned_user_id !== '') {
+      const aid = normalizeOptionalUserId(assigned_user_id);
+      if (aid != null) {
+        const agent = await fetchUserBrief(tenantId, aid);
+        if (!agent || agent.role !== 'agent') {
+          const err = new Error('assigned_user_id must be an agent');
+          err.status = 400;
+          throw err;
+        }
+      }
+    }
+    return;
+  }
+
+  if (user.role === 'agent') {
+    if (manager_id !== undefined || assigned_user_id !== undefined) {
+      const err = new Error('Agents cannot change manager or assignment');
+      err.status = 403;
+      throw err;
+    }
+    return;
+  }
+
+  if (user.role === 'manager') {
+    if (manager_id !== undefined) {
+      if (manager_id === null || manager_id === '') {
+        const err = new Error('Managers cannot clear manager_id');
+        err.status = 403;
+        throw err;
+      }
+      const mid = normalizeOptionalUserId(manager_id);
+      if (mid !== Number(user.id)) {
+        const err = new Error('Managers can only set themselves as manager');
+        err.status = 403;
+        throw err;
+      }
+    }
+    if (assigned_user_id !== undefined && assigned_user_id !== null && assigned_user_id !== '') {
+      const aid = normalizeOptionalUserId(assigned_user_id);
+      if (aid != null) {
+        const agent = await fetchUserBrief(tenantId, aid);
+        if (!agent || agent.role !== 'agent') {
+          const err = new Error('assigned_user_id must be an agent');
+          err.status = 400;
+          throw err;
+        }
+        if (Number(agent.manager_id) !== Number(user.id)) {
+          const err = new Error('Managers can only assign agents in their team');
+          err.status = 403;
+          throw err;
+        }
+        if (existing.manager_id != null && Number(existing.manager_id) !== Number(user.id)) {
+          const err = new Error('Contact is not in your team');
+          err.status = 403;
+          throw err;
+        }
+      }
+    }
+  }
+}
+
 export async function updateContact(id, tenantId, user, payload) {
   const existing = await getContactById(id, tenantId, user);
   if (!existing) {
@@ -302,6 +512,8 @@ export async function updateContact(id, tenantId, user, payload) {
     phones,
     custom_fields,
   } = payload;
+
+  await assertCanChangeContactOwnership(tenantId, user, payload, existing);
 
   if (Array.isArray(phones)) {
     assertUniquePhoneLabels(phones);
@@ -454,122 +666,196 @@ export async function assignContacts(tenantId, user, payload) {
   }
 
   if (user.role === 'agent') {
-    const err = new Error('Agents cannot assign/distribute contacts');
+    const err = new Error('Agents cannot assign or unassign contacts');
     err.status = 403;
     throw err;
   }
 
-  let resolvedManagerId = manager_id;
+  const midProvided = manager_id !== undefined;
+  const aidProvided = assigned_user_id !== undefined;
+  const cidProvided = campaign_id !== undefined;
+
+  if (!midProvided && !aidProvided && !cidProvided) {
+    const err = new Error('Provide at least one of: manager_id, assigned_user_id, campaign_id');
+    err.status = 400;
+    throw err;
+  }
+
+  const normalizedMid = midProvided ? normalizeOptionalUserId(manager_id) : undefined;
+  const normalizedAid = aidProvided ? normalizeOptionalUserId(assigned_user_id) : undefined;
+
   if (user.role === 'manager') {
-    if (resolvedManagerId !== undefined && Number(resolvedManagerId) !== Number(user.id)) {
-      const err = new Error('Managers can only assign contacts within their own team');
+    if (midProvided && normalizedMid !== null && Number(normalizedMid) !== Number(user.id)) {
+      const err = new Error('Managers can only set themselves as owning manager');
       err.status = 403;
       throw err;
     }
-    resolvedManagerId = user.id;
+    if (midProvided && normalizedMid === null) {
+      const err = new Error('Managers cannot clear manager_id (use a tenant admin)');
+      err.status = 403;
+      throw err;
+    }
   }
 
-  if (!resolvedManagerId) {
-    const err = new Error('manager_id is required');
+  const ids = [...new Set(contactIds.map((id) => Number(id)).filter((n) => Number.isFinite(n) && n > 0))];
+  if (ids.length === 0) {
+    const err = new Error('contactIds must contain valid numeric ids');
     err.status = 400;
     throw err;
   }
 
-  // Validate manager exists (per tenant)
-  const [managerRow] = await query(
-    `SELECT id FROM users
-     WHERE id = ? AND tenant_id = ? AND role = 'manager' AND is_deleted = 0 LIMIT 1`,
-    [resolvedManagerId, tenantId]
+  const placeholders = ids.map(() => '?').join(', ');
+  const contacts = await query(
+    `SELECT id, manager_id, assigned_user_id FROM contacts
+     WHERE tenant_id = ? AND id IN (${placeholders}) AND deleted_at IS NULL`,
+    [tenantId, ...ids]
   );
-  if (!managerRow) {
-    const err = new Error('Invalid manager_id');
+
+  if (contacts.length !== ids.length) {
+    const err = new Error('One or more contacts were not found');
     err.status = 400;
     throw err;
   }
 
-  let resolvedAssignedUserId = assigned_user_id;
-  if (resolvedAssignedUserId !== undefined) {
-    if (resolvedAssignedUserId === null) {
-      // allow clearing assignment
-      resolvedAssignedUserId = null;
-    } else {
-      // Validate assigned user is an agent and (for managers) belongs to the same manager
-      const agentRow = await query(
-        `SELECT id, manager_id, role FROM users
-         WHERE id = ? AND tenant_id = ? AND is_deleted = 0 LIMIT 1`,
-        [resolvedAssignedUserId, tenantId]
-      );
-      const agent = agentRow?.[0];
+  if (user.role === 'manager') {
+    const foreign = contacts.filter((c) => c.manager_id != null && Number(c.manager_id) !== Number(user.id));
+    if (foreign.length > 0) {
+      const err = new Error('Managers can only assign contacts in their own team');
+      err.status = 403;
+      throw err;
+    }
+  }
 
-      if (!agent || agent.role !== 'agent') {
-        const err = new Error('assigned_user_id must be an agent');
-        err.status = 400;
-        throw err;
-      }
+  if (midProvided && normalizedMid != null) {
+    const [managerRow] = await query(
+      `SELECT id FROM users
+       WHERE id = ? AND tenant_id = ? AND role = 'manager' AND is_deleted = 0 LIMIT 1`,
+      [normalizedMid, tenantId]
+    );
+    if (!managerRow) {
+      const err = new Error('Invalid manager_id');
+      err.status = 400;
+      throw err;
+    }
+  }
 
-      if (user.role === 'manager' && Number(agent.manager_id) !== Number(user.id)) {
-        const err = new Error('Managers can only assign to agents in their team');
-        err.status = 403;
-        throw err;
-      }
+  if (midProvided && normalizedMid === null && user.role !== 'admin') {
+    const err = new Error('Only admins can move contacts to the unassigned pool');
+    err.status = 403;
+    throw err;
+  }
+
+  let agentRow = null;
+  if (aidProvided && normalizedAid != null) {
+    agentRow = await fetchUserBrief(tenantId, normalizedAid);
+    if (!agentRow || agentRow.role !== 'agent') {
+      const err = new Error('assigned_user_id must be an agent');
+      err.status = 400;
+      throw err;
+    }
+    if (user.role === 'manager' && Number(agentRow.manager_id) !== Number(user.id)) {
+      const err = new Error('Managers can only assign agents in their team');
+      err.status = 403;
+      throw err;
     }
   }
 
   const setClauses = [];
-  const params = [];
+  const setParams = [];
 
-  setClauses.push('manager_id = ?');
-  params.push(resolvedManagerId);
+  let clearAgentForManagerChange = false;
+  if (midProvided) {
+    if (normalizedMid === null) {
+      clearAgentForManagerChange = true;
+    } else {
+      clearAgentForManagerChange = contacts.some(
+        (c) => Number(c.manager_id || 0) !== Number(normalizedMid)
+      );
+    }
+  }
 
-  if (resolvedAssignedUserId !== undefined) {
+  if (midProvided) {
+    setClauses.push('manager_id = ?');
+    setParams.push(normalizedMid);
+  }
+
+  if (aidProvided) {
     setClauses.push('assigned_user_id = ?');
-    params.push(resolvedAssignedUserId);
+    setParams.push(normalizedAid);
+  } else if (clearAgentForManagerChange) {
+    setClauses.push('assigned_user_id = ?');
+    setParams.push(null);
   }
 
-  if (campaign_id !== undefined) {
+  // Assigning an agent without changing manager: contacts must share one team (or all pool) so we know which manager_id to set.
+  // Unassigning (assigned_user_id: null) applies to any mix of managers — no same-manager rule.
+  if (!midProvided && aidProvided && normalizedAid != null) {
+    const mgrKeys = [...new Set(contacts.map((c) => (c.manager_id == null ? 'null' : String(c.manager_id))))];
+    if (mgrKeys.length > 1) {
+      const err = new Error(
+        'Bulk agent assign requires all selected contacts to share the same manager (or all unassigned)'
+      );
+      err.status = 400;
+      throw err;
+    }
+    const poolMgr = contacts[0].manager_id;
+
+    if (poolMgr == null) {
+      if (!setClauses.some((s) => s.startsWith('manager_id'))) {
+        setClauses.unshift('manager_id = ?');
+        setParams.unshift(agentRow.manager_id);
+      }
+    } else if (Number(agentRow.manager_id) !== Number(poolMgr)) {
+      const err = new Error('Agent does not belong to the manager for these contacts');
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  if (midProvided && normalizedMid != null && aidProvided && normalizedAid != null) {
+    if (Number(agentRow.manager_id) !== Number(normalizedMid)) {
+      const err = new Error('Agent does not belong to the selected manager');
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  if (cidProvided) {
     setClauses.push('campaign_id = ?');
-    params.push(campaign_id || null);
+    setParams.push(campaign_id || null);
   }
 
-  // Bulk assignment counts as update; track updater
+  if (setClauses.length === 0) {
+    const err = new Error('Nothing to update');
+    err.status = 400;
+    throw err;
+  }
+
   setClauses.push('updated_by = ?');
-  params.push(user.id);
+  setParams.push(user.id);
 
-  const whereClauses = ['tenant_id = ?', 'id IN ('];
-  const placeholders = contactIds.map(() => '?').join(', ');
-  whereClauses.push(placeholders);
-  whereClauses.push(')');
-
-  const whereSql = `WHERE ${whereClauses.join('')}`;
-  const finalParams = params.concat([tenantId, ...contactIds]);
-
+  let whereSql = `tenant_id = ? AND id IN (${placeholders})`;
+  let whereParams = [tenantId, ...ids];
   if (user.role === 'manager') {
-    // Apply manager constraint via parameterized WHERE
-    await query(
-      `UPDATE contacts
-       SET ${setClauses.join(', ')}
-       WHERE tenant_id = ?
-         AND id IN (${placeholders})
-         AND manager_id = ?`,
-      finalParams.concat([user.id])
-    );
-  } else {
-    await query(
-      `UPDATE contacts
-       SET ${setClauses.join(', ')}
-       ${whereSql}`,
-      finalParams
-    );
+    whereSql += ' AND (manager_id = ? OR manager_id IS NULL)';
+    whereParams.push(user.id);
   }
+
+  const updateResult = await query(
+    `UPDATE contacts SET ${setClauses.join(', ')} WHERE ${whereSql}`,
+    [...setParams, ...whereParams]
+  );
+
+  const affectedRows = updateResult?.affectedRows ?? 0;
 
   const updated = await query(
     `SELECT id, tenant_id, type, first_name, last_name, display_name, email, source, manager_id, assigned_user_id, status_id, campaign_id, created_at
      FROM contacts
-     WHERE tenant_id = ? AND id IN (${placeholders})`,
-    [tenantId, ...contactIds]
+     WHERE tenant_id = ? AND id IN (${placeholders}) AND deleted_at IS NULL`,
+    [tenantId, ...ids]
   );
 
-  return { updatedCount: updated.length, data: updated };
+  return { updatedCount: affectedRows, data: updated };
 }
 
 function normalizeHeader(s) {
@@ -676,7 +962,14 @@ function csvEscape(v) {
 export async function exportContactsCsv(
   tenantId,
   user,
-  { search = '', type, statusId, includeCustomFields = true } = {}
+  {
+    search = '',
+    type,
+    statusId,
+    includeCustomFields = true,
+    filterManagerId,
+    filterAssignedUserId,
+  } = {}
 ) {
   const { whereSQL, params } = buildOwnershipWhere(user);
   const whereClauses = [whereSQL];
@@ -695,6 +988,11 @@ export async function exportContactsCsv(
     whereClauses.push('(c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ? OR c.display_name LIKE ?)');
     params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
   }
+
+  await applyContactListFilters(tenantId, user, whereClauses, params, {
+    filterManagerId,
+    filterAssignedUserId,
+  });
 
   const finalWhere = `WHERE ${whereClauses.join(' AND ')}`;
 
