@@ -1,0 +1,3 @@
+full_name,phone,email,utm_source,utm_medium,utm_campaign,utm_content,utm_term,placement,ad_name,lead_stage
+Campaign Test User 1,9876500001,c1@example.com,google,cpc,brand_search_q1,in_ad1,flats+near+metro,Search,Ad Set 1,New
+Campaign Test User 2,9876500002,c2@example.com,facebook,social,lookalike_lal_500,video_v2,,Feed,Carousel RE,Contacted

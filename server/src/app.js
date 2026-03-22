@@ -30,13 +30,16 @@ import emailTemplatesRoutes from './routes/tenant/emailTemplates.js';
 import whatsappTemplatesRoutes from './routes/tenant/whatsappTemplates.js';
 import callScriptsRoutes from './routes/tenant/callScripts.js';
 import contactsRoutes from './routes/tenant/contacts.js';
+import contactTagsRoutes from './routes/tenant/contactTags.js';
 import contactCustomFieldsRoutes from './routes/tenant/contactCustomFields.js';
+import integrationsRoutes from './routes/tenant/integrations.js';
 import tenantUsersRoutes from './routes/tenant/users.js';
 import campaignsRoutes from './routes/tenant/campaigns.js';
 import whatsappModuleRoutes from './routes/tenant/whatsapp.js';
 import whatsappWebhookRoutes from './routes/whatsappWebhook.js';
 import emailModuleRoutes from './routes/tenant/email.js';
 import templateVariablesRoutes from './routes/templateVariables.js';
+import integrationsWebhookRoutes from './routes/integrationsWebhook.js';
 
 const app = express();
 
@@ -56,6 +59,9 @@ app.get('/health', (req, res) => {
 
 // Public WhatsApp webhook (before tenantResolver so ngrok/Twilio host doesn't get 404)
 app.use('/api/whatsapp/webhook', whatsappWebhookRoutes);
+
+// Public Integrations webhooks (before tenantResolver so providers don't need tenant subdomain)
+app.use('/api/integrations/webhook', integrationsWebhookRoutes);
 
 // Resolve tenant/platform context from subdomain for all API routes
 app.use(tenantResolver);
@@ -94,7 +100,9 @@ app.use('/api/tenant/campaigns', campaignsRoutes);
 app.use('/api/tenant/whatsapp', whatsappModuleRoutes);
 app.use('/api/tenant/email', emailModuleRoutes);
 app.use('/api/tenant/contacts', contactsRoutes);
+app.use('/api/tenant/contact-tags', contactTagsRoutes);
 app.use('/api/tenant/contact-custom-fields', contactCustomFieldsRoutes);
+app.use('/api/tenant/integrations', integrationsRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);

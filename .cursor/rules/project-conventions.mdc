@@ -57,22 +57,15 @@ See: `MasterCRUDPage.jsx`, `WhatsAppMessagesPage.jsx`, `WhatsAppLogsPage.jsx`.
 
 ## Migrations — MySQL command line
 
-When adding or referencing SQL migrations, **always give a direct command** the user can paste and run in the MySQL command line:
+When adding or referencing SQL migrations, **always provide both**:
 
-1. **From project root**, start MySQL and run a migration file:
-   ```bash
-   mysql -u root -p call_nest
-   ```
-   Then inside MySQL:
-   ```sql
-   source server/schema/migrations/004_call_scripts_is_default.sql
-   ```
-   Or from the shell in one go (replace user/pass/db as needed):
-   ```bash
-   mysql -u root -p call_nest < server/schema/migrations/004_call_scripts_is_default.sql
-   ```
+1. **Paste-ready SQL** — full statements (optionally with `USE your_database;`) so the user can run them in **any SQL editor** (Workbench, phpMyAdmin, DBeaver, etc.).
 
-2. Alternatively provide **paste-ready SQL** (after `USE your_database;`) so the user can run it directly in the MySQL CLI.
+2. **File-based run** — the exact commands to execute the same file from the project root:
+   - Shell: `mysql -u root -p call_nest < server/schema/migrations/NNN_name.sql`
+   - Or interactive MySQL: `source server/schema/migrations/NNN_name.sql` (after `USE call_nest;` if needed)
+
+Replace user, password, and database name as appropriate.
 
 ## Principles
 - Professional structure, simple and efficient

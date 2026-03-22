@@ -1,4 +1,6 @@
 import { query } from '../../config/db.js';
+import { buildOwnershipWhere } from './contactsService.js';
+import { appendCampaignFilterRules, normalizeFiltersToRules } from '../../utils/campaignFilterSql.js';
 
 async function getUserManagerId(tenantId, userId) {
   const [row] = await query(
@@ -23,6 +25,227 @@ function normalizeManagerId(value) {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function parseCampaignListQuery(query = {}) {
+  const page = Math.max(1, parseInt(String(query.page ?? '1'), 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(String(query.limit ?? '20'), 10) || 20));
+  const offset = (page - 1) * limit;
+  const search = String(query.search ?? '').trim();
+  const type = String(query.type ?? '').trim();
+  const manager_id = query.manager_id;
+  const show_paused =
+    query.show_paused === true || query.show_paused === 'true' || query.show_paused === '1';
+  const include_archived =
+    query.include_archived === true ||
+    query.include_archived === 'true' ||
+    query.include_archived === '1';
+  return { page, limit, offset, search, type, manager_id, show_paused, include_archived };
+}
+
+function totalPages(total, limit) {
+  if (total <= 0) return 1;
+  return Math.max(1, Math.ceil(total / limit));
+}
+
+/**
+ * mysql2 prepared statements often reject bound parameters for LIMIT/OFFSET (ER_WRONG_ARGUMENTS).
+ * Use validated integer literals instead.
+ */
+function limitOffsetClause(q) {
+  const limit = Math.min(100, Math.max(1, Math.floor(Number(q.limit)) || 20));
+  const offset = Math.max(0, Math.floor(Number(q.offset)) || 0);
+  return `LIMIT ${limit} OFFSET ${offset}`;
+}
+
+/**
+ * Paginated campaign list with search and filters (admin: full; manager/agent: scoped).
+ */
+export async function listCampaigns(tenantId, user, query = {}) {
+  const q = parseCampaignListQuery(query);
+  const includeArchived = user.role === 'admin' ? q.include_archived : false;
+
+  if (user.role === 'admin') {
+    return listCampaignsAdmin(tenantId, q, includeArchived);
+  }
+  if (user.role === 'manager') {
+    return listCampaignsManager(tenantId, user, q);
+  }
+  return listCampaignsAgent(tenantId, user, q);
+}
+
+async function listCampaignsAdmin(tenantId, q, includeArchived) {
+  const where = ['tenant_id = ?'];
+  const params = [tenantId];
+
+  if (!includeArchived) {
+    where.push('deleted_at IS NULL');
+  }
+  if (q.show_paused) {
+    where.push("status IN ('active','paused')");
+  } else {
+    where.push("status = 'active'");
+  }
+  if (q.search) {
+    where.push('name LIKE ?');
+    params.push(`%${q.search}%`);
+  }
+  if (q.type === 'static' || q.type === 'filter') {
+    where.push('type = ?');
+    params.push(q.type);
+  }
+  if (q.manager_id === 'unassigned') {
+    where.push('manager_id IS NULL');
+  } else if (q.manager_id != null && q.manager_id !== '' && q.manager_id !== '__all__') {
+    const mid = Number(q.manager_id);
+    if (Number.isFinite(mid) && mid > 0) {
+      where.push('manager_id = ?');
+      params.push(mid);
+    }
+  }
+
+  const whereSql = where.join(' AND ');
+  const [countRow] = await query(`SELECT COUNT(*) AS c FROM campaigns WHERE ${whereSql}`, params);
+  const total = Number(countRow?.c ?? 0);
+
+  const rows = await query(
+    `SELECT * FROM campaigns WHERE ${whereSql} ORDER BY created_at DESC ${limitOffsetClause(q)}`,
+    params
+  );
+
+  return {
+    data: rows,
+    pagination: {
+      page: q.page,
+      limit: q.limit,
+      total,
+      totalPages: totalPages(total, q.limit),
+    },
+  };
+}
+
+async function listCampaignsManager(tenantId, user, q) {
+  const where = [
+    'tenant_id = ?',
+    'deleted_at IS NULL',
+    '(manager_id IS NULL OR manager_id = ?)',
+  ];
+  const params = [tenantId, user.id];
+
+  if (q.show_paused) {
+    where.push("status IN ('active','paused')");
+  } else {
+    where.push("status = 'active'");
+  }
+  if (q.search) {
+    where.push('name LIKE ?');
+    params.push(`%${q.search}%`);
+  }
+  if (q.type === 'static' || q.type === 'filter') {
+    where.push('type = ?');
+    params.push(q.type);
+  }
+  if (q.manager_id === 'unassigned') {
+    where.push('manager_id IS NULL');
+  } else if (q.manager_id != null && q.manager_id !== '' && q.manager_id !== '__all__') {
+    const mid = Number(q.manager_id);
+    if (Number.isFinite(mid) && mid > 0) {
+      if (mid !== Number(user.id)) {
+        return {
+          data: [],
+          pagination: { page: q.page, limit: q.limit, total: 0, totalPages: 1 },
+        };
+      }
+      where.push('manager_id = ?');
+      params.push(mid);
+    }
+  }
+
+  const whereSql = where.join(' AND ');
+  const [countRow] = await query(`SELECT COUNT(*) AS c FROM campaigns WHERE ${whereSql}`, params);
+  const total = Number(countRow?.c ?? 0);
+
+  const rows = await query(
+    `SELECT * FROM campaigns WHERE ${whereSql} ORDER BY created_at DESC ${limitOffsetClause(q)}`,
+    params
+  );
+
+  return {
+    data: rows,
+    pagination: {
+      page: q.page,
+      limit: q.limit,
+      total,
+      totalPages: totalPages(total, q.limit),
+    },
+  };
+}
+
+async function listCampaignsAgent(tenantId, user, q) {
+  const managerId = await getUserManagerId(tenantId, user.id);
+  if (!managerId) {
+    return {
+      data: [],
+      pagination: { page: q.page, limit: q.limit, total: 0, totalPages: 1 },
+    };
+  }
+
+  const visibilitySql = `(
+    c.type = 'filter'
+    OR (
+      c.type = 'static'
+      AND EXISTS (
+        SELECT 1 FROM contacts ct
+        WHERE ct.tenant_id = c.tenant_id
+          AND ct.campaign_id = c.id
+          AND ct.assigned_user_id = ?
+      )
+    )
+  )`;
+
+  const where = [
+    'c.tenant_id = ?',
+    '(c.manager_id IS NULL OR c.manager_id = ?)',
+    'c.deleted_at IS NULL',
+    visibilitySql,
+  ];
+  const params = [tenantId, managerId, user.id];
+
+  if (q.show_paused) {
+    where.push("c.status IN ('active','paused')");
+  } else {
+    where.push("c.status = 'active'");
+  }
+  if (q.search) {
+    where.push('c.name LIKE ?');
+    params.push(`%${q.search}%`);
+  }
+  if (q.type === 'static' || q.type === 'filter') {
+    where.push('c.type = ?');
+    params.push(q.type);
+  }
+
+  const whereSql = where.join(' AND ');
+  const [countRow] = await query(
+    `SELECT COUNT(*) AS c FROM campaigns c WHERE ${whereSql}`,
+    params
+  );
+  const total = Number(countRow?.c ?? 0);
+
+  const rows = await query(
+    `SELECT c.* FROM campaigns c WHERE ${whereSql} ORDER BY c.created_at DESC ${limitOffsetClause(q)}`,
+    params
+  );
+
+  return {
+    data: rows,
+    pagination: {
+      page: q.page,
+      limit: q.limit,
+      total,
+      totalPages: totalPages(total, q.limit),
+    },
+  };
 }
 
 export async function createCampaign(tenantId, user, payload) {
@@ -76,8 +299,13 @@ export async function createCampaign(tenantId, user, payload) {
 
   let filtersStored = filters_json ?? null;
   if (type === 'filter') {
-    const parsed = parseFiltersJSON(filters_json);
-    filtersStored = Object.keys(parsed).length ? JSON.stringify(parsed) : '{}';
+    const rules = normalizeFiltersToRules(filters_json);
+    if (rules.length === 0) {
+      const err = new Error('Filter campaigns need at least one rule.');
+      err.status = 400;
+      throw err;
+    }
+    filtersStored = JSON.stringify({ version: 2, rules });
   }
 
   const result = await query(
@@ -121,7 +349,9 @@ export async function getCampaign(tenantId, user, campaignId) {
   if (user.role === 'manager') {
     const [row] = await query(
       `SELECT * FROM campaigns
-       WHERE id = ? AND tenant_id = ? AND manager_id = ? AND deleted_at IS NULL
+       WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+       
+         AND (manager_id IS NULL OR manager_id = ?)
        LIMIT 1`,
       [id, tenantId, user.id]
     );
@@ -153,52 +383,6 @@ export async function getCampaign(tenantId, user, campaignId) {
     [id, tenantId, managerId, user.id]
   );
   return row || null;
-}
-
-export async function listCampaigns(tenantId, user) {
-  if (user.role === 'admin') {
-    return query(
-      `SELECT * FROM campaigns
-       WHERE tenant_id = ? AND deleted_at IS NULL AND status IN ('active','paused')
-       ORDER BY created_at DESC`,
-      [tenantId]
-    );
-  }
-
-  if (user.role === 'manager') {
-    return query(
-      `SELECT * FROM campaigns
-       WHERE tenant_id = ? AND manager_id = ? AND deleted_at IS NULL
-       ORDER BY created_at DESC`,
-      [tenantId, user.id]
-    );
-  }
-
-  // agent
-  const managerId = await getUserManagerId(tenantId, user.id);
-  if (!managerId) return [];
-
-  return query(
-    `SELECT c.*
-     FROM campaigns c
-     WHERE c.tenant_id = ?
-       AND (c.manager_id IS NULL OR c.manager_id = ?)
-       AND c.deleted_at IS NULL
-       AND (
-         c.type = 'filter'
-         OR (
-           c.type = 'static'
-           AND EXISTS (
-             SELECT 1 FROM contacts ct
-             WHERE ct.tenant_id = c.tenant_id
-               AND ct.campaign_id = c.id
-               AND ct.assigned_user_id = ?
-           )
-         )
-       )
-     ORDER BY c.created_at DESC`,
-    [tenantId, managerId, user.id]
-  );
 }
 
 export async function updateCampaign(tenantId, user, campaignId, payload) {
@@ -237,8 +421,11 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
       err.status = 400;
       throw err;
     }
-    updates.push('type = ?');
-    params.push(type);
+    if (String(type) !== String(existing.type)) {
+      const err = new Error('Campaign type cannot be changed after creation');
+      err.status = 400;
+      throw err;
+    }
   }
   if (manager_id !== undefined) {
     const resolved = normalizeManagerId(manager_id);
@@ -261,8 +448,13 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
     const nextType = type !== undefined ? type : existing.type;
     let toStore = filters_json;
     if (nextType === 'filter') {
-      const parsed = parseFiltersJSON(filters_json);
-      toStore = Object.keys(parsed).length ? JSON.stringify(parsed) : '{}';
+      const rules = normalizeFiltersToRules(filters_json);
+      if (rules.length === 0) {
+        const err = new Error('Filter campaigns need at least one rule.');
+        err.status = 400;
+        throw err;
+      }
+      toStore = JSON.stringify({ version: 2, rules });
     } else if (nextType === 'static') {
       toStore = null;
     }
@@ -387,31 +579,26 @@ export async function openCampaignForAgent(tenantId, user, campaignId, { page = 
   const finalLimit = Math.floor(Number(limitNum)) || 20;
   const finalOffset = Math.floor(Number(offset)) || 0;
 
-  const where = ['c.tenant_id = ?', 'c.assigned_user_id = ?'];
+  const where = ['c.tenant_id = ?', 'c.assigned_user_id = ?', 'c.deleted_at IS NULL'];
   const params = [tenantId, user.id];
 
   if (campaign.type === 'static') {
     where.push('c.campaign_id = ?');
     params.push(campaign.id);
   } else {
-    const filters = parseFiltersJSON(campaign.filters_json);
-    if (filters.type) {
-      where.push('c.type = ?');
-      params.push(filters.type);
-    }
-    if (filters.status_id) {
-      where.push('c.status_id = ?');
-      params.push(filters.status_id);
-    }
-    if (filters.source) {
-      where.push('c.source = ?');
-      params.push(filters.source);
-    }
+    appendCampaignFilterRules(where, params, campaign.filters_json);
   }
 
   if (search) {
-    where.push('(c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    const q = `%${search}%`;
+    where.push(
+      `(c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ? OR c.display_name LIKE ? OR p.phone LIKE ? OR EXISTS (
+        SELECT 1 FROM contact_tag_assignments cta_s
+        INNER JOIN contact_tags ct_s ON ct_s.id = cta_s.tag_id AND ct_s.tenant_id = cta_s.tenant_id
+        WHERE cta_s.contact_id = c.id AND cta_s.tenant_id = c.tenant_id AND ct_s.deleted_at IS NULL AND ct_s.name LIKE ?
+      ))`
+    );
+    params.push(q, q, q, q, q, q);
   }
 
   const whereSQL = `WHERE ${where.join(' AND ')}`;
@@ -419,6 +606,8 @@ export async function openCampaignForAgent(tenantId, user, campaignId, { page = 
   const [countRow] = await query(
     `SELECT COUNT(*) AS total
      FROM contacts c
+     LEFT JOIN contact_phones p
+       ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id
      ${whereSQL}`,
     params
   );
@@ -434,13 +623,111 @@ export async function openCampaignForAgent(tenantId, user, campaignId, { page = 
         c.display_name,
         c.email,
         c.source,
+        (SELECT GROUP_CONCAT(DISTINCT ct.name ORDER BY ct.name SEPARATOR ', ')
+         FROM contact_tag_assignments cta
+         INNER JOIN contact_tags ct ON ct.id = cta.tag_id AND ct.tenant_id = cta.tenant_id
+         WHERE cta.tenant_id = c.tenant_id AND cta.contact_id = c.id AND ct.deleted_at IS NULL
+        ) AS tag_names,
         c.status_id,
+        csm.name AS status_name,
         c.campaign_id,
         p.phone AS primary_phone
      FROM contacts c
      LEFT JOIN contact_phones p
        ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id
+     LEFT JOIN contact_status_master csm
+       ON csm.id = c.status_id AND csm.is_deleted = 0
      ${whereSQL}
+     ORDER BY c.created_at DESC
+     LIMIT ${finalLimit} OFFSET ${finalOffset}`,
+    params
+  );
+
+  return {
+    data,
+    pagination: {
+      page: pageNum,
+      limit: finalLimit,
+      total,
+      totalPages: Math.ceil(total / finalLimit) || 1,
+    },
+  };
+}
+
+/**
+ * Preview contacts matching filter rules (respects list visibility like contacts list).
+ */
+export async function previewFilterCampaignLeads(tenantId, user, { filters_json, page = 1, limit = 20, search = '' } = {}) {
+  const rules = normalizeFiltersToRules(filters_json);
+  if (rules.length === 0) {
+    const err = new Error('At least one filter rule is required for preview.');
+    err.status = 400;
+    throw err;
+  }
+
+  const { whereSQL, params } = buildOwnershipWhere(user);
+  const where = [whereSQL];
+  appendCampaignFilterRules(where, params, filters_json);
+
+  if (search) {
+    const q = `%${search}%`;
+    where.push(
+      `(c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ? OR c.display_name LIKE ? OR p.phone LIKE ? OR EXISTS (
+        SELECT 1 FROM contact_tag_assignments cta_s
+        INNER JOIN contact_tags ct_s ON ct_s.id = cta_s.tag_id AND ct_s.tenant_id = cta_s.tenant_id
+        WHERE cta_s.contact_id = c.id AND cta_s.tenant_id = c.tenant_id AND ct_s.deleted_at IS NULL AND ct_s.name LIKE ?
+      ))`
+    );
+    params.push(q, q, q, q, q, q);
+  }
+
+  const finalWhere = `WHERE ${where.join(' AND ')}`;
+
+  const pageNum = parseInt(page, 10) || 1;
+  const limitNum = Math.min(parseInt(limit, 10) || 20, 100);
+  const offset = (pageNum - 1) * limitNum;
+  const finalLimit = Math.floor(Number(limitNum)) || 20;
+  const finalOffset = Math.floor(Number(offset)) || 0;
+
+  const [countRow] = await query(
+    `SELECT COUNT(*) AS total
+     FROM contacts c
+     LEFT JOIN contact_phones p
+       ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id
+     ${finalWhere}`,
+    params
+  );
+
+  const total = countRow?.total ?? 0;
+
+  const data = await query(
+    `SELECT 
+        c.id,
+        c.type,
+        c.first_name,
+        c.last_name,
+        c.display_name,
+        c.email,
+        c.source,
+        (SELECT GROUP_CONCAT(DISTINCT ct.name ORDER BY ct.name SEPARATOR ', ')
+         FROM contact_tag_assignments cta
+         INNER JOIN contact_tags ct ON ct.id = cta.tag_id AND ct.tenant_id = cta.tenant_id
+         WHERE cta.tenant_id = c.tenant_id AND cta.contact_id = c.id AND ct.deleted_at IS NULL
+        ) AS tag_names,
+        c.status_id,
+        csm.name AS status_name,
+        c.campaign_id,
+        cam.name AS campaign_name,
+        p.phone AS primary_phone,
+        c.created_at
+     FROM contacts c
+     LEFT JOIN contact_phones p
+       ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id
+     LEFT JOIN contact_status_master csm
+       ON csm.id = c.status_id AND csm.is_deleted = 0
+     LEFT JOIN campaigns cam
+       ON cam.id = c.campaign_id AND cam.tenant_id = c.tenant_id AND cam.deleted_at IS NULL
+     ${finalWhere}
      ORDER BY c.created_at DESC
      LIMIT ${finalLimit} OFFSET ${finalOffset}`,
     params

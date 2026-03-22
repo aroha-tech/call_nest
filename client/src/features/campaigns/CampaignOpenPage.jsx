@@ -124,6 +124,7 @@ export function CampaignOpenPage() {
                   <TableHeaderCell>Name</TableHeaderCell>
                   <TableHeaderCell>Phone</TableHeaderCell>
                   <TableHeaderCell>Email</TableHeaderCell>
+                  <TableHeaderCell>Tag</TableHeaderCell>
                   <TableHeaderCell>Type</TableHeaderCell>
                   <TableHeaderCell width="120px" align="center">
                     Actions
@@ -136,6 +137,7 @@ export function CampaignOpenPage() {
                     <TableCell>{c.display_name || `${c.first_name || ''} ${c.last_name || ''}`.trim() || '—'}</TableCell>
                     <TableCell>{c.primary_phone || '—'}</TableCell>
                     <TableCell>{c.email || '—'}</TableCell>
+                    <TableCell>{c.tag_names || '—'}</TableCell>
                     <TableCell>{c.type}</TableCell>
                     <TableCell align="center">
                       <Button

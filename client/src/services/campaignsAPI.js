@@ -3,7 +3,8 @@ import { axiosInstance } from './axiosInstance';
 const BASE = '/api/tenant/campaigns';
 
 export const campaignsAPI = {
-  list: () => axiosInstance.get(BASE),
+  /** @param {Record<string, unknown>} [params] — page, limit, search, type, manager_id, show_paused, include_archived */
+  list: (params) => axiosInstance.get(BASE, { params }),
 
   getById: (id) => axiosInstance.get(`${BASE}/${id}`),
 
@@ -19,4 +20,7 @@ export const campaignsAPI = {
     axiosInstance.post(`${BASE}/${id}/open`, null, {
       params: { page, limit, search: search || undefined },
     }),
+
+  /** Preview contacts matching filter rules (admin/manager/agent visibility). */
+  preview: (body) => axiosInstance.post(`${BASE}/preview`, body),
 };

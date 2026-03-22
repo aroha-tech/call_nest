@@ -12,6 +12,12 @@ router.get(
   campaignsController.list
 );
 
+router.post(
+  '/preview',
+  requirePermission(['contacts.read', 'leads.read']),
+  campaignsController.preview
+);
+
 router.get(
   '/:id',
   requirePermission(['contacts.read', 'leads.read']),

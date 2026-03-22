@@ -140,6 +140,42 @@
   line-height: 1.5;
 }
 
+.reviewScroll {
+  overflow-x: auto;
+  @include custom-scrollbar;
+}
+
+.duplicateBadge {
+  display: inline-block;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  padding: 2px 8px;
+  border-radius: $radius-sm;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.duplicateCreate {
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+}
+
+.duplicateSkip {
+  background: rgba(234, 179, 8, 0.2);
+  color: #ca8a04;
+}
+
+.duplicateUpdate {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+}
+
+.errorHint {
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
 @media (max-width: 860px) {
   .grid2 {
     grid-template-columns: 1fr;

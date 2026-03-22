@@ -4,3 +4,12 @@
   min-width: 200px;
   max-width: 280px;
 }
+
+.toolbarFilters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: $space-3;
+  flex: 1;
+  justify-content: flex-end;
+}

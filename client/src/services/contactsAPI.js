@@ -8,6 +8,12 @@ function contactFilterParam(v) {
   return v;
 }
 
+function campaignFilterParam(v) {
+  if (v === undefined || v === null || v === '' || v === '__all__') return undefined;
+  if (v === 'none') return 'none';
+  return v;
+}
+
 export const contactsAPI = {
   getAll: ({
     search,
@@ -17,6 +23,7 @@ export const contactsAPI = {
     status_id,
     filter_manager_id,
     filter_assigned_user_id,
+    campaign_id,
   } = {}) =>
     axiosInstance.get(`${BASE}`, {
       params: {
@@ -27,6 +34,7 @@ export const contactsAPI = {
         status_id: status_id || undefined,
         filter_manager_id: contactFilterParam(filter_manager_id),
         filter_assigned_user_id: contactFilterParam(filter_assigned_user_id),
+        campaign_id: campaignFilterParam(campaign_id),
       },
     }),
 
@@ -53,6 +61,7 @@ export const contactsAPI = {
     include_custom_fields = true,
     filter_manager_id,
     filter_assigned_user_id,
+    campaign_id,
   } = {}) =>
     axiosInstance.get(`${BASE}/export/csv`, {
       params: {
@@ -62,6 +71,7 @@ export const contactsAPI = {
         include_custom_fields: include_custom_fields ? '1' : '0',
         filter_manager_id: contactFilterParam(filter_manager_id),
         filter_assigned_user_id: contactFilterParam(filter_assigned_user_id),
+        campaign_id: campaignFilterParam(campaign_id),
       },
       responseType: 'blob',
     }),
@@ -88,5 +98,31 @@ export const contactsAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+
+  /** Server-resolved sample rows (same rules as import) for review step */
+  resolveImportPreview: ({
+    file,
+    mode = 'skip',
+    default_country_code = '+91',
+    mapping,
+    limit = 12,
+  } = {}) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('mode', mode);
+    form.append('default_country_code', default_country_code);
+    form.append('limit', String(limit));
+    if (mapping) {
+      form.append('mapping', JSON.stringify(mapping));
+    }
+    return axiosInstance.post(`${BASE}/import/resolve-preview`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  listImportHistory: ({ page = 1, limit = 20, type } = {}) =>
+    axiosInstance.get(`${BASE}/import/history`, {
+      params: { page, limit, type: type || undefined },
+    }),
 };
 

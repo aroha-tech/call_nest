@@ -1,5 +1,19 @@
 import { query } from '../../config/db.js';
 import { parse as parseCsv } from 'csv-parse/sync';
+import {
+  buildPhonesFromCsvRow,
+  extractNamesAndEmailFromNormalizedRow,
+  pickFirstByAliasKeys,
+  SOURCE_KEYS,
+  STATUS_KEYS,
+  PROPERTY_KEYS,
+  BUDGET_KEYS,
+  CITY_KEYS,
+  STATE_KEYS,
+  suggestImportColumnTarget,
+  splitFullNameToFirstLast,
+} from '../../utils/leadImportCsvHelpers.js';
+import * as contactTagsService from './contactTagsService.js';
 
 function assertUniquePhoneLabels(phones) {
   if (!Array.isArray(phones)) return;
@@ -15,7 +29,7 @@ function assertUniquePhoneLabels(phones) {
   }
 }
 
-function buildOwnershipWhere(user) {
+export function buildOwnershipWhere(user) {
   const clauses = ['c.tenant_id = ?', 'c.deleted_at IS NULL'];
   const params = [user.tenantId];
 
@@ -129,7 +143,16 @@ export async function syncContactsManagerForAgent(tenantId, agentUserId, newMana
 export async function listContacts(
   tenantId,
   user,
-  { search = '', page = 1, limit = 20, type, statusId, filterManagerId, filterAssignedUserId } = {}
+  {
+    search = '',
+    page = 1,
+    limit = 20,
+    type,
+    statusId,
+    filterManagerId,
+    filterAssignedUserId,
+    campaignIdFilter,
+  } = {}
 ) {
   const pageNum = parseInt(page, 10) || 1;
   const limitNum = Math.min(parseInt(limit, 10) || 20, 100);
@@ -150,9 +173,23 @@ export async function listContacts(
     params.push(statusId);
   }
 
+  if (campaignIdFilter === 'none') {
+    whereClauses.push('c.campaign_id IS NULL');
+  } else if (campaignIdFilter !== undefined && campaignIdFilter !== null) {
+    whereClauses.push('c.campaign_id = ?');
+    params.push(Number(campaignIdFilter));
+  }
+
   if (search) {
-    whereClauses.push('(c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    const q = `%${search}%`;
+    whereClauses.push(
+      `(c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ? OR c.display_name LIKE ? OR EXISTS (
+        SELECT 1 FROM contact_tag_assignments cta_s
+        INNER JOIN contact_tags ct_s ON ct_s.id = cta_s.tag_id AND ct_s.tenant_id = cta_s.tenant_id
+        WHERE cta_s.contact_id = c.id AND cta_s.tenant_id = c.tenant_id AND ct_s.deleted_at IS NULL AND ct_s.name LIKE ?
+      ))`
+    );
+    params.push(q, q, q, q, q);
   }
 
   await applyContactListFilters(tenantId, user, whereClauses, params, {
@@ -180,12 +217,18 @@ export async function listContacts(
         c.display_name,
         c.email,
         c.source,
+        (SELECT GROUP_CONCAT(DISTINCT ct.name ORDER BY ct.name SEPARATOR ', ')
+         FROM contact_tag_assignments cta
+         INNER JOIN contact_tags ct ON ct.id = cta.tag_id AND ct.tenant_id = cta.tenant_id
+         WHERE cta.tenant_id = c.tenant_id AND cta.contact_id = c.id AND ct.deleted_at IS NULL
+        ) AS tag_names,
         c.manager_id,
         c.assigned_user_id,
         mgr.name AS manager_name,
         ag.name AS assigned_user_name,
         c.status_id,
         c.campaign_id,
+        cam.name AS campaign_name,
         c.primary_phone_id,
         p.phone AS primary_phone,
         c.created_source,
@@ -195,6 +238,8 @@ export async function listContacts(
      FROM contacts c
      LEFT JOIN contact_phones p
        ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id
+     LEFT JOIN campaigns cam
+       ON cam.id = c.campaign_id AND cam.tenant_id = c.tenant_id AND cam.deleted_at IS NULL
      LEFT JOIN users mgr
        ON mgr.id = c.manager_id AND mgr.tenant_id = c.tenant_id AND mgr.is_deleted = 0
      LEFT JOIN users ag
@@ -258,9 +303,13 @@ export async function getContactById(id, tenantId, user) {
     [tenantId, id]
   );
 
+  const tags = await contactTagsService.fetchTagsForContact(tenantId, id);
+
   return {
     ...row,
     phones,
+    tags,
+    tag_ids: tags.map((t) => t.id),
   };
 }
 
@@ -272,6 +321,7 @@ export async function createContact(tenantId, user, payload) {
     display_name,
     email,
     source,
+    tag_ids,
     status_id,
     campaign_id,
     manager_id,
@@ -319,7 +369,7 @@ export async function createContact(tenantId, user, payload) {
         campaign_id,
         created_source,
         created_by
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
       type,
@@ -389,6 +439,8 @@ export async function createContact(tenantId, user, payload) {
       );
     }
   }
+
+  await contactTagsService.syncContactTagAssignments(tenantId, user, contactId, tag_ids);
 
   return getContactById(contactId, tenantId, user);
 }
@@ -505,6 +557,7 @@ export async function updateContact(id, tenantId, user, payload) {
     display_name,
     email,
     source,
+    tag_ids,
     status_id,
     campaign_id,
     manager_id,
@@ -632,6 +685,10 @@ export async function updateContact(id, tenantId, user, payload) {
         [tenantId, id, field.field_id, field.value_text ?? null]
       );
     }
+  }
+
+  if (tag_ids !== undefined) {
+    await contactTagsService.syncContactTagAssignments(tenantId, user, id, tag_ids);
   }
 
   return getContactById(id, tenantId, user);
@@ -953,6 +1010,166 @@ async function ensureCustomFieldDefinition(tenantId, { name, label, type }) {
   }
 }
 
+const PROVIDER_COLUMNS_AUTO_CF = [
+  { key: 'property', label: 'Property', type: 'text' },
+  { key: 'budget', label: 'Budget', type: 'number' },
+  { key: 'city', label: 'City', type: 'text' },
+  { key: 'state', label: 'State', type: 'text' },
+];
+
+const PROVIDER_ALIAS_BY_KEY = {
+  property: PROPERTY_KEYS,
+  budget: BUDGET_KEYS,
+  city: CITY_KEYS,
+  state: STATE_KEYS,
+};
+
+/**
+ * Same rules as CSV import row processing (may create missing Property/Budget/City/State custom fields).
+ * @returns {{ error: string } | { error: null, first_name, last_name, display_name, email, finalSource, resolvedStatusId, providerStatusName, campaign_id, manager_id, assigned_user_id, phones, custom_fields_deduped, primaryPhone }}
+ */
+async function resolveCsvRowToImportPayload(tenantId, { normalized, headerMapping, byHeader, defaultCountryCode }) {
+  let first_name = null;
+  let last_name = null;
+  let email = null;
+  let display_name = null;
+  let mappedSource = null;
+  let mappedStatusName = null;
+  let mappedPrimaryPhone = null;
+
+  const custom_fields = [];
+
+  if (headerMapping) {
+    for (const [nk, cfg] of Object.entries(headerMapping)) {
+      const val = normalized[nk];
+      if (val === undefined) continue;
+      const target = cfg?.target;
+      if (!target || target === 'ignore') continue;
+
+      if (target === 'first_name') first_name = val;
+      else if (target === 'last_name') last_name = val;
+      else if (target === 'full_name') {
+        const sp = splitFullNameToFirstLast(val);
+        if (!first_name) first_name = sp.first_name;
+        if (!last_name) last_name = sp.last_name;
+      } else if (target === 'display_name') display_name = val;
+      else if (target === 'email') email = val;
+      else if (target === 'primary_phone') mappedPrimaryPhone = val;
+      else if (target === 'source') mappedSource = val;
+      else if (target === 'status') mappedStatusName = val;
+      else if (target === 'property' || target === 'budget' || target === 'city' || target === 'state') {
+        if (val === null || !String(val).trim()) continue;
+        const def = PROVIDER_COLUMNS_AUTO_CF.find((d) => d.key === target);
+        if (!def) continue;
+        const existingField = byHeader.get(def.key);
+        const field =
+          existingField ||
+          (await ensureCustomFieldDefinition(tenantId, { name: def.key, label: def.label, type: def.type }));
+        if (!field?.id) continue;
+        byHeader.set(def.key, field);
+        byHeader.set(normalizeHeader(def.label), field);
+        custom_fields.push({ field_id: field.id, value_text: val === null ? null : String(val) });
+      } else if (target === 'custom' && cfg.customFieldId) {
+        custom_fields.push({ field_id: cfg.customFieldId, value_text: val === null ? null : String(val) });
+      }
+    }
+  }
+
+  const extracted = extractNamesAndEmailFromNormalizedRow(normalized);
+  if (!first_name) first_name = extracted.first_name;
+  if (!last_name) last_name = extracted.last_name;
+  if (!email) email = extracted.email;
+  if (!display_name || !String(display_name).trim()) {
+    display_name = extracted.display_name;
+  }
+
+  if (!display_name || !String(display_name).trim()) {
+    const composed = [first_name, last_name].filter(Boolean).join(' ').trim();
+    display_name = composed || email || extracted.full_name_raw || null;
+  }
+
+  const normalizedForPhones = { ...normalized };
+  if (mappedPrimaryPhone != null && String(mappedPrimaryPhone).trim()) {
+    normalizedForPhones.primary_phone = mappedPrimaryPhone;
+  }
+  const phones = buildPhonesFromCsvRow(normalizedForPhones, defaultCountryCode, toE164Phone);
+
+  if (!display_name || !String(display_name).trim()) {
+    return { error: 'display_name is required (or provide first_name/last_name/email)' };
+  }
+
+  if (!first_name && !email) {
+    return { error: 'Either first_name or email is required' };
+  }
+
+  const source = normalized.source || null;
+  const providerSource = pickFirstByAliasKeys(normalized, SOURCE_KEYS);
+  const finalSource = mappedSource || providerSource || source;
+
+  const status_id = normalized.status_id || undefined;
+  const providerStatusName =
+    mappedStatusName || pickFirstByAliasKeys(normalized, STATUS_KEYS) || null;
+  const resolvedStatusId =
+    status_id || (providerStatusName ? await resolveContactStatusIdByName(tenantId, providerStatusName) : null);
+  const campaign_id = normalized.campaign_id ? Number(normalized.campaign_id) : undefined;
+  const manager_id = normalized.manager_id ? Number(normalized.manager_id) : undefined;
+  const assigned_user_id = normalized.assigned_user_id ? Number(normalized.assigned_user_id) : undefined;
+
+  for (const [k, v] of Object.entries(normalized)) {
+    let header = k;
+    if (header.startsWith('cf:')) header = header.slice(3);
+    const field = byHeader.get(normalizeHeader(header));
+    if (!field) continue;
+    if (v === undefined) continue;
+    const value_text = v === null ? null : String(v);
+    custom_fields.push({ field_id: field.id, value_text });
+  }
+
+  for (const def of PROVIDER_COLUMNS_AUTO_CF) {
+    const val =
+      pickFirstByAliasKeys(normalized, PROVIDER_ALIAS_BY_KEY[def.key] || []) ?? normalized[def.key];
+    if (val === undefined || val === null || !String(val).trim()) continue;
+    const existingField = byHeader.get(def.key);
+    const field =
+      existingField ||
+      (await ensureCustomFieldDefinition(tenantId, { name: def.key, label: def.label, type: def.type }));
+    if (!field?.id) continue;
+    byHeader.set(def.key, field);
+    byHeader.set(normalizeHeader(def.label), field);
+
+    const value_text = val === null ? null : String(val);
+    custom_fields.push({ field_id: field.id, value_text });
+  }
+
+  const cfByField = new Map();
+  for (const c of custom_fields) {
+    if (c?.field_id) cfByField.set(c.field_id, c.value_text);
+  }
+  const custom_fields_deduped = [...cfByField.entries()].map(([field_id, value_text]) => ({
+    field_id,
+    value_text,
+  }));
+
+  const primaryPhone = phones.find((p) => p.is_primary)?.phone || null;
+
+  return {
+    error: null,
+    first_name,
+    last_name,
+    display_name,
+    email,
+    finalSource,
+    resolvedStatusId,
+    providerStatusName: providerStatusName || null,
+    campaign_id,
+    manager_id,
+    assigned_user_id,
+    phones,
+    custom_fields_deduped,
+    primaryPhone,
+  };
+}
+
 function csvEscape(v) {
   const s = v === null || v === undefined ? '' : String(v);
   if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
@@ -969,6 +1186,7 @@ export async function exportContactsCsv(
     includeCustomFields = true,
     filterManagerId,
     filterAssignedUserId,
+    campaignIdFilter,
   } = {}
 ) {
   const { whereSQL, params } = buildOwnershipWhere(user);
@@ -984,9 +1202,23 @@ export async function exportContactsCsv(
     params.push(statusId);
   }
 
+  if (campaignIdFilter === 'none') {
+    whereClauses.push('c.campaign_id IS NULL');
+  } else if (campaignIdFilter !== undefined && campaignIdFilter !== null) {
+    whereClauses.push('c.campaign_id = ?');
+    params.push(Number(campaignIdFilter));
+  }
+
   if (search) {
-    whereClauses.push('(c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ? OR c.display_name LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+    const q = `%${search}%`;
+    whereClauses.push(
+      `(c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ? OR c.display_name LIKE ? OR EXISTS (
+        SELECT 1 FROM contact_tag_assignments cta_s
+        INNER JOIN contact_tags ct_s ON ct_s.id = cta_s.tag_id AND ct_s.tenant_id = cta_s.tenant_id
+        WHERE cta_s.contact_id = c.id AND cta_s.tenant_id = c.tenant_id AND ct_s.deleted_at IS NULL AND ct_s.name LIKE ?
+      ))`
+    );
+    params.push(q, q, q, q, q);
   }
 
   await applyContactListFilters(tenantId, user, whereClauses, params, {
@@ -1006,7 +1238,13 @@ export async function exportContactsCsv(
         c.email,
         p.phone AS primary_phone,
         c.source,
+        (SELECT GROUP_CONCAT(DISTINCT ct.name ORDER BY ct.name SEPARATOR ', ')
+         FROM contact_tag_assignments cta
+         INNER JOIN contact_tags ct ON ct.id = cta.tag_id AND ct.tenant_id = cta.tenant_id
+         WHERE cta.tenant_id = c.tenant_id AND cta.contact_id = c.id AND ct.deleted_at IS NULL
+        ) AS tag_names,
         c.campaign_id,
+        cam.name AS campaign_name,
         c.status_id,
         c.manager_id,
         c.assigned_user_id,
@@ -1017,6 +1255,8 @@ export async function exportContactsCsv(
      FROM contacts c
      LEFT JOIN contact_phones p
        ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id
+     LEFT JOIN campaigns cam
+       ON cam.id = c.campaign_id AND cam.tenant_id = c.tenant_id AND cam.deleted_at IS NULL
      ${finalWhere}
      ORDER BY c.created_at DESC`,
     params
@@ -1060,7 +1300,9 @@ export async function exportContactsCsv(
     'email',
     'primary_phone',
     'source',
+    'tags',
     'campaign_id',
+    'campaign_name',
     'status_id',
     'manager_id',
     'assigned_user_id',
@@ -1090,7 +1332,9 @@ export async function exportContactsCsv(
       c.email,
       c.primary_phone,
       c.source,
+      c.tag_names || '',
       c.campaign_id,
+      c.campaign_name,
       c.status_id,
       c.manager_id,
       c.assigned_user_id,
@@ -1137,7 +1381,7 @@ export async function importContactsCsv(
     byHeader.set(normalizeHeader(f.label), f);
   }
 
-  // mapping: { [normalizedHeader]: { target: 'ignore' | 'first_name' | 'last_name' | 'email' | 'primary_phone' | 'source' | 'status' | 'custom', customFieldId?: number } }
+  // mapping: { [normalizedHeader]: { target: 'ignore' | 'first_name' | 'last_name' | 'full_name' | 'display_name' | 'email' | 'primary_phone' | 'source' | 'status' | 'custom', customFieldId?: number } }
   const headerMapping = mapping && typeof mapping === 'object' ? mapping : null;
 
   let created = 0;
@@ -1158,145 +1402,36 @@ export async function importContactsCsv(
 
     try {
       const normalized = {};
-      const originalByNormalized = {};
       for (const [k, v] of Object.entries(row)) {
         const nk = normalizeHeader(k);
         normalized[nk] = v;
-        originalByNormalized[nk] = k;
       }
 
-      // Apply manual mapping first (if provided)
-      let first_name = null;
-      let last_name = null;
-      let email = null;
-      let mappedSource = null;
-      let mappedStatusName = null;
+      const resolved = await resolveCsvRowToImportPayload(tenantId, {
+        normalized,
+        headerMapping,
+        byHeader,
+        defaultCountryCode,
+      });
 
-      const custom_fields = [];
-
-      if (headerMapping) {
-        for (const [nk, cfg] of Object.entries(headerMapping)) {
-          const val = normalized[nk];
-          if (val === undefined) continue;
-          const target = cfg?.target;
-          if (!target || target === 'ignore') continue;
-
-          if (target === 'first_name') first_name = val;
-          else if (target === 'last_name') last_name = val;
-          else if (target === 'email') email = val;
-          else if (target === 'source') mappedSource = val;
-          else if (target === 'status') mappedStatusName = val;
-          else if (target === 'custom' && cfg.customFieldId) {
-            custom_fields.push({ field_id: cfg.customFieldId, value_text: val === null ? null : String(val) });
-          }
-        }
+      if (resolved.error) {
+        throw new Error(resolved.error);
       }
 
-      // Fallback auto-detection if not mapped
-      if (!first_name) first_name = normalized.first_name || normalized.firstname || normalized.first || null;
-      if (!last_name) last_name = normalized.last_name || normalized.lastname || normalized.last || null;
-      if (!email) email = normalized.email || null;
-
-      let display_name =
-        normalized.display_name ||
-        normalized.displayname ||
-        null;
-
-      if (!display_name || !String(display_name).trim()) {
-        const composed = [first_name, last_name].filter(Boolean).join(' ').trim();
-        display_name = composed || email || null;
-      }
-
-      // Phones: support phone / primary_phone / phone:<label> / phone_<label>
-      const phones = [];
-      const basePhone =
-        normalized.primary_phone || normalized.phone || normalized.mobile || normalized.mobileno || normalized.mobile_no;
-      const mobilePhone = normalized.mobile_phone || normalized.mobilephone || null;
-      if (basePhone) {
-        const e164 = toE164Phone(basePhone, defaultCountryCode);
-        if (e164) {
-          phones.push({ phone: e164, label: 'mobile', is_primary: 1 });
-        }
-      } else if (mobilePhone) {
-        const e164 = toE164Phone(mobilePhone, defaultCountryCode);
-        if (e164) {
-          phones.push({ phone: e164, label: 'mobile', is_primary: 1 });
-        }
-      }
-
-      for (const [k, v] of Object.entries(normalized)) {
-        const m = k.match(/^phone[:_](.+)$/i);
-        if (!m) continue;
-        const label = String(m[1] || '').trim().toLowerCase() || 'mobile';
-        const e164 = toE164Phone(v, defaultCountryCode);
-        if (!e164) continue;
-        phones.push({ phone: e164, label, is_primary: 0 });
-      }
-
-      // If multiple phones exist, ensure first one primary
-      if (phones.length > 0) {
-        phones[0].is_primary = 1;
-      }
-
-      if (!display_name || !String(display_name).trim()) {
-        const err = new Error('display_name is required (or provide first_name/last_name/email)');
-        err.status = 400;
-        throw err;
-      }
-
-      if (!first_name && !email) {
-        const err = new Error('Either first_name or email is required');
-        err.status = 400;
-        throw err;
-      }
-
-      const source = normalized.source || null;
-      const providerSource = normalized.lead_source || normalized.leadsource || null;
-      const finalSource = mappedSource || providerSource || source;
-
-      const status_id = normalized.status_id || undefined; // status_id is CHAR(36)
-      const providerStatusName = mappedStatusName || normalized.lead_status || normalized.leadstatus || normalized.status || null;
-      const resolvedStatusId =
-        status_id || (providerStatusName ? await resolveContactStatusIdByName(tenantId, providerStatusName) : null);
-      const campaign_id = normalized.campaign_id ? Number(normalized.campaign_id) : undefined;
-      const manager_id = normalized.manager_id ? Number(normalized.manager_id) : undefined;
-      const assigned_user_id = normalized.assigned_user_id ? Number(normalized.assigned_user_id) : undefined;
-
-      // Custom fields from headers: cf:<name> or direct name/label header
-      for (const [k, v] of Object.entries(normalized)) {
-        let header = k;
-        if (header.startsWith('cf:')) header = header.slice(3);
-        const field = byHeader.get(normalizeHeader(header));
-        if (!field) continue;
-        if (v === undefined) continue;
-        const value_text = v === null ? null : String(v);
-        custom_fields.push({ field_id: field.id, value_text });
-      }
-
-      // Provider mapping (common India real-estate lead sheets)
-      // Auto-create common custom fields if missing so imports don't silently drop important columns.
-      const providerColumnsToAutoCF = [
-        { key: 'property', label: 'Property', type: 'text' },
-        { key: 'budget', label: 'Budget', type: 'number' },
-        { key: 'city', label: 'City', type: 'text' },
-      ];
-
-      for (const def of providerColumnsToAutoCF) {
-        const val = normalized[def.key];
-        if (val === undefined) continue;
-        const existingField = byHeader.get(def.key);
-        const field =
-          existingField ||
-          (await ensureCustomFieldDefinition(tenantId, { name: def.key, label: def.label, type: def.type }));
-        if (!field?.id) continue;
-        byHeader.set(def.key, field);
-        byHeader.set(normalizeHeader(def.label), field);
-
-        const value_text = val === null ? null : String(val);
-        custom_fields.push({ field_id: field.id, value_text });
-      }
-
-      const primaryPhone = phones.find((p) => p.is_primary)?.phone || null;
+      const {
+        first_name,
+        last_name,
+        display_name,
+        email,
+        finalSource,
+        resolvedStatusId,
+        campaign_id,
+        manager_id,
+        assigned_user_id,
+        phones,
+        custom_fields_deduped,
+        primaryPhone,
+      } = resolved;
 
       let existingId = null;
       if (primaryPhone) {
@@ -1330,7 +1465,7 @@ export async function importContactsCsv(
           ...(manager_id !== undefined ? { manager_id } : {}),
           ...(assigned_user_id !== undefined ? { assigned_user_id } : {}),
           ...(phones.length > 0 ? { phones } : {}),
-          ...(custom_fields.length > 0 ? { custom_fields } : {}),
+          ...(custom_fields_deduped.length > 0 ? { custom_fields: custom_fields_deduped } : {}),
         };
 
         await updateContact(existingId, tenantId, user, payload);
@@ -1350,7 +1485,7 @@ export async function importContactsCsv(
         ...(manager_id !== undefined ? { manager_id } : {}),
         ...(assigned_user_id !== undefined ? { assigned_user_id } : {}),
         phones,
-        custom_fields,
+        custom_fields: custom_fields_deduped,
         created_source,
       });
 
@@ -1364,11 +1499,120 @@ export async function importContactsCsv(
   }
 
   return {
+    rowCount: records.length,
     created,
     updated,
     skipped,
     failed: errors.length,
     errors,
+  };
+}
+
+export async function previewResolvedContactsImportCsv(
+  tenantId,
+  { buffer, mapping, defaultCountryCode = '+91', mode = 'skip', limit = 12 } = {}
+) {
+  const csvText = Buffer.isBuffer(buffer) ? buffer.toString('utf8') : String(buffer || '');
+  const records = parseCsv(csvText, {
+    columns: true,
+    skip_empty_lines: true,
+    relax_column_count: true,
+    trim: true,
+  });
+
+  if (!records || records.length === 0) {
+    return { totalRows: 0, mode, sampleRows: [] };
+  }
+
+  if (records.length > 2000) {
+    const err = new Error('CSV import supports up to 2000 rows per upload');
+    err.status = 400;
+    throw err;
+  }
+
+  const allFields = await query(
+    `SELECT id, name, label
+     FROM contact_custom_fields
+     WHERE tenant_id = ?`,
+    [tenantId]
+  );
+
+  const byHeader = new Map();
+  for (const f of allFields) {
+    byHeader.set(normalizeHeader(f.name), f);
+    byHeader.set(normalizeHeader(f.label), f);
+  }
+
+  const headerMapping = mapping && typeof mapping === 'object' ? mapping : null;
+
+  const fieldLabelById = new Map(allFields.map((f) => [f.id, f.label || f.name]));
+
+  const sampleLimit = Math.min(Math.max(1, parseInt(limit, 10) || 12), 50);
+  const sampleRows = [];
+
+  for (let i = 0; i < records.length && i < sampleLimit; i++) {
+    const rowIndex = i + 2;
+    const row = records[i] || {};
+    const normalized = {};
+    for (const [k, v] of Object.entries(row)) {
+      normalized[normalizeHeader(k)] = v;
+    }
+
+    const resolved = await resolveCsvRowToImportPayload(tenantId, {
+      normalized,
+      headerMapping,
+      byHeader,
+      defaultCountryCode,
+    });
+
+    if (resolved.error) {
+      sampleRows.push({
+        row: rowIndex,
+        error: resolved.error,
+        duplicate_action: null,
+      });
+      continue;
+    }
+
+    let duplicate_action = 'create';
+    if (resolved.primaryPhone) {
+      const rows = await query(
+        `SELECT c.id
+         FROM contact_phones p
+         JOIN contacts c
+           ON c.id = p.contact_id AND c.tenant_id = p.tenant_id
+         WHERE p.tenant_id = ? AND p.phone = ? AND c.deleted_at IS NULL
+         LIMIT 1`,
+        [tenantId, resolved.primaryPhone]
+      );
+      if (rows?.[0]?.id) {
+        duplicate_action = mode === 'update' ? 'update' : 'skip';
+      }
+    }
+
+    const custom_fields_preview = (resolved.custom_fields_deduped || []).map((c) => ({
+      label: fieldLabelById.get(c.field_id) || `Field ${c.field_id}`,
+      value: c.value_text,
+    }));
+
+    sampleRows.push({
+      row: rowIndex,
+      duplicate_action,
+      display_name: resolved.display_name,
+      first_name: resolved.first_name,
+      last_name: resolved.last_name,
+      email: resolved.email,
+      primary_phone: resolved.primaryPhone,
+      source: resolved.finalSource,
+      status: resolved.providerStatusName,
+      custom_fields_preview,
+    });
+  }
+
+  return {
+    totalRows: records.length,
+    mode,
+    sampleRows,
   };
 }
 
@@ -1406,25 +1650,7 @@ export async function previewContactsImportCsv(tenantId, { buffer } = {}) {
       }
     }
 
-    let suggested = 'ignore';
-    const n = normalized;
-    if (['first_name', 'firstname', 'first'].includes(n)) suggested = 'first_name';
-    else if (['last_name', 'lastname', 'last', 'surname'].includes(n)) suggested = 'last_name';
-    else if (n === 'email' || n === 'email_id') suggested = 'email';
-    else if (['mobile', 'mobile_no', 'mobileno', 'mobilephone', 'mobile_phone', 'phone', 'primary_phone'].includes(n))
-      suggested = 'primary_phone';
-    else if (n === 'lead_source' || n === 'leadsource' || n === 'source') suggested = 'source';
-    else if (n === 'lead_status' || n === 'leadstatus' || n === 'status') suggested = 'status';
-    else {
-      // Try match a custom field by name/label
-      const lower = n.toLowerCase();
-      const cf =
-        customFields.find((f) => normalizeHeader(f.name) === lower) ||
-        customFields.find((f) => normalizeHeader(f.label) === lower);
-      if (cf) {
-        suggested = `custom:${cf.id}`;
-      }
-    }
+    const suggested = suggestImportColumnTarget(normalized, customFields);
 
     return {
       header,
@@ -1439,5 +1665,265 @@ export async function previewContactsImportCsv(tenantId, { buffer } = {}) {
     columns,
     customFields,
   };
+}
+
+function pickFirstNonEmpty(...values) {
+  for (const v of values) {
+    if (v === undefined || v === null) continue;
+    const s = String(v).trim();
+    if (s) return v;
+  }
+  return null;
+}
+
+function extractLeadPhones(lead, defaultCountryCode) {
+  const phones = [];
+
+  // If provider sends explicit array
+  if (Array.isArray(lead?.phones)) {
+    const safe = lead.phones.filter((p) => p && p.phone);
+    safe.forEach((p, idx) => {
+      const phoneE164 = toE164Phone(p.phone, defaultCountryCode);
+      if (!phoneE164) return;
+      const label = String(p.label || (idx === 0 ? 'mobile' : 'work')).trim().toLowerCase() || 'mobile';
+      const isPrimary = p.is_primary === 1 || p.is_primary === true || idx === 0;
+      phones.push({ phone: phoneE164, label, is_primary: isPrimary ? 1 : 0 });
+    });
+  }
+
+  // Fallback: common fields
+  if (phones.length === 0) {
+    const primaryRaw = pickFirstNonEmpty(
+      lead?.primary_phone,
+      lead?.phone,
+      lead?.mobile_phone,
+      lead?.mobilePhone,
+      lead?.mobileno,
+      lead?.phone_number
+    );
+
+    if (primaryRaw) {
+      const e164 = toE164Phone(primaryRaw, defaultCountryCode);
+      if (e164) phones.push({ phone: e164, label: 'mobile', is_primary: 1 });
+    }
+
+    const workRaw = pickFirstNonEmpty(lead?.work_phone, lead?.phone_work);
+    if (workRaw) {
+      const e164 = toE164Phone(workRaw, defaultCountryCode);
+      if (e164) phones.push({ phone: e164, label: 'work', is_primary: 0 });
+    }
+
+    const homeRaw = pickFirstNonEmpty(lead?.home_phone, lead?.phone_home);
+    if (homeRaw) {
+      const e164 = toE164Phone(homeRaw, defaultCountryCode);
+      if (e164) phones.push({ phone: e164, label: 'home', is_primary: 0 });
+    }
+  }
+
+  // Ensure only one primary (first primary wins)
+  if (phones.length > 0) {
+    let primaryIdx = phones.findIndex((p) => p.is_primary === 1);
+    if (primaryIdx === -1) primaryIdx = 0;
+    phones.forEach((p, idx) => {
+      p.is_primary = idx === primaryIdx ? 1 : 0;
+    });
+  }
+
+  // Ensure unique labels (create/update validates label uniqueness)
+  if (phones.length > 0) {
+    const seen = new Set();
+    phones.forEach((p, idx) => {
+      const base = String(p?.label || (idx === 0 ? 'mobile' : 'work')).trim() || 'mobile';
+      const key = base.toLowerCase();
+      if (seen.has(key)) {
+        // Make label unique deterministically
+        const fallback = idx === 0 ? `${base}_${idx + 1}` : `alt_${base}_${idx + 1}`;
+        p.label = fallback;
+      } else {
+        p.label = base;
+      }
+      seen.add(String(p.label).toLowerCase());
+    });
+  }
+
+  return phones;
+}
+
+function extractCustomFieldValues(lead) {
+  // Supported formats:
+  // - { custom_fields: { property: '1BHK', city: 'Ahmedabad' } }
+  // - { customFields: { ... } }
+  // - { answers: [{ question: 'City', value: 'Ahmedabad' }, ...] }
+  if (lead?.custom_fields && typeof lead.custom_fields === 'object') return lead.custom_fields;
+  if (lead?.customFields && typeof lead.customFields === 'object') return lead.customFields;
+
+  const answers = Array.isArray(lead?.answers) ? lead.answers : Array.isArray(lead?.lead_answers) ? lead.lead_answers : null;
+  if (!answers) return {};
+
+  const obj = {};
+  for (const a of answers) {
+    const key = a?.key || a?.field || a?.question || a?.name;
+    const value = a?.value ?? a?.answer;
+    if (!key) continue;
+    obj[key] = value;
+  }
+  return obj;
+}
+
+async function mapCustomFieldsForIntegration(tenantId, leadCustomFields) {
+  if (!leadCustomFields || typeof leadCustomFields !== 'object') return [];
+
+  const allFields = await query(
+    `SELECT id, name, label, type
+     FROM contact_custom_fields
+     WHERE tenant_id = ?`,
+    [tenantId]
+  );
+
+  const byKey = new Map();
+  for (const f of allFields) {
+    byKey.set(normalizeHeader(f.name), f);
+    byKey.set(normalizeHeader(f.label), f);
+  }
+
+  const autoCF = [
+    { key: 'property', label: 'Property', type: 'text' },
+    { key: 'budget', label: 'Budget', type: 'number' },
+    { key: 'city', label: 'City', type: 'text' },
+    { key: 'state', label: 'State', type: 'text' },
+  ];
+
+  const customFields = [];
+
+  for (const [rawKey, rawVal] of Object.entries(leadCustomFields)) {
+    const key = String(rawKey || '').trim();
+    if (!key) continue;
+
+    const val = rawVal === undefined ? undefined : rawVal;
+    if (val === undefined) continue;
+
+    const existing = byKey.get(normalizeHeader(key));
+    if (existing) {
+      customFields.push({
+        field_id: existing.id,
+        value_text: val === null ? null : String(val),
+      });
+      continue;
+    }
+
+    const auto = autoCF.find((d) => normalizeHeader(d.key) === normalizeHeader(key));
+    if (auto) {
+      const created = await ensureCustomFieldDefinition(tenantId, {
+        name: auto.key,
+        label: auto.label,
+        type: auto.type,
+      });
+      if (created?.id) {
+        byKey.set(normalizeHeader(auto.key), created);
+        byKey.set(normalizeHeader(auto.label), created);
+        customFields.push({
+          field_id: created.id,
+          value_text: val === null ? null : String(val),
+        });
+      }
+    }
+  }
+
+  return customFields;
+}
+
+export async function upsertLeadsFromIntegration(
+  tenantId,
+  user,
+  { leads = [], defaultCountryCode = '+91', integrationCreatedSource = 'integration' } = {}
+) {
+  const whereBase = buildOwnershipWhere(user);
+  const errors = [];
+  let created = 0;
+  let updated = 0;
+
+  for (let i = 0; i < leads.length; i++) {
+    const lead = leads[i] || {};
+    const rowIndex = i + 1;
+
+    try {
+      const first_name = pickFirstNonEmpty(lead.first_name, lead.firstname, lead.firstName) ?? null;
+      const last_name = pickFirstNonEmpty(lead.last_name, lead.lastname, lead.lastName) ?? null;
+      const email = pickFirstNonEmpty(lead.email, lead.email_id) ?? null;
+
+      const display_name = pickFirstNonEmpty(
+        lead.display_name,
+        lead.displayName,
+        lead.full_name,
+        [first_name, last_name].filter(Boolean).join(' '),
+        email
+      );
+
+      const source = pickFirstNonEmpty(lead.source, lead.lead_source, lead.leadSource, lead.source_name) ?? null;
+
+      const phones = extractLeadPhones(lead, defaultCountryCode);
+      const primaryPhone = phones.find((p) => p.is_primary === 1)?.phone ?? null;
+
+      if (!primaryPhone) {
+        const err = new Error('No phone found for lead');
+        err.status = 400;
+        throw err;
+      }
+
+      const providerStatus =
+        pickFirstNonEmpty(lead.lead_status, lead.leadStatus, lead.status, lead.status_code, lead.statusCode) ?? null;
+
+      const resolvedStatusId = providerStatus ? await resolveContactStatusIdByName(tenantId, providerStatus) : null;
+
+      const custom_fields = await mapCustomFieldsForIntegration(tenantId, extractCustomFieldValues(lead));
+
+      const payload = {
+        type: 'lead',
+        first_name,
+        last_name,
+        display_name: display_name ?? [first_name, last_name].filter(Boolean).join(' ') ?? email ?? null,
+        email,
+        source,
+        ...(resolvedStatusId ? { status_id: resolvedStatusId } : {}),
+        ...(lead.campaign_id ? { campaign_id: Number(lead.campaign_id) } : {}),
+        ...(lead.manager_id ? { manager_id: Number(lead.manager_id) } : {}),
+        ...(lead.assigned_user_id ? { assigned_user_id: Number(lead.assigned_user_id) } : {}),
+        phones,
+        custom_fields,
+        created_source: integrationCreatedSource,
+      };
+
+      // Dedupe by primary phone WITH ownership scope (agent/manager integration user)
+      const existingRows = await query(
+        `SELECT c.id
+         FROM contacts c
+         JOIN contact_phones p
+           ON p.contact_id = c.id AND p.tenant_id = c.tenant_id
+         WHERE ${whereBase.whereSQL}
+           AND c.type = 'lead'
+           AND p.is_primary = 1
+           AND p.phone = ?
+         LIMIT 1`,
+        [...whereBase.params, primaryPhone]
+      );
+
+      const existingId = existingRows?.[0]?.id ?? null;
+
+      if (existingId) {
+        await updateContact(existingId, tenantId, user, payload);
+        updated++;
+      } else {
+        await createContact(tenantId, user, payload);
+        created++;
+      }
+    } catch (e) {
+      errors.push({
+        row: rowIndex,
+        error: e?.message || 'Integration lead import failed',
+      });
+    }
+  }
+
+  return { created, updated, failed: errors.length, errors };
 }
 

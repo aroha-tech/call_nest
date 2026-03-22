@@ -1,10 +1,9 @@
 import { Router } from 'express';
 import * as contactsController from '../../controllers/tenant/contactsController.js';
 import { tenantAuthMiddleware, requirePermission } from '../../middleware/auth.js';
-import multer from 'multer';
+import { uploadCsvImportSingle } from '../../middleware/uploadCsvImport.js';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
 
 router.use(tenantAuthMiddleware);
 
@@ -18,14 +17,30 @@ router.get(
 router.post(
   '/import/preview',
   requirePermission(['contacts.create', 'leads.create', 'contacts.update', 'leads.update']),
-  upload.single('file'),
+  uploadCsvImportSingle,
   contactsController.previewImportCsv
 );
 router.post(
   '/import/csv',
   requirePermission(['contacts.create', 'leads.create', 'contacts.update', 'leads.update']),
-  upload.single('file'),
+  uploadCsvImportSingle,
   contactsController.importCsv
+);
+router.post(
+  '/import/resolve-preview',
+  requirePermission(['contacts.create', 'leads.create', 'contacts.update', 'leads.update']),
+  uploadCsvImportSingle,
+  contactsController.previewResolvedImportCsv
+);
+router.get(
+  '/import/history',
+  requirePermission([
+    'contacts.read',
+    'leads.read',
+    'contacts.create',
+    'leads.create',
+  ]),
+  contactsController.listImportHistory
 );
 router.get(
   '/custom-fields',

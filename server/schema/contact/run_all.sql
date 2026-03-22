@@ -17,6 +17,7 @@ SOURCE D:/own_software/call_nest/server/schema/contact/01_contacts.sql;
 SOURCE D:/own_software/call_nest/server/schema/contact/02_contact_phones.sql;
 SOURCE D:/own_software/call_nest/server/schema/contact/03_contact_custom_fields.sql;
 SOURCE D:/own_software/call_nest/server/schema/contact/04_contact_custom_field_values.sql;
+SOURCE D:/own_software/call_nest/server/schema/contact/05_contact_tags.sql;
 
 SELECT '' AS '';
 SELECT '======================================' AS '';

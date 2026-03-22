@@ -1,0 +1,289 @@
+@use '../../styles/variables' as *;
+
+.page {
+  padding: $space-6;
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
+}
+
+.section {
+  margin: 0;
+  padding: $space-5;
+  border: 1px solid var(--border-subtle);
+  border-radius: $radius-lg;
+  background: var(--color-bg-elevated, rgba(255, 255, 255, 0.02));
+  box-shadow: $shadow-xs;
+}
+
+.sectionTitle {
+  margin: 0 0 $space-1;
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.sectionDesc {
+  margin: 0 0 $space-4;
+  font-size: $font-size-xs;
+  line-height: $line-height-relaxed;
+  color: var(--color-text-secondary);
+  max-width: 52rem;
+}
+
+.sectionDescTight {
+  margin-bottom: 0;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: $space-4;
+
+  @media (min-width: 640px) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $space-3;
+  margin-bottom: $space-3;
+  flex-wrap: wrap;
+
+  .sectionTitle {
+    margin-bottom: 0;
+  }
+}
+
+.sectionHeaderText {
+  flex: 1;
+  min-width: 0;
+}
+
+.tagChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2;
+  min-height: $space-4;
+  margin-bottom: $space-3;
+}
+
+.tagChip {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
+  padding: $space-1 $space-3;
+  border-radius: $radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  color: var(--color-text-primary);
+  background: var(--color-bg-subtle, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border-subtle);
+  max-width: 100%;
+}
+
+.tagChipLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tagRemove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: $radius-full;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color $transition-fast, background $transition-fast;
+
+  &:hover {
+    color: var(--color-text-primary);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-input-border-focus);
+    outline-offset: 1px;
+  }
+}
+
+.tagAddSelect {
+  width: 100%;
+  max-width: 28rem;
+  height: 34px;
+  padding: 0 $space-8 0 $space-3;
+  font-size: $font-size-sm;
+  color: var(--color-text-primary);
+  background-color: var(--color-input-bg);
+  border: 1px solid var(--color-input-border);
+  border-radius: $radius-sm;
+  cursor: pointer;
+  transition: border-color $transition-fast, box-shadow $transition-fast;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right $space-3 center;
+
+  &:hover {
+    border-color: var(--color-input-border-hover);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-input-border-focus);
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+  }
+
+  option {
+    background: var(--color-bg-elevated);
+    color: var(--color-text-primary);
+  }
+}
+
+.tagEmptyHint {
+  margin: 0 0 $space-3;
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.assignGrid {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+}
+
+.phoneList {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+}
+
+.phoneRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: $space-3;
+  padding: $space-4;
+  border: 1px solid var(--border-subtle);
+  border-radius: $radius-md;
+  background: var(--color-input-bg);
+}
+
+.phoneCc {
+  flex: 0 0 7.5rem;
+  min-width: 6.5rem;
+}
+
+.phoneNum {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.phoneLabel {
+  flex: 0 0 10rem;
+  min-width: 8rem;
+}
+
+.phoneTail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $space-4;
+  margin-left: auto;
+}
+
+.primaryCheck {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  font-size: $font-size-xs;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+  padding-bottom: 2px;
+  white-space: nowrap;
+
+  input {
+    width: 1rem;
+    height: 1rem;
+    cursor: pointer;
+    accent-color: var(--color-primary, #6366f1);
+  }
+}
+
+.customFieldsGrid {
+  display: grid;
+  gap: $space-4;
+  grid-template-columns: 1fr;
+
+  @media (min-width: 640px) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.customFieldFull {
+  grid-column: 1 / -1;
+}
+
+.customBooleanRow {
+  align-items: flex-start;
+  padding: $space-2 0;
+}
+
+.booleanLabel {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: var(--color-text-primary);
+}
+
+.customEmpty {
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.loadingInline {
+  margin-left: $space-2;
+  font-weight: $font-weight-normal;
+  color: var(--color-text-muted);
+  font-size: $font-size-xs;
+}
+
+.stateWrap {
+  padding: $space-6;
+}
+
+.stateCenter {
+  display: flex;
+  justify-content: center;
+  padding: $space-8;
+}
+
+.headerActions {
+  display: flex;
+  gap: $space-2;
+  flex-wrap: wrap;
+}

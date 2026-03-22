@@ -1,0 +1,4 @@
+name,email,mobile,city
+Valid Lead One,valid1@example.com,9911111111,Mumbai
+,,9922222222,InvalidRowNoNameOrEmail
+Valid Lead Two,valid2@example.com,9933333333,Pune

@@ -5,6 +5,7 @@ import { selectUser } from '../../features/auth/authSelectors';
 import { usePermission } from '../../hooks/usePermission';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import { contactsAPI } from '../../services/contactsAPI';
+import { campaignsAPI } from '../../services/campaignsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
@@ -44,8 +45,11 @@ export function ContactsPage({ type }) {
   const [unassignError, setUnassignError] = useState('');
 
   const showOwnershipFilters = canRead && (role === 'admin' || role === 'manager');
+  const showCampaign = type === 'lead' && canRead;
 
   const [tenantUsers, setTenantUsers] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
+  const [campaignFilter, setCampaignFilter] = useState(FILTER_ALL);
   const [draftManagerFilter, setDraftManagerFilter] = useState(FILTER_ALL);
   const [draftAgentFilter, setDraftAgentFilter] = useState(FILTER_ALL);
   const [appliedManagerFilter, setAppliedManagerFilter] = useState(FILTER_ALL);
@@ -66,6 +70,23 @@ export function ContactsPage({ type }) {
     };
   }, [showOwnershipFilters]);
 
+  useEffect(() => {
+    if (!showCampaign) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await campaignsAPI.list({ page: 1, limit: 500, show_paused: true });
+        const list = res?.data?.data ?? res?.data ?? [];
+        if (!cancelled) setCampaigns(Array.isArray(list) ? list : []);
+      } catch {
+        if (!cancelled) setCampaigns([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showCampaign]);
+
   const filterParamsForApi = useMemo(() => {
     const mid = role === 'manager' ? FILTER_ALL : appliedManagerFilter;
     const aid = appliedAgentFilter;
@@ -74,8 +95,29 @@ export function ContactsPage({ type }) {
         !mid || mid === FILTER_ALL ? undefined : mid === 'unassigned' ? 'unassigned' : Number(mid),
       filter_assigned_user_id:
         !aid || aid === FILTER_ALL ? undefined : aid === 'unassigned' ? 'unassigned' : Number(aid),
+      campaign_id:
+        !showCampaign || !campaignFilter || campaignFilter === FILTER_ALL
+          ? undefined
+          : campaignFilter === 'none'
+            ? 'none'
+            : campaignFilter,
     };
-  }, [role, appliedManagerFilter, appliedAgentFilter]);
+  }, [role, appliedManagerFilter, appliedAgentFilter, showCampaign, campaignFilter]);
+
+  const campaignFilterOptions = useMemo(() => {
+    const rows = [...campaigns].sort((a, b) =>
+      String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' })
+    );
+    const opts = rows.map((c) => ({
+      value: String(c.id),
+      label: c.name || `#${c.id}`,
+    }));
+    return [
+      { value: FILTER_ALL, label: 'All campaigns' },
+      { value: 'none', label: 'No campaign' },
+      ...opts,
+    ];
+  }, [campaigns]);
 
   const fetchContacts = useCallback(
     () =>
@@ -190,9 +232,16 @@ export function ContactsPage({ type }) {
     setDraftAgentFilter(FILTER_ALL);
     setAppliedManagerFilter(FILTER_ALL);
     setAppliedAgentFilter(FILTER_ALL);
+    setCampaignFilter(FILTER_ALL);
     setPage(1);
     clearSelection();
   }, [clearSelection]);
+
+  const onCampaignFilterChange = (e) => {
+    setCampaignFilter(e.target.value);
+    setPage(1);
+    clearSelection();
+  };
 
   const handleDraftManagerChange = (e) => {
     const v = e.target.value;
@@ -258,7 +307,8 @@ export function ContactsPage({ type }) {
 
   const hasActiveFilters =
     (role === 'admin' && (appliedManagerFilter !== FILTER_ALL || appliedAgentFilter !== FILTER_ALL)) ||
-    (role === 'manager' && appliedAgentFilter !== FILTER_ALL);
+    (role === 'manager' && appliedAgentFilter !== FILTER_ALL) ||
+    (showCampaign && campaignFilter !== FILTER_ALL);
 
   return (
     <div className={listStyles.page}>
@@ -406,6 +456,8 @@ export function ContactsPage({ type }) {
                   <TableHeaderCell>Display Name</TableHeaderCell>
                   <TableHeaderCell>Primary Phone</TableHeaderCell>
                   <TableHeaderCell>Email</TableHeaderCell>
+                  <TableHeaderCell>Tag</TableHeaderCell>
+                  {showCampaign ? <TableHeaderCell>Campaign</TableHeaderCell> : null}
                   <TableHeaderCell>Type</TableHeaderCell>
                   {(role === 'admin' || role === 'manager') && canRead ? (
                     <>
@@ -434,6 +486,8 @@ export function ContactsPage({ type }) {
                     <TableCell>{c.display_name || c.first_name || c.email || '—'}</TableCell>
                     <TableCell>{c.primary_phone || '—'}</TableCell>
                     <TableCell>{c.email || '—'}</TableCell>
+                    <TableCell>{c.tag_names || '—'}</TableCell>
+                    {showCampaign ? <TableCell>{c.campaign_name || '—'}</TableCell> : null}
                     <TableCell>{c.type}</TableCell>
                     {(role === 'admin' || role === 'manager') && canRead ? (
                       <>

@@ -1,0 +1,4 @@
+customer_name,mobile,email,budget_range,locality,bhk,property_type,lead_source
+Neha Agarwal,9765432100,neha.a@example.com,85 Lac - 1.2 Cr,Sector 62,3 BHK,Apartment,99acres
+Suresh Iyer,9445566778,,45 - 60 Lac,Whitefield,2 BHK,Villa,Direct Walk-in
+Kavita Nair,9845012345,kavita.n@gmail.com,1.5 Cr+,Indiranagar,4 BHK,Penthouse,MagicBricks

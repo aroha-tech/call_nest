@@ -1,5 +1,6 @@
 import * as contactsService from '../../services/tenant/contactsService.js';
 import * as contactCustomFieldsService from '../../services/tenant/contactCustomFieldsService.js';
+import * as contactImportBatchService from '../../services/tenant/contactImportBatchService.js';
 
 /** Query: omit / empty = no filter; unassigned = pool / no agent; else positive int user id */
 function parseContactListFilterParam(raw) {
@@ -9,6 +10,20 @@ function parseContactListFilterParam(raw) {
   const n = parseInt(raw, 10);
   if (!Number.isFinite(n) || n < 1) {
     const err = new Error('Invalid filter_manager_id or filter_assigned_user_id');
+    err.status = 400;
+    throw err;
+  }
+  return n;
+}
+
+/** campaign_id query: omit = no filter; none | no_campaign = contacts with no campaign; else numeric id */
+function parseCampaignIdFilterParam(raw) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return undefined;
+  const s = String(raw).trim().toLowerCase();
+  if (s === 'none' || s === 'no_campaign') return 'none';
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) {
+    const err = new Error('Invalid campaign_id filter');
     err.status = 400;
     throw err;
   }
@@ -200,6 +215,7 @@ export async function exportCsv(req, res, next) {
 
     const filterManagerId = parseContactListFilterParam(req.query.filter_manager_id);
     const filterAssignedUserId = parseContactListFilterParam(req.query.filter_assigned_user_id);
+    const campaignIdFilter = parseCampaignIdFilterParam(req.query.campaign_id);
 
     const csv = await contactsService.exportContactsCsv(tenantId, req.user, {
       search,
@@ -208,6 +224,7 @@ export async function exportCsv(req, res, next) {
       includeCustomFields: include_custom_fields !== '0',
       filterManagerId,
       filterAssignedUserId,
+      campaignIdFilter,
     });
 
     const filename = `${type === 'contact' ? 'contacts' : type === 'lead' ? 'leads' : 'contacts'}_export_${new Date()
@@ -237,6 +254,58 @@ export async function previewImportCsv(req, res, next) {
     });
 
     res.json(preview);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function previewResolvedImportCsv(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
+
+    const file = req.file;
+    if (!file?.buffer) {
+      return res.status(400).json({ error: 'CSV file is required (multipart field "file")' });
+    }
+
+    const { mode = 'skip', default_country_code = '+91', mapping, limit = '12' } = req.body || {};
+
+    let parsedMapping = undefined;
+    if (mapping) {
+      try {
+        parsedMapping = JSON.parse(mapping);
+      } catch {
+        return res.status(400).json({ error: 'Invalid mapping JSON' });
+      }
+    }
+
+    const data = await contactsService.previewResolvedContactsImportCsv(tenantId, {
+      buffer: file.buffer,
+      mapping: parsedMapping,
+      defaultCountryCode: default_country_code,
+      mode,
+      limit: parseInt(limit, 10) || 12,
+    });
+
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function listImportHistory(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
+
+    const { page = '1', limit = '20', type } = req.query;
+    const result = await contactImportBatchService.listContactImportBatches(tenantId, {
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+      contactType: type || undefined,
+    });
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -277,6 +346,23 @@ export async function importCsv(req, res, next) {
       defaultCountryCode: default_country_code,
       mapping: parsedMapping,
     });
+
+    try {
+      await contactImportBatchService.insertContactImportBatch(tenantId, req.user?.id, {
+        contactType: type,
+        originalFilename: file.originalname,
+        mode,
+        defaultCountryCode: default_country_code,
+        rowCount: result.rowCount ?? 0,
+        created: result.created,
+        updated: result.updated,
+        skipped: result.skipped,
+        failed: result.failed,
+        errorSample: result.errors,
+      });
+    } catch (e) {
+      console.error('contact import history insert failed', e);
+    }
 
     res.status(201).json({ ok: true, ...result });
   } catch (err) {

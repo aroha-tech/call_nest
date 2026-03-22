@@ -35,8 +35,11 @@ import { EmailTemplatesPage } from '../features/email/EmailTemplatesPage';
 import { EmailAccountsPage } from '../features/email/EmailAccountsPage';
 import { ContactsPage } from '../features/contacts/ContactsPage';
 import { ContactCustomFieldsPage } from '../features/contacts/ContactCustomFieldsPage';
+import { ContactTagsPage } from '../features/contacts/ContactTagsPage';
 import { ContactFormPage } from '../features/contacts/ContactFormPage';
 import { ContactImportPage } from '../features/contacts/ContactImportPage';
+import { ContactImportHistoryPage } from '../features/contacts/ContactImportHistoryPage';
+import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
 import { CampaignsPage } from '../features/campaigns/CampaignsPage';
 import { CampaignOpenPage } from '../features/campaigns/CampaignOpenPage';
 import { useEmailModuleEnabled } from '../hooks/useEmailModuleEnabled';
@@ -302,6 +305,16 @@ function TenantRoutes() {
         }
       />
       <Route
+        path="/leads/import/history"
+        element={
+          <ProtectedRoute permissions={[PERMISSIONS.LEADS_READ, PERMISSIONS.LEADS_CREATE]}>
+            <AppShellLayout>
+              <ContactImportHistoryPage type="lead" />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/leads/new"
         element={
           <ProtectedRoute permission={PERMISSIONS.LEADS_CREATE}>
@@ -357,6 +370,16 @@ function TenantRoutes() {
           <ProtectedRoute permission={PERMISSIONS.CONTACTS_CREATE}>
             <AppShellLayout>
               <ContactImportPage type="contact" />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/contacts/import/history"
+        element={
+          <ProtectedRoute permissions={[PERMISSIONS.CONTACTS_READ, PERMISSIONS.CONTACTS_CREATE]}>
+            <AppShellLayout>
+              <ContactImportHistoryPage type="contact" />
             </AppShellLayout>
           </ProtectedRoute>
         }
@@ -427,6 +450,26 @@ function TenantRoutes() {
           <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
             <AppShellLayout>
               <ContactCustomFieldsPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/contact-tags"
+        element={
+          <ProtectedRoute permissions={[PERMISSIONS.CONTACTS_UPDATE, PERMISSIONS.LEADS_UPDATE]}>
+            <AppShellLayout>
+              <ContactTagsPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/integrations"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+            <AppShellLayout>
+              <IntegrationsPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

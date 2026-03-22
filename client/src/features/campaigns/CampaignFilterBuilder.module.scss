@@ -1,0 +1,104 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted, #888);
+  line-height: 1.4;
+}
+
+.headerRow {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(120px, 0.9fr) minmax(180px, 2fr) 40px;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.85;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle, #333);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(120px, 0.9fr) minmax(180px, 2fr) 40px;
+  gap: 8px;
+  align-items: start;
+}
+
+.colProp,
+.colOp {
+  min-width: 0;
+}
+
+.colVal {
+  min-width: 0;
+}
+
+.colAct {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.valueInput {
+  width: 100%;
+}
+
+.valueHint {
+  display: inline-block;
+  padding: 8px 0;
+  opacity: 0.6;
+  font-size: 13px;
+}
+
+.multiWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--color-bg-subtle, #2a2a2a);
+  font-size: 12px;
+  max-width: 100%;
+}
+
+.chipX {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.chipX:hover {
+  opacity: 1;
+}
+
+.addSelect {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle, #444);
+  background: var(--color-bg, #1a1a1a);
+  color: inherit;
+  font-size: 13px;
+}

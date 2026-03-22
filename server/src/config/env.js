@@ -74,4 +74,10 @@ export const env = {
   microsoftRedirectUri: process.env.MICROSOFT_REDIRECT_URI || null,
   /** Azure AD tenant: common | organizations | consumers | or tenant GUID */
   microsoftTenant: process.env.MICROSOFT_TENANT || 'common',
+
+  /** Max upload size for CSV contact/lead import (bytes). Default 5 MB. */
+  csvImportMaxFileBytes: Math.max(
+    1024 * 1024,
+    Number(process.env.CSV_IMPORT_MAX_FILE_BYTES) || 5 * 1024 * 1024
+  ),
 };

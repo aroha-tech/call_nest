@@ -1,0 +1,4 @@
+patient_name,contact_no,email,speciality,city,lead_channel,sub_status
+Drishti Kapoor,9811122233,drishti.k@example.com,Dermatology,Delhi,WhatsApp,New
+Manoj Pillai,9445566777,,Orthopaedics,Chennai,Walk-in,Appointment Fixed
+Sneha Reddy,sneha.r@gmail.com,9845099999,Gynaecology,Hyderabad,Google,Callback

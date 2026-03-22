@@ -99,6 +99,13 @@ const TENANT_ADMIN_NAV_ITEMS = [
     children: [
       { key: 'settings-main', label: 'General', path: '/settings', permission: PERMISSIONS.SETTINGS_MANAGE },
       { key: 'contact-fields', label: 'Contact Fields', path: '/settings/contact-fields', permission: PERMISSIONS.SETTINGS_MANAGE },
+      {
+        key: 'contact-tags',
+        label: 'Contact tags',
+        path: '/settings/contact-tags',
+        permissions: [PERMISSIONS.CONTACTS_UPDATE, PERMISSIONS.LEADS_UPDATE],
+      },
+      { key: 'integrations', label: 'Integrations', path: '/settings/integrations', permission: PERMISSIONS.SETTINGS_MANAGE },
     ],
   },
 ];
@@ -116,6 +123,12 @@ const MANAGER_NAV_ITEMS = [
     permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
   },
   { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
+  {
+    key: 'contact-tags',
+    label: 'Contact tags',
+    path: '/settings/contact-tags',
+    permissions: [PERMISSIONS.CONTACTS_UPDATE, PERMISSIONS.LEADS_UPDATE],
+  },
   { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
   { key: 'activities', label: 'Activities', path: '/activities', permission: PERMISSIONS.DIAL_EXECUTE },
   { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },

@@ -18,8 +18,8 @@ export async function list(req, res, next) {
     const tenantId = req.tenant?.id;
     if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
 
-    const data = await campaignsService.listCampaigns(tenantId, req.user);
-    res.json({ data });
+    const result = await campaignsService.listCampaigns(tenantId, req.user, req.query || {});
+    res.json({ data: result.data, pagination: result.pagination });
   } catch (err) {
     next(err);
   }
@@ -87,6 +87,25 @@ export async function open(req, res, next) {
     );
 
     if (!result) return res.status(404).json({ error: 'Campaign not found or not accessible' });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** Preview contacts matching filter rules (body: filters_json, optional page, limit, search). */
+export async function preview(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
+
+    const { filters_json, page, limit, search } = req.body || {};
+    const result = await campaignsService.previewFilterCampaignLeads(tenantId, req.user, {
+      filters_json,
+      page,
+      limit,
+      search,
+    });
     res.json(result);
   } catch (err) {
     next(err);

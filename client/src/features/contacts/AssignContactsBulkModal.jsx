@@ -53,7 +53,7 @@ export function AssignContactsBulkModal({
     try {
       const [uRes, cRes] = await Promise.all([
         tenantUsersAPI.getAll({ page: 1, limit: 500, includeDisabled: false }),
-        campaignsAPI.list().catch(() => ({ data: { data: [] } })),
+        campaignsAPI.list({ page: 1, limit: 500, show_paused: true }).catch(() => ({ data: { data: [] } })),
       ]);
       setUsers(uRes?.data?.data ?? []);
       setCampaigns(cRes?.data?.data ?? []);

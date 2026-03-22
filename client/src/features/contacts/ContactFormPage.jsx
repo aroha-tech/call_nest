@@ -11,7 +11,9 @@ import { Spinner } from '../../components/ui/Spinner';
 import { contactsAPI } from '../../services/contactsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
 import { campaignsAPI } from '../../services/campaignsAPI';
+import { contactTagsAPI } from '../../services/contactTagsAPI';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
+import styles from './ContactFormPage.module.scss';
 
 const PHONE_LABEL_OPTIONS = [
   { value: 'mobile', label: 'Mobile' },
@@ -62,6 +64,7 @@ export function ContactFormPage({ defaultType }) {
   const [customFields, setCustomFields] = useState([]);
   const [tenantUsers, setTenantUsers] = useState([]);
   const [campaignList, setCampaignList] = useState([]);
+  const [contactTagOptions, setContactTagOptions] = useState([]);
   const [loadingCustomFields, setLoadingCustomFields] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [formErrors, setFormErrors] = useState({});
@@ -77,6 +80,7 @@ export function ContactFormPage({ defaultType }) {
     manager_id: '',
     assigned_user_id: '',
     campaign_id: '',
+    tag_ids: [],
   });
 
   function splitPhoneE164(value) {
@@ -127,12 +131,29 @@ export function ContactFormPage({ defaultType }) {
 
   useEffect(() => {
     let cancelled = false;
+    (async () => {
+      try {
+        const res = await contactTagsAPI.list();
+        if (cancelled) return;
+        const rows = res?.data?.data ?? [];
+        setContactTagOptions(rows.map((t) => ({ value: String(t.id), label: t.name || `#${t.id}` })));
+      } catch {
+        if (!cancelled) setContactTagOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     if (role !== 'admin' && role !== 'manager') return;
     (async () => {
       try {
         const [uRes, cRes] = await Promise.all([
           tenantUsersAPI.getAll({ page: 1, limit: 500, includeDisabled: false }),
-          campaignsAPI.list().catch(() => ({ data: { data: [] } })),
+          campaignsAPI.list({ page: 1, limit: 500, show_paused: true }).catch(() => ({ data: { data: [] } })),
         ]);
         if (cancelled) return;
         setTenantUsers(uRes?.data?.data ?? []);
@@ -175,6 +196,11 @@ export function ContactFormPage({ defaultType }) {
       manager_id: contact.manager_id != null ? String(contact.manager_id) : '',
       assigned_user_id: contact.assigned_user_id != null ? String(contact.assigned_user_id) : '',
       campaign_id: contact.campaign_id != null ? String(contact.campaign_id) : '',
+      tag_ids: Array.isArray(contact.tag_ids)
+        ? contact.tag_ids.map((x) => String(x))
+        : Array.isArray(contact.tags)
+          ? contact.tags.map((t) => String(t.id))
+          : [],
     }));
   }, [contact, isNew]);
 
@@ -342,6 +368,7 @@ export function ContactFormPage({ defaultType }) {
       first_name: formData.first_name || null,
       last_name: formData.last_name || null,
       email: formData.email || null,
+      tag_ids: (formData.tag_ids || []).map((id) => Number(id)).filter((n) => Number.isFinite(n) && n > 0),
       phones,
       custom_fields,
     };
@@ -409,12 +436,17 @@ export function ContactFormPage({ defaultType }) {
   };
 
   const title = isNew ? `Add ${type === 'lead' ? 'Lead' : 'Contact'}` : `Edit ${type === 'lead' ? 'Lead' : 'Contact'}`;
+  const isLeadRoute = location.pathname.startsWith('/leads');
+  const recordLabel = type === 'lead' ? 'lead' : 'contact';
+  const pageDescription = isNew
+    ? `Create a ${recordLabel}: name, tags, phones${role === 'admin' ? ', and optional ownership' : ''}.`
+    : `Update ${recordLabel} profile, tags, assignment, and phone numbers.`;
 
   if (!isNew && loadingContact && !contact) {
     return (
-      <div style={{ padding: 24 }}>
+      <div className={styles.stateWrap}>
         <PageHeader title={title} />
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
+        <div className={styles.stateCenter}>
           <Spinner size="lg" />
         </div>
       </div>
@@ -423,7 +455,7 @@ export function ContactFormPage({ defaultType }) {
 
   if (!isNew && contactError) {
     return (
-      <div style={{ padding: 24 }}>
+      <div className={styles.stateWrap}>
         <PageHeader title={title} />
         <Alert variant="error">{contactError}</Alert>
         <Button variant="ghost" onClick={() => navigate(-1)} style={{ marginTop: 12 }}>
@@ -434,16 +466,16 @@ export function ContactFormPage({ defaultType }) {
   }
 
   return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className={styles.page}>
       <PageHeader
         title={title}
-        description={location.pathname.startsWith('/leads') ? 'Lead details' : 'Contact details'}
+        description={pageDescription}
         actions={
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className={styles.headerActions}>
             <Button variant="ghost" onClick={() => navigate(-1)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} loading={createMutation.loading || updateMutation.loading}>
+            <Button type="submit" form="contact-record-form" loading={createMutation.loading || updateMutation.loading}>
               Save
             </Button>
           </div>
@@ -453,125 +485,191 @@ export function ContactFormPage({ defaultType }) {
       {submitError && <Alert variant="error">{submitError}</Alert>}
       {formErrors.phones && <Alert variant="warning">{formErrors.phones}</Alert>}
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 920 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Input
-            label="First name"
-            value={formData.first_name}
-            onChange={(e) => setFormData((p) => ({ ...p, first_name: e.target.value }))}
-            error={formErrors.first_name}
-          />
-          <Input
-            label="Last name"
-            value={formData.last_name}
-            onChange={(e) => setFormData((p) => ({ ...p, last_name: e.target.value }))}
-          />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Input
-            required
-            label="Display name"
-            value={formData.display_name}
-            onChange={(e) => {
-              setDisplayNameTouched(true);
-              setFormData((p) => ({ ...p, display_name: e.target.value }));
-            }}
-            error={formErrors.display_name}
-          />
-          <Input
-            label="Email"
-            value={formData.email}
-            onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
-          />
-        </div>
-
-        {role === 'admin' && isNew ? (
-          <div
-            style={{
-              marginTop: 8,
-              paddingTop: 12,
-              borderTop: '1px solid var(--border-subtle)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-            }}
-          >
-            <div style={{ fontWeight: 600 }}>Ownership (optional)</div>
-            <Select
-              label="Manager"
-              value={formData.manager_id}
-              onChange={(e) => setFormData((p) => ({ ...p, manager_id: e.target.value }))}
-              placeholder="— None —"
-              options={[{ value: '', label: '— None —' }, ...managerSelectOptions]}
+      <form id="contact-record-form" onSubmit={handleSubmit} className={styles.form}>
+        <section className={styles.section} aria-labelledby="contact-section-identity">
+          <h2 id="contact-section-identity" className={styles.sectionTitle}>
+            {isLeadRoute ? 'Lead details' : 'Contact details'}
+          </h2>
+          <p className={styles.sectionDesc}>
+            Display name is required. Provide at least first name or email. Display name updates from first and last name until you edit it directly.
+          </p>
+          <div className={styles.fieldGrid}>
+            <Input
+              label="First name"
+              value={formData.first_name}
+              onChange={(e) => setFormData((p) => ({ ...p, first_name: e.target.value }))}
+              error={formErrors.first_name}
             />
-            <Select
-              label="Assigned agent"
-              value={formData.assigned_user_id}
-              onChange={(e) => setFormData((p) => ({ ...p, assigned_user_id: e.target.value }))}
-              placeholder="— None —"
-              options={[{ value: '', label: '— None —' }, ...agentSelectOptions]}
+            <Input
+              label="Last name"
+              value={formData.last_name}
+              onChange={(e) => setFormData((p) => ({ ...p, last_name: e.target.value }))}
             />
-            <Select
-              label="Campaign"
-              value={formData.campaign_id}
-              onChange={(e) => setFormData((p) => ({ ...p, campaign_id: e.target.value }))}
-              placeholder="— None —"
-              options={[{ value: '', label: '— None —' }, ...campaignSelectOptions]}
+            <Input
+              required
+              label="Display name"
+              value={formData.display_name}
+              onChange={(e) => {
+                setDisplayNameTouched(true);
+                setFormData((p) => ({ ...p, display_name: e.target.value }));
+              }}
+              error={formErrors.display_name}
+            />
+            <Input
+              label="Email"
+              value={formData.email}
+              onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
+              type="email"
+              autoComplete="email"
             />
           </div>
-        ) : null}
+        </section>
 
-        {!isNew && (role === 'admin' || role === 'manager') ? (
-          <div
-            style={{
-              marginTop: 8,
-              paddingTop: 12,
-              borderTop: '1px solid var(--border-subtle)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
+        <section className={styles.section} aria-labelledby="contact-section-tags">
+          <h2 id="contact-section-tags" className={styles.sectionTitle}>
+            Tags
+          </h2>
+          <p className={styles.sectionDesc}>
+            Choose any active tags from your tenant list (shared catalog). Admins and managers manage the catalog under Settings → Contact tags.
+          </p>
+          {(formData.tag_ids || []).length === 0 ? (
+            <p className={styles.tagEmptyHint}>No tags yet — add one below.</p>
+          ) : null}
+          <div className={styles.tagChips} role="list">
+            {(formData.tag_ids || []).map((tid) => {
+              const label = contactTagOptions.find((o) => o.value === String(tid))?.label || tid;
+              return (
+                <span key={tid} className={styles.tagChip} role="listitem">
+                  <span className={styles.tagChipLabel}>{label}</span>
+                  <button
+                    type="button"
+                    className={styles.tagRemove}
+                    onClick={() =>
+                      setFormData((p) => ({
+                        ...p,
+                        tag_ids: (p.tag_ids || []).filter((x) => String(x) !== String(tid)),
+                      }))
+                    }
+                    aria-label={`Remove tag ${label}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+          <select
+            className={styles.tagAddSelect}
+            aria-label="Add tag"
+            value=""
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) return;
+              setFormData((p) => {
+                const cur = p.tag_ids || [];
+                if (cur.map(String).includes(v)) return p;
+                return { ...p, tag_ids: [...cur, v] };
+              });
+              e.target.value = '';
             }}
           >
-            <div style={{ fontWeight: 600 }}>Assign / unassign</div>
-            <p style={{ margin: 0, fontSize: 13, opacity: 0.85 }}>
-              {role === 'manager'
-                ? 'Assign to an agent on your team, or clear agent. Unassigned pool records get your manager id when you assign an agent.'
-                : 'Set manager (or leave empty for unassigned pool), agent, and static campaign.'}
+            <option value="">Add tag…</option>
+            {contactTagOptions
+              .filter((o) => !(formData.tag_ids || []).map(String).includes(o.value))
+              .map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+          </select>
+        </section>
+
+        {role === 'admin' && isNew ? (
+          <section className={styles.section} aria-labelledby="contact-section-ownership">
+            <h2 id="contact-section-ownership" className={styles.sectionTitle}>
+              Ownership (optional)
+            </h2>
+            <p className={styles.sectionDesc}>
+              Optionally set manager, agent, and a static campaign before saving. You can leave these empty for the unassigned pool.
             </p>
-            {role === 'admin' ? (
+            <div className={styles.assignGrid}>
               <Select
                 label="Manager"
                 value={formData.manager_id}
                 onChange={(e) => setFormData((p) => ({ ...p, manager_id: e.target.value }))}
-                placeholder="— Unassigned pool —"
-                options={[{ value: '', label: '— Unassigned pool —' }, ...managerSelectOptions]}
+                placeholder="— None —"
+                options={[{ value: '', label: '— None —' }, ...managerSelectOptions]}
               />
-            ) : null}
-            <Select
-              label="Assigned agent"
-              value={formData.assigned_user_id}
-              onChange={(e) => setFormData((p) => ({ ...p, assigned_user_id: e.target.value }))}
-              placeholder="— Unassigned —"
-              options={[{ value: '', label: '— Unassigned —' }, ...agentSelectOptions]}
-            />
-            <Select
-              label="Campaign"
-              value={formData.campaign_id}
-              onChange={(e) => setFormData((p) => ({ ...p, campaign_id: e.target.value }))}
-              placeholder="— None —"
-              options={[{ value: '', label: '— None —' }, ...campaignSelectOptions]}
-            />
-          </div>
+              <Select
+                label="Assigned agent"
+                value={formData.assigned_user_id}
+                onChange={(e) => setFormData((p) => ({ ...p, assigned_user_id: e.target.value }))}
+                placeholder="— None —"
+                options={[{ value: '', label: '— None —' }, ...agentSelectOptions]}
+              />
+              <Select
+                label="Campaign"
+                value={formData.campaign_id}
+                onChange={(e) => setFormData((p) => ({ ...p, campaign_id: e.target.value }))}
+                placeholder="— None —"
+                options={[{ value: '', label: '— None —' }, ...campaignSelectOptions]}
+              />
+            </div>
+          </section>
         ) : null}
 
-        <div style={{ marginTop: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <label style={{ fontWeight: 600 }}>Phone numbers</label>
+        {!isNew && (role === 'admin' || role === 'manager') ? (
+          <section className={styles.section} aria-labelledby="contact-section-assign">
+            <h2 id="contact-section-assign" className={styles.sectionTitle}>
+              Assignment
+            </h2>
+            <p className={styles.sectionDesc}>
+              {role === 'manager'
+                ? 'Assign an agent on your team or leave unassigned. Assigning an agent can set ownership rules for unassigned-pool records.'
+                : 'Manager controls the unassigned pool scope. Pick agent and static campaign as needed.'}
+            </p>
+            <div className={styles.assignGrid}>
+              {role === 'admin' ? (
+                <Select
+                  label="Manager"
+                  value={formData.manager_id}
+                  onChange={(e) => setFormData((p) => ({ ...p, manager_id: e.target.value }))}
+                  placeholder="— Unassigned pool —"
+                  options={[{ value: '', label: '— Unassigned pool —' }, ...managerSelectOptions]}
+                />
+              ) : null}
+              <Select
+                label="Assigned agent"
+                value={formData.assigned_user_id}
+                onChange={(e) => setFormData((p) => ({ ...p, assigned_user_id: e.target.value }))}
+                placeholder="— Unassigned —"
+                options={[{ value: '', label: '— Unassigned —' }, ...agentSelectOptions]}
+              />
+              <Select
+                label="Campaign"
+                value={formData.campaign_id}
+                onChange={(e) => setFormData((p) => ({ ...p, campaign_id: e.target.value }))}
+                placeholder="— None —"
+                options={[{ value: '', label: '— None —' }, ...campaignSelectOptions]}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        <section className={styles.section} aria-labelledby="contact-section-phones">
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionHeaderText}>
+              <h2 id="contact-section-phones" className={styles.sectionTitle}>
+                Phone numbers
+              </h2>
+              <p className={`${styles.sectionDesc} ${styles.sectionDescTight}`}>
+                One row per line type (e.g. mobile vs WhatsApp). Mark exactly one as primary when possible.
+              </p>
+            </div>
             <Button
               type="button"
               size="sm"
-              variant="ghost"
+              variant="secondary"
               disabled={availableLabelOptions.length === 0}
               onClick={() => {
                 const nextLabel = availableLabelOptions[0]?.value || 'other';
@@ -584,148 +682,160 @@ export function ContactFormPage({ defaultType }) {
               + Add phone
             </Button>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+
+          <div className={styles.phoneList}>
             {(formData.phones || []).map((p, idx) => {
               const used = new Set((formData.phones || []).map((x, i) => (i === idx ? null : (x.label || 'mobile').toLowerCase())).filter(Boolean));
               const labelOptionsForRow = PHONE_LABEL_OPTIONS.filter((o) => !used.has(o.value) || o.value === (p.label || 'mobile'));
               return (
-                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 180px 140px 90px', gap: 10, alignItems: 'end' }}>
-                  <Input
-                    label={idx === 0 ? 'Country code' : undefined}
-                    value={p.country_code || DEFAULT_COUNTRY_CODE}
-                    onChange={(e) => {
-                      const next = [...formData.phones];
-                      next[idx] = { ...next[idx], country_code: e.target.value };
-                      setFormData((prev) => ({ ...prev, phones: next }));
-                    }}
-                    placeholder="+91"
-                  />
-                  <Input
-                    label={idx === 0 ? 'Number' : undefined}
-                    value={p.number || ''}
-                    onChange={(e) => {
-                      const next = [...formData.phones];
-                      next[idx] = { ...next[idx], number: e.target.value };
-                      setFormData((prev) => ({ ...prev, phones: next }));
-                    }}
-                    placeholder="9876543210"
-                  />
-                  <Select
-                    label={idx === 0 ? 'Label' : undefined}
-                    value={p.label || 'mobile'}
-                    onChange={(e) => {
-                      const next = [...formData.phones];
-                      next[idx] = { ...next[idx], label: e.target.value };
-                      setFormData((prev) => ({ ...prev, phones: next }));
-                    }}
-                    options={labelOptionsForRow}
-                  />
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 2 }}>
-                    <input
-                      type="checkbox"
-                      checked={!!p.is_primary}
+                <div key={idx} className={styles.phoneRow}>
+                  <div className={styles.phoneCc}>
+                    <Input
+                      label={idx === 0 ? 'Country code' : undefined}
+                      value={p.country_code || DEFAULT_COUNTRY_CODE}
                       onChange={(e) => {
-                        const checked = e.target.checked;
                         const next = [...formData.phones];
-                        if (checked) {
-                          next.forEach((row, i) => {
-                            next[i] = { ...row, is_primary: i === idx };
-                          });
-                        } else {
-                          next[idx] = { ...next[idx], is_primary: false };
+                        next[idx] = { ...next[idx], country_code: e.target.value };
+                        setFormData((prev) => ({ ...prev, phones: next }));
+                      }}
+                      placeholder="+91"
+                    />
+                  </div>
+                  <div className={styles.phoneNum}>
+                    <Input
+                      label={idx === 0 ? 'Number' : undefined}
+                      value={p.number || ''}
+                      onChange={(e) => {
+                        const next = [...formData.phones];
+                        next[idx] = { ...next[idx], number: e.target.value };
+                        setFormData((prev) => ({ ...prev, phones: next }));
+                      }}
+                      placeholder="9876543210"
+                      inputMode="tel"
+                    />
+                  </div>
+                  <div className={styles.phoneLabel}>
+                    <Select
+                      label={idx === 0 ? 'Label' : undefined}
+                      value={p.label || 'mobile'}
+                      onChange={(e) => {
+                        const next = [...formData.phones];
+                        next[idx] = { ...next[idx], label: e.target.value };
+                        setFormData((prev) => ({ ...prev, phones: next }));
+                      }}
+                      options={labelOptionsForRow}
+                    />
+                  </div>
+                  <div className={styles.phoneTail}>
+                    <label className={styles.primaryCheck}>
+                      <input
+                        type="checkbox"
+                        checked={!!p.is_primary}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          const next = [...formData.phones];
+                          if (checked) {
+                            next.forEach((row, i) => {
+                              next[i] = { ...row, is_primary: i === idx };
+                            });
+                          } else {
+                            next[idx] = { ...next[idx], is_primary: false };
+                          }
+                          setFormData((prev) => ({ ...prev, phones: next }));
+                        }}
+                      />
+                      Primary
+                    </label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={(formData.phones || []).length <= 1}
+                      onClick={() => {
+                        const next = (formData.phones || []).filter((_, i) => i !== idx);
+                        if (next.length > 0 && !next.some((x) => x.is_primary)) {
+                          next[0].is_primary = true;
                         }
                         setFormData((prev) => ({ ...prev, phones: next }));
                       }}
-                    />
-                    Primary
-                  </label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={(formData.phones || []).length <= 1}
-                    onClick={() => {
-                      const next = (formData.phones || []).filter((_, i) => i !== idx);
-                      // keep exactly one primary
-                      if (next.length > 0 && !next.some((x) => x.is_primary)) {
-                        next[0].is_primary = true;
-                      }
-                      setFormData((prev) => ({ ...prev, phones: next }));
-                    }}
-                  >
-                    Remove
-                  </Button>
+                    >
+                      Remove
+                    </Button>
+                  </div>
                 </div>
               );
             })}
           </div>
-        </div>
+        </section>
 
-        <div style={{ marginTop: 10 }}>
-          <label style={{ fontWeight: 600, display: 'block', marginBottom: 8 }}>
+        <section className={styles.section} aria-labelledby="contact-section-custom">
+          <h2 id="contact-section-custom" className={styles.sectionTitle}>
             Custom fields
-            {loadingCustomFields ? (
-              <span style={{ marginLeft: 8, color: 'var(--color-text-muted)', fontWeight: 400 }}>(loading...)</span>
-            ) : null}
-          </label>
+            {loadingCustomFields ? <span className={styles.loadingInline}>Loading…</span> : null}
+          </h2>
+          <p className={styles.sectionDesc}>
+            Tenant-defined fields. Leave blank to clear optional values on save.
+          </p>
           {!loadingCustomFields && customFields.length === 0 ? (
-            <div style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>No custom fields configured for this tenant.</div>
+            <p className={styles.customEmpty}>No custom fields configured for this tenant.</p>
           ) : null}
 
-          {customFields.map((f) => {
-            const value = formData?.customValuesMap?.[f.field_id] ?? '';
-            const options = normalizeOptions(f.options_json);
+          <div className={styles.customFieldsGrid}>
+            {customFields.map((f) => {
+              const value = formData?.customValuesMap?.[f.field_id] ?? '';
+              const options = normalizeOptions(f.options_json);
 
-            if (f.type === 'select') {
+              if (f.type === 'select') {
+                return (
+                  <Select
+                    key={f.field_id}
+                    label={f.label}
+                    value={value || ''}
+                    onChange={(e) => {
+                      const nextMap = { ...(formData.customValuesMap || {}) };
+                      nextMap[f.field_id] = e.target.value;
+                      setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
+                    }}
+                    options={options.map((opt) => ({ value: String(opt), label: String(opt) }))}
+                    placeholder="Select..."
+                  />
+                );
+              }
+
+              if (f.type === 'boolean') {
+                return (
+                  <label key={f.field_id} className={`${styles.customFieldFull} ${styles.primaryCheck} ${styles.customBooleanRow}`}>
+                    <input
+                      type="checkbox"
+                      checked={String(value).toLowerCase() === 'true' || value === '1'}
+                      onChange={(e) => {
+                        const nextMap = { ...(formData.customValuesMap || {}) };
+                        nextMap[f.field_id] = e.target.checked ? 'true' : 'false';
+                        setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
+                      }}
+                    />
+                    <span className={styles.booleanLabel}>{f.label}</span>
+                  </label>
+                );
+              }
+
               return (
-                <Select
+                <Input
                   key={f.field_id}
                   label={f.label}
-                  value={value || ''}
+                  value={value}
                   onChange={(e) => {
                     const nextMap = { ...(formData.customValuesMap || {}) };
                     nextMap[f.field_id] = e.target.value;
                     setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
                   }}
-                  options={options.map((opt) => ({ value: String(opt), label: String(opt) }))}
-                  placeholder="Select..."
+                  type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
+                  placeholder="Optional"
                 />
               );
-            }
-
-            if (f.type === 'boolean') {
-              return (
-                <label key={f.field_id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input
-                    type="checkbox"
-                    checked={String(value).toLowerCase() === 'true' || value === '1'}
-                    onChange={(e) => {
-                      const nextMap = { ...(formData.customValuesMap || {}) };
-                      nextMap[f.field_id] = e.target.checked ? 'true' : 'false';
-                      setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
-                    }}
-                  />
-                  {f.label}
-                </label>
-              );
-            }
-
-            return (
-              <Input
-                key={f.field_id}
-                label={f.label}
-                value={value}
-                onChange={(e) => {
-                  const nextMap = { ...(formData.customValuesMap || {}) };
-                  nextMap[f.field_id] = e.target.value;
-                  setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
-                }}
-                type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
-                placeholder="Optional"
-              />
-            );
-          })}
-        </div>
+            })}
+          </div>
+        </section>
       </form>
     </div>
   );
