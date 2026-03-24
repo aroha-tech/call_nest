@@ -65,8 +65,25 @@ export function ContactImportPage({ type }) {
       { value: 'status', label: 'Lead Status' },
       { value: 'property', label: 'Property (saved as custom field)' },
       { value: 'budget', label: 'Budget (saved as custom field)' },
-      { value: 'city', label: 'City (saved as custom field)' },
-      { value: 'state', label: 'State (saved as custom field)' },
+      { value: 'city', label: 'City (default contact field)' },
+      { value: 'state', label: 'State (default contact field)' },
+      { value: 'country', label: 'Country (default contact field)' },
+      { value: 'address', label: 'Address / street (default contact field)' },
+      { value: 'address_line_2', label: 'Address line 2 / landmark (default contact field)' },
+      { value: 'pin_code', label: 'Pin code (default contact field)' },
+      { value: 'company', label: 'Company / organization (default contact field)' },
+      { value: 'job_title', label: 'Job title / designation (default contact field)' },
+      { value: 'website', label: 'Website / LinkedIn (default contact field)' },
+      { value: 'industry', label: 'Industry / sector (default contact field)' },
+      { value: 'date_of_birth', label: 'Date of birth (default contact field)' },
+      { value: 'tax_id', label: 'GST / PAN / Tax ID (default contact field)' },
+      { value: 'services', label: 'Services (saved as custom field)' },
+      { value: 'remark', label: 'Remark (saved as custom field)' },
+      { value: 'remark_status', label: 'Remark Status (saved as custom field)' },
+      { value: 'assign_date', label: 'Assign Date (saved as custom field)' },
+      { value: 'lead_date', label: 'Lead Date (saved as custom field)' },
+      { value: 'lead_timestamp', label: 'Time Stamp (saved as custom field)' },
+      { value: 'assign_status', label: 'Assign / assignment (saved as custom field)' },
     ];
 
     const custom =
@@ -80,7 +97,7 @@ export function ContactImportPage({ type }) {
 
   const assertFileSize = () => {
     if (file && file.size > CSV_IMPORT_MAX_BYTES) {
-      setError(`File is too large (max ${CSV_IMPORT_MAX_MB} MB). Split the CSV or ask your admin to raise the limit.`);
+      setError(`File is too large (max ${CSV_IMPORT_MAX_MB} MB). Split the file or ask your admin to raise the limit.`);
       return false;
     }
     return true;
@@ -171,7 +188,7 @@ export function ContactImportPage({ type }) {
     <div className={listStyles.page}>
       <PageHeader
         title={title}
-        description="Upload CSV exports from Meta, Google, IndiaMART, JustDial, 99acres, MagicBricks, NoBroker, etc. Column names are auto-mapped; adjust in Step 3 if needed. Duplicates match on primary phone."
+        description="Upload CSV or Excel (.xlsx) exports from Meta, Google, IndiaMART, JustDial, 99acres, MagicBricks, NoBroker, etc. Column names are auto-mapped; adjust in Step 3 if needed. Duplicates match on primary phone. You can upload a real .xlsx file — renaming .xlsx to .csv is not needed."
         actions={
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Button variant="secondary" onClick={() => navigate(historyPath)}>
@@ -191,12 +208,12 @@ export function ContactImportPage({ type }) {
           <div className={styles.wrap}>
             <div className={styles.stepCard}>
               <div className={styles.stepTitle}>
-                <div className={styles.stepTitleText}>Step 1 — Upload CSV</div>
+                <div className={styles.stepTitleText}>Step 1 — Upload file</div>
                 {file ? <div className={styles.stepHint}>{file.name}</div> : null}
               </div>
               <input
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,.xlsx,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 onChange={(e) => {
                   setFile(e.target.files?.[0] || null);
                   setPreview(null);
@@ -270,7 +287,7 @@ export function ContactImportPage({ type }) {
                     <table className={styles.table}>
                       <thead>
                         <tr>
-                          <th>CSV column</th>
+                          <th>Column</th>
                           <th>Sample values</th>
                           <th style={{ width: 260 }}>Map to</th>
                         </tr>

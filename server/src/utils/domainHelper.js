@@ -1,4 +1,23 @@
-import { env } from '../config/env.js';
+/** Public tunnel domains: first label is a random id, not a tenant slug */
+const TUNNEL_HOST_SUFFIXES = [
+  'ngrok-free.app',
+  'ngrok.io',
+  'ngrok.app',
+  'ngrok.dev',
+  'loca.lt',
+  'localhost.run',
+];
+
+/**
+ * True if hostname is a dev tunnel (ngrok, etc.) — do not treat *.ngrok as tenant slug.
+ */
+export function isTunnelHostname(hostname) {
+  if (!hostname || typeof hostname !== 'string') {
+    return false;
+  }
+  const h = hostname.toLowerCase().trim();
+  return TUNNEL_HOST_SUFFIXES.some((suffix) => h === suffix || h.endsWith(`.${suffix}`));
+}
 
 /**
  * Extract subdomain from a Host header value.
@@ -8,6 +27,7 @@ import { env } from '../config/env.js';
  * - www.arohva.com        -> www
  * - localhost:4000        -> null
  * - 127.0.0.1:4000        -> null
+ * - xxx.ngrok-free.app    -> null (tunnel, not tenant slug)
  */
 export function getSubdomainFromHost(host) {
   if (!host || typeof host !== 'string') {
@@ -27,6 +47,10 @@ export function getSubdomainFromHost(host) {
     lowerHost === '127.0.0.1' ||
     lowerHost === '::1'
   ) {
+    return null;
+  }
+
+  if (isTunnelHostname(lowerHost)) {
     return null;
   }
 

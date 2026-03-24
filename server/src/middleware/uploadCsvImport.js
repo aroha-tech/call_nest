@@ -18,7 +18,7 @@ export function uploadCsvImportSingle(req, res, next) {
     if (err.code === 'LIMIT_FILE_SIZE') {
       const mb = Math.max(1, Math.round(env.csvImportMaxFileBytes / 1024 / 1024));
       return res.status(400).json({
-        error: `CSV file too large. Maximum size is ${mb} MB. Try splitting the file or increase CSV_IMPORT_MAX_FILE_BYTES (server config).`,
+        error: `Import file too large. Maximum size is ${mb} MB. Try splitting the file or increase CSV_IMPORT_MAX_FILE_BYTES (server config).`,
       });
     }
     return next(err);

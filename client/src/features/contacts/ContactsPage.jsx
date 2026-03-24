@@ -342,7 +342,7 @@ export function ContactsPage({ type }) {
             )}
             {canCreate && (
               <Button variant="secondary" onClick={() => navigate(type === 'lead' ? '/leads/import' : '/contacts/import')}>
-                Import CSV
+                Import
               </Button>
             )}
             {canCreate ? (

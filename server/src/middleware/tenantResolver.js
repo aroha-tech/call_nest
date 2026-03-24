@@ -1,6 +1,6 @@
 import { query } from '../config/db.js';
 import { env } from '../config/env.js';
-import { getSubdomainFromHost } from '../utils/domainHelper.js';
+import { getSubdomainFromHost, isTunnelHostname } from '../utils/domainHelper.js';
 
 const PLATFORM_SUBDOMAIN = process.env.PLATFORM_SUBDOMAIN || 'admin';
 const MARKETING_SUBDOMAIN = process.env.MARKETING_SUBDOMAIN || 'www';
@@ -14,20 +14,24 @@ const MARKETING_SUBDOMAIN = process.env.MARKETING_SUBDOMAIN || 'www';
  * - www.<domain> or unknown tenant -> 404 Tenant Not Found
  *
  * In non-production environments, if no subdomain is present (e.g. localhost),
- * we use URL path to determine context:
+ * or when Host is a dev tunnel (ngrok), we use URL path + JWT tenant (same as dev):
  * - /api/admin/* routes -> platform context
- * - Other routes -> no tenant context (dev mode)
+ * - /api/tenant/* -> tenant from authenticated user's tenant_id
  */
 export async function tenantResolver(req, res, next) {
   req.isPlatform = false;
   req.tenant = null;
 
-  const host = req.headers.host;
+  const host = req.headers.host || '';
+  const [hostname] = host.split(':');
   const subdomain = getSubdomainFromHost(host);
 
-  // In development/test with no subdomain (localhost, IP, etc),
-  // determine context from URL path and attach a default tenant for /api/tenant/*
-  if (!subdomain && env.nodeEnv !== 'production') {
+  const onTunnel = isTunnelHostname(hostname);
+  const useDevStyleResolution =
+    onTunnel || (!subdomain && env.nodeEnv !== 'production');
+
+  // Dev / ngrok: no real tenant slug in Host — resolve tenant from JWT on /api/tenant/*
+  if (useDevStyleResolution) {
     // Platform admin APIs in development
     if (req.path.startsWith('/api/admin/')) {
       req.isPlatform = true;

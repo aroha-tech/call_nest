@@ -57,7 +57,7 @@ export const env = {
   whatsappStatusCallbackUrl: process.env.WHATSAPP_STATUS_CALLBACK_URL || '',
 
   /** Email OAuth (Gmail / Outlook). Frontend redirect after connect. */
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3001',
   /** Base URL of this API (for OAuth callback). e.g. http://localhost:4000 */
   apiBaseUrl: process.env.API_BASE_URL || process.env.BASE_URL || 'http://localhost:4000',
 

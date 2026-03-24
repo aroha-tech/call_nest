@@ -6,6 +6,16 @@ const PLATFORM_ADMIN_HOST = 'admin.arohva.com';
 const MARKETING_HOST = 'www.arohva.com';
 const DEV_TENANT_KEY = 'dev_tenant';
 
+/** Match server domainHelper — ngrok first label is not a tenant slug */
+const TUNNEL_HOST_SUFFIXES = [
+  'ngrok-free.app',
+  'ngrok.io',
+  'ngrok.app',
+  'ngrok.dev',
+  'loca.lt',
+  'localhost.run',
+];
+
 function getHostname() {
   if (typeof window === 'undefined') return '';
   return window.location.hostname || '';
@@ -15,8 +25,17 @@ function isLocalhost(hostname) {
   return hostname.includes('localhost');
 }
 
+function isTunnelHostname(hostname) {
+  if (!hostname) return false;
+  const h = hostname.toLowerCase();
+  return TUNNEL_HOST_SUFFIXES.some((suffix) => h === suffix || h.endsWith(`.${suffix}`));
+}
+
 function getDevTenantOverride(hostname) {
-  if (!hostname || !isLocalhost(hostname) || typeof window === 'undefined') {
+  if (!hostname || typeof window === 'undefined') {
+    return null;
+  }
+  if (!isLocalhost(hostname) && !isTunnelHostname(hostname)) {
     return null;
   }
 
@@ -43,7 +62,7 @@ export function getSubdomain() {
     return devOverride.toLowerCase();
   }
 
-  if (isLocalhost(hostname)) {
+  if (isLocalhost(hostname) || isTunnelHostname(hostname)) {
     return null;
   }
 
@@ -72,7 +91,7 @@ export function isPlatformAdminDomain() {
     return devOverride.toLowerCase() === 'platform';
   }
 
-  if (isLocalhost(hostname)) {
+  if (isLocalhost(hostname) || isTunnelHostname(hostname)) {
     return false;
   }
 
@@ -83,7 +102,7 @@ export function isMarketingDomain() {
   const hostname = getHostname();
   if (!hostname) return false;
 
-  if (isLocalhost(hostname)) {
+  if (isLocalhost(hostname) || isTunnelHostname(hostname)) {
     return false;
   }
 

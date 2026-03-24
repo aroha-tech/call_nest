@@ -269,17 +269,30 @@ function filterNavItems(items, can, isPlatformAdmin) {
 }
 
 /**
+ * Whether pathname belongs to this nav path (exact, or under it with a path segment).
+ * Avoids /settings matching /settings/contact-fields as "General" only — longer paths win below.
+ */
+function pathMatches(pathname, navPath) {
+  if (navPath === '/') return pathname === '/';
+  if (pathname === navPath) return true;
+  if (navPath !== '/' && pathname.startsWith(`${navPath}/`)) return true;
+  return false;
+}
+
+/**
  * Find active key from nested navigation items.
+ * For nested children, the longest matching path wins (e.g. /settings/contact-fields vs /settings).
  */
 function findActiveKey(items, pathname) {
   for (const item of items) {
     if (item.children) {
-      for (const child of item.children) {
-        if (child.path === pathname || (child.path !== '/' && pathname.startsWith(child.path))) {
-          return { parentKey: item.key, childKey: child.key };
-        }
+      const matches = item.children.filter((child) => pathMatches(pathname, child.path));
+      if (matches.length > 0) {
+        matches.sort((a, b) => b.path.length - a.path.length);
+        const best = matches[0];
+        return { parentKey: item.key, childKey: best.key };
       }
-    } else if (item.path === '/' ? pathname === '/' : pathname.startsWith(item.path)) {
+    } else if (pathMatches(pathname, item.path)) {
       return { parentKey: null, childKey: item.key };
     }
   }

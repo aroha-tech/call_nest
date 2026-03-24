@@ -262,6 +262,160 @@ export const BUDGET_KEYS = [
   'price',
 ];
 
+/** Postal / PIN (Indian + generic exports) */
+export const PIN_CODE_KEYS = [
+  'pin_code',
+  'pincode',
+  'postal_code',
+  'postcode',
+  'zip',
+  'zip_code',
+  'postal',
+];
+
+/** Product or service interest (often JSON-like in vendor exports) */
+export const SERVICES_KEYS = [
+  'services',
+  'service',
+  'services_interested',
+  'interested_services',
+  'product_services',
+  'service_type',
+];
+
+/** Call / lead notes from dialer or CRM exports */
+export const REMARK_KEYS = [
+  'remark',
+  'remarks',
+  'notes',
+  'note',
+  'comments',
+  'comment',
+  'call_notes',
+  'telephony_notes',
+];
+
+/** Separate from lead status — call outcome labels (e.g. "Call Not Answered") */
+export const REMARK_STATUS_KEYS = [
+  'remark_status',
+  'call_status_detail',
+  'call_disposition_label',
+  'telephony_status',
+  'dialer_status',
+];
+
+export const ASSIGN_DATE_KEYS = [
+  'assign_date',
+  'assigned_date',
+  'assignment_date',
+  'date_assigned',
+];
+
+export const LEAD_DATE_KEYS = [
+  'lead_date',
+  'enquiry_date',
+  'inquiry_date',
+  'lead_created_date',
+  'created_on',
+  'enquiry_on',
+];
+
+export const LEAD_TIMESTAMP_KEYS = [
+  'time_stamp',
+  'timestamp',
+  'time_stamp_date',
+  'last_updated',
+  'updated_at',
+  'modified_at',
+];
+
+/** Assignment flag / owner label from exports (e.g. "Assigned") */
+export const ASSIGN_STATUS_KEYS = ['assign', 'assignment', 'lead_assign', 'assigned_to_label', 'allocation'];
+
+export const COUNTRY_KEYS = [
+  'country',
+  'country_name',
+  'nation',
+  'country_code',
+];
+
+export const ADDRESS_KEYS = [
+  'address',
+  'street',
+  'street_address',
+  'address_line_1',
+  'address_line1',
+  'full_address',
+  'residential_address',
+  'communication_address',
+  'mailing_address',
+  'billing_address',
+];
+
+export const ADDRESS_LINE2_KEYS = [
+  'address_line_2',
+  'address_line2',
+  'address2',
+  'landmark',
+  'suite',
+  'unit',
+  'flat_no',
+  'apartment',
+  'floor',
+];
+
+export const COMPANY_KEYS = [
+  'company',
+  'company_name',
+  'organization',
+  'organisation',
+  'business_name',
+  'employer',
+  'firm',
+  'org',
+];
+
+/** Avoid "title" alone — clashes with display_name / person title in some sheets */
+export const JOB_TITLE_KEYS = [
+  'job_title',
+  'designation',
+  'position',
+  'role',
+  'occupation',
+  'job_role',
+];
+
+export const WEBSITE_KEYS = [
+  'website',
+  'web',
+  'company_website',
+  'web_site',
+  'site_url',
+  'linkedin',
+  'linkedin_url',
+];
+
+export const INDUSTRY_KEYS = [
+  'industry',
+  'sector',
+  'vertical',
+  'business_type',
+  'line_of_business',
+];
+
+export const DATE_OF_BIRTH_KEYS = ['date_of_birth', 'dob', 'birth_date', 'birthday'];
+
+/** India / GST-style business id (stored as text) */
+export const TAX_ID_KEYS = [
+  'gstin',
+  'gst',
+  'gst_number',
+  'tax_id',
+  'vat_id',
+  'pan',
+  'pan_number',
+];
+
 /** Map normalized column name -> suggested UI target (matches ContactImportPage) */
 const PREVIEW_SUGGEST_MAP = new Map();
 
@@ -282,19 +436,38 @@ registerSuggestions('city', CITY_KEYS);
 registerSuggestions('state', STATE_KEYS);
 registerSuggestions('property', PROPERTY_KEYS);
 registerSuggestions('budget', BUDGET_KEYS);
+registerSuggestions('pin_code', PIN_CODE_KEYS);
+registerSuggestions('services', SERVICES_KEYS);
+registerSuggestions('remark', REMARK_KEYS);
+registerSuggestions('remark_status', REMARK_STATUS_KEYS);
+registerSuggestions('assign_date', ASSIGN_DATE_KEYS);
+registerSuggestions('lead_date', LEAD_DATE_KEYS);
+registerSuggestions('lead_timestamp', LEAD_TIMESTAMP_KEYS);
+registerSuggestions('assign_status', ASSIGN_STATUS_KEYS);
+registerSuggestions('country', COUNTRY_KEYS);
+registerSuggestions('address', ADDRESS_KEYS);
+registerSuggestions('address_line_2', ADDRESS_LINE2_KEYS);
+registerSuggestions('company', COMPANY_KEYS);
+registerSuggestions('job_title', JOB_TITLE_KEYS);
+registerSuggestions('website', WEBSITE_KEYS);
+registerSuggestions('industry', INDUSTRY_KEYS);
+registerSuggestions('date_of_birth', DATE_OF_BIRTH_KEYS);
+registerSuggestions('tax_id', TAX_ID_KEYS);
 
 /**
  * @param {string} normalizedCol - already normalizeImportHeader(columnName)
  * @param {{ id: number, name: string, label: string }[]} customFields
+ * Built-in targets (name, city, email, default contact columns, etc.) win over tenant custom fields
+ * with the same name/label so imports map to `contacts` columns first.
  */
 export function suggestImportColumnTarget(normalizedCol, customFields = []) {
+  const direct = PREVIEW_SUGGEST_MAP.get(normalizedCol);
+  if (direct) return direct;
+
   const cf =
     customFields.find((f) => normalizeImportHeader(f.name) === normalizedCol) ||
     customFields.find((f) => normalizeImportHeader(f.label) === normalizedCol);
   if (cf) return `custom:${cf.id}`;
-
-  const direct = PREVIEW_SUGGEST_MAP.get(normalizedCol);
-  if (direct) return direct;
 
   return 'ignore';
 }

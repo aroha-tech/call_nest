@@ -19,6 +19,20 @@ CREATE TABLE IF NOT EXISTS contacts (
   email VARCHAR(255) NULL,
   source VARCHAR(100) NULL,
 
+  -- Profile & location (defaults on every contact / lead)
+  city VARCHAR(150) NULL,
+  state VARCHAR(150) NULL,
+  country VARCHAR(100) NULL,
+  address VARCHAR(500) NULL,
+  address_line_2 VARCHAR(255) NULL,
+  pin_code VARCHAR(20) NULL,
+  company VARCHAR(255) NULL,
+  job_title VARCHAR(150) NULL,
+  website VARCHAR(500) NULL,
+  industry VARCHAR(150) NULL,
+  date_of_birth DATE NULL,
+  tax_id VARCHAR(50) NULL,
+
   -- Ownership
   manager_id BIGINT UNSIGNED NULL,
   assigned_user_id BIGINT UNSIGNED NULL,

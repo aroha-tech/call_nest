@@ -246,11 +246,12 @@ export async function previewImportCsv(req, res, next) {
 
     const file = req.file;
     if (!file?.buffer) {
-      return res.status(400).json({ error: 'CSV file is required (multipart field "file")' });
+      return res.status(400).json({ error: 'CSV or Excel file is required (multipart field "file")' });
     }
 
     const preview = await contactsService.previewContactsImportCsv(tenantId, {
       buffer: file.buffer,
+      originalFilename: file.originalname || '',
     });
 
     res.json(preview);
@@ -266,7 +267,7 @@ export async function previewResolvedImportCsv(req, res, next) {
 
     const file = req.file;
     if (!file?.buffer) {
-      return res.status(400).json({ error: 'CSV file is required (multipart field "file")' });
+      return res.status(400).json({ error: 'CSV or Excel file is required (multipart field "file")' });
     }
 
     const { mode = 'skip', default_country_code = '+91', mapping, limit = '12' } = req.body || {};
@@ -282,6 +283,7 @@ export async function previewResolvedImportCsv(req, res, next) {
 
     const data = await contactsService.previewResolvedContactsImportCsv(tenantId, {
       buffer: file.buffer,
+      originalFilename: file.originalname || '',
       mapping: parsedMapping,
       defaultCountryCode: default_country_code,
       mode,
@@ -318,7 +320,7 @@ export async function importCsv(req, res, next) {
 
     const file = req.file;
     if (!file?.buffer) {
-      return res.status(400).json({ error: 'CSV file is required (multipart field "file")' });
+      return res.status(400).json({ error: 'CSV or Excel file is required (multipart field "file")' });
     }
 
     const {
@@ -340,6 +342,7 @@ export async function importCsv(req, res, next) {
 
     const result = await contactsService.importContactsCsv(tenantId, req.user, {
       buffer: file.buffer,
+      originalFilename: file.originalname || '',
       type,
       mode,
       created_source,

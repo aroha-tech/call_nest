@@ -29,10 +29,10 @@ export function TableRow({ children, onClick, className = '' }) {
   );
 }
 
-export function TableCell({ children, align = 'left', width, className = '' }) {
+export function TableCell({ children, align = 'left', width, className = '', noTruncate = false }) {
   return (
     <td 
-      className={`${styles.cell} ${styles[align]} ${className}`}
+      className={`${styles.cell} ${styles[align]} ${noTruncate ? styles.noTruncate : ''} ${className}`.trim()}
       style={width ? { width } : undefined}
     >
       {children}
@@ -40,10 +40,10 @@ export function TableCell({ children, align = 'left', width, className = '' }) {
   );
 }
 
-export function TableHeaderCell({ children, align = 'left', width, sortable, sorted, onSort }) {
+export function TableHeaderCell({ children, align = 'left', width, sortable, sorted, onSort, noTruncate = false }) {
   return (
     <th 
-      className={`${styles.headerCell} ${styles[align]} ${sortable ? styles.sortable : ''}`}
+      className={`${styles.headerCell} ${styles[align]} ${sortable ? styles.sortable : ''} ${noTruncate ? styles.noTruncate : ''}`.trim()}
       style={width ? { width } : undefined}
       onClick={sortable ? onSort : undefined}
     >

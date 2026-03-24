@@ -54,6 +54,10 @@
   }
 }
 
+.fullWidthField {
+  grid-column: 1 / -1;
+}
+
 .sectionHeader {
   display: flex;
   align-items: flex-start;

@@ -132,18 +132,23 @@ export function MasterCRUDPage({
   };
 
   const showStatusColumn = columns.some((col) => col.key === 'is_active');
+  const isActiveValue = (val) => val === 1 || val === true;
   const columnsWithStatus = showStatusColumn
     ? columns
-    : [...columns, {
-        key: 'is_active',
-        label: 'Status',
-        width: '100px',
-        render: (val) => (
-          <Badge variant={val === 1 ? 'success' : 'warning'}>
-            {val === 1 ? 'Active' : 'Inactive'}
-          </Badge>
-        ),
-      }];
+    : [
+        ...columns,
+        {
+          key: 'is_active',
+          label: 'Status',
+          width: '108px',
+          noTruncate: true,
+          render: (val) => (
+            <Badge variant={isActiveValue(val) ? 'success' : 'warning'} size="md">
+              {isActiveValue(val) ? 'Active' : 'Inactive'}
+            </Badge>
+          ),
+        },
+      ];
 
   const columnsWithoutWidth = columnsWithStatus.filter((c) => !c.width).length;
   const defaultFlexPct =
@@ -205,7 +210,7 @@ export function MasterCRUDPage({
               <TableHead>
                 <TableRow>
                   {columnsForTable.map((col) => (
-                    <TableHeaderCell key={col.key} width={col.width}>
+                    <TableHeaderCell key={col.key} width={col.width} noTruncate={!!col.noTruncate}>
                       {col.label}
                     </TableHeaderCell>
                   ))}
@@ -216,7 +221,7 @@ export function MasterCRUDPage({
                 {data.map((item) => (
                   <TableRow key={item.id}>
                     {columnsForTable.map((col) => (
-                      <TableCell key={col.key} width={col.width}>
+                      <TableCell key={col.key} width={col.width} noTruncate={!!col.noTruncate}>
                         {col.render ? col.render(item[col.key], item) : item[col.key]}
                       </TableCell>
                     ))}

@@ -1,5 +1,5 @@
 import { query } from '../../config/db.js';
-import { parse as parseCsv } from 'csv-parse/sync';
+import { parseImportBufferToRecords } from '../../utils/importSpreadsheetBuffer.js';
 import {
   buildPhonesFromCsvRow,
   extractNamesAndEmailFromNormalizedRow,
@@ -10,6 +10,23 @@ import {
   BUDGET_KEYS,
   CITY_KEYS,
   STATE_KEYS,
+  PIN_CODE_KEYS,
+  SERVICES_KEYS,
+  REMARK_KEYS,
+  REMARK_STATUS_KEYS,
+  ASSIGN_DATE_KEYS,
+  LEAD_DATE_KEYS,
+  LEAD_TIMESTAMP_KEYS,
+  ASSIGN_STATUS_KEYS,
+  COUNTRY_KEYS,
+  ADDRESS_KEYS,
+  ADDRESS_LINE2_KEYS,
+  COMPANY_KEYS,
+  JOB_TITLE_KEYS,
+  WEBSITE_KEYS,
+  INDUSTRY_KEYS,
+  DATE_OF_BIRTH_KEYS,
+  TAX_ID_KEYS,
   suggestImportColumnTarget,
   splitFullNameToFirstLast,
 } from '../../utils/leadImportCsvHelpers.js';
@@ -27,6 +44,24 @@ function assertUniquePhoneLabels(phones) {
     }
     seen.add(label);
   }
+}
+
+function normalizeDateOfBirthForDb(raw) {
+  if (raw === null || raw === undefined) return null;
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    return raw.toISOString().slice(0, 10);
+  }
+  const s = String(raw).trim();
+  if (!s) return null;
+  const iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  return null;
+}
+
+function trimStr(v) {
+  if (v === null || v === undefined) return null;
+  const t = String(v).trim();
+  return t === '' ? null : t;
 }
 
 export function buildOwnershipWhere(user) {
@@ -183,13 +218,14 @@ export async function listContacts(
   if (search) {
     const q = `%${search}%`;
     whereClauses.push(
-      `(c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ? OR c.display_name LIKE ? OR EXISTS (
+      `(c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ? OR c.display_name LIKE ?
+        OR c.city LIKE ? OR c.company LIKE ? OR EXISTS (
         SELECT 1 FROM contact_tag_assignments cta_s
         INNER JOIN contact_tags ct_s ON ct_s.id = cta_s.tag_id AND ct_s.tenant_id = cta_s.tenant_id
         WHERE cta_s.contact_id = c.id AND cta_s.tenant_id = c.tenant_id AND ct_s.deleted_at IS NULL AND ct_s.name LIKE ?
       ))`
     );
-    params.push(q, q, q, q, q);
+    params.push(q, q, q, q, q, q, q);
   }
 
   await applyContactListFilters(tenantId, user, whereClauses, params, {
@@ -217,6 +253,18 @@ export async function listContacts(
         c.display_name,
         c.email,
         c.source,
+        c.city,
+        c.state,
+        c.country,
+        c.address,
+        c.address_line_2,
+        c.pin_code,
+        c.company,
+        c.job_title,
+        c.website,
+        c.industry,
+        c.date_of_birth,
+        c.tax_id,
         (SELECT GROUP_CONCAT(DISTINCT ct.name ORDER BY ct.name SEPARATOR ', ')
          FROM contact_tag_assignments cta
          INNER JOIN contact_tags ct ON ct.id = cta.tag_id AND ct.tenant_id = cta.tenant_id
@@ -276,6 +324,18 @@ export async function getContactById(id, tenantId, user) {
         c.display_name,
         c.email,
         c.source,
+        c.city,
+        c.state,
+        c.country,
+        c.address,
+        c.address_line_2,
+        c.pin_code,
+        c.company,
+        c.job_title,
+        c.website,
+        c.industry,
+        c.date_of_birth,
+        c.tax_id,
         c.manager_id,
         c.assigned_user_id,
         c.status_id,
@@ -321,6 +381,18 @@ export async function createContact(tenantId, user, payload) {
     display_name,
     email,
     source,
+    city,
+    state,
+    country,
+    address,
+    address_line_2,
+    pin_code,
+    company,
+    job_title,
+    website,
+    industry,
+    date_of_birth,
+    tax_id,
     tag_ids,
     status_id,
     campaign_id,
@@ -354,6 +426,8 @@ export async function createContact(tenantId, user, payload) {
     resolvedManagerId = user.id;
   }
 
+  const dob = date_of_birth !== undefined && date_of_birth !== null ? normalizeDateOfBirthForDb(date_of_birth) : null;
+
   const result = await query(
     `INSERT INTO contacts (
         tenant_id,
@@ -363,13 +437,25 @@ export async function createContact(tenantId, user, payload) {
         display_name,
         email,
         source,
+        city,
+        state,
+        country,
+        address,
+        address_line_2,
+        pin_code,
+        company,
+        job_title,
+        website,
+        industry,
+        date_of_birth,
+        tax_id,
         manager_id,
         assigned_user_id,
         status_id,
         campaign_id,
         created_source,
         created_by
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
       type,
@@ -378,6 +464,18 @@ export async function createContact(tenantId, user, payload) {
       display_name,
       email || null,
       source || null,
+      trimStr(city),
+      trimStr(state),
+      trimStr(country),
+      trimStr(address),
+      trimStr(address_line_2),
+      trimStr(pin_code),
+      trimStr(company),
+      trimStr(job_title),
+      trimStr(website),
+      trimStr(industry),
+      dob,
+      trimStr(tax_id),
       resolvedManagerId,
       resolvedAssignedUserId,
       status_id || null,
@@ -557,6 +655,18 @@ export async function updateContact(id, tenantId, user, payload) {
     display_name,
     email,
     source,
+    city,
+    state,
+    country,
+    address,
+    address_line_2,
+    pin_code,
+    company,
+    job_title,
+    website,
+    industry,
+    date_of_birth,
+    tax_id,
     tag_ids,
     status_id,
     campaign_id,
@@ -598,6 +708,54 @@ export async function updateContact(id, tenantId, user, payload) {
   if (source !== undefined) {
     updates.push('source = ?');
     params.push(source || null);
+  }
+  if (city !== undefined) {
+    updates.push('city = ?');
+    params.push(trimStr(city));
+  }
+  if (state !== undefined) {
+    updates.push('state = ?');
+    params.push(trimStr(state));
+  }
+  if (country !== undefined) {
+    updates.push('country = ?');
+    params.push(trimStr(country));
+  }
+  if (address !== undefined) {
+    updates.push('address = ?');
+    params.push(trimStr(address));
+  }
+  if (address_line_2 !== undefined) {
+    updates.push('address_line_2 = ?');
+    params.push(trimStr(address_line_2));
+  }
+  if (pin_code !== undefined) {
+    updates.push('pin_code = ?');
+    params.push(trimStr(pin_code));
+  }
+  if (company !== undefined) {
+    updates.push('company = ?');
+    params.push(trimStr(company));
+  }
+  if (job_title !== undefined) {
+    updates.push('job_title = ?');
+    params.push(trimStr(job_title));
+  }
+  if (website !== undefined) {
+    updates.push('website = ?');
+    params.push(trimStr(website));
+  }
+  if (industry !== undefined) {
+    updates.push('industry = ?');
+    params.push(trimStr(industry));
+  }
+  if (date_of_birth !== undefined) {
+    updates.push('date_of_birth = ?');
+    params.push(date_of_birth === null || date_of_birth === '' ? null : normalizeDateOfBirthForDb(date_of_birth));
+  }
+  if (tax_id !== undefined) {
+    updates.push('tax_id = ?');
+    params.push(trimStr(tax_id));
   }
   if (status_id !== undefined) {
     updates.push('status_id = ?');
@@ -1010,11 +1168,35 @@ async function ensureCustomFieldDefinition(tenantId, { name, label, type }) {
   }
 }
 
+/** First-class `contacts` columns (not custom fields). Import + forms map here. */
+const CONTACT_DEFAULT_EXTRA_KEYS = [
+  'city',
+  'state',
+  'country',
+  'address',
+  'address_line_2',
+  'pin_code',
+  'company',
+  'job_title',
+  'website',
+  'industry',
+  'date_of_birth',
+  'tax_id',
+];
+
+const CONTACT_DEFAULT_EXTRA_KEY_SET = new Set(CONTACT_DEFAULT_EXTRA_KEYS);
+
+/** Auto-created custom fields for import/integration (excludes CONTACT_DEFAULT_EXTRA_KEYS). */
 const PROVIDER_COLUMNS_AUTO_CF = [
   { key: 'property', label: 'Property', type: 'text' },
   { key: 'budget', label: 'Budget', type: 'number' },
-  { key: 'city', label: 'City', type: 'text' },
-  { key: 'state', label: 'State', type: 'text' },
+  { key: 'services', label: 'Services', type: 'text' },
+  { key: 'remark', label: 'Remark', type: 'text' },
+  { key: 'remark_status', label: 'Remark Status', type: 'text' },
+  { key: 'assign_date', label: 'Assign Date', type: 'text' },
+  { key: 'lead_date', label: 'Lead Date', type: 'text' },
+  { key: 'lead_timestamp', label: 'Time Stamp', type: 'text' },
+  { key: 'assign_status', label: 'Assign', type: 'text' },
 ];
 
 const PROVIDER_ALIAS_BY_KEY = {
@@ -1022,10 +1204,51 @@ const PROVIDER_ALIAS_BY_KEY = {
   budget: BUDGET_KEYS,
   city: CITY_KEYS,
   state: STATE_KEYS,
+  country: COUNTRY_KEYS,
+  address: ADDRESS_KEYS,
+  address_line_2: ADDRESS_LINE2_KEYS,
+  pin_code: PIN_CODE_KEYS,
+  company: COMPANY_KEYS,
+  job_title: JOB_TITLE_KEYS,
+  website: WEBSITE_KEYS,
+  industry: INDUSTRY_KEYS,
+  date_of_birth: DATE_OF_BIRTH_KEYS,
+  tax_id: TAX_ID_KEYS,
+  services: SERVICES_KEYS,
+  remark: REMARK_KEYS,
+  remark_status: REMARK_STATUS_KEYS,
+  assign_date: ASSIGN_DATE_KEYS,
+  lead_date: LEAD_DATE_KEYS,
+  lead_timestamp: LEAD_TIMESTAMP_KEYS,
+  assign_status: ASSIGN_STATUS_KEYS,
 };
 
+function applyCoreDefaultsFromNormalized(normalized, mappedCore = {}) {
+  const out = {};
+  for (const key of CONTACT_DEFAULT_EXTRA_KEYS) {
+    let val = mappedCore[key];
+    if (val !== undefined && val !== null && String(val).trim() !== '') {
+      out[key] = key === 'date_of_birth' ? normalizeDateOfBirthForDb(val) : trimStr(val);
+      continue;
+    }
+    let picked = pickFirstByAliasKeys(normalized, PROVIDER_ALIAS_BY_KEY[key] || []);
+    if (picked === undefined || picked === null) picked = normalized[key];
+    if (picked === undefined || picked === null || !String(picked).trim()) continue;
+    out[key] = key === 'date_of_birth' ? normalizeDateOfBirthForDb(picked) : trimStr(picked);
+  }
+  return out;
+}
+
+function pickDefinedCoreFieldsFromResolved(resolved) {
+  const o = {};
+  for (const k of CONTACT_DEFAULT_EXTRA_KEYS) {
+    if (resolved[k] !== undefined) o[k] = resolved[k];
+  }
+  return o;
+}
+
 /**
- * Same rules as CSV import row processing (may create missing Property/Budget/City/State custom fields).
+ * Same rules as CSV import row processing (may create missing provider-style custom fields).
  * @returns {{ error: string } | { error: null, first_name, last_name, display_name, email, finalSource, resolvedStatusId, providerStatusName, campaign_id, manager_id, assigned_user_id, phones, custom_fields_deduped, primaryPhone }}
  */
 async function resolveCsvRowToImportPayload(tenantId, { normalized, headerMapping, byHeader, defaultCountryCode }) {
@@ -1038,6 +1261,7 @@ async function resolveCsvRowToImportPayload(tenantId, { normalized, headerMappin
   let mappedPrimaryPhone = null;
 
   const custom_fields = [];
+  const mappedCore = {};
 
   if (headerMapping) {
     for (const [nk, cfg] of Object.entries(headerMapping)) {
@@ -1057,7 +1281,10 @@ async function resolveCsvRowToImportPayload(tenantId, { normalized, headerMappin
       else if (target === 'primary_phone') mappedPrimaryPhone = val;
       else if (target === 'source') mappedSource = val;
       else if (target === 'status') mappedStatusName = val;
-      else if (target === 'property' || target === 'budget' || target === 'city' || target === 'state') {
+      else if (CONTACT_DEFAULT_EXTRA_KEY_SET.has(target)) {
+        if (val === null || !String(val).trim()) continue;
+        mappedCore[target] = target === 'date_of_birth' ? normalizeDateOfBirthForDb(val) : trimStr(val);
+      } else if (PROVIDER_COLUMNS_AUTO_CF.some((d) => d.key === target)) {
         if (val === null || !String(val).trim()) continue;
         const def = PROVIDER_COLUMNS_AUTO_CF.find((d) => d.key === target);
         if (!def) continue;
@@ -1141,6 +1368,8 @@ async function resolveCsvRowToImportPayload(tenantId, { normalized, headerMappin
     custom_fields.push({ field_id: field.id, value_text });
   }
 
+  const coreDefaults = applyCoreDefaultsFromNormalized(normalized, mappedCore);
+
   const cfByField = new Map();
   for (const c of custom_fields) {
     if (c?.field_id) cfByField.set(c.field_id, c.value_text);
@@ -1167,6 +1396,7 @@ async function resolveCsvRowToImportPayload(tenantId, { normalized, headerMappin
     phones,
     custom_fields_deduped,
     primaryPhone,
+    ...coreDefaults,
   };
 }
 
@@ -1212,13 +1442,14 @@ export async function exportContactsCsv(
   if (search) {
     const q = `%${search}%`;
     whereClauses.push(
-      `(c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ? OR c.display_name LIKE ? OR EXISTS (
+      `(c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ? OR c.display_name LIKE ?
+        OR c.city LIKE ? OR c.company LIKE ? OR EXISTS (
         SELECT 1 FROM contact_tag_assignments cta_s
         INNER JOIN contact_tags ct_s ON ct_s.id = cta_s.tag_id AND ct_s.tenant_id = cta_s.tenant_id
         WHERE cta_s.contact_id = c.id AND cta_s.tenant_id = c.tenant_id AND ct_s.deleted_at IS NULL AND ct_s.name LIKE ?
       ))`
     );
-    params.push(q, q, q, q, q);
+    params.push(q, q, q, q, q, q, q);
   }
 
   await applyContactListFilters(tenantId, user, whereClauses, params, {
@@ -1238,6 +1469,18 @@ export async function exportContactsCsv(
         c.email,
         p.phone AS primary_phone,
         c.source,
+        c.city,
+        c.state,
+        c.country,
+        c.address,
+        c.address_line_2,
+        c.pin_code,
+        c.company,
+        c.job_title,
+        c.website,
+        c.industry,
+        c.date_of_birth,
+        c.tax_id,
         (SELECT GROUP_CONCAT(DISTINCT ct.name ORDER BY ct.name SEPARATOR ', ')
          FROM contact_tag_assignments cta
          INNER JOIN contact_tags ct ON ct.id = cta.tag_id AND ct.tenant_id = cta.tenant_id
@@ -1300,6 +1543,18 @@ export async function exportContactsCsv(
     'email',
     'primary_phone',
     'source',
+    'city',
+    'state',
+    'country',
+    'address',
+    'address_line_2',
+    'pin_code',
+    'company',
+    'job_title',
+    'website',
+    'industry',
+    'date_of_birth',
+    'tax_id',
     'tags',
     'campaign_id',
     'campaign_name',
@@ -1323,6 +1578,12 @@ export async function exportContactsCsv(
   lines.push(`\uFEFF${headers.map(csvEscape).join(',')}`);
 
   for (const c of contacts) {
+    const dob =
+      c.date_of_birth == null
+        ? ''
+        : c.date_of_birth instanceof Date
+          ? c.date_of_birth.toISOString().slice(0, 10)
+          : String(c.date_of_birth).slice(0, 10);
     const base = [
       c.id,
       c.type,
@@ -1332,6 +1593,18 @@ export async function exportContactsCsv(
       c.email,
       c.primary_phone,
       c.source,
+      c.city,
+      c.state,
+      c.country,
+      c.address,
+      c.address_line_2,
+      c.pin_code,
+      c.company,
+      c.job_title,
+      c.website,
+      c.industry,
+      dob,
+      c.tax_id,
       c.tag_names || '',
       c.campaign_id,
       c.campaign_name,
@@ -1358,15 +1631,17 @@ export async function exportContactsCsv(
 export async function importContactsCsv(
   tenantId,
   user,
-  { buffer, type = 'lead', mode = 'skip', created_source = 'import', defaultCountryCode = '+91', mapping } = {}
+  {
+    buffer,
+    type = 'lead',
+    mode = 'skip',
+    created_source = 'import',
+    defaultCountryCode = '+91',
+    mapping,
+    originalFilename = '',
+  } = {}
 ) {
-  const csvText = Buffer.isBuffer(buffer) ? buffer.toString('utf8') : String(buffer || '');
-  const records = parseCsv(csvText, {
-    columns: true,
-    skip_empty_lines: true,
-    relax_column_count: true,
-    trim: true,
-  });
+  const { records, headerRowIndex } = parseImportBufferToRecords(buffer, { originalFilename });
 
   const allFields = await query(
     `SELECT id, name, label
@@ -1397,7 +1672,7 @@ export async function importContactsCsv(
   }
 
   for (let i = 0; i < records.length; i++) {
-    const rowIndex = i + 2; // header row is 1
+    const rowIndex = headerRowIndex + i + 2; // 1-based sheet row (header + data offset)
     const row = records[i] || {};
 
     try {
@@ -1433,6 +1708,8 @@ export async function importContactsCsv(
         primaryPhone,
       } = resolved;
 
+      const coreRowFields = pickDefinedCoreFieldsFromResolved(resolved);
+
       let existingId = null;
       if (primaryPhone) {
         const rows = await query(
@@ -1460,6 +1737,7 @@ export async function importContactsCsv(
           display_name,
           email,
           source: finalSource,
+          ...coreRowFields,
           ...(resolvedStatusId ? { status_id: resolvedStatusId } : {}),
           ...(campaign_id !== undefined ? { campaign_id } : {}),
           ...(manager_id !== undefined ? { manager_id } : {}),
@@ -1480,6 +1758,7 @@ export async function importContactsCsv(
         display_name,
         email,
         source: finalSource,
+        ...coreRowFields,
         ...(resolvedStatusId ? { status_id: resolvedStatusId } : {}),
         ...(campaign_id !== undefined ? { campaign_id } : {}),
         ...(manager_id !== undefined ? { manager_id } : {}),
@@ -1510,15 +1789,9 @@ export async function importContactsCsv(
 
 export async function previewResolvedContactsImportCsv(
   tenantId,
-  { buffer, mapping, defaultCountryCode = '+91', mode = 'skip', limit = 12 } = {}
+  { buffer, mapping, defaultCountryCode = '+91', mode = 'skip', limit = 12, originalFilename = '' } = {}
 ) {
-  const csvText = Buffer.isBuffer(buffer) ? buffer.toString('utf8') : String(buffer || '');
-  const records = parseCsv(csvText, {
-    columns: true,
-    skip_empty_lines: true,
-    relax_column_count: true,
-    trim: true,
-  });
+  const { records, headerRowIndex } = parseImportBufferToRecords(buffer, { originalFilename });
 
   if (!records || records.length === 0) {
     return { totalRows: 0, mode, sampleRows: [] };
@@ -1551,7 +1824,7 @@ export async function previewResolvedContactsImportCsv(
   const sampleRows = [];
 
   for (let i = 0; i < records.length && i < sampleLimit; i++) {
-    const rowIndex = i + 2;
+    const rowIndex = headerRowIndex + i + 2;
     const row = records[i] || {};
     const normalized = {};
     for (const [k, v] of Object.entries(row)) {
@@ -1616,14 +1889,8 @@ export async function previewResolvedContactsImportCsv(
   };
 }
 
-export async function previewContactsImportCsv(tenantId, { buffer } = {}) {
-  const csvText = Buffer.isBuffer(buffer) ? buffer.toString('utf8') : String(buffer || '');
-  const records = parseCsv(csvText, {
-    columns: true,
-    skip_empty_lines: true,
-    relax_column_count: true,
-    trim: true,
-  });
+export async function previewContactsImportCsv(tenantId, { buffer, originalFilename = '' } = {}) {
+  const { records } = parseImportBufferToRecords(buffer, { originalFilename });
 
   if (!records || records.length === 0) {
     return { columns: [], totalRows: 0, customFields: [] };
@@ -1770,6 +2037,22 @@ function extractCustomFieldValues(lead) {
   return obj;
 }
 
+function leadObjectToNormalizedRow(lead) {
+  const n = {};
+  if (!lead || typeof lead !== 'object') return n;
+  for (const [k, v] of Object.entries(lead)) {
+    if (v === undefined) continue;
+    if (['phones', 'custom_fields', 'customFields', 'answers', 'lead_answers'].includes(k)) continue;
+    if (v !== null && typeof v === 'object' && !Array.isArray(v)) continue;
+    n[normalizeHeader(k)] = v;
+  }
+  const cf = extractCustomFieldValues(lead);
+  for (const [k, v] of Object.entries(cf)) {
+    if (v !== undefined) n[normalizeHeader(k)] = v;
+  }
+  return n;
+}
+
 async function mapCustomFieldsForIntegration(tenantId, leadCustomFields) {
   if (!leadCustomFields || typeof leadCustomFields !== 'object') return [];
 
@@ -1786,13 +2069,6 @@ async function mapCustomFieldsForIntegration(tenantId, leadCustomFields) {
     byKey.set(normalizeHeader(f.label), f);
   }
 
-  const autoCF = [
-    { key: 'property', label: 'Property', type: 'text' },
-    { key: 'budget', label: 'Budget', type: 'number' },
-    { key: 'city', label: 'City', type: 'text' },
-    { key: 'state', label: 'State', type: 'text' },
-  ];
-
   const customFields = [];
 
   for (const [rawKey, rawVal] of Object.entries(leadCustomFields)) {
@@ -1802,7 +2078,10 @@ async function mapCustomFieldsForIntegration(tenantId, leadCustomFields) {
     const val = rawVal === undefined ? undefined : rawVal;
     if (val === undefined) continue;
 
-    const existing = byKey.get(normalizeHeader(key));
+    const nk = normalizeHeader(key);
+    if (CONTACT_DEFAULT_EXTRA_KEY_SET.has(nk)) continue;
+
+    const existing = byKey.get(nk);
     if (existing) {
       customFields.push({
         field_id: existing.id,
@@ -1811,7 +2090,7 @@ async function mapCustomFieldsForIntegration(tenantId, leadCustomFields) {
       continue;
     }
 
-    const auto = autoCF.find((d) => normalizeHeader(d.key) === normalizeHeader(key));
+    const auto = PROVIDER_COLUMNS_AUTO_CF.find((d) => normalizeHeader(d.key) === nk);
     if (auto) {
       const created = await ensureCustomFieldDefinition(tenantId, {
         name: auto.key,
@@ -1876,6 +2155,7 @@ export async function upsertLeadsFromIntegration(
       const resolvedStatusId = providerStatus ? await resolveContactStatusIdByName(tenantId, providerStatus) : null;
 
       const custom_fields = await mapCustomFieldsForIntegration(tenantId, extractCustomFieldValues(lead));
+      const coreFromLead = applyCoreDefaultsFromNormalized(leadObjectToNormalizedRow(lead), {});
 
       const payload = {
         type: 'lead',
@@ -1884,6 +2164,7 @@ export async function upsertLeadsFromIntegration(
         display_name: display_name ?? [first_name, last_name].filter(Boolean).join(' ') ?? email ?? null,
         email,
         source,
+        ...coreFromLead,
         ...(resolvedStatusId ? { status_id: resolvedStatusId } : {}),
         ...(lead.campaign_id ? { campaign_id: Number(lead.campaign_id) } : {}),
         ...(lead.manager_id ? { manager_id: Number(lead.manager_id) } : {}),

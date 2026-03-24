@@ -75,6 +75,18 @@ export function ContactFormPage({ defaultType }) {
     first_name: '',
     last_name: '',
     email: '',
+    city: '',
+    state: '',
+    country: '',
+    address: '',
+    address_line_2: '',
+    pin_code: '',
+    company: '',
+    job_title: '',
+    website: '',
+    industry: '',
+    date_of_birth: '',
+    tax_id: '',
     phones: [{ country_code: DEFAULT_COUNTRY_CODE, number: '', label: 'mobile', is_primary: true }],
     customValuesMap: {},
     manager_id: '',
@@ -191,6 +203,21 @@ export function ContactFormPage({ defaultType }) {
       first_name: contact.first_name ?? '',
       last_name: contact.last_name ?? '',
       email: contact.email ?? '',
+      city: contact.city ?? '',
+      state: contact.state ?? '',
+      country: contact.country ?? '',
+      address: contact.address ?? '',
+      address_line_2: contact.address_line_2 ?? '',
+      pin_code: contact.pin_code ?? '',
+      company: contact.company ?? '',
+      job_title: contact.job_title ?? '',
+      website: contact.website ?? '',
+      industry: contact.industry ?? '',
+      date_of_birth:
+        contact.date_of_birth == null
+          ? ''
+          : String(contact.date_of_birth).slice(0, 10),
+      tax_id: contact.tax_id ?? '',
       phones: mappedPhones,
       customValuesMap: prev.customValuesMap || {},
       manager_id: contact.manager_id != null ? String(contact.manager_id) : '',
@@ -368,6 +395,18 @@ export function ContactFormPage({ defaultType }) {
       first_name: formData.first_name || null,
       last_name: formData.last_name || null,
       email: formData.email || null,
+      city: formData.city?.trim() || null,
+      state: formData.state?.trim() || null,
+      country: formData.country?.trim() || null,
+      address: formData.address?.trim() || null,
+      address_line_2: formData.address_line_2?.trim() || null,
+      pin_code: formData.pin_code?.trim() || null,
+      company: formData.company?.trim() || null,
+      job_title: formData.job_title?.trim() || null,
+      website: formData.website?.trim() || null,
+      industry: formData.industry?.trim() || null,
+      date_of_birth: formData.date_of_birth?.trim() || null,
+      tax_id: formData.tax_id?.trim() || null,
       tag_ids: (formData.tag_ids || []).map((id) => Number(id)).filter((n) => Number.isFinite(n) && n > 0),
       phones,
       custom_fields,
@@ -521,6 +560,83 @@ export function ContactFormPage({ defaultType }) {
               onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
               type="email"
               autoComplete="email"
+            />
+          </div>
+        </section>
+
+        <section className={styles.section} aria-labelledby="contact-section-location">
+          <h2 id="contact-section-location" className={styles.sectionTitle}>
+            Location &amp; professional
+          </h2>
+          <p className={styles.sectionDesc}>
+            Standard fields stored on the contact record (not custom fields). Used in lists, export, and imports.
+          </p>
+          <div className={styles.fieldGrid}>
+            <Input
+              label="Country"
+              value={formData.country}
+              onChange={(e) => setFormData((p) => ({ ...p, country: e.target.value }))}
+              autoComplete="country-name"
+            />
+            <Input
+              label="State / region"
+              value={formData.state}
+              onChange={(e) => setFormData((p) => ({ ...p, state: e.target.value }))}
+            />
+            <Input
+              label="City"
+              value={formData.city}
+              onChange={(e) => setFormData((p) => ({ ...p, city: e.target.value }))}
+            />
+            <Input
+              label="PIN / postal code"
+              value={formData.pin_code}
+              onChange={(e) => setFormData((p) => ({ ...p, pin_code: e.target.value }))}
+            />
+            <Input
+              label="Address line 1"
+              value={formData.address}
+              onChange={(e) => setFormData((p) => ({ ...p, address: e.target.value }))}
+              className={styles.fullWidthField}
+            />
+            <Input
+              label="Address line 2"
+              value={formData.address_line_2}
+              onChange={(e) => setFormData((p) => ({ ...p, address_line_2: e.target.value }))}
+              className={styles.fullWidthField}
+            />
+            <Input
+              label="Company"
+              value={formData.company}
+              onChange={(e) => setFormData((p) => ({ ...p, company: e.target.value }))}
+            />
+            <Input
+              label="Job title"
+              value={formData.job_title}
+              onChange={(e) => setFormData((p) => ({ ...p, job_title: e.target.value }))}
+            />
+            <Input
+              label="Industry"
+              value={formData.industry}
+              onChange={(e) => setFormData((p) => ({ ...p, industry: e.target.value }))}
+            />
+            <Input
+              label="Website"
+              value={formData.website}
+              onChange={(e) => setFormData((p) => ({ ...p, website: e.target.value }))}
+              type="url"
+              placeholder="https://"
+            />
+            <Input
+              label="Date of birth"
+              value={formData.date_of_birth}
+              onChange={(e) => setFormData((p) => ({ ...p, date_of_birth: e.target.value }))}
+              type="date"
+            />
+            <Input
+              label="GST / PAN / Tax ID"
+              value={formData.tax_id}
+              onChange={(e) => setFormData((p) => ({ ...p, tax_id: e.target.value }))}
             />
           </div>
         </section>
