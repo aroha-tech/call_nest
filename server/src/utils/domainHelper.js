@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 /** Public tunnel domains: first label is a random id, not a tenant slug */
 const TUNNEL_HOST_SUFFIXES = [
   'ngrok-free.app',
@@ -19,6 +20,8 @@ export function isTunnelHostname(hostname) {
   return TUNNEL_HOST_SUFFIXES.some((suffix) => h === suffix || h.endsWith(`.${suffix}`));
 }
 
+=======
+>>>>>>> Stashed changes
 /**
  * Extract subdomain from a Host header value.
  * Examples:
@@ -27,8 +30,16 @@ export function isTunnelHostname(hostname) {
  * - www.arohva.com        -> www
  * - localhost:4000        -> null
  * - 127.0.0.1:4000        -> null
+<<<<<<< Updated upstream
  * - xxx.ngrok-free.app    -> null (tunnel, not tenant slug)
+=======
+ * - 143.110.254.35:4000   -> null (IPv4 — use API_BOOTSTRAP_HOSTS for path-based routing)
+>>>>>>> Stashed changes
  */
+function isIpv4(hostname) {
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname);
+}
+
 export function getSubdomainFromHost(host) {
   if (!host || typeof host !== 'string') {
     return null;
@@ -45,7 +56,9 @@ export function getSubdomainFromHost(host) {
   if (
     lowerHost === 'localhost' ||
     lowerHost === '127.0.0.1' ||
-    lowerHost === '::1'
+    lowerHost === '::1' ||
+    lowerHost.includes(':') ||
+    isIpv4(lowerHost)
   ) {
     return null;
   }

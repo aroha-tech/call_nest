@@ -3,19 +3,18 @@
  * Handles errors consistently across the application
  */
 
+import { env } from '../config/env.js';
+
 export function errorHandler(err, req, res, next) {
-  // Log error in development
-  if (process.env.NODE_ENV === 'development') {
+  if (!env.isProduction) {
     console.error('Error:', err);
   }
-  
-  // Determine status code
+
   const status = err.status || err.statusCode || 500;
   const message = err.message || 'Internal server error';
-  
-  // Send error response
+
   res.status(status).json({
     error: message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    ...(!env.isProduction && { stack: err.stack }),
   });
 }

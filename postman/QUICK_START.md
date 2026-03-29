@@ -2,10 +2,10 @@
 
 ## Step 1: Setup Server Environment
 
-1. Copy `.env.example` to `.env` in `server/` folder:
+1. Copy `.env.development.example` to `.env` in `server/` folder:
    ```bash
    cd server
-   cp .env.example .env
+   cp .env.development.example .env
    ```
 
 2. Update `.env` with your values:

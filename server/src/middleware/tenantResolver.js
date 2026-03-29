@@ -1,6 +1,11 @@
 import { query } from '../config/db.js';
+<<<<<<< Updated upstream
 import { env } from '../config/env.js';
 import { getSubdomainFromHost, isTunnelHostname } from '../utils/domainHelper.js';
+=======
+import { env, isBootstrapApiHost } from '../config/env.js';
+import { getSubdomainFromHost } from '../utils/domainHelper.js';
+>>>>>>> Stashed changes
 
 const PLATFORM_SUBDOMAIN = process.env.PLATFORM_SUBDOMAIN || 'admin';
 const MARKETING_SUBDOMAIN = process.env.MARKETING_SUBDOMAIN || 'www';
@@ -26,12 +31,22 @@ export async function tenantResolver(req, res, next) {
   const [hostname] = host.split(':');
   const subdomain = getSubdomainFromHost(host);
 
+<<<<<<< Updated upstream
   const onTunnel = isTunnelHostname(hostname);
   const useDevStyleResolution =
     onTunnel || (!subdomain && env.nodeEnv !== 'production');
 
   // Dev / ngrok: no real tenant slug in Host — resolve tenant from JWT on /api/tenant/*
   if (useDevStyleResolution) {
+=======
+  // Path-based routing: dev (no subdomain), or any host listed in API_BOOTSTRAP_HOSTS
+  // (apex domain, IP, or e.g. www when listed — avoids "marketing" 404 for www on bootstrap).
+  const usePathBasedRouting =
+    isBootstrapApiHost(host) ||
+    (!subdomain && !env.isProduction);
+
+  if (usePathBasedRouting) {
+>>>>>>> Stashed changes
     // Platform admin APIs in development
     if (req.path.startsWith('/api/admin/')) {
       req.isPlatform = true;

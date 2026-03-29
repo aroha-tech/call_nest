@@ -5,10 +5,35 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const serverRoot = path.resolve(path.join(__dirname, '../../'));
 
-// Load .env first (dev defaults), then .env.production overrides when NODE_ENV=production
+// Load .env first, then .env.production when APP_ENV or NODE_ENV is production (single knob)
 dotenv.config({ path: path.join(serverRoot, '.env') });
-if ((process.env.NODE_ENV || 'development') === 'production') {
+const firstMode = (
+  process.env.APP_ENV ||
+  process.env.NODE_ENV ||
+  'development'
+).toLowerCase();
+if (firstMode === 'production') {
   dotenv.config({ path: path.join(serverRoot, '.env.production') });
+}
+
+const appEnv = (
+  process.env.APP_ENV ||
+  process.env.NODE_ENV ||
+  'development'
+).toLowerCase();
+const isProduction = appEnv === 'production';
+
+// Keep Express / ecosystem expectations aligned when APP_ENV is the only flag set
+if (process.env.APP_ENV) {
+  process.env.NODE_ENV = isProduction ? 'production' : 'development';
+}
+
+function parseBootstrapHosts() {
+  const raw = process.env.API_BOOTSTRAP_HOSTS || '';
+  return raw
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
 }
 
 // Parse DATABASE_URL if provided (format: mysql://user:password@host:port/database)
@@ -35,8 +60,23 @@ const dbFromUrl = parseDatabaseUrl();
 
 export const env = {
   port: Number(process.env.PORT) || 4000,
-  nodeEnv: process.env.NODE_ENV || 'development',
-  isProduction: (process.env.NODE_ENV || 'development') === 'production',
+  /** Application mode: development | production (from APP_ENV or NODE_ENV) */
+  appEnv,
+  /** Alias for libraries that read NODE_ENV */
+  nodeEnv: process.env.NODE_ENV || appEnv,
+  isProduction,
+  /**
+   * Comma-separated allowed browser origins for CORS in production (e.g. https://admin.arohva.com,https://www.arohva.com).
+   * If empty in production, falls back to FRONTEND_URL only. Development uses permissive CORS.
+   */
+  corsOrigins: (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+  /** If set (e.g. .arohva.com), any https?://*.suffix origin is allowed in production in addition to corsOrigins */
+  corsOriginSuffix: (process.env.CORS_ORIGIN_SUFFIX || '').trim().toLowerCase(),
+  /** Hostnames (no port) allowed to use path-based API routing like dev — e.g. droplet IP before DNS */
+  bootstrapHosts: parseBootstrapHosts(),
   jwtSecret: process.env.JWT_SECRET || 'change-in-production',
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || 'change-refresh-secret-in-production',
   jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m', // Short-lived access token
@@ -81,3 +121,13 @@ export const env = {
     Number(process.env.CSV_IMPORT_MAX_FILE_BYTES) || 5 * 1024 * 1024
   ),
 };
+
+/**
+ * Path-based “dev style” API routing for bootstrap hosts (IP-only deploy before DNS points to the server).
+ */
+export function isBootstrapApiHost(hostHeader) {
+  if (!hostHeader || !env.bootstrapHosts.length) return false;
+  const [hostname] = hostHeader.split(':');
+  if (!hostname) return false;
+  return env.bootstrapHosts.includes(hostname.toLowerCase());
+}

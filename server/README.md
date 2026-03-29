@@ -20,10 +20,11 @@ mysql -u root -p call_nest < user/user.sql
 ```
 
 ### 3. Environment Variables
-Copy `.env.example` to `.env` and configure:
+Copy `.env.development.example` to `.env` and configure:
 ```bash
-cp .env.example .env
+cp .env.development.example .env
 ```
+For production, use `.env.production.example` (see comments inside that file).
 
 Update:
 - `DB_PASSWORD` — your MySQL password

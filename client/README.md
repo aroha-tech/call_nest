@@ -8,6 +8,11 @@ SaaS-grade React client with subdomain-ready auth (multi-tenant CRM).
 - Redux Toolkit, React Router v6, Axios
 - SCSS (modular)
 
+## Environment
+
+- **Development:** copy `.env.development.example` → `.env` (optional; defaults work with the dev proxy).
+- **Production build:** copy `.env.production.example` → `.env.production`, then `npm run build`.
+
 ## Run
 
 ```bash

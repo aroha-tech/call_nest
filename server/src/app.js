@@ -43,17 +43,52 @@ import integrationsWebhookRoutes from './routes/integrationsWebhook.js';
 
 const app = express();
 
+if (env.isProduction) {
+  app.set('trust proxy', 1);
+}
+
+function productionCorsAllowed(origin) {
+  if (!origin) return true;
+  if (env.corsOrigins.includes(origin)) return true;
+  try {
+    const { hostname } = new URL(origin);
+    const hostLower = hostname.toLowerCase();
+    if (
+      env.bootstrapHosts.length &&
+      env.bootstrapHosts.includes(hostLower)
+    ) {
+      return true;
+    }
+    if (env.corsOriginSuffix && hostLower.endsWith(env.corsOriginSuffix)) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  if (env.frontendUrl && origin === env.frontendUrl) return true;
+  return false;
+}
+
 // Middleware
-app.use(cors({ origin: true, credentials: true }));
+app.use(
+  cors({
+    credentials: true,
+    origin: env.isProduction
+      ? (origin, callback) => {
+          callback(null, productionCorsAllowed(origin));
+        }
+      : true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Twilio status callbacks use form-encoded body
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ 
-    ok: true, 
+  res.json({
+    ok: true,
     timestamp: new Date().toISOString(),
-    environment: env.nodeEnv,
+    environment: env.appEnv,
   });
 });
 
@@ -119,7 +154,7 @@ async function start() {
 
   app.listen(port, () => {
     console.log(`Call Nest API listening on port ${port}`);
-    console.log(`Environment: ${env.nodeEnv}`);
+    console.log(`Environment: ${env.appEnv}`);
   });
 }
 
