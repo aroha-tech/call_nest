@@ -7,6 +7,7 @@ import { parseExpiration } from '../utils/dateHelper.js';
 import { redis, isRedisAvailable, refreshTokenKey, userSessionsKey } from '../config/redis.js';
 import { getUserPermissions, createSystemRolesForTenant, getRoleByTenantAndName } from './rbacService.js';
 import { cloneDefaultsForTenant } from './dispositionCloneService.js';
+import { validateTenantSlugFormat } from '../utils/tenantSlugRules.js';
 
 function ttlFromString(expiresIn) {
   if (typeof expiresIn !== 'string') {
@@ -47,6 +48,13 @@ export async function registerTenant(name, slug, industryId = null) {
       err.status = 400;
       throw err;
     }
+  }
+
+  const slugFmt = validateTenantSlugFormat(slug);
+  if (!slugFmt.ok) {
+    const err = new Error(slugFmt.error);
+    err.status = 400;
+    throw err;
   }
 
   // Check if slug already exists
@@ -545,4 +553,117 @@ export async function revokeAllUserTokens(tenantId, userId) {
       console.error('Redis error while revoking all user tokens (logout all):', err);
     }
   }
+}
+
+const TENANT_SLUG_SUGGEST_SUFFIXES = [
+  'hq',
+  'team',
+  'work',
+  'crm',
+  'group',
+  'inc',
+  'corp',
+  'sales',
+  'global',
+];
+
+function randomAlphaSlugSuffix(len) {
+  const chars = 'abcdefghijklmnopqrstuvwxyz';
+  let s = '';
+  for (let i = 0; i < len; i += 1) {
+    s += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return s;
+}
+
+async function isTenantSlugTakenDb(slug, excludeTenantId = null) {
+  if (excludeTenantId != null && excludeTenantId !== '') {
+    const rows = await query(
+      'SELECT id FROM tenants WHERE slug = ? AND is_deleted = 0 AND id != ? LIMIT 1',
+      [slug, excludeTenantId]
+    );
+    return rows.length > 0;
+  }
+  const rows = await query('SELECT id FROM tenants WHERE slug = ? AND is_deleted = 0 LIMIT 1', [slug]);
+  return rows.length > 0;
+}
+
+/**
+ * Build letter-only alternative slugs for registration (excludes taken rows).
+ */
+export async function suggestAvailableTenantSlugs(baseSlug, maxSuggestions = 5, excludeTenantId = null) {
+  const suggestions = [];
+  const candidates = [];
+  const seen = new Set();
+
+  const pushCandidate = (c) => {
+    if (!c || seen.has(c)) return;
+    seen.add(c);
+    const fmt = validateTenantSlugFormat(c);
+    if (fmt.ok) candidates.push(c);
+  };
+
+  for (const suf of TENANT_SLUG_SUGGEST_SUFFIXES) {
+    pushCandidate(`${baseSlug}-${suf}`);
+  }
+  for (let i = 0; i < 16; i += 1) {
+    pushCandidate(`${baseSlug}-${randomAlphaSlugSuffix(4)}`);
+  }
+
+  if (candidates.length === 0) return [];
+
+  const placeholders = candidates.map(() => '?').join(',');
+  let sql = `SELECT slug FROM tenants WHERE slug IN (${placeholders}) AND is_deleted = 0`;
+  const params = [...candidates];
+  if (excludeTenantId != null && excludeTenantId !== '') {
+    sql += ' AND id != ?';
+    params.push(excludeTenantId);
+  }
+  const takenRows = await query(sql, params);
+  const taken = new Set(takenRows.map((r) => r.slug));
+
+  for (const c of candidates) {
+    if (suggestions.length >= maxSuggestions) break;
+    if (!taken.has(c)) suggestions.push(c);
+  }
+
+  return suggestions;
+}
+
+/**
+ * Format + availability + suggestions if taken.
+ * @param {string} normalizedSlug
+ * @param {number|string|null} [excludeTenantId] - tenant id that may already own this slug (e.g. edit mode)
+ */
+export async function getTenantSlugStatus(normalizedSlug, excludeTenantId = null) {
+  const format = validateTenantSlugFormat(normalizedSlug);
+  if (!format.ok) {
+    return {
+      valid: false,
+      available: false,
+      normalized: normalizedSlug || '',
+      error: format.error,
+      suggestions: [],
+    };
+  }
+
+  const taken = await isTenantSlugTakenDb(normalizedSlug, excludeTenantId);
+  if (!taken) {
+    return {
+      valid: true,
+      available: true,
+      normalized: normalizedSlug,
+      error: null,
+      suggestions: [],
+    };
+  }
+
+  const suggestions = await suggestAvailableTenantSlugs(normalizedSlug, 5, excludeTenantId);
+  return {
+    valid: true,
+    available: false,
+    normalized: normalizedSlug,
+    error: 'This workspace address is already in use.',
+    suggestions,
+  };
 }

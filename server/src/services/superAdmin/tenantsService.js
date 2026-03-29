@@ -1,12 +1,35 @@
 import { query } from '../../config/db.js';
 import { registerTenant, registerUser } from '../authService.js';
 import { cloneDefaultsForTenant } from '../dispositionCloneService.js';
+import { validateTenantSlugFormat } from '../../utils/tenantSlugRules.js';
+
+const TENANT_USER_COUNT_SQL = `(SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id AND (u.is_platform_admin = 0 OR u.is_platform_admin IS NULL))`;
+
+function parseNonNegativeIntParam(value) {
+  if (value === undefined || value === null || String(value).trim() === '') return null;
+  const n = parseInt(String(value), 10);
+  if (Number.isNaN(n) || n < 0) return null;
+  return n;
+}
 
 /**
  * List tenants for platform admin (paginated).
  * Excludes soft-deleted by default.
+ *
+ * @param {object} [opts]
+ * @param {string} [opts.industryId] - filter by industries.id; use '__none__' for NULL industry_id only
+ * @param {string|number} [opts.minUsers] - minimum user count (inclusive)
+ * @param {string|number} [opts.maxUsers] - maximum user count (inclusive)
  */
-export async function findAll({ search = '', includeDisabled = false, page = 1, limit = 20 } = {}) {
+export async function findAll({
+  search = '',
+  includeDisabled = false,
+  page = 1,
+  limit = 20,
+  industryId,
+  minUsers: minUsersRaw,
+  maxUsers: maxUsersRaw,
+} = {}) {
   const pageNum = parseInt(page, 10) || 1;
   const limitNum = Math.min(parseInt(limit, 10) || 20, 100);
   const offset = (pageNum - 1) * limitNum;
@@ -25,6 +48,31 @@ export async function findAll({ search = '', includeDisabled = false, page = 1, 
     params.push(`%${search}%`, `%${search}%`);
   }
 
+  if (industryId && String(industryId).trim() && String(industryId) !== '__all__') {
+    if (String(industryId) === '__none__') {
+      whereClauses.push('t.industry_id IS NULL');
+    } else {
+      whereClauses.push('t.industry_id = ?');
+      params.push(industryId);
+    }
+  }
+
+  const minU = parseNonNegativeIntParam(minUsersRaw);
+  const maxU = parseNonNegativeIntParam(maxUsersRaw);
+  if (minU !== null && maxU !== null && minU > maxU) {
+    const err = new Error('min_users cannot be greater than max_users');
+    err.status = 400;
+    throw err;
+  }
+  if (minU !== null) {
+    whereClauses.push(`${TENANT_USER_COUNT_SQL} >= ?`);
+    params.push(minU);
+  }
+  if (maxU !== null) {
+    whereClauses.push(`${TENANT_USER_COUNT_SQL} <= ?`);
+    params.push(maxU);
+  }
+
   const whereSQL = `WHERE ${whereClauses.join(' AND ')}`;
 
   const [countRow] = await query(
@@ -37,7 +85,7 @@ export async function findAll({ search = '', includeDisabled = false, page = 1, 
     `SELECT t.id, t.name, t.slug, t.industry_id, t.is_enabled, t.created_at, t.updated_at,
             t.whatsapp_send_mode, t.whatsapp_module_enabled, t.whatsapp_automation_enabled,
             t.email_communication_enabled, t.email_module_enabled, t.email_automation_enabled,
-            (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id AND (u.is_platform_admin = 0 OR u.is_platform_admin IS NULL)) AS user_count
+            ${TENANT_USER_COUNT_SQL} AS user_count
      FROM tenants t
      ${whereSQL}
      ORDER BY t.name ASC
@@ -142,7 +190,13 @@ export async function update(id, payload) {
     email_automation_enabled,
   } = payload;
 
-  if (slug && slug !== existing.slug) {
+  if (slug !== undefined && slug !== existing.slug) {
+    const fmt = validateTenantSlugFormat(slug);
+    if (!fmt.ok) {
+      const err = new Error(fmt.error);
+      err.status = 400;
+      throw err;
+    }
     const [dup] = await query('SELECT id FROM tenants WHERE slug = ? AND is_deleted = 0 AND id != ?', [slug, id]);
     if (dup) {
       const err = new Error('Tenant slug already exists');

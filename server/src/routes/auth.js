@@ -7,6 +7,7 @@ const router = Router();
 
 // Public routes (subdomain is resolved by tenantResolver, but no auth required)
 router.post('/register', authController.register);
+router.get('/tenant-slug-status', authController.tenantSlugStatus);
 router.post('/login', authController.login);
 router.post('/refresh', authController.refresh);
 

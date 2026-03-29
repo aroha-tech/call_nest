@@ -7,6 +7,9 @@ export async function getAll(req, res, next) {
       include_disabled,
       page = '1',
       limit = '20',
+      industry_id,
+      min_users,
+      max_users,
     } = req.query;
 
     const result = await tenantsService.findAll({
@@ -14,6 +17,9 @@ export async function getAll(req, res, next) {
       includeDisabled: include_disabled === 'true',
       page: parseInt(page, 10),
       limit: parseInt(limit, 10),
+      industryId: industry_id,
+      minUsers: min_users,
+      maxUsers: max_users,
     });
 
     res.json(result);

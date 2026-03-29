@@ -1,7 +1,11 @@
-
 import * as authService from '../services/authService.js';
 import { query } from '../config/db.js';
 import { syncContactsManagerForAgent } from '../services/tenant/contactsService.js';
+import {
+  normalizeTenantSlugInput,
+  describeTenantSlugSourceIssue,
+  validateTenantSlugFormat,
+} from '../utils/tenantSlugRules.js';
 
 /**
  * Register a new tenant (company) with admin
@@ -30,16 +34,13 @@ export async function register(req, res, next) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
     
-    // Validate slug format (alphanumeric, hyphens, underscores)
-    const slugRegex = /^[a-z0-9_-]+$/;
-    if (!slugRegex.test(tenantSlug)) {
-      return res.status(400).json({ 
-        error: 'Tenant slug must contain only lowercase letters, numbers, hyphens, and underscores' 
-      });
+    const slugCheck = validateTenantSlugFormat(String(tenantSlug).trim());
+    if (!slugCheck.ok) {
+      return res.status(400).json({ error: slugCheck.error });
     }
     
     const result = await authService.registerTenantWithAdmin(
-      { name: tenantName, slug: tenantSlug, industryId },
+      { name: tenantName, slug: String(tenantSlug).trim(), industryId },
       { email, password, name }
     );
     
@@ -53,6 +54,36 @@ export async function register(req, res, next) {
         role: result.admin.role,
       },
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Public: validate tenant slug and check availability (registration / admin create).
+ * GET /api/auth/tenant-slug-status?slug=...&excludeTenantId=... (excludeTenantId optional, for edit)
+ */
+export async function tenantSlugStatus(req, res, next) {
+  try {
+    const raw = req.query.slug != null ? String(req.query.slug) : '';
+    let excludeTenantId = null;
+    if (req.query.excludeTenantId != null && String(req.query.excludeTenantId).trim() !== '') {
+      const n = parseInt(String(req.query.excludeTenantId), 10);
+      if (!Number.isNaN(n) && n > 0) excludeTenantId = n;
+    }
+    const sourceIssue = describeTenantSlugSourceIssue(raw);
+    if (sourceIssue) {
+      return res.json({
+        valid: false,
+        available: false,
+        normalized: normalizeTenantSlugInput(raw),
+        error: sourceIssue,
+        suggestions: [],
+      });
+    }
+    const normalized = normalizeTenantSlugInput(raw);
+    const result = await authService.getTenantSlugStatus(normalized, excludeTenantId);
+    res.json(result);
   } catch (err) {
     next(err);
   }
