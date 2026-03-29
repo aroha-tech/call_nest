@@ -9,10 +9,27 @@ export const dashboardAPI = {
 };
 
 export const tenantsAPI = {
-  getAll: ({ search = '', includeDisabled = false, page = 1, limit = 20 } = {}) =>
-    axiosInstance.get('/api/admin/tenants', {
-      params: { search, include_disabled: includeDisabled, page, limit },
-    }),
+  getAll: ({
+    search = '',
+    includeDisabled = false,
+    page = 1,
+    limit = 20,
+    industryId,
+    minUsers,
+    maxUsers,
+  } = {}) => {
+    const params = { search, include_disabled: includeDisabled, page, limit };
+    if (industryId && industryId !== '__all__') {
+      params.industry_id = industryId;
+    }
+    if (minUsers !== undefined && minUsers !== null && String(minUsers).trim() !== '') {
+      params.min_users = minUsers;
+    }
+    if (maxUsers !== undefined && maxUsers !== null && String(maxUsers).trim() !== '') {
+      params.max_users = maxUsers;
+    }
+    return axiosInstance.get('/api/admin/tenants', { params });
+  },
   getById: (id) => axiosInstance.get(`/api/admin/tenants/${id}`),
   create: (data) => axiosInstance.post('/api/admin/tenants', data),
   update: (id, data) => axiosInstance.put(`/api/admin/tenants/${id}`, data),

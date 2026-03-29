@@ -1,0 +1,46 @@
+@use '../../styles/variables' as *;
+
+.wrap {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: $space-2;
+  width: 100%;
+  max-width: 300px;
+}
+
+.host {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, monospace;
+  font-size: $font-size-xs;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copyBtn {
+  flex-shrink: 0;
+  min-width: 4.25rem;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  padding: $space-1 $space-2;
+  border-radius: $radius-md;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+  color: var(--color-primary-400);
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+
+  &:hover {
+    border-color: var(--color-primary-500);
+  }
+}
+
+.muted {
+  color: var(--color-text-muted);
+  font-size: $font-size-sm;
+}

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
@@ -21,11 +21,19 @@ import { Pagination, PaginationPageSize } from '../components/ui/Pagination';
 import { Alert } from '../components/ui/Alert';
 import { EmptyState } from '../components/ui/EmptyState';
 import listStyles from '../components/admin/adminDataList.module.scss';
+import { FilterBar } from '../components/admin/FilterBar';
 import { tenantsAPI } from '../services/adminAPI';
 import { industriesAPI } from '../services/dispositionAPI';
+import { getTenantSlugStatus } from '../features/auth/authAPI';
+import {
+  slugFromCompanyName,
+  validateSlug,
+  describeTenantSlugSourceIssue,
+} from '../features/auth/utils/slugUtils';
 import { useMutation } from '../hooks/useAsyncData';
 import { useTableLoadingState } from '../hooks/useTableLoadingState';
 import { TableDataRegion } from '../components/admin/TableDataRegion';
+import { TenantWorkspaceUrlCopy } from '../components/admin/TenantWorkspaceUrlCopy';
 import styles from './TenantsPage.module.scss';
 
 const defaultForm = () => ({
@@ -44,6 +52,56 @@ const defaultForm = () => ({
   email_automation_enabled: false,
 });
 
+const SLUG_DEBOUNCE_MS = 400;
+
+const FILTER_ALL = '__all__';
+
+function formatTenantDate(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return (
+      d.toLocaleDateString(undefined, { dateStyle: 'medium' }) +
+      ' ' +
+      d.toLocaleTimeString(undefined, { timeStyle: 'short' })
+    );
+  } catch {
+    return '—';
+  }
+}
+
+/** Parsed non-negative int, or undefined if empty/invalid */
+function parseUsersFilterInt(s) {
+  if (s == null || String(s).trim() === '') return undefined;
+  const n = parseInt(String(s).trim(), 10);
+  if (Number.isNaN(n) || n < 0) return undefined;
+  return n;
+}
+
+function normRangeStr(s) {
+  return String(s ?? '').trim();
+}
+
+/** Quick presets + custom min/max; values match API draft strings */
+const USER_SIZE_PRESETS = [
+  { id: 'any', label: 'Any', min: '', max: '' },
+  { id: 'zero', label: '0', min: '0', max: '0' },
+  { id: 's1_5', label: '1–5', min: '1', max: '5' },
+  { id: 's6_20', label: '6–20', min: '6', max: '20' },
+  { id: 's21p', label: '21+', min: '21', max: '' },
+];
+
+function getActiveUserSizePreset(minS, maxS) {
+  const m = normRangeStr(minS);
+  const x = normRangeStr(maxS);
+  for (const p of USER_SIZE_PRESETS) {
+    if (normRangeStr(p.min) === m && normRangeStr(p.max) === x) {
+      return p.id;
+    }
+  }
+  return null;
+}
+
 export function TenantsPage() {
   const [tenants, setTenants] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
@@ -51,11 +109,46 @@ export function TenantsPage() {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [showDisabled, setShowDisabled] = useState(false);
+  const [draftIndustryFilter, setDraftIndustryFilter] = useState(FILTER_ALL);
+  const [appliedIndustryFilter, setAppliedIndustryFilter] = useState(FILTER_ALL);
+  const [draftMinUsers, setDraftMinUsers] = useState('');
+  const [draftMaxUsers, setDraftMaxUsers] = useState('');
+  const [appliedMinUsers, setAppliedMinUsers] = useState('');
+  const [appliedMaxUsers, setAppliedMaxUsers] = useState('');
+  const [filterError, setFilterError] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(defaultForm);
   const [formErrors, setFormErrors] = useState({});
   const [industryOptions, setIndustryOptions] = useState([]);
+  /** Create modal: slug field mirrors registration rules + availability API */
+  const [slugInputRaw, setSlugInputRaw] = useState('');
+  const [slugAutoFromName, setSlugAutoFromName] = useState(true);
+  const [slugSourceError, setSlugSourceError] = useState(null);
+  const [slugRemote, setSlugRemote] = useState({
+    loading: false,
+    available: null,
+    message: null,
+    suggestions: [],
+  });
+  const slugReqId = useRef(0);
+
+  const clearFormErr = useCallback((...keys) => {
+    setFormErrors((prev) => {
+      let next = prev;
+      let changed = false;
+      for (const key of keys) {
+        if (next[key]) {
+          if (!changed) {
+            next = { ...prev };
+            changed = true;
+          }
+          delete next[key];
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, []);
 
   const fetchTenants = useCallback(async () => {
     setLoading(true);
@@ -66,6 +159,9 @@ export function TenantsPage() {
         includeDisabled: showDisabled,
         page: pagination.page,
         limit: pagination.limit,
+        industryId: appliedIndustryFilter,
+        minUsers: appliedMinUsers,
+        maxUsers: appliedMaxUsers,
       });
       setTenants(res.data?.data || []);
       setPagination(res.data?.pagination || { page: 1, limit: 20, total: 0, totalPages: 0 });
@@ -75,7 +171,15 @@ export function TenantsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, showDisabled, pagination.page, pagination.limit]);
+  }, [
+    search,
+    showDisabled,
+    pagination.page,
+    pagination.limit,
+    appliedIndustryFilter,
+    appliedMinUsers,
+    appliedMaxUsers,
+  ]);
 
   const { hasCompletedInitialFetch } = useTableLoadingState(loading);
 
@@ -106,6 +210,53 @@ export function TenantsPage() {
       .catch(() => setIndustryOptions([]));
   }, []);
 
+  useEffect(() => {
+    if (!modalOpen || editing) {
+      return;
+    }
+    const localErr = validateSlug(form.slug);
+    if (localErr || slugSourceError) {
+      setSlugRemote({ loading: false, available: null, message: null, suggestions: [] });
+      return;
+    }
+    const trimmed = form.slug.trim();
+    if (!trimmed) {
+      setSlugRemote({ loading: false, available: null, message: null, suggestions: [] });
+      return;
+    }
+    const reqId = ++slugReqId.current;
+    setSlugRemote((s) => ({ ...s, loading: true }));
+    const t = setTimeout(async () => {
+      try {
+        const data = await getTenantSlugStatus(trimmed);
+        if (slugReqId.current !== reqId) return;
+        if (!data.valid) {
+          setSlugRemote({
+            loading: false,
+            available: false,
+            message: data.error,
+            suggestions: data.suggestions || [],
+          });
+          return;
+        }
+        if (!data.available) {
+          setSlugRemote({
+            loading: false,
+            available: false,
+            message: data.error,
+            suggestions: data.suggestions || [],
+          });
+          return;
+        }
+        setSlugRemote({ loading: false, available: true, message: null, suggestions: [] });
+      } catch {
+        if (slugReqId.current !== reqId) return;
+        setSlugRemote({ loading: false, available: null, message: null, suggestions: [] });
+      }
+    }, SLUG_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [modalOpen, editing, form.slug, slugSourceError]);
+
   const createMutation = useMutation((data) => tenantsAPI.create(data));
   const updateMutation = useMutation((id, data) => tenantsAPI.update(id, data));
 
@@ -113,11 +264,19 @@ export function TenantsPage() {
     setEditing(null);
     setForm(defaultForm());
     setFormErrors({});
+    setSlugInputRaw('');
+    setSlugAutoFromName(true);
+    setSlugSourceError(null);
+    setSlugRemote({ loading: false, available: null, message: null, suggestions: [] });
     setModalOpen(true);
   };
 
   const openEdit = (row) => {
     setEditing(row);
+    setSlugInputRaw(row.slug || '');
+    setSlugAutoFromName(false);
+    setSlugSourceError(null);
+    setSlugRemote({ loading: false, available: null, message: null, suggestions: [] });
     setForm({
       name: row.name || '',
       slug: row.slug || '',
@@ -137,7 +296,7 @@ export function TenantsPage() {
   const payloadFromForm = () => {
     const base = {
       name: form.name.trim(),
-      slug: form.slug.trim().toLowerCase().replace(/\s+/g, '-'),
+      slug: form.slug.trim(),
       industry_id: form.industry_id || null,
       is_enabled: form.is_enabled ? 1 : 0,
       whatsapp_send_mode: form.whatsapp_send_mode,
@@ -167,6 +326,26 @@ export function TenantsPage() {
       return;
     }
     if (!editing) {
+      const srcErr = describeTenantSlugSourceIssue(slugInputRaw || form.slug);
+      const fmtErr = validateSlug(form.slug.trim());
+      if (srcErr) {
+        setFormErrors({ slug: srcErr });
+        return;
+      }
+      if (fmtErr) {
+        setFormErrors({ slug: fmtErr });
+        return;
+      }
+      if (slugRemote.loading) {
+        setFormErrors({ slug: 'Please wait while we check availability.' });
+        return;
+      }
+      if (slugRemote.available === false) {
+        setFormErrors({
+          slug: slugRemote.message || 'This workspace address is already in use.',
+        });
+        return;
+      }
       if (!form.admin_email?.trim()) {
         setFormErrors({ admin_email: 'Admin email is required' });
         return;
@@ -184,9 +363,61 @@ export function TenantsPage() {
       setModalOpen(false);
       fetchTenants();
     } else {
-      setFormErrors({ submit: result.error });
+      const errMsg = result.error || '';
+      if (!editing && /slug|already|workspace|address/i.test(errMsg)) {
+        setFormErrors({ slug: errMsg, submit: errMsg });
+      } else {
+        setFormErrors({ submit: errMsg });
+      }
     }
   };
+
+  const slugFormatErrCreate =
+    !editing && form.slug.trim() ? validateSlug(form.slug.trim()) : null;
+  const slugDisplayError = editing
+    ? formErrors.slug || null
+    : formErrors.slug ||
+      slugSourceError ||
+      slugFormatErrCreate ||
+      (slugRemote.available === false && slugRemote.message ? slugRemote.message : null) ||
+      null;
+
+  const slugHintParts = [];
+  if (!editing) {
+    if (!slugFormatErrCreate && !slugSourceError && slugRemote.loading) {
+      slugHintParts.push('Checking availability…');
+    }
+    if (slugRemote.available === true) {
+      slugHintParts.push('This address is available.');
+    }
+  }
+
+  const showSlugSuggestions =
+    !editing &&
+    Array.isArray(slugRemote.suggestions) &&
+    slugRemote.suggestions.length > 0 &&
+    !slugRemote.loading;
+
+  const applySuggestedSlug = (s) => {
+    setSlugAutoFromName(false);
+    setSlugInputRaw(s);
+    setSlugSourceError(null);
+    setForm((f) => ({ ...f, slug: s }));
+    clearFormErr('slug', 'submit');
+  };
+
+  const industryFilterSelectOptions = [
+    { value: FILTER_ALL, label: 'All industries' },
+    { value: '__none__', label: 'No industry' },
+    ...industryOptions,
+  ];
+
+  const activeUserSizePresetId = getActiveUserSizePreset(draftMinUsers, draftMaxUsers);
+
+  const hasActiveTenantFilters =
+    appliedIndustryFilter !== FILTER_ALL ||
+    String(appliedMinUsers || '').trim() !== '' ||
+    String(appliedMaxUsers || '').trim() !== '';
 
   return (
     <div className={styles.wrapper}>
@@ -202,6 +433,103 @@ export function TenantsPage() {
         />
 
         {error && <Alert variant="error">{error}</Alert>}
+        {filterError && <Alert variant="error">{filterError}</Alert>}
+
+        <FilterBar
+          onApply={() => {
+            const minP = parseUsersFilterInt(draftMinUsers);
+            const maxP = parseUsersFilterInt(draftMaxUsers);
+            if (minP !== undefined && maxP !== undefined && minP > maxP) {
+              setFilterError('Min users cannot be greater than max users.');
+              return;
+            }
+            setFilterError(null);
+            setAppliedIndustryFilter(draftIndustryFilter);
+            setAppliedMinUsers(draftMinUsers.trim());
+            setAppliedMaxUsers(draftMaxUsers.trim());
+            setPagination((p) => ({ ...p, page: 1 }));
+          }}
+          onReset={() => {
+            setDraftIndustryFilter(FILTER_ALL);
+            setAppliedIndustryFilter(FILTER_ALL);
+            setDraftMinUsers('');
+            setDraftMaxUsers('');
+            setAppliedMinUsers('');
+            setAppliedMaxUsers('');
+            setFilterError(null);
+            setPagination((p) => ({ ...p, page: 1 }));
+          }}
+        >
+          <div className={styles.tenantsFilterPanel}>
+            <div className={styles.filterSection}>
+              <span className={styles.filterSectionLabel} id="tenants-filter-industry-label">
+                Industry
+              </span>
+              <Select
+                aria-labelledby="tenants-filter-industry-label"
+                value={draftIndustryFilter}
+                onChange={(e) => setDraftIndustryFilter(e.target.value)}
+                options={industryFilterSelectOptions}
+                className={styles.filterSelectWide}
+                placeholder="Choose industry…"
+              />
+            </div>
+            <div className={styles.filterSectionGrow}>
+              <span className={styles.filterSectionLabel} id="tenants-filter-team-label">
+                Team size (users)
+              </span>
+              <div className={styles.teamSizeRow}>
+                <div
+                  className={styles.segmentGroup}
+                  role="group"
+                  aria-labelledby="tenants-filter-team-label"
+                >
+                  {USER_SIZE_PRESETS.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`${styles.segment} ${
+                        activeUserSizePresetId === p.id ? styles.segmentActive : ''
+                      }`}
+                      onClick={() => {
+                        setDraftMinUsers(p.min);
+                        setDraftMaxUsers(p.max);
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                <div className={styles.customRange}>
+                  <span className={styles.customRangeLabel}>Custom</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    className={styles.customRangeInput}
+                    value={draftMinUsers}
+                    onChange={(e) => setDraftMinUsers(e.target.value)}
+                    aria-label="Custom minimum users"
+                    placeholder="Min"
+                  />
+                  <span className={styles.customRangeDash} aria-hidden>
+                    –
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    className={styles.customRangeInput}
+                    value={draftMaxUsers}
+                    onChange={(e) => setDraftMaxUsers(e.target.value)}
+                    aria-label="Custom maximum users"
+                    placeholder="Max"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </FilterBar>
 
         <div className={listStyles.tableCard}>
           <div className={listStyles.tableCardToolbarTop}>
@@ -228,13 +556,17 @@ export function TenantsPage() {
               <div className={listStyles.tableCardEmpty}>
                 <EmptyState
                   icon="🏢"
-                  title={search || showDisabled ? 'No tenants found' : 'No tenants yet'}
+                  title={
+                    search || showDisabled || hasActiveTenantFilters
+                      ? 'No tenants found'
+                      : 'No tenants yet'
+                  }
                   description={
-                    search || showDisabled
-                      ? 'Try a different search or clear filters.'
+                    search || showDisabled || hasActiveTenantFilters
+                      ? 'Try a different search, adjust filters (Apply), or reset filters.'
                       : 'Add a tenant to onboard a new organization.'
                   }
-                  action={!search && !showDisabled ? openCreate : undefined}
+                  action={!search && !showDisabled && !hasActiveTenantFilters ? openCreate : undefined}
                   actionLabel="Add Tenant"
                 />
               </div>
@@ -245,6 +577,8 @@ export function TenantsPage() {
               <TableRow>
                 <TableHeaderCell>Name</TableHeaderCell>
                 <TableHeaderCell>Slug</TableHeaderCell>
+                <TableHeaderCell width="160px">Created</TableHeaderCell>
+                <TableHeaderCell width="200px">Sign-in URL</TableHeaderCell>
                 <TableHeaderCell>Industry</TableHeaderCell>
                 <TableHeaderCell width="90px">Users</TableHeaderCell>
                 <TableHeaderCell width="90px">Status</TableHeaderCell>
@@ -258,6 +592,12 @@ export function TenantsPage() {
                 <TableRow key={t.id}>
                   <TableCell>{t.name}</TableCell>
                   <TableCell>{t.slug}</TableCell>
+                  <TableCell>
+                    <span className={styles.createdCell}>{formatTenantDate(t.created_at)}</span>
+                  </TableCell>
+                  <TableCell>
+                    <TenantWorkspaceUrlCopy tenantId={t.id} slug={t.slug} />
+                  </TableCell>
                   <TableCell>{industryOptions.find((o) => o.value === t.industry_id)?.label || '—'}</TableCell>
                   <TableCell>
                     <Link to={`/admin/users?tenantId=${t.id}`} className={styles.userCountLink}>
@@ -315,20 +655,68 @@ export function TenantsPage() {
             <Input
               label="Name"
               value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              onChange={(e) => {
+                const v = e.target.value;
+                clearFormErr('name', 'submit');
+                if (!editing && slugAutoFromName) {
+                  const s = slugFromCompanyName(v);
+                  setSlugInputRaw(s);
+                  setSlugSourceError(
+                    describeTenantSlugSourceIssue(v) || describeTenantSlugSourceIssue(s)
+                  );
+                  clearFormErr('slug');
+                  setForm((f) => ({ ...f, name: v, slug: s }));
+                } else {
+                  setForm((f) => ({ ...f, name: v }));
+                }
+              }}
               error={formErrors.name}
               required
               placeholder="Company name"
             />
-            <Input
-              label="Slug"
-              value={form.slug}
-              onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-              error={formErrors.slug}
-              required
-              placeholder="company-slug"
-              readOnly={!!editing}
-            />
+            <div className={styles.slugFieldWrap}>
+              <Input
+                label={editing ? 'Slug' : 'Workspace address (slug)'}
+                value={editing ? form.slug : slugInputRaw || form.slug}
+                onChange={(e) => {
+                  if (editing) return;
+                  setSlugAutoFromName(false);
+                  const raw = e.target.value;
+                  setSlugInputRaw(raw);
+                  setSlugSourceError(describeTenantSlugSourceIssue(raw));
+                  setForm((f) => ({ ...f, slug: slugFromCompanyName(raw) }));
+                  clearFormErr('slug', 'submit');
+                }}
+                error={slugDisplayError}
+                hint={
+                  editing
+                    ? undefined
+                    : slugHintParts.length > 0
+                      ? slugHintParts.join(' ')
+                      : 'Lowercase letters and hyphens only — sign-in subdomain. No numbers.'
+                }
+                required
+                placeholder="acme-corp"
+                readOnly={!!editing}
+              />
+              {showSlugSuggestions && (
+                <div className={styles.slugSuggestions}>
+                  <span className={styles.slugSuggestionsLabel}>Available ideas:</span>
+                  <div className={styles.slugSuggestionChips}>
+                    {slugRemote.suggestions.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        className={styles.slugSuggestionChip}
+                        onClick={() => applySuggestedSlug(s)}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <Select
               label="Industry"
               options={industryOptions}
@@ -351,7 +739,10 @@ export function TenantsPage() {
                 label="Admin email"
                 type="email"
                 value={form.admin_email}
-                onChange={(e) => setForm((f) => ({ ...f, admin_email: e.target.value }))}
+                onChange={(e) => {
+                  clearFormErr('admin_email', 'submit');
+                  setForm((f) => ({ ...f, admin_email: e.target.value }));
+                }}
                 error={formErrors.admin_email}
                 required
                 placeholder="admin@company.com"
@@ -360,7 +751,10 @@ export function TenantsPage() {
                 label="Admin password"
                 type="password"
                 value={form.admin_password}
-                onChange={(e) => setForm((f) => ({ ...f, admin_password: e.target.value }))}
+                onChange={(e) => {
+                  clearFormErr('admin_password', 'submit');
+                  setForm((f) => ({ ...f, admin_password: e.target.value }));
+                }}
                 error={formErrors.admin_password}
                 required
                 placeholder="••••••••"

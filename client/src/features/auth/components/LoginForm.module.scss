@@ -22,6 +22,56 @@
   margin: 0;
 }
 
+.workspaceBanner {
+  padding: $space-3;
+  border-radius: $radius-md;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  margin: 0 0 $space-2;
+}
+
+.workspaceBannerTitle {
+  margin: 0 0 $space-2;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+}
+
+.workspaceBannerText {
+  margin: 0 0 $space-3;
+  font-size: $font-size-xs;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.workspaceBannerRow {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  flex-wrap: wrap;
+  margin-bottom: $space-2;
+}
+
+.workspaceHost {
+  font-family: ui-monospace, monospace;
+  font-size: $font-size-xs;
+  color: var(--color-text-primary);
+  word-break: break-all;
+  flex: 1;
+  min-width: 140px;
+}
+
+.workspaceCopyBtn {
+  flex-shrink: 0;
+}
+
+.workspaceBannerHint {
+  margin: 0;
+  font-size: $font-size-xs;
+  color: var(--color-text-tertiary);
+  line-height: 1.4;
+}
+
 .submit {
   margin-top: $space-2;
 }

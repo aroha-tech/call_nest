@@ -4,6 +4,151 @@
   padding: $space-4;
 }
 
+.filterSelect {
+  min-width: 200px;
+}
+
+.tenantsFilterPanel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-5 $space-8;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.filterSection {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+  min-width: min(100%, 220px);
+}
+
+.filterSectionGrow {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+  flex: 1;
+  min-width: min(100%, 320px);
+}
+
+.filterSectionLabel {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.filterSelectWide {
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.teamSizeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $space-3 $space-4;
+}
+
+.segmentGroup {
+  display: inline-flex;
+  flex-wrap: wrap;
+  border-radius: $radius-md;
+  border: 1px solid var(--color-border-subtle);
+  overflow: hidden;
+  background: var(--color-bg-elevated);
+}
+
+.segment {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  padding: $space-2 $space-3;
+  border: none;
+  border-right: 1px solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  line-height: 1.2;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:last-child {
+    border-right: none;
+  }
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--color-text-primary);
+  }
+}
+
+.segmentActive {
+  background: rgba(139, 92, 246, 0.2);
+  color: var(--color-primary-300);
+  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.35);
+
+  &:hover {
+    background: rgba(139, 92, 246, 0.22);
+    color: var(--color-primary-300);
+  }
+}
+
+.customRange {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
+  padding: $space-1 $space-2;
+  border-radius: $radius-md;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+}
+
+.customRangeLabel {
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.customRangeDash {
+  font-size: $font-size-sm;
+  color: var(--color-text-muted);
+  user-select: none;
+}
+
+.customRangeInput {
+  width: 4rem;
+  font-size: $font-size-sm;
+  padding: $space-1 $space-2;
+  border-radius: $radius-sm;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+
+  &::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary-500);
+    box-shadow: 0 0 0 1px var(--color-primary-500);
+  }
+}
+
+.filterHint {
+  margin: 0;
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+  max-width: 520px;
+}
+
+.createdCell {
+  font-size: $font-size-xs;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -73,6 +218,45 @@
   color: var(--color-success);
   font-size: $font-size-xs;
   font-weight: $font-weight-medium;
+}
+
+.slugFieldWrap {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
+.slugSuggestions {
+  display: flex;
+  flex-direction: column;
+  gap: $space-1;
+}
+
+.slugSuggestionsLabel {
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+}
+
+.slugSuggestionChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2;
+}
+
+.slugSuggestionChip {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  padding: $space-1 $space-2;
+  border-radius: $radius-md;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+  color: var(--color-primary-400);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-primary-500);
+    color: var(--color-primary-300);
+  }
 }
 
 .moduleOff {

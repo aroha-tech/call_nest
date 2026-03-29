@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { selectAuthLoading, selectAuthError } from '../authSelectors';
 import { loginStart, loginSuccess, loginFailure } from '../authSlice';
 import { login as loginAPI } from '../authAPI';
 import { userAndTenantFromToken } from '../utils/jwtUtils';
+import { getTenantWorkspaceHost, getTenantWorkspaceUrl } from '../../../config/tenantWorkspaceUrl';
+import { copyToClipboard } from '../../../utils/copyToClipboard';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Card } from '../../../components/ui/Card';
@@ -26,12 +28,27 @@ export function LoginForm() {
   const dispatch = useAppDispatch();
   const [searchParams] = useSearchParams();
   const registered = searchParams.get('registered') === '1';
+  const workspaceSlugRaw = searchParams.get('workspace');
+  const workspaceSlug =
+    workspaceSlugRaw && workspaceSlugRaw.trim() ? workspaceSlugRaw.trim().toLowerCase() : '';
+  const workspaceHost = workspaceSlug ? getTenantWorkspaceHost(workspaceSlug) : '';
+  const workspaceUrl = workspaceSlug ? getTenantWorkspaceUrl(workspaceSlug) : '';
   const loading = useAppSelector(selectAuthLoading);
   const error = useAppSelector(selectAuthError);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [sessionMessage, setSessionMessage] = useState(null);
+  const [workspaceCopied, setWorkspaceCopied] = useState(false);
+
+  const copyWorkspaceUrl = useCallback(async () => {
+    if (!workspaceUrl) return;
+    const ok = await copyToClipboard(workspaceUrl);
+    if (ok) {
+      setWorkspaceCopied(true);
+      window.setTimeout(() => setWorkspaceCopied(false), 2000);
+    }
+  }, [workspaceUrl]);
 
   // Check for session expired message (e.g., token version mismatch)
   useEffect(() => {
@@ -92,9 +109,29 @@ export function LoginForm() {
             {sessionMessage}
           </Alert>
         )}
-        {registered && (
+        {registered && workspaceHost && (
+          <div className={styles.workspaceBanner}>
+            <p className={styles.workspaceBannerTitle}>Your workspace is ready</p>
+            <p className={styles.workspaceBannerText}>
+              Sign in only from your company’s address — bookmarks or opens from this link. The main site or admin
+              URLs won&apos;t work for your team login.
+            </p>
+            <div className={styles.workspaceBannerRow}>
+              <code className={styles.workspaceHost}>{workspaceHost}</code>
+              <Button type="button" variant="secondary" className={styles.workspaceCopyBtn} onClick={copyWorkspaceUrl}>
+                {workspaceCopied ? 'Copied' : 'Copy link'}
+              </Button>
+            </div>
+            <p className={styles.workspaceBannerHint}>
+              Bookmark the copied link, open it in a new tab, and sign in there with the email and password you just
+              created.
+            </p>
+          </div>
+        )}
+        {registered && !workspaceHost && (
           <Alert variant="success" className={styles.alert}>
-            Account created. Please sign in.
+            Account created. Please sign in from your workspace URL (your administrator can share it), then use your
+            email and password.
           </Alert>
         )}
         {error && (

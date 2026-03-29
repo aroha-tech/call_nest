@@ -1,27 +1,32 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { selectAuthLoading, selectAuthError } from '../authSelectors';
-import { registerStart, registerSuccess, registerFailure } from '../authSlice';
-import { registerTenant as registerTenantAPI, getIndustries } from '../authAPI';
+import { registerStart, registerSuccess, registerFailure, clearError } from '../authSlice';
+import {
+  registerTenant as registerTenantAPI,
+  getIndustries,
+  getTenantSlugStatus,
+} from '../authAPI';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { Card } from '../../../components/ui/Card';
 import { Alert } from '../../../components/ui/Alert';
 import { PasswordField } from './PasswordField';
-import { slugFromCompanyName, validateSlug } from '../utils/slugUtils';
+import {
+  slugFromCompanyName,
+  validateSlug,
+  describeTenantSlugSourceIssue,
+} from '../utils/slugUtils';
 import { getPasswordStrength } from '../utils/passwordStrength';
 import styles from './RegisterTenantForm.module.scss';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const SLUG_REGEX = /^[a-z0-9-]+$/;
 
 function validateFields(values) {
   const errors = {};
   if (!values.tenantName?.trim()) errors.tenantName = 'Company name is required';
-  if (!values.tenantSlug?.trim()) errors.tenantSlug = 'Slug is required';
-  else if (!SLUG_REGEX.test(values.tenantSlug)) errors.tenantSlug = 'Only lowercase letters, numbers, and hyphens';
   if (!values.industryId) errors.industryId = 'Industry is required';
   if (!values.name?.trim()) errors.name = 'Admin name is required';
   if (!values.email?.trim()) errors.email = 'Email is required';
@@ -32,17 +37,20 @@ function validateFields(values) {
   return errors;
 }
 
+const SLUG_DEBOUNCE_MS = 400;
+
 export function RegisterTenantForm() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const loading = useAppSelector(selectAuthLoading);
   const error = useAppSelector(selectAuthError);
-  
+
   const [industries, setIndustries] = useState([]);
   const [industriesLoading, setIndustriesLoading] = useState(true);
-  
+
   const [tenantName, setTenantName] = useState('');
   const [tenantSlug, setTenantSlug] = useState('');
+  const [slugRawInput, setSlugRawInput] = useState('');
   const [industryId, setIndustryId] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -51,7 +59,34 @@ export function RegisterTenantForm() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [slugTouched, setSlugTouched] = useState(false);
 
-  // Load industries on mount
+  /** Drop server/submit errors for fields the user is correcting. */
+  const clearFieldError = useCallback((...keys) => {
+    setFieldErrors((prev) => {
+      let next = prev;
+      let changed = false;
+      for (const key of keys) {
+        if (next[key]) {
+          if (!changed) {
+            next = { ...prev };
+            changed = true;
+          }
+          delete next[key];
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, []);
+
+  const [slugSourceError, setSlugSourceError] = useState(null);
+  const [slugRemote, setSlugRemote] = useState({
+    loading: false,
+    available: null,
+    message: null,
+    suggestions: [],
+  });
+
+  const slugReqId = useRef(0);
+
   useEffect(() => {
     async function loadIndustries() {
       try {
@@ -66,20 +101,110 @@ export function RegisterTenantForm() {
     loadIndustries();
   }, []);
 
-  const industryOptions = industries.map(i => ({ value: i.id, label: i.name }));
+  useEffect(() => {
+    const localErr = validateSlug(tenantSlug);
+    if (localErr || slugSourceError) {
+      setSlugRemote({ loading: false, available: null, message: null, suggestions: [] });
+      return;
+    }
+    const trimmed = tenantSlug.trim();
+    if (!trimmed) {
+      setSlugRemote({ loading: false, available: null, message: null, suggestions: [] });
+      return;
+    }
 
-  const handleCompanyChange = useCallback((e) => {
-    const value = e.target.value;
-    setTenantName(value);
-    if (!slugTouched) setTenantSlug(slugFromCompanyName(value));
-  }, [slugTouched]);
+    const reqId = ++slugReqId.current;
+    setSlugRemote((s) => ({ ...s, loading: true }));
+
+    const t = setTimeout(async () => {
+      try {
+        const data = await getTenantSlugStatus(trimmed);
+        if (slugReqId.current !== reqId) return;
+        if (!data.valid) {
+          setSlugRemote({
+            loading: false,
+            available: false,
+            message: data.error,
+            suggestions: data.suggestions || [],
+          });
+          return;
+        }
+        if (!data.available) {
+          setSlugRemote({
+            loading: false,
+            available: false,
+            message: data.error,
+            suggestions: data.suggestions || [],
+          });
+          return;
+        }
+        setSlugRemote({ loading: false, available: true, message: null, suggestions: [] });
+      } catch {
+        if (slugReqId.current !== reqId) return;
+        setSlugRemote({ loading: false, available: null, message: null, suggestions: [] });
+      }
+    }, SLUG_DEBOUNCE_MS);
+
+    return () => clearTimeout(t);
+  }, [tenantSlug, slugSourceError]);
+
+  const industryOptions = industries.map((i) => ({ value: i.id, label: i.name }));
+
+  const handleCompanyChange = useCallback(
+    (e) => {
+      const value = e.target.value;
+      setTenantName(value);
+      clearFieldError('tenantName', 'tenantSlug');
+      dispatch(clearError());
+      if (!slugTouched) {
+        const nextSlug = slugFromCompanyName(value);
+        setTenantSlug(nextSlug);
+        setSlugRawInput(nextSlug);
+        setSlugSourceError(
+          describeTenantSlugSourceIssue(value) || describeTenantSlugSourceIssue(nextSlug)
+        );
+      }
+    },
+    [slugTouched, clearFieldError, dispatch]
+  );
 
   const handleSlugChange = (e) => {
     setSlugTouched(true);
-    setTenantSlug(slugFromCompanyName(e.target.value));
+    clearFieldError('tenantSlug');
+    dispatch(clearError());
+    const raw = e.target.value;
+    setSlugRawInput(raw);
+    setSlugSourceError(describeTenantSlugSourceIssue(raw));
+    setTenantSlug(slugFromCompanyName(raw));
   };
 
-  const slugError = validateSlug(tenantSlug);
+  const applySuggestedSlug = (s) => {
+    setSlugTouched(true);
+    setTenantSlug(s);
+    setSlugRawInput(s);
+    setSlugSourceError(null);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.tenantSlug;
+      return next;
+    });
+  };
+
+  const slugFormatError = validateSlug(tenantSlug);
+
+  const slugHintParts = [];
+  if (!slugFormatError && !slugSourceError && slugRemote.loading) {
+    slugHintParts.push('Checking availability…');
+  }
+  if (slugRemote.available === true) {
+    slugHintParts.push('This address is available.');
+  }
+
+  const slugFieldError =
+    fieldErrors.tenantSlug ||
+    (slugTouched && (slugSourceError || slugFormatError)) ||
+    (slugTouched && slugRemote.available === false && (slugRemote.message || null)) ||
+    null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -93,18 +218,24 @@ export function RegisterTenantForm() {
       confirmPassword,
     };
     const errors = validateFields(values);
+    const srcErr = describeTenantSlugSourceIssue(slugRawInput || tenantSlug);
+    const fmtErr = validateSlug(tenantSlug);
+    if (srcErr) errors.tenantSlug = srcErr;
+    else if (fmtErr) errors.tenantSlug = fmtErr;
+    else if (slugRemote.loading) errors.tenantSlug = 'Please wait while we check availability.';
+    else if (slugRemote.available === false) {
+      errors.tenantSlug = slugRemote.message || 'This address is not available.';
+    }
+
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       return;
     }
-    if (slugError) {
-      setFieldErrors((prev) => ({ ...prev, tenantSlug: slugError }));
-      return;
-    }
+
     setFieldErrors({});
     dispatch(registerStart());
     try {
-      await registerTenantAPI({
+      const data = await registerTenantAPI({
         tenantName: tenantName.trim(),
         tenantSlug: tenantSlug.trim(),
         industryId,
@@ -113,27 +244,34 @@ export function RegisterTenantForm() {
         name: name.trim(),
       });
       dispatch(registerSuccess());
-      navigate('/login?registered=1');
+      const registeredSlug = data?.tenant?.slug ?? tenantSlug.trim();
+      navigate(`/login?registered=1&workspace=${encodeURIComponent(registeredSlug)}`);
     } catch (err) {
       const message = err.response?.data?.error ?? err.message ?? 'Registration failed';
       dispatch(registerFailure(message));
+      if (err.response?.status === 409 || /slug|address|workspace/i.test(message)) {
+        setFieldErrors((prev) => ({ ...prev, tenantSlug: message }));
+      }
     }
   };
 
   const strength = getPasswordStrength(password);
+
+  const showSuggestions =
+    Array.isArray(slugRemote.suggestions) && slugRemote.suggestions.length > 0 && !slugRemote.loading;
 
   return (
     <Card className={styles.card}>
       <form onSubmit={handleSubmit} className={styles.form} noValidate>
         <h1 className={styles.title}>Register your company</h1>
         <p className={styles.subtitle}>Get started with Call Nest CRM</p>
-        
+
         {error && (
           <Alert variant="error" className={styles.alert}>
             {error}
           </Alert>
         )}
-        
+
         <div className={styles.section}>
           <p className={styles.sectionTitle}>Company Details</p>
           <Input
@@ -145,34 +283,65 @@ export function RegisterTenantForm() {
             placeholder="Acme Inc"
             autoComplete="organization"
           />
-          <Input
-            label="Slug"
-            value={tenantSlug}
-            onChange={handleSlugChange}
-            onBlur={() => setSlugTouched(true)}
-            error={fieldErrors.tenantSlug || (slugTouched && slugError)}
-            hint="Lowercase, numbers, hyphens only (e.g. acme-inc)"
-            disabled={loading}
-            placeholder="acme-inc"
-            autoComplete="off"
-          />
+          <div className={styles.slugBlock}>
+            <Input
+              label="Workspace address (slug)"
+              value={slugRawInput || tenantSlug}
+              onChange={handleSlugChange}
+              onBlur={() => setSlugTouched(true)}
+              error={slugFieldError}
+              hint={
+                slugHintParts.length > 0
+                  ? slugHintParts.join(' ')
+                  : 'Lowercase letters and hyphens only — used in your sign-in URL (for example acme-corp). No numbers.'
+              }
+              disabled={loading}
+              placeholder="acme-corp"
+              autoComplete="off"
+            />
+            {showSuggestions && (
+              <div className={styles.suggestions}>
+                <span className={styles.suggestionsLabel}>Available ideas:</span>
+                <div className={styles.suggestionChips}>
+                  {slugRemote.suggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      className={styles.suggestionChip}
+                      onClick={() => applySuggestedSlug(s)}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           <Select
             label="Industry"
             value={industryId}
-            onChange={(e) => setIndustryId(e.target.value)}
+            onChange={(e) => {
+              setIndustryId(e.target.value);
+              clearFieldError('industryId');
+              dispatch(clearError());
+            }}
             options={industryOptions}
             error={fieldErrors.industryId}
             disabled={loading || industriesLoading}
             placeholder={industriesLoading ? 'Loading...' : 'Select your industry'}
           />
         </div>
-        
+
         <div className={styles.section}>
           <p className={styles.sectionTitle}>Admin Account</p>
           <Input
             label="Admin Name"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              clearFieldError('name');
+              dispatch(clearError());
+            }}
             error={fieldErrors.name}
             disabled={loading}
             placeholder="Jane Doe"
@@ -182,7 +351,11 @@ export function RegisterTenantForm() {
             label="Email"
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              clearFieldError('email');
+              dispatch(clearError());
+            }}
             error={fieldErrors.email}
             disabled={loading}
             placeholder="admin@acme.com"
@@ -192,7 +365,11 @@ export function RegisterTenantForm() {
             <PasswordField
               label="Password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                clearFieldError('password', 'confirmPassword');
+                dispatch(clearError());
+              }}
               error={fieldErrors.password}
               disabled={loading}
               placeholder="••••••••"
@@ -208,14 +385,18 @@ export function RegisterTenantForm() {
           <PasswordField
             label="Confirm Password"
             value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              clearFieldError('confirmPassword');
+              dispatch(clearError());
+            }}
             error={fieldErrors.confirmPassword}
             disabled={loading}
             placeholder="••••••••"
             autoComplete="new-password"
           />
         </div>
-        
+
         <Button type="submit" fullWidth loading={loading} className={styles.submit}>
           Create account
         </Button>

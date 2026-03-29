@@ -20,6 +20,21 @@ export async function getIndustries() {
 }
 
 /**
+ * Check slug format + database availability (public).
+ * Returns { valid, available, normalized, error, suggestions }.
+ * @param {string} slug
+ * @param {{ excludeTenantId?: number|string }} [options] - when editing, exclude this tenant so its current slug stays "available"
+ */
+export async function getTenantSlugStatus(slug, options = {}) {
+  const params = { slug: slug ?? '' };
+  if (options.excludeTenantId != null && options.excludeTenantId !== '') {
+    params.excludeTenantId = options.excludeTenantId;
+  }
+  const { data } = await axiosInstance.get(`${AUTH_BASE}/tenant-slug-status`, { params });
+  return data;
+}
+
+/**
  * Register new tenant with admin user.
  * Body: { tenantName, tenantSlug, industryId, email, password, name } (name = admin name).
  */
