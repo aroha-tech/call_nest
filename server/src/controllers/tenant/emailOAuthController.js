@@ -4,18 +4,34 @@
  */
 import { env } from '../../config/env.js';
 import { decodeState } from '../../services/email/oauthState.js';
+import { isAllowedReturnOrigin, normalizeReturnOrigin } from '../../services/email/oauthReturnOrigin.js';
 import * as googleOAuth from '../../services/email/googleOAuthService.js';
 import * as outlookOAuth from '../../services/email/outlookOAuthService.js';
 import * as emailAccountService from '../../services/tenant/emailAccountService.js';
 
-const FRONTEND_ACCOUNTS = `${env.frontendUrl.replace(/\/$/, '')}/email/accounts`;
-
-function redirectSuccess(res, message = 'Account connected') {
-  res.redirect(`${FRONTEND_ACCOUNTS}?oauth=success&message=${encodeURIComponent(message)}`);
+function accountsBaseUrl(returnOrigin) {
+  const normalized = normalizeReturnOrigin(returnOrigin);
+  const base = normalized || env.frontendUrl.replace(/\/$/, '');
+  return `${base}/email/accounts`;
 }
 
-function redirectError(res, errMsg) {
-  res.redirect(`${FRONTEND_ACCOUNTS}?oauth=error&message=${encodeURIComponent(errMsg || 'Connection failed')}`);
+function redirectSuccess(res, message = 'Account connected', returnOrigin) {
+  res.redirect(
+    `${accountsBaseUrl(returnOrigin)}?oauth=success&message=${encodeURIComponent(message)}`
+  );
+}
+
+function redirectError(res, errMsg, returnOrigin) {
+  res.redirect(
+    `${accountsBaseUrl(returnOrigin)}?oauth=error&message=${encodeURIComponent(errMsg || 'Connection failed')}`
+  );
+}
+
+function parseReturnOrigin(req) {
+  const raw = (req.query.returnOrigin || '').trim();
+  if (!raw) return null;
+  if (!isAllowedReturnOrigin(raw)) return null;
+  return raw;
 }
 
 /** GET /oauth/google/url — returns { url } for redirect. Requires auth. */
@@ -25,7 +41,18 @@ export function getGoogleUrl(req, res) {
   if (!tenantId || !userId) {
     return res.status(401).json({ error: 'Authentication required' });
   }
-  const result = googleOAuth.getAuthUrl({ tenantId, userId });
+  const returnOrigin = parseReturnOrigin(req);
+  if ((req.query.returnOrigin || '').trim() && !returnOrigin) {
+    return res.status(400).json({
+      error:
+        'Invalid returnOrigin. Use your app origin (e.g. https://tenant.example.com) and set CORS_ORIGIN_SUFFIX for multi-tenant hosts.',
+    });
+  }
+  const result = googleOAuth.getAuthUrl({
+    tenantId,
+    userId,
+    ...(returnOrigin ? { returnOrigin } : {}),
+  });
   if (result.error) {
     return res.status(400).json({ error: result.error });
   }
@@ -39,16 +66,20 @@ export async function callbackGoogle(req, res) {
   if (!payload) {
     return redirectError(res, 'Invalid or expired state. Please try again.');
   }
+  const ro =
+    payload.returnOrigin && isAllowedReturnOrigin(payload.returnOrigin)
+      ? payload.returnOrigin
+      : undefined;
   if (!code) {
-    return redirectError(res, 'Missing authorization code.');
+    return redirectError(res, 'Missing authorization code.', ro);
   }
   const tokens = await googleOAuth.exchangeCodeForTokens(code);
   if (tokens.error) {
-    return redirectError(res, tokens.error);
+    return redirectError(res, tokens.error, ro);
   }
   const email = (tokens.email || '').trim();
   if (!email) {
-    return redirectError(res, 'Could not read email from Google.');
+    return redirectError(res, 'Could not read email from Google.', ro);
   }
   const { tenantId, userId } = payload;
   const tokenExpiresAt = tokens.expires_at
@@ -63,7 +94,7 @@ export async function callbackGoogle(req, res) {
         refresh_token: tokens.refresh_token,
         token_expires_at: tokenExpiresAt,
       }, userId);
-      return redirectSuccess(res, `${email} reconnected.`);
+      return redirectSuccess(res, `${email} reconnected.`, ro);
     }
     await emailAccountService.create(tenantId, {
       provider: 'gmail',
@@ -75,10 +106,10 @@ export async function callbackGoogle(req, res) {
       token_expires_at: tokenExpiresAt,
       status: 'active',
     }, userId);
-    return redirectSuccess(res, `${email} connected.`);
+    return redirectSuccess(res, `${email} connected.`, ro);
   } catch (err) {
     console.error('Email OAuth callback error:', err);
-    return redirectError(res, err.message || 'Failed to save account.');
+    return redirectError(res, err.message || 'Failed to save account.', ro);
   }
 }
 
@@ -89,7 +120,18 @@ export function getOutlookUrl(req, res) {
   if (!tenantId || !userId) {
     return res.status(401).json({ error: 'Authentication required' });
   }
-  const result = outlookOAuth.getAuthUrl({ tenantId, userId });
+  const returnOrigin = parseReturnOrigin(req);
+  if ((req.query.returnOrigin || '').trim() && !returnOrigin) {
+    return res.status(400).json({
+      error:
+        'Invalid returnOrigin. Use your app origin (e.g. https://tenant.example.com) and set CORS_ORIGIN_SUFFIX for multi-tenant hosts.',
+    });
+  }
+  const result = outlookOAuth.getAuthUrl({
+    tenantId,
+    userId,
+    ...(returnOrigin ? { returnOrigin } : {}),
+  });
   if (result.error) {
     return res.status(400).json({ error: result.error });
   }
@@ -103,16 +145,20 @@ export async function callbackOutlook(req, res) {
   if (!payload) {
     return redirectError(res, 'Invalid or expired state. Please try again.');
   }
+  const ro =
+    payload.returnOrigin && isAllowedReturnOrigin(payload.returnOrigin)
+      ? payload.returnOrigin
+      : undefined;
   if (!code) {
-    return redirectError(res, 'Missing authorization code.');
+    return redirectError(res, 'Missing authorization code.', ro);
   }
   const tokens = await outlookOAuth.exchangeCodeForTokens(code);
   if (tokens.error) {
-    return redirectError(res, tokens.error);
+    return redirectError(res, tokens.error, ro);
   }
   const email = (tokens.email || '').trim();
   if (!email) {
-    return redirectError(res, 'Could not read email from Microsoft.');
+    return redirectError(res, 'Could not read email from Microsoft.', ro);
   }
   const { tenantId, userId } = payload;
   const tokenExpiresAt = tokens.expires_at
@@ -127,7 +173,7 @@ export async function callbackOutlook(req, res) {
         refresh_token: tokens.refresh_token,
         token_expires_at: tokenExpiresAt,
       }, userId);
-      return redirectSuccess(res, `${email} reconnected.`);
+      return redirectSuccess(res, `${email} reconnected.`, ro);
     }
     await emailAccountService.create(tenantId, {
       provider: 'outlook',
@@ -139,9 +185,9 @@ export async function callbackOutlook(req, res) {
       token_expires_at: tokenExpiresAt,
       status: 'active',
     }, userId);
-    return redirectSuccess(res, `${email} connected.`);
+    return redirectSuccess(res, `${email} connected.`, ro);
   } catch (err) {
     console.error('Email OAuth callback error:', err);
-    return redirectError(res, err.message || 'Failed to save account.');
+    return redirectError(res, err.message || 'Failed to save account.', ro);
   }
 }

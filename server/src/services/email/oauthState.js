@@ -5,8 +5,8 @@ const SECRET = env.jwtSecret || 'oauth-state-secret';
 const TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
- * Encode and sign state for OAuth callback (tenantId, userId).
- * @param {{ tenantId: number, userId: number }} payload
+ * Encode and sign state for OAuth callback (tenantId, userId, optional returnOrigin).
+ * @param {{ tenantId: number, userId: number, returnOrigin?: string }} payload
  * @returns {string} state string to pass to provider
  */
 export function encodeState(payload) {
@@ -14,6 +14,7 @@ export function encodeState(payload) {
     tenantId: Number(payload.tenantId),
     userId: Number(payload.userId),
     t: Date.now(),
+    ...(payload.returnOrigin ? { ro: String(payload.returnOrigin) } : {}),
   });
   const b64 = Buffer.from(data, 'utf8').toString('base64url');
   const sig = crypto.createHmac('sha256', SECRET).update(b64).digest('base64url');
@@ -23,7 +24,7 @@ export function encodeState(payload) {
 /**
  * Decode and verify state from OAuth callback.
  * @param {string} state
- * @returns {{ tenantId: number, userId: number } | null}
+ * @returns {{ tenantId: number, userId: number, returnOrigin?: string } | null}
  */
 export function decodeState(state) {
   if (!state || typeof state !== 'string') return null;
@@ -41,5 +42,9 @@ export function decodeState(state) {
   const tenantId = Number(data.tenantId);
   const userId = Number(data.userId);
   if (!tenantId || !userId) return null;
-  return { tenantId, userId };
+  const out = { tenantId, userId };
+  if (data.ro && typeof data.ro === 'string') {
+    out.returnOrigin = data.ro;
+  }
+  return out;
 }

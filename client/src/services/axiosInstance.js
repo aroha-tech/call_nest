@@ -70,6 +70,17 @@ function handleLogout(message = null) {
   }
 }
 
+/** Do not run refresh-token flow for these requests (e.g. login 401 must surface as invalid credentials). */
+function isAuthBootstrapRequest(config) {
+  if (!config?.url) return false;
+  const u = config.url;
+  return (
+    u.includes('/api/auth/login') ||
+    u.includes('/api/auth/register') ||
+    u.includes('/api/auth/refresh')
+  );
+}
+
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (err) => {
@@ -81,7 +92,11 @@ axiosInstance.interceptors.response.use(
       return Promise.reject(err);
     }
 
-    if (err.response?.status === 401 && !originalRequest._retry) {
+    if (
+      err.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthBootstrapRequest(originalRequest)
+    ) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });

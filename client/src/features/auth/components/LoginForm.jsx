@@ -66,7 +66,19 @@ export function LoginForm() {
         })
       );
     } catch (err) {
-      const message = err.response?.data?.error ?? err.message ?? 'Login failed';
+      const apiMsg = err.response?.data?.error;
+      const transient =
+        err.code === 'ECONNRESET' ||
+        err.code === 'ECONNREFUSED' ||
+        err.code === 'ETIMEDOUT' ||
+        err.message === 'Network Error';
+      const message =
+        apiMsg ??
+        (transient
+          ? 'Could not reach the server. Check your connection and try again.'
+          : null) ??
+        err.message ??
+        'Login failed';
       dispatch(loginFailure(message));
     }
   };

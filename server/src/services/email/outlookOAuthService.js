@@ -29,7 +29,7 @@ const AUTH_URL = `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/author
 const TOKEN_URL = `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/token`;
 
 /**
- * @param {{ tenantId: number, userId: number }} context
+ * @param {{ tenantId: number, userId: number, returnOrigin?: string }} context
  * @returns {{ url: string } | { error: string }}
  */
 export function getAuthUrl(context) {
@@ -39,7 +39,11 @@ export function getAuthUrl(context) {
         'Microsoft OAuth is not configured (MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET)',
     };
   }
-  const state = encodeState(context);
+  const state = encodeState({
+    tenantId: context.tenantId,
+    userId: context.userId,
+    ...(context.returnOrigin ? { returnOrigin: context.returnOrigin } : {}),
+  });
   const params = new URLSearchParams({
     client_id: env.microsoftClientId,
     response_type: 'code',

@@ -15,10 +15,18 @@ export const emailAccountsAPI = {
   delete: (id) => axiosInstance.delete(`${BASE}/accounts/${id}`),
   activate: (id) => axiosInstance.post(`${BASE}/accounts/${id}/activate`),
   deactivate: (id) => axiosInstance.post(`${BASE}/accounts/${id}/deactivate`),
-  /** Returns { url } for redirect to Google OAuth. */
-  getOAuthGoogleUrl: () => axiosInstance.get(`${BASE}/oauth/google/url`),
+  /** Returns { url } for redirect to Google OAuth. Sends current origin so post-OAuth redirect returns to the same host (tenant subdomain). */
+  getOAuthGoogleUrl: () =>
+    axiosInstance.get(`${BASE}/oauth/google/url`, {
+      params:
+        typeof window !== 'undefined' ? { returnOrigin: window.location.origin } : {},
+    }),
   /** Returns { url } for redirect to Microsoft OAuth. */
-  getOAuthOutlookUrl: () => axiosInstance.get(`${BASE}/oauth/outlook/url`),
+  getOAuthOutlookUrl: () =>
+    axiosInstance.get(`${BASE}/oauth/outlook/url`, {
+      params:
+        typeof window !== 'undefined' ? { returnOrigin: window.location.origin } : {},
+    }),
 };
 
 export const emailTemplatesAPI = {
@@ -56,5 +64,7 @@ export const emailMessagesAPI = {
 };
 
 export const emailSendAPI = {
-  send: (data) => axiosInstance.post(`${BASE}/send`, data),
+  /** Server may take time for SMTP + OAuth; avoid indefinite spinner if network stalls. */
+  send: (data) =>
+    axiosInstance.post(`${BASE}/send`, data, { timeout: 120_000 }),
 };

@@ -13,7 +13,8 @@ const SCOPES = [
   'https://mail.google.com/',
 ];
 
-function getRedirectUri() {
+/** Used by OAuth flows and Gmail API client (must match Google Cloud redirect URI). */
+export function getRedirectUri() {
   return (
     env.googleRedirectUri ||
     `${env.apiBaseUrl.replace(/\/$/, '')}/api/tenant/email/oauth/google/callback`
@@ -21,7 +22,7 @@ function getRedirectUri() {
 }
 
 /**
- * @param {{ tenantId: number, userId: number }} context
+ * @param {{ tenantId: number, userId: number, returnOrigin?: string }} context
  * @returns {{ url: string } | { error: string }}
  */
 export function getAuthUrl(context) {
@@ -33,7 +34,11 @@ export function getAuthUrl(context) {
     env.googleClientSecret,
     getRedirectUri()
   );
-  const state = encodeState(context);
+  const state = encodeState({
+    tenantId: context.tenantId,
+    userId: context.userId,
+    ...(context.returnOrigin ? { returnOrigin: context.returnOrigin } : {}),
+  });
   const url = client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
@@ -85,5 +90,42 @@ export async function exchangeCodeForTokens(code) {
     };
   } catch (err) {
     return { error: err.message || 'Failed to exchange code for tokens' };
+  }
+}
+
+/**
+ * Refresh Gmail access token (used before SMTP send when token is expired/near expiry).
+ * @param {string} refreshToken
+ * @returns {Promise<{ access_token: string, refresh_token?: string, expires_at: number | null } | { error: string }>}
+ */
+export async function refreshAccessToken(refreshToken) {
+  if (!refreshToken) {
+    return { error: 'No refresh token. Reconnect the Gmail account under Email Accounts.' };
+  }
+  if (!env.googleClientId || !env.googleClientSecret) {
+    return { error: 'Gmail OAuth is not configured' };
+  }
+  const client = new OAuth2Client(
+    env.googleClientId,
+    env.googleClientSecret,
+    getRedirectUri()
+  );
+  try {
+    client.setCredentials({ refresh_token: refreshToken });
+    await client.getAccessToken();
+    const creds = client.credentials;
+    if (!creds.access_token) {
+      return { error: 'Google did not return an access token' };
+    }
+    const expiresAt = creds.expiry_date
+      ? Math.floor(creds.expiry_date / 1000)
+      : null;
+    return {
+      access_token: creds.access_token,
+      refresh_token: creds.refresh_token || refreshToken,
+      expires_at: expiresAt,
+    };
+  } catch (err) {
+    return { error: err.message || 'Failed to refresh Gmail token' };
   }
 }

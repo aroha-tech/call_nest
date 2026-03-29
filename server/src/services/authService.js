@@ -152,8 +152,14 @@ export async function registerTenantWithAdmin(tenantData, adminData) {
  * Login user
  * Returns JWT token and user info
  * JWT includes permissions array and token_version for RBAC
+ *
+ * @param {object} [hostContext]
+ * @param {object|null} [hostContext.tenantFromHost] - req.tenant when request is on a tenant subdomain
+ * @param {boolean} [hostContext.isPlatformHost] - true when request is on the platform (admin) host
  */
-export async function login(email, password) {
+export async function login(email, password, hostContext = {}) {
+  const { tenantFromHost, isPlatformHost } = hostContext;
+
   // Find user by email (tenantId derived from user record)
   const [user] = await query(
     `SELECT id, tenant_id, email, password_hash, name, role, role_id, is_enabled, is_platform_admin, token_version 
@@ -184,6 +190,39 @@ export async function login(email, password) {
   }
   
   const isPlatformAdmin = Boolean(user.is_platform_admin);
+
+  // Host must match account type (subdomain / admin site)
+  if (isPlatformHost && !isPlatformAdmin) {
+    const [trow] = await query(
+      'SELECT slug FROM tenants WHERE id = ? AND is_deleted = 0',
+      [user.tenant_id]
+    );
+    const slug = trow?.slug;
+    const err = new Error(
+      slug
+        ? `This account is for workspace "${slug}". Sign in using that organization's URL, not the admin site.`
+        : 'This account is for a workspace. Sign in from your organization\'s URL, not the admin site.'
+    );
+    err.status = 403;
+    err.code = 'WRONG_WORKSPACE_HOST';
+    throw err;
+  }
+
+  if (tenantFromHost && !isPlatformAdmin) {
+    if (user.tenant_id !== tenantFromHost.id) {
+      const [otherTenant] = await query(
+        'SELECT slug, name FROM tenants WHERE id = ? AND is_deleted = 0',
+        [user.tenant_id]
+      );
+      const slug = otherTenant?.slug || 'your organization';
+      const err = new Error(
+        `This account belongs to a different workspace ("${slug}"). Use that workspace's sign-in URL and try again.`
+      );
+      err.status = 403;
+      err.code = 'WRONG_WORKSPACE_HOST';
+      throw err;
+    }
+  }
 
   // Check if tenant is enabled (for non-platform users)
   if (!isPlatformAdmin && user.tenant_id != null) {

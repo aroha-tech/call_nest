@@ -1,13 +1,25 @@
 /**
  * Send email using the client's connected account (SMTP or OAuth).
- * Uses nodemailer; for Gmail/Outlook OAuth the account must have valid access_token/refresh_token.
+ * Gmail uses the Gmail REST API (HTTPS) so sends work when outbound SMTP (587/465) is blocked.
+ * Outlook uses Microsoft Graph; SMTP uses nodemailer.
  */
 import nodemailer from 'nodemailer';
+import { google } from 'googleapis';
+import { OAuth2Client } from 'google-auth-library';
+import MailComposer from 'nodemailer/lib/mail-composer/index.js';
 import { env } from '../../config/env.js';
 import * as emailAccountService from '../tenant/emailAccountService.js';
 import * as emailMessageService from '../tenant/emailMessageService.js';
 import * as emailTemplateService from '../tenant/emailTemplateService.js';
 import * as outlookOAuth from './outlookOAuthService.js';
+import * as googleOAuth from './googleOAuthService.js';
+
+/** Prevent SMTP OAuth handshakes from hanging indefinitely (nodemailer default is no timeout). */
+const SMTP_TIMEOUT_MS = {
+  connectionTimeout: 25_000,
+  greetingTimeout: 25_000,
+  socketTimeout: 90_000,
+};
 
 /**
  * Build transporter for the given account (SMTP or OAuth2).
@@ -24,40 +36,107 @@ function getTransporter(account) {
         user: account.smtp_user,
         pass: account.smtp_password_encrypted || account.smtp_password,
       },
-    });
-  }
-
-  if (provider === 'gmail' || provider === 'outlook') {
-    // OAuth2: use stored access_token. Refresh flow should run separately (cron or on send failure).
-    if (!account.access_token) {
-      throw new Error('Email account is configured for OAuth but has no access token');
-    }
-
-    const baseAuth = {
-      type: 'OAuth2',
-      user: account.email_address,
-      accessToken: account.access_token,
-      refreshToken: account.refresh_token,
-    };
-
-    // Gmail requires clientId/clientSecret on the OAuth2 config, otherwise it can return:
-    // "invalid_request: Could not determine client ID from request."
-    const auth =
-      provider === 'gmail'
-        ? {
-            ...baseAuth,
-            clientId: env.googleClientId,
-            clientSecret: env.googleClientSecret,
-          }
-        : baseAuth;
-
-    return nodemailer.createTransport({
-      service: provider === 'gmail' ? 'gmail' : 'hotmail',
-      auth,
+      ...SMTP_TIMEOUT_MS,
     });
   }
 
   throw new Error(`Unsupported email provider: ${provider}`);
+}
+
+/**
+ * Send via Gmail API (HTTPS only — avoids SMTP blocked by many cloud firewalls).
+ */
+async function sendViaGmailRestApi(account, mailOptions) {
+  if (!env.googleClientId || !env.googleClientSecret) {
+    throw new Error('Gmail send requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET');
+  }
+  if (!account.access_token) {
+    throw new Error('Gmail account has no access token');
+  }
+
+  const oauth2 = new OAuth2Client(
+    env.googleClientId,
+    env.googleClientSecret,
+    googleOAuth.getRedirectUri()
+  );
+  oauth2.setCredentials({
+    access_token: account.access_token,
+    refresh_token: account.refresh_token,
+  });
+
+  const mimeBuffer = await new MailComposer(mailOptions).compile().build();
+  const raw = mimeBuffer
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  const gmail = google.gmail({ version: 'v1', auth: oauth2 });
+  try {
+    const res = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw },
+    });
+    return res.data.id || res.data.threadId || null;
+  } catch (err) {
+    const msg =
+      err?.response?.data?.error?.message ||
+      err?.errors?.[0]?.message ||
+      err?.message ||
+      'Gmail send failed';
+    throw new Error(msg);
+  }
+}
+
+/**
+ * Refresh Gmail OAuth token when expired or about to expire (Outlook does this before Graph send).
+ */
+async function ensureFreshGmailAccessToken(account, tenantId, updatedBy) {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const expiresAtSec = account.token_expires_at
+    ? Math.floor(new Date(account.token_expires_at).getTime() / 1000)
+    : null;
+
+  const needsRefresh =
+    !account.access_token ||
+    (expiresAtSec != null && expiresAtSec <= nowSec + 60) ||
+    (expiresAtSec == null && account.refresh_token);
+
+  if (!needsRefresh) return account;
+
+  if (!account.refresh_token) {
+    const err = new Error(
+      'Gmail access expired and no refresh token is stored. Reconnect the account under Email Accounts.'
+    );
+    err.status = 400;
+    throw err;
+  }
+
+  const refreshed = await googleOAuth.refreshAccessToken(account.refresh_token);
+  if (refreshed?.error) {
+    const err = new Error(refreshed.error);
+    err.status = 400;
+    throw err;
+  }
+
+  await emailAccountService.update(
+    tenantId,
+    account.id,
+    {
+      access_token: refreshed.access_token,
+      refresh_token: refreshed.refresh_token || account.refresh_token,
+      token_expires_at: refreshed.expires_at
+        ? new Date(refreshed.expires_at * 1000)
+        : null,
+    },
+    updatedBy
+  );
+  account.access_token = refreshed.access_token;
+  if (refreshed.refresh_token) account.refresh_token = refreshed.refresh_token;
+  account.token_expires_at = refreshed.expires_at
+    ? new Date(refreshed.expires_at * 1000)
+    : account.token_expires_at;
+  return account;
 }
 
 /**
@@ -241,8 +320,12 @@ export async function sendEmail(tenantId, payload, createdBy) {
   };
 
   let messageId = null;
-  if ((account.provider || '').toLowerCase() === 'outlook') {
+  const provider = (account.provider || '').toLowerCase();
+  if (provider === 'outlook') {
     await sendViaMicrosoftGraph(account, mailOptions);
+  } else if (provider === 'gmail') {
+    await ensureFreshGmailAccessToken(account, tenantId, createdBy);
+    messageId = await sendViaGmailRestApi(account, mailOptions);
   } else {
     const transporter = getTransporter(account);
     const info = await transporter.sendMail(mailOptions);

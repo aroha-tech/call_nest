@@ -70,7 +70,7 @@ export function EmailAccountsPage() {
       setOauthError(decodeURIComponent(message));
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, []);
+  }, [refetch]);
 
   const createMutation = useMutation(emailAccountsAPI.create);
   const updateMutation = useMutation((id, data) => emailAccountsAPI.update(id, data));

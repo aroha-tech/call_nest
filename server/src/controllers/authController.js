@@ -73,7 +73,11 @@ export async function login(req, res, next) {
     
     const { accessToken, refreshToken, expiresIn } = await authService.login(
       email,
-      password
+      password,
+      {
+        tenantFromHost: req.tenant,
+        isPlatformHost: Boolean(req.isPlatform),
+      }
     );
     
     res.json({

@@ -1,38 +1,23 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig(({ mode }) => ({
+/**
+ * Development only: `server` runs when you use `npm run dev`.
+ * It is ignored for `npm run build` — production has no Vite dev server.
+ *
+ * Prod API URL is not configured here. At build time Vite injects
+ * `VITE_*` from `.env.production`; `src/services/axiosInstance.js` uses
+ * `VITE_API_BASE_URL` (or same-origin if empty). See `.env.*.example`.
+ */
+export default defineConfig({
   plugins: [react()],
   server: {
-<<<<<<< Updated upstream
-    port: 3001,
-    /** Allow QA access via ngrok (friend hits https://*.ngrok-free.app → this dev server) */
-    host: true,
-    allowedHosts: ['.ngrok-free.app', '.ngrok.io', '.ngrok.app'],
+    port: 3000,
     proxy: {
       '/api': {
         target: 'http://localhost:4000',
         changeOrigin: true,
-        // So the API always sees localhost Host (tenantResolver), not *.ngrok-free.app
-        configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq) => {
-            proxyReq.setHeader('Host', 'localhost:4000');
-          });
-        },
       },
     },
-=======
-    port: 3000,
-    // Only in development — production build uses VITE_API_BASE_URL or same-origin
-    proxy:
-      mode === 'development'
-        ? {
-            '/api': {
-              target: 'http://localhost:4000',
-              changeOrigin: true,
-            },
-          }
-        : undefined,
->>>>>>> Stashed changes
   },
-}));
+});

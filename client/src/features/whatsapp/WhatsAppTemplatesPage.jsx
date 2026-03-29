@@ -17,6 +17,7 @@ import listStyles from '../../components/admin/adminDataList.module.scss';
 import { FilterBar } from '../../components/admin/FilterBar';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
+import { Spinner } from '../../components/ui/Spinner';
 
 const COMPONENT_TYPES = [
   { value: 'HEADER', label: 'HEADER' },
