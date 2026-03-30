@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as authController from '../controllers/authController.js';
-import { tenantAuthMiddleware } from '../middleware/auth.js';
+import { tenantAuthMiddleware, authMiddleware, verifyTokenVersion } from '../middleware/auth.js';
 import { query } from '../config/db.js';
 
 const router = Router();
@@ -10,6 +10,9 @@ router.post('/register', authController.register);
 router.get('/tenant-slug-status', authController.tenantSlugStatus);
 router.post('/login', authController.login);
 router.post('/refresh', authController.refresh);
+
+// Authenticated: update own profile (name, password); works for tenant users and platform admins
+router.patch('/me', authMiddleware, verifyTokenVersion, authController.updateMe);
 
 // Public: Get industries for registration dropdown
 router.get('/industries', async (req, res, next) => {

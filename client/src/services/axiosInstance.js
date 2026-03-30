@@ -81,6 +81,18 @@ function isAuthBootstrapRequest(config) {
   );
 }
 
+/**
+ * Profile PATCH can return 401 for "wrong current password" — that is not an expired JWT.
+ * Skipping refresh here avoids failed refresh → forced logout.
+ */
+function isProfileMePatchRequest(config) {
+  if (!config?.url) return false;
+  const method = (config.method || 'get').toLowerCase();
+  if (method !== 'patch') return false;
+  const u = config.url;
+  return u.includes('/api/auth/me') || u.includes('/auth/me');
+}
+
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (err) => {
@@ -95,7 +107,8 @@ axiosInstance.interceptors.response.use(
     if (
       err.response?.status === 401 &&
       !originalRequest._retry &&
-      !isAuthBootstrapRequest(originalRequest)
+      !isAuthBootstrapRequest(originalRequest) &&
+      !isProfileMePatchRequest(originalRequest)
     ) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {

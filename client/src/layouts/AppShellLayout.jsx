@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useSalesNavigation } from '../hooks/useSalesNavigation';
+import { SidebarUserPanel } from './SidebarUserPanel';
 import styles from './AppShellLayout.module.scss';
 
 /**
@@ -44,6 +46,7 @@ function NavGroup({ item, activeKey, activeParentKey, onNavigate, expandedGroups
  * Base authenticated app shell with responsive sidebar.
  */
 export function AppShellLayout({ children }) {
+  const location = useLocation();
   const { items, activeKey, activeParentKey, goTo, tenantSlug, isPlatform } = useSalesNavigation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState({});
@@ -64,6 +67,7 @@ export function AppShellLayout({ children }) {
   };
 
   const findCurrentLabel = () => {
+    if (location.pathname === '/profile') return 'Profile';
     for (const item of items) {
       if (item.children) {
         const child = item.children.find((c) => c.key === activeKey);
@@ -115,6 +119,7 @@ export function AppShellLayout({ children }) {
             )
           )}
         </nav>
+        <SidebarUserPanel onNavigate={() => setSidebarOpen(false)} />
       </aside>
 
       {/* Main content */}

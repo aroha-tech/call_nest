@@ -65,9 +65,6 @@ export async function create(req, res, next) {
     if (!['admin', 'manager', 'agent'].includes(role)) {
       return res.status(400).json({ error: 'role must be admin, manager, or agent' });
     }
-    if (req.user?.role === 'manager' && role !== 'agent') {
-      return res.status(403).json({ error: 'Managers can only create agents' });
-    }
     const user = await tenantUsersService.create(tenantId, req.user, {
       email: email.trim(),
       password,

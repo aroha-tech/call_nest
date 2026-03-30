@@ -58,3 +58,12 @@ export async function refreshToken(refreshTokenValue) {
 export async function logoutAPI(refreshTokenValue) {
   await axiosInstance.post(`${AUTH_BASE}/logout`, { refreshToken: refreshTokenValue });
 }
+
+/**
+ * Update current user's profile (name, password). Email is not editable via this API.
+ * Returns new access_token.
+ */
+export async function updateProfile(payload) {
+  const { data } = await axiosInstance.patch(`${AUTH_BASE}/me`, payload);
+  return data;
+}

@@ -28,6 +28,8 @@ export function userAndTenantFromToken(accessToken) {
   const user = {
     id: payload.user_id ?? payload.sub,
     email: payload.email,
+    name: payload.name ?? null,
+    profilePhotoUrl: payload.profile_photo_url ?? null,
     role: payload.role,
     roleId: payload.role_id ?? null,
     isPlatformAdmin: Boolean(payload.is_platform_admin),

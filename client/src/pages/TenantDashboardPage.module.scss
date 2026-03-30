@@ -1,0 +1,9 @@
+@use '../styles/variables' as *;
+
+.recentWrap {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: $space-6;
+  margin-top: $space-8;
+  max-width: 640px;
+}

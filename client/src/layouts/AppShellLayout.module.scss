@@ -51,6 +51,7 @@
 
 .nav {
   flex: 1;
+  min-height: 0;
   padding: $space-2;
   overflow-y: auto;
   @include custom-scrollbar;

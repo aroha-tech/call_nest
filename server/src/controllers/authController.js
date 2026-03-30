@@ -182,6 +182,28 @@ export async function registerAgent(req, res, next) {
 }
 
 /**
+ * PATCH /api/auth/me
+ * Update signed-in user's name and/or password. Email cannot be changed here.
+ * Returns new access_token.
+ */
+export async function updateMe(req, res, next) {
+  try {
+    const { name, currentPassword, newPassword } = req.body;
+    const result = await authService.updateProfile(req.user.id, {
+      name,
+      currentPassword,
+      newPassword,
+    });
+    res.json({
+      access_token: result.accessToken,
+      expires_in: result.expiresIn,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
  * Refresh access token
  * POST /api/auth/refresh
  * Body: { refreshToken }

@@ -24,13 +24,13 @@ async function fetchUserRowUnscoped(id, tenantId) {
 }
 
 /**
- * Manager may see: self, agents on their team, and unassigned agents (manager_id IS NULL).
+ * Manager may see: self and agents who report to them only (no unassigned pool).
  */
 function managerCanSeeUserRow(actingUser, row) {
   if (!row || actingUser?.role !== 'manager') return true;
   if (Number(row.id) === Number(actingUser.id)) return true;
   if (row.role !== 'agent') return false;
-  return row.manager_id == null || Number(row.manager_id) === Number(actingUser.id);
+  return Number(row.manager_id) === Number(actingUser.id);
 }
 
 /**
@@ -51,10 +51,8 @@ export async function findAll(
   const params = [tenantId];
 
   if (actingUser?.role === 'manager') {
-    whereClauses.push(
-      '((u.id = ?) OR (u.role = ? AND (u.manager_id IS NULL OR u.manager_id = ?)))'
-    );
-    params.push(actingUser.id, 'agent', actingUser.id);
+    whereClauses.push('u.role = ? AND u.manager_id = ?');
+    params.push('agent', actingUser.id);
   }
 
   if (!includeDisabled) {
@@ -140,16 +138,13 @@ export async function findById(id, tenantId, actingUser) {
  * Create user in the current tenant.
  */
 export async function create(tenantId, actingUser, { email, password, name, role, manager_id = null }) {
-  let effectiveManagerId = manager_id;
-
   if (actingUser?.role === 'manager') {
-    if (role !== 'agent') {
-      const err = new Error('Managers can only create agents');
-      err.status = 403;
-      throw err;
-    }
-    effectiveManagerId = actingUser.id;
+    const err = new Error('Only an administrator can create users');
+    err.status = 403;
+    throw err;
   }
+
+  const effectiveManagerId = manager_id;
 
   const user = await registerUser(email, password, name, tenantId, role);
 
@@ -176,7 +171,7 @@ export async function create(tenantId, actingUser, { email, password, name, role
 }
 
 /**
- * Update user. Managers may only manage agents on / off their team (and their own profile basics).
+ * Update user. Only administrators may change reporting manager (assign / unassign).
  */
 export async function update(id, tenantId, actingUser, payload) {
   const existing = await findById(id, tenantId, actingUser);
@@ -185,15 +180,15 @@ export async function update(id, tenantId, actingUser, payload) {
   const { name, role, is_enabled, password, manager_id } = payload;
 
   if (actingUser?.role === 'manager') {
+    if (manager_id !== undefined) {
+      const err = new Error('Only an administrator can assign or change reporting manager');
+      err.status = 403;
+      throw err;
+    }
     const isSelf = Number(existing.id) === Number(actingUser.id);
     if (isSelf) {
       if (role !== undefined) {
         const err = new Error('Managers cannot change their own role');
-        err.status = 403;
-        throw err;
-      }
-      if (manager_id !== undefined) {
-        const err = new Error('Cannot set manager_id on a manager account');
         err.status = 403;
         throw err;
       }
@@ -202,15 +197,6 @@ export async function update(id, tenantId, actingUser, payload) {
         const err = new Error('Managers cannot change an agent into another role');
         err.status = 403;
         throw err;
-      }
-      if (manager_id !== undefined) {
-        const cleared = manager_id === null || manager_id === '';
-        const midNum = cleared ? null : Number(manager_id);
-        if (midNum != null && midNum !== Number(actingUser.id)) {
-          const err = new Error('Managers can only assign agents to their own team or unassign (pool)');
-          err.status = 403;
-          throw err;
-        }
       }
     } else {
       const err = new Error('Managers can only edit their own profile or agents on their team');

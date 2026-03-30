@@ -7,6 +7,8 @@ import { AppShellLayout } from '../layouts/AppShellLayout';
 import { LoginPage } from '../features/auth/pages/LoginPage';
 import { RegisterPage } from '../features/auth/pages/RegisterPage';
 import { HomePage } from '../pages/HomePage';
+import { TenantDashboardPage } from '../pages/TenantDashboardPage';
+import { ProfilePage } from '../pages/ProfilePage';
 import { PlatformDashboardPage } from '../pages/PlatformDashboardPage';
 import { TenantsPage } from '../pages/TenantsPage';
 import { UsersPage } from '../pages/UsersPage';
@@ -156,9 +158,9 @@ function TenantRoutes() {
       <Route
         path="/"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute permission={PERMISSIONS.DASHBOARD_VIEW}>
             <AppShellLayout>
-              <HomePage />
+              <TenantDashboardPage />
             </AppShellLayout>
           </ProtectedRoute>
         }
@@ -484,6 +486,16 @@ function TenantRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <ProfilePage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -636,6 +648,16 @@ function PlatformRoutes() {
           <ProtectedRoute>
             <AppShellLayout>
               <DefaultDialingSetsPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <ProfilePage />
             </AppShellLayout>
           </ProtectedRoute>
         }

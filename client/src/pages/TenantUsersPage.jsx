@@ -173,30 +173,6 @@ export function TenantUsersPage() {
     setPagination((p) => ({ ...p, limit: next, page: 1 }));
   }, []);
 
-  const handleAssignToMyTeam = async (row) => {
-    if (!authUser?.id || row.role !== 'agent') return;
-    setActionMessage(null);
-    const result = await updateMutation.mutate(row.id, { manager_id: Number(authUser.id) });
-    if (result.success) {
-      setActionMessage({ type: 'success', text: `${row.email} is now on your team.` });
-      fetchUsers();
-    } else {
-      setActionMessage({ type: 'error', text: result.error || 'Could not assign.' });
-    }
-  };
-
-  const handleRemoveFromTeam = async (row) => {
-    if (row.role !== 'agent') return;
-    setActionMessage(null);
-    const result = await updateMutation.mutate(row.id, { manager_id: null });
-    if (result.success) {
-      setActionMessage({ type: 'success', text: `${row.email} removed from your team (unassigned pool).` });
-      fetchUsers();
-    } else {
-      setActionMessage({ type: 'error', text: result.error || 'Could not unassign.' });
-    }
-  };
-
   const createMutation = useMutation((data) => tenantUsersAPI.create(data));
   const updateMutation = useMutation((id, data) => tenantUsersAPI.update(id, data));
 
@@ -268,7 +244,7 @@ export function TenantUsersPage() {
       };
       if (form.new_password?.trim()) payload.password = form.new_password.trim();
       const effectiveRole = form.role || editing.role;
-      if (effectiveRole === 'agent' && (isFullAccess || isManagerTeamView)) {
+      if (effectiveRole === 'agent' && isFullAccess) {
         payload.manager_id = form.manager_id ? Number(form.manager_id) : null;
       }
       const result = await updateMutation.mutate(editing.id, payload);
@@ -299,9 +275,9 @@ export function TenantUsersPage() {
 
   const pageTitle = isManagerTeamView ? 'My team' : 'Users';
   const pageDescription = isManagerTeamView
-    ? 'You, your agents, and unassigned agents. Add agents to your team or move them back to the pool.'
+    ? 'Agents assigned to you by an administrator. Reporting assignments can only be changed by an admin.'
     : 'Manage users in your organization';
-  const canAddUser = isFullAccess || isManagerTeamView;
+  const canAddUser = isFullAccess;
 
   return (
     <div className={styles.wrapper}>
@@ -404,9 +380,13 @@ export function TenantUsersPage() {
                   description={
                     search || showDisabled || hasActiveUserFilters
                       ? 'Try a different search or change filters and click Apply, or Reset.'
-                      : 'Add users to your organization.'
+                      : isManagerTeamView
+                        ? 'No agents are assigned to you yet. An administrator can assign agents to your team.'
+                        : 'Add users to your organization.'
                   }
-                  action={!search && !showDisabled && !hasActiveUserFilters ? openCreate : undefined}
+                  action={
+                    canAddUser && !search && !showDisabled && !hasActiveUserFilters ? openCreate : undefined
+                  }
                   actionLabel="Add User"
                 />
               </div>
@@ -421,7 +401,7 @@ export function TenantUsersPage() {
                 <TableHeaderCell>Reports to</TableHeaderCell>
                 <TableHeaderCell width="100px">Status</TableHeaderCell>
                 <TableHeaderCell width="120px">Last login</TableHeaderCell>
-                <TableHeaderCell width={isManagerTeamView ? '220px' : '80px'} align="right">
+                <TableHeaderCell width="80px" align="right">
                   Actions
                 </TableHeaderCell>
               </TableRow>
@@ -442,37 +422,9 @@ export function TenantUsersPage() {
                   </TableCell>
                   <TableCell className={styles.dateCell}>{formatDate(u.last_login_at)}</TableCell>
                   <TableCell align="right">
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}>
-                      {isManagerTeamView &&
-                      u.role === 'agent' &&
-                      Number(u.id) !== Number(authUser?.id) ? (
-                        <>
-                          {u.manager_id == null ? (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => handleAssignToMyTeam(u)}
-                              disabled={updateMutation.loading}
-                            >
-                              Add to my team
-                            </Button>
-                          ) : null}
-                          {Number(u.manager_id) === Number(authUser.id) ? (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleRemoveFromTeam(u)}
-                              disabled={updateMutation.loading}
-                            >
-                              Remove from team
-                            </Button>
-                          ) : null}
-                        </>
-                      ) : null}
-                      <IconButton title="Edit" onClick={() => openEdit(u)} size="sm">
-                        ✏️
-                      </IconButton>
-                    </div>
+                    <IconButton title="Edit" onClick={() => openEdit(u)} size="sm">
+                      ✏️
+                    </IconButton>
                   </TableCell>
                 </TableRow>
             ))}
@@ -551,20 +503,27 @@ export function TenantUsersPage() {
             ) : null}
             {editing &&
             (form.role === 'agent' || editing.role === 'agent') &&
-            (isFullAccess || isManagerTeamView) ? (
+            isFullAccess ? (
               <Select
                 label="Reporting manager"
                 value={form.manager_id}
                 onChange={(e) => setForm((f) => ({ ...f, manager_id: e.target.value }))}
                 placeholder="— Unassigned —"
-                options={
-                  isManagerTeamView
-                    ? [
-                        { value: '', label: '— Unassigned (pool) —' },
-                        { value: String(authUser?.id || ''), label: 'My team (me)' },
-                      ]
-                    : [{ value: '', label: '— Unassigned —' }, ...managerOptionsForForm]
+                options={[{ value: '', label: '— Unassigned —' }, ...managerOptionsForForm]}
+              />
+            ) : null}
+            {editing &&
+            isManagerTeamView &&
+            (form.role === 'agent' || editing.role === 'agent') ? (
+              <Input
+                label="Reporting manager"
+                value={
+                  editing.manager_id != null
+                    ? editing.manager_name || editing.manager_email || `#${editing.manager_id}`
+                    : '— Unassigned —'
                 }
+                readOnly
+                hint="Only an administrator can change who this agent reports to."
               />
             ) : null}
             {editing && (

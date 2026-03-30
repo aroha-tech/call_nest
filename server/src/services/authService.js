@@ -260,6 +260,7 @@ export async function login(email, password, hostContext = {}) {
       sub: user.id,
       email: user.email,
       user_id: user.id,
+      name: user.name ?? null,
       tenant_id: jwtTenantId,
       role: user.role,
       role_id: user.role_id,
@@ -424,7 +425,7 @@ export async function refreshAccessToken(refreshToken) {
 
   // 4) Load user info for new tokens
   const [user] = await query(
-    `SELECT id, tenant_id, email, role, role_id, is_enabled, is_platform_admin, token_version
+    `SELECT id, tenant_id, email, name, role, role_id, is_enabled, is_platform_admin, token_version
      FROM users
      WHERE id = ? AND is_deleted = 0`,
     [userId]
@@ -449,6 +450,7 @@ export async function refreshAccessToken(refreshToken) {
       sub: user.id,
       email: user.email,
       user_id: user.id,
+      name: user.name ?? null,
       tenant_id: jwtTenantId,
       role: user.role,
       role_id: user.role_id,
@@ -553,6 +555,132 @@ export async function revokeAllUserTokens(tenantId, userId) {
       console.error('Redis error while revoking all user tokens (logout all):', err);
     }
   }
+}
+
+/**
+ * Update the authenticated user's own profile: name and/or password.
+ * Email cannot be changed here (reserved for a future verified email-change flow).
+ * Returns a new access token so the client can refresh JWT claims without re-login.
+ */
+export async function updateProfile(userId, payload) {
+  const { name, currentPassword, newPassword } = payload;
+
+  const wantsPasswordChange =
+    newPassword !== undefined &&
+    newPassword !== null &&
+    String(newPassword).trim() !== '';
+
+  if (name === undefined && !wantsPasswordChange) {
+    const err = new Error('No fields to update');
+    err.status = 400;
+    throw err;
+  }
+
+  const [user] = await query(
+    `SELECT id, tenant_id, email, name, password_hash, role, role_id, is_enabled, is_platform_admin, token_version
+     FROM users WHERE id = ? AND is_deleted = 0`,
+    [userId]
+  );
+
+  if (!user) {
+    const err = new Error('User not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (!user.is_enabled) {
+    const err = new Error('Account is disabled');
+    err.status = 403;
+    throw err;
+  }
+
+  const updates = [];
+  const params = [];
+
+  if (name !== undefined) {
+    const n =
+      name === null || String(name).trim() === ''
+        ? null
+        : String(name).trim().slice(0, 255);
+    const prev = user.name == null ? null : String(user.name).trim();
+    if (prev !== n) {
+      updates.push('name = ?');
+      params.push(n);
+    }
+  }
+
+  if (wantsPasswordChange) {
+    const pwd = String(newPassword).trim();
+    if (pwd.length < 8) {
+      const err = new Error('Password must be at least 8 characters');
+      err.status = 400;
+      throw err;
+    }
+    const cur =
+      currentPassword !== undefined && currentPassword !== null
+        ? String(currentPassword)
+        : '';
+    if (!cur.trim()) {
+      const err = new Error('Current password is required to set a new password');
+      err.status = 400;
+      throw err;
+    }
+    const match = await bcrypt.compare(cur, user.password_hash);
+    if (!match) {
+      const err = new Error('Current password is incorrect');
+      err.status = 400;
+      throw err;
+    }
+    const passwordHash = await bcrypt.hash(pwd, 10);
+    updates.push(
+      'password_hash = ?, password_changed_at = NOW(), token_version = COALESCE(token_version, 1) + 1'
+    );
+    params.push(passwordHash);
+  }
+
+  if (updates.length === 0) {
+    const err = new Error('No changes to save');
+    err.status = 400;
+    throw err;
+  }
+
+  params.push(userId);
+  await query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
+
+  const [updated] = await query(
+    `SELECT id, tenant_id, email, name, role, role_id, is_enabled, is_platform_admin, token_version
+     FROM users WHERE id = ? AND is_deleted = 0`,
+    [userId]
+  );
+
+  const isPlatformAdmin = Boolean(updated.is_platform_admin);
+  const permissions = isPlatformAdmin ? [] : await getUserPermissions(updated.id, updated.role_id);
+  const jwtTenantId = isPlatformAdmin ? null : updated.tenant_id;
+  const tokenVersion = updated.token_version ?? 1;
+
+  const accessToken = jwt.sign(
+    {
+      sub: updated.id,
+      email: updated.email,
+      user_id: updated.id,
+      name: updated.name ?? null,
+      tenant_id: jwtTenantId,
+      role: updated.role,
+      role_id: updated.role_id,
+      is_platform_admin: isPlatformAdmin,
+      permissions,
+      token_version: tokenVersion,
+    },
+    env.jwtSecret,
+    { expiresIn: env.jwtAccessExpiresIn }
+  );
+
+  return {
+    accessToken,
+    expiresIn: typeof env.jwtAccessExpiresIn === 'string'
+      ? ttlFromString(env.jwtAccessExpiresIn)
+      : 15 * 60,
+  };
 }
 
 const TENANT_SLUG_SUGGEST_SUFFIXES = [
