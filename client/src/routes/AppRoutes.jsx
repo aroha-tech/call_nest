@@ -42,6 +42,7 @@ import { ContactFormPage } from '../features/contacts/ContactFormPage';
 import { ContactImportPage } from '../features/contacts/ContactImportPage';
 import { ContactImportHistoryPage } from '../features/contacts/ContactImportHistoryPage';
 import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
+import { TenantCompanySettingsPage } from '../pages/TenantCompanySettingsPage';
 import { CampaignsPage } from '../features/campaigns/CampaignsPage';
 import { CampaignOpenPage } from '../features/campaigns/CampaignOpenPage';
 import { useEmailModuleEnabled } from '../hooks/useEmailModuleEnabled';
@@ -441,7 +442,7 @@ function TenantRoutes() {
         element={
           <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
             <AppShellLayout>
-              <PlaceholderPage title="Settings" />
+              <TenantCompanySettingsPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

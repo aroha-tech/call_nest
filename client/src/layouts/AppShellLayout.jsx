@@ -2,7 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSalesNavigation } from '../hooks/useSalesNavigation';
 import { SidebarUserPanel } from './SidebarUserPanel';
+import { useAppSelector } from '../app/hooks';
+import { selectTenant, selectUser } from '../features/auth/authSelectors';
 import styles from './AppShellLayout.module.scss';
+
+/** Sidebar line under company name: human-readable role (not workspace slug). */
+function roleLabelForSidebar(user, isPlatform) {
+  if (isPlatform) return 'Platform Admin';
+  const raw = user?.role;
+  if (!raw || typeof raw !== 'string') return null;
+  const r = raw.toLowerCase();
+  if (r === 'admin') return 'Admin';
+  if (r === 'manager') return 'Manager';
+  if (r === 'agent') return 'Agent';
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+}
 
 /**
  * Expandable navigation group component.
@@ -48,8 +62,17 @@ function NavGroup({ item, activeKey, activeParentKey, onNavigate, expandedGroups
 export function AppShellLayout({ children }) {
   const location = useLocation();
   const { items, activeKey, activeParentKey, goTo, tenantSlug, isPlatform } = useSalesNavigation();
+  const tenant = useAppSelector(selectTenant);
+  const user = useAppSelector(selectUser);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState({});
+
+  const name = tenant?.name?.trim();
+  const slug = tenantSlug ?? tenant?.slug ?? null;
+  const workspaceTitle = isPlatform
+    ? 'Call Nest'
+    : name || slug || 'Workspace';
+  const workspaceSubtitle = roleLabelForSidebar(user, isPlatform);
 
   useEffect(() => {
     if (activeParentKey) {
@@ -90,10 +113,10 @@ export function AppShellLayout({ children }) {
       {/* Sidebar */}
       <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''}`}>
         <div className={styles.sidebarHeader}>
-          <span className={styles.brand}>Call Nest</span>
-          <span className={styles.tenant}>
-            {isPlatform ? 'Platform Admin' : tenantSlug ?? 'Workspace'}
-          </span>
+          <span className={styles.brand}>{workspaceTitle}</span>
+          {workspaceSubtitle != null && workspaceSubtitle !== '' && (
+            <span className={styles.tenant}>{workspaceSubtitle}</span>
+          )}
         </div>
         <nav className={styles.nav}>
           {items.map((item) =>

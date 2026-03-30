@@ -127,7 +127,8 @@ export function ProfilePage() {
         setApiError('Unexpected response from server');
         return;
       }
-      const { user: nextUser, permissions, tokenVersion } = userAndTenantFromToken(token);
+      const { user: nextUser, tenant: nextTenant, permissions, tokenVersion } =
+        userAndTenantFromToken(token);
       dispatch(
         setTokens({
           accessToken: token,
@@ -135,6 +136,7 @@ export function ProfilePage() {
           permissions,
           tokenVersion,
           user: nextUser,
+          tenant: nextTenant,
         })
       );
       closePasswordFlow();

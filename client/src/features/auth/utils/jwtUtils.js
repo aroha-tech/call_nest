@@ -35,7 +35,14 @@ export function userAndTenantFromToken(accessToken) {
     isPlatformAdmin: Boolean(payload.is_platform_admin),
   };
 
-  const tenant = payload.tenant_id != null ? { id: payload.tenant_id } : null;
+  const tenant =
+    payload.tenant_id != null
+      ? {
+          id: payload.tenant_id,
+          name: payload.tenant_name ?? null,
+          slug: payload.tenant_slug ?? null,
+        }
+      : null;
   const permissions = Array.isArray(payload.permissions) ? payload.permissions : [];
   const tokenVersion = payload.token_version ?? null;
 

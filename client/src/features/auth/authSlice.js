@@ -129,18 +129,31 @@ const authSlice = createSlice({
       state.error = action.payload ?? 'Registration failed';
     },
     setTokens(state, action) {
-      const { accessToken, refreshToken, permissions, tokenVersion, user } = action.payload;
+      const { accessToken, refreshToken, permissions, tokenVersion, user, tenant } = action.payload;
       if (accessToken != null) state.accessToken = accessToken;
       if (refreshToken != null) state.refreshToken = refreshToken;
       // Update RBAC fields if provided (from token refresh)
       if (permissions != null) state.permissions = permissions;
       if (tokenVersion != null) state.tokenVersion = tokenVersion;
       if (user != null) state.user = user;
+      if (tenant !== undefined) {
+        state.tenant = tenant;
+        state.tenantSlug = tenant?.slug ?? state.tenantSlug;
+      }
       // Persist updated tokens
       persistAuth(state.accessToken, state.refreshToken);
     },
     clearError(state) {
       state.error = null;
+    },
+    /** After saving company name / slug from tenant settings (JWT may still refresh later). */
+    workspaceCompanyUpdated(state, action) {
+      const { name, slug } = action.payload;
+      if (state.tenant) {
+        if (name != null) state.tenant.name = name;
+        if (slug != null) state.tenant.slug = slug;
+      }
+      if (slug != null) state.tenantSlug = slug;
     },
   },
 });
@@ -155,6 +168,7 @@ export const {
   registerFailure,
   setTokens,
   clearError,
+  workspaceCompanyUpdated,
 } = authSlice.actions;
 
 export default authSlice.reducer;

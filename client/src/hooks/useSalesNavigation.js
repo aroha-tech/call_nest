@@ -97,7 +97,7 @@ const TENANT_ADMIN_NAV_ITEMS = [
     path: '/settings',
     permission: PERMISSIONS.SETTINGS_MANAGE,
     children: [
-      { key: 'settings-main', label: 'General', path: '/settings', permission: PERMISSIONS.SETTINGS_MANAGE },
+      { key: 'settings-main', label: 'Company', path: '/settings', permission: PERMISSIONS.SETTINGS_MANAGE },
       { key: 'contact-fields', label: 'Contact Fields', path: '/settings/contact-fields', permission: PERMISSIONS.SETTINGS_MANAGE },
       {
         key: 'contact-tags',

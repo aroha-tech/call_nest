@@ -130,7 +130,7 @@ axiosInstance.interceptors.response.use(
           processQueue(null, newToken);
           if (newToken && typeof window !== 'undefined' && window.__authStore) {
             // Extract updated user info and permissions from new token
-            const { user, permissions, tokenVersion } = userAndTenantFromToken(newToken);
+            const { user, tenant, permissions, tokenVersion } = userAndTenantFromToken(newToken);
             window.__authStore.dispatch({
               type: 'auth/setTokens',
               payload: {
@@ -139,6 +139,7 @@ axiosInstance.interceptors.response.use(
                 permissions,
                 tokenVersion,
                 user,
+                tenant,
               },
             });
           }

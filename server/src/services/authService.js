@@ -33,6 +33,21 @@ function ttlFromString(expiresIn) {
   }
 }
 
+/** Claims for workspace branding in the client (sidebar). Omitted for platform admins. */
+async function tenantClaimsForJwt(tenantId, isPlatformAdmin) {
+  if (isPlatformAdmin || tenantId == null) {
+    return {};
+  }
+  const [row] = await query(
+    'SELECT name, slug FROM tenants WHERE id = ? AND is_deleted = 0',
+    [tenantId]
+  );
+  return {
+    tenant_name: row?.name ?? null,
+    tenant_slug: row?.slug ?? null,
+  };
+}
+
 /**
  * Register a new tenant (company)
  * Can be called by super admin or self-registration
@@ -255,6 +270,7 @@ export async function login(email, password, hostContext = {}) {
   // Generate access token (short-lived) with permissions and token_version
   const jwtTenantId = isPlatformAdmin ? null : user.tenant_id;
   const tokenVersion = user.token_version ?? 1;
+  const tenantBranding = await tenantClaimsForJwt(user.tenant_id, isPlatformAdmin);
   const accessToken = jwt.sign(
     {
       sub: user.id,
@@ -267,6 +283,7 @@ export async function login(email, password, hostContext = {}) {
       is_platform_admin: isPlatformAdmin,
       permissions,
       token_version: tokenVersion,
+      ...tenantBranding,
     },
     env.jwtSecret,
     { expiresIn: env.jwtAccessExpiresIn }
@@ -445,6 +462,7 @@ export async function refreshAccessToken(refreshToken) {
 
   // 5) Generate new access + refresh tokens with permissions and token_version
   const jwtTenantId = isPlatformAdmin ? null : user.tenant_id;
+  const tenantBranding = await tenantClaimsForJwt(user.tenant_id, isPlatformAdmin);
   const accessToken = jwt.sign(
     {
       sub: user.id,
@@ -457,6 +475,7 @@ export async function refreshAccessToken(refreshToken) {
       is_platform_admin: isPlatformAdmin,
       permissions,
       token_version: tokenVersion,
+      ...tenantBranding,
     },
     env.jwtSecret,
     { expiresIn: env.jwtAccessExpiresIn }
@@ -657,6 +676,7 @@ export async function updateProfile(userId, payload) {
   const permissions = isPlatformAdmin ? [] : await getUserPermissions(updated.id, updated.role_id);
   const jwtTenantId = isPlatformAdmin ? null : updated.tenant_id;
   const tokenVersion = updated.token_version ?? 1;
+  const tenantBranding = await tenantClaimsForJwt(updated.tenant_id, isPlatformAdmin);
 
   const accessToken = jwt.sign(
     {
@@ -670,6 +690,7 @@ export async function updateProfile(userId, payload) {
       is_platform_admin: isPlatformAdmin,
       permissions,
       token_version: tokenVersion,
+      ...tenantBranding,
     },
     env.jwtSecret,
     { expiresIn: env.jwtAccessExpiresIn }
