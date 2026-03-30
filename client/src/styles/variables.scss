@@ -71,7 +71,7 @@ $bp-2xl: 1536px;
 
 :root {
   // Typography
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
 
   // Primary brand colors
@@ -87,8 +87,8 @@ $bp-2xl: 1536px;
   --color-primary-900: #312e81;
 
   // Surfaces (dark theme)
-  --color-bg-body: #09090b;
-  --color-bg-surface: #0f0f12;
+  --color-bg-body: #060608;
+  --color-bg-surface: #0c0c0f;
   --color-bg-elevated: #18181b;
   --color-bg-subtle: #1c1c1f;
   --color-bg-muted: #27272a;
@@ -131,4 +131,9 @@ $bp-2xl: 1536px;
   // Scrollbar
   --scrollbar-thumb: rgba(255, 255, 255, 0.1);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.15);
+
+  // Tenant white-label (overridden in JS when `tenant.theme` is set)
+  --tenant-shell-radius: #{$radius-sm};
+  --tenant-gradient-start: transparent;
+  --tenant-gradient-end: transparent;
 }

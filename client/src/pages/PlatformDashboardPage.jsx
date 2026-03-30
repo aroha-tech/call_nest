@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
+import { Button } from '../components/ui/Button';
+import { PlatformDataCharts } from '../components/dashboard/DashboardDataCharts';
 import { dashboardAPI, tenantsAPI, usersAPI } from '../services/adminAPI';
+import { useToast } from '../context/ToastContext';
 import styles from './PlatformDashboardPage.module.scss';
 
 const ROLE_LABELS = {
@@ -36,16 +39,28 @@ function StatCard({ value, label, to, icon, accent }) {
 }
 
 export function PlatformDashboardPage() {
+  const { showToast } = useToast();
   const [stats, setStats] = useState(null);
   const [recentTenants, setRecentTenants] = useState([]);
   const [recentUsers, setRecentUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [statsRefreshing, setStatsRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [rangeFrom, setRangeFrom] = useState('');
+  const [rangeTo, setRangeTo] = useState('');
+  const [activeRange, setActiveRange] = useState(null);
+  const initialFetch = useRef(true);
 
   useEffect(() => {
     let mounted = true;
+    const params = activeRange ? { from: activeRange.from, to: activeRange.to } : {};
+    if (initialFetch.current) {
+      setLoading(true);
+    } else {
+      setStatsRefreshing(true);
+    }
     Promise.all([
-      dashboardAPI.getStats(),
+      dashboardAPI.getStats(params),
       tenantsAPI.getAll({ page: 1, limit: 5 }).catch(() => ({ data: { data: [], pagination: {} } })),
       usersAPI.getAll({ page: 1, limit: 5 }).catch(() => ({ data: { data: [], pagination: {} } })),
     ])
@@ -54,15 +69,46 @@ export function PlatformDashboardPage() {
         setStats(statsRes.data?.data || null);
         setRecentTenants(tenantsRes.data?.data || []);
         setRecentUsers(usersRes.data?.data || []);
+        setError(null);
       })
       .catch((err) => {
         if (mounted) setError(err.response?.data?.error || err.message);
       })
       .finally(() => {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          initialFetch.current = false;
+          setLoading(false);
+          setStatsRefreshing(false);
+        }
       });
-    return () => { mounted = false; };
-  }, []);
+    return () => {
+      mounted = false;
+    };
+  }, [activeRange]);
+
+  function applyDateRange() {
+    const from = rangeFrom.trim();
+    const to = rangeTo.trim();
+    if (!from || !to) {
+      showToast(
+        'Pick a start and end date, then Apply. Or tap Reset for all-time totals.',
+        'warning'
+      );
+      return;
+    }
+    if (from > to) {
+      showToast('End date must be on or after the start date.', 'warning');
+      return;
+    }
+    setActiveRange({ from, to });
+  }
+
+  function clearDateRange() {
+    setRangeFrom('');
+    setRangeTo('');
+    setActiveRange(null);
+    setError(null);
+  }
 
   if (loading) {
     return (
@@ -85,15 +131,75 @@ export function PlatformDashboardPage() {
   }
 
   const usersTotal = stats?.usersTotal ?? 0;
+  const dr = stats?.dateRange;
+  const headerDescription = dr
+    ? `Platform health and quick access · ${dr.from} → ${dr.to}`
+    : 'Platform health and quick access';
 
   return (
     <div className={styles.wrapper}>
       <PageHeader
         title="Dashboard"
-        description="Platform health and quick access"
+        description={headerDescription}
+        actionsAlign="center"
+        actions={
+          <div
+            className={styles.dateFilterBox}
+            title="Filter KPIs and charts by when tenants and tenant users were created. Recent lists below are not filtered."
+          >
+            <div className={styles.dateFilterRow}>
+              <span className={styles.dateFieldInline}>
+                <label className={styles.dateLabelCompact} htmlFor="platform-dash-from">
+                  From
+                </label>
+                <input
+                  id="platform-dash-from"
+                  className={styles.dateInputCompact}
+                  type="date"
+                  value={rangeFrom}
+                  onChange={(e) => setRangeFrom(e.target.value)}
+                />
+              </span>
+              <span className={styles.dateFieldInline}>
+                <label className={styles.dateLabelCompact} htmlFor="platform-dash-to">
+                  To
+                </label>
+                <input
+                  id="platform-dash-to"
+                  className={styles.dateInputCompact}
+                  type="date"
+                  value={rangeTo}
+                  onChange={(e) => setRangeTo(e.target.value)}
+                />
+              </span>
+              <div className={styles.dateFilterActionsCompact}>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="xs"
+                  onClick={applyDateRange}
+                  loading={statsRefreshing}
+                >
+                  Apply
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="xs"
+                  title="Clear dates and show all-time totals"
+                  onClick={clearDateRange}
+                  disabled={statsRefreshing}
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </div>
+        }
       />
 
-      {/* KPI row */}
+      {/* KPI row + charts (date-scoped) */}
+      <div className={statsRefreshing ? styles.statsRefreshing : undefined}>
       <section className={styles.kpiSection}>
         <StatCard
           value={stats?.tenantsTotal ?? 0}
@@ -122,6 +228,13 @@ export function PlatformDashboardPage() {
           icon="📊"
         />
       </section>
+
+      <PlatformDataCharts
+        tenantsTotal={stats?.tenantsTotal ?? 0}
+        usersTotal={stats?.usersTotal ?? 0}
+        usersByRole={stats?.usersByRole ?? {}}
+      />
+      </div>
 
       <div className={styles.grid}>
         {/* Users by role */}

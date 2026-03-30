@@ -11,8 +11,8 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 220px;
-  background: var(--color-bg-surface);
+  width: 240px;
+  background: #050507;
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
@@ -34,12 +34,32 @@
   border-bottom: 1px solid var(--color-border);
 }
 
+.brandRow {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  min-width: 0;
+}
+
+.brandLogo {
+  width: auto;
+  height: 28px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 .brand {
   display: block;
   font-size: $font-size-md;
   font-weight: $font-weight-bold;
   color: var(--color-text-primary);
   letter-spacing: -0.02em;
+  min-width: 0;
+  @include truncate;
+}
+
+.brandRow .brand {
+  display: block;
 }
 
 .tenant {
@@ -52,9 +72,73 @@
 .nav {
   flex: 1;
   min-height: 0;
-  padding: $space-2;
+  padding: $space-2 $space-2 $space-3;
   overflow-y: auto;
   @include custom-scrollbar;
+}
+
+.navSectionLabel {
+  font-size: $font-size-2xs;
+  font-weight: $font-weight-semibold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  padding: $space-3 $space-3 $space-2;
+  margin-top: $space-1;
+
+  &:first-child {
+    margin-top: 0;
+    padding-top: 0;
+  }
+}
+
+.navItemMain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.navItemIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  color: var(--color-text-tertiary);
+}
+
+.navItem:hover .navItemIcon,
+.navGroupHeader:hover .navItemIcon {
+  color: var(--color-text-secondary);
+}
+
+.navItem.navItemActive .navItemIcon {
+  color: var(--color-primary-300);
+}
+
+.navGroupHeader.navGroupActive .navItemIcon {
+  color: var(--color-primary-400);
+}
+
+.navChildIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-muted);
+}
+
+.navChild:hover .navChildIcon {
+  color: var(--color-text-secondary);
+}
+
+.navChild.navChildActive .navChildIcon {
+  color: var(--color-primary-400);
 }
 
 .navItem {
@@ -64,12 +148,13 @@
   padding: $space-2 $space-3;
   margin-bottom: 2px;
   font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
   color: var(--color-text-secondary);
   background: transparent;
   border: none;
-  border-radius: $radius-sm;
+  border-radius: var(--tenant-shell-radius, #{$radius-md});
   cursor: pointer;
-  transition: all $transition-fast;
+  transition: color $transition-fast, background $transition-fast;
   text-align: left;
 
   &:hover {
@@ -78,14 +163,23 @@
   }
 
   &.navItemActive {
-    background: rgba(99, 102, 241, 0.12);
-    color: var(--color-primary-400);
-    font-weight: $font-weight-medium;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-primary-600) 22%, transparent) 0%,
+      color-mix(in srgb, var(--color-primary-500) 12%, transparent) 100%
+    );
+    color: var(--color-text-primary);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary-500) 25%, transparent);
+
+    .navLabel {
+      font-weight: $font-weight-semibold;
+    }
   }
 }
 
 .navLabel {
   @include truncate;
+  letter-spacing: -0.01em;
 }
 
 .navGroup {
@@ -96,15 +190,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: $space-2;
   width: 100%;
   padding: $space-2 $space-3;
   font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
   color: var(--color-text-secondary);
   background: transparent;
   border: none;
-  border-radius: $radius-sm;
+  border-radius: var(--tenant-shell-radius, #{$radius-md});
   cursor: pointer;
-  transition: all $transition-fast;
+  transition: color $transition-fast, background $transition-fast;
   text-align: left;
 
   &:hover {
@@ -114,38 +210,41 @@
 
   &.navGroupActive {
     color: var(--color-primary-400);
-    font-weight: $font-weight-medium;
   }
 }
 
-.navChevron {
-  font-size: $font-size-xs;
+.navChevronSvg {
+  flex-shrink: 0;
+  opacity: 0.55;
   transition: transform $transition-fast;
-  
-  &.expanded {
-    transform: rotate(90deg);
-  }
+}
+
+.navChevronExpanded {
+  transform: rotate(90deg);
 }
 
 .navGroupChildren {
-  padding-left: $space-3;
+  padding-left: $space-2;
   margin-top: 2px;
+  margin-bottom: $space-1;
 }
 
 .navChild {
   display: flex;
   align-items: center;
+  gap: 8px;
   width: 100%;
-  padding: $space-1 $space-3;
-  padding-left: $space-4;
+  padding: $space-2 $space-3;
+  padding-left: $space-3;
   margin-bottom: 2px;
-  font-size: $font-size-sm;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
   color: var(--color-text-muted);
   background: transparent;
   border: none;
-  border-radius: $radius-sm;
+  border-radius: var(--tenant-shell-radius, #{$radius-sm});
   cursor: pointer;
-  transition: all $transition-fast;
+  transition: color $transition-fast, background $transition-fast;
   text-align: left;
 
   &:hover {
@@ -154,9 +253,9 @@
   }
 
   &.navChildActive {
-    background: rgba(99, 102, 241, 0.12);
+    background: color-mix(in srgb, var(--color-primary-500) 14%, transparent);
     color: var(--color-primary-400);
-    font-weight: $font-weight-medium;
+    font-weight: $font-weight-semibold;
   }
 }
 
@@ -168,7 +267,7 @@
   width: 100%;
 
   @include lg {
-    margin-left: 220px;
+    margin-left: 240px;
   }
 }
 
@@ -180,10 +279,11 @@
   align-items: center;
   justify-content: space-between;
   gap: $space-4;
-  height: 48px;
-  padding: 0 $space-4;
+  min-height: 52px;
+  padding: $space-2 $space-4;
   background: var(--color-bg-surface);
   border-bottom: 1px solid var(--color-border);
+  backdrop-filter: blur(10px);
 
   @include md {
     padding: 0 $space-5;
@@ -220,8 +320,9 @@
 }
 
 .topbarTitle {
-  font-size: $font-size-base;
-  font-weight: $font-weight-medium;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  letter-spacing: -0.03em;
   color: var(--color-text-primary);
   margin: 0;
   @include truncate;

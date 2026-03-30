@@ -36,6 +36,92 @@ import { TableDataRegion } from '../components/admin/TableDataRegion';
 import { TenantWorkspaceUrlCopy } from '../components/admin/TenantWorkspaceUrlCopy';
 import styles from './TenantsPage.module.scss';
 
+function emptyThemeFormFields() {
+  return {
+    theme_primary: '',
+    theme_logo_url: '',
+    theme_workspace_title: '',
+    theme_radius_px: '',
+    theme_font_preset: 'inter',
+    theme_gradient_start: '',
+    theme_gradient_end: '',
+  };
+}
+
+function themeFieldsFromRow(row) {
+  let t = row?.theme_json;
+  if (typeof t === 'string') {
+    try {
+      t = JSON.parse(t);
+    } catch {
+      t = null;
+    }
+  }
+  if (!t || typeof t !== 'object') {
+    return emptyThemeFormFields();
+  }
+  return {
+    theme_primary: typeof t.primary === 'string' ? t.primary : '',
+    theme_logo_url: typeof t.logoUrl === 'string' ? t.logoUrl : '',
+    theme_workspace_title: typeof t.workspaceTitle === 'string' ? t.workspaceTitle : '',
+    theme_radius_px: t.radiusPx != null && t.radiusPx !== '' ? String(t.radiusPx) : '',
+    theme_font_preset: t.fontPreset === 'system' ? 'system' : 'inter',
+    theme_gradient_start: typeof t.gradientStart === 'string' ? t.gradientStart : '',
+    theme_gradient_end: typeof t.gradientEnd === 'string' ? t.gradientEnd : '',
+  };
+}
+
+/** @returns {{ value: object|null, error?: string }} */
+function themePayloadFromForm(form) {
+  const o = {};
+  const p = form.theme_primary?.trim();
+  if (p) {
+    if (!/^#[0-9A-Fa-f]{6}$/.test(p)) {
+      return { value: null, error: 'Brand color must be #RRGGBB (six hex digits).' };
+    }
+    o.primary = p.toLowerCase();
+  }
+  const logo = form.theme_logo_url?.trim();
+  if (logo) {
+    try {
+      const u = new URL(logo);
+      if (u.protocol !== 'https:') {
+        return { value: null, error: 'Logo URL must use https://' };
+      }
+    } catch {
+      return { value: null, error: 'Logo URL must be a valid https URL.' };
+    }
+    o.logoUrl = logo;
+  }
+  const wt = form.theme_workspace_title?.trim();
+  if (wt) o.workspaceTitle = wt.slice(0, 120);
+  const gs = form.theme_gradient_start?.trim();
+  if (gs) {
+    if (!/^#[0-9A-Fa-f]{6}$/.test(gs)) {
+      return { value: null, error: 'Gradient start must be #RRGGBB.' };
+    }
+    o.gradientStart = gs.toLowerCase();
+  }
+  const ge = form.theme_gradient_end?.trim();
+  if (ge) {
+    if (!/^#[0-9A-Fa-f]{6}$/.test(ge)) {
+      return { value: null, error: 'Gradient end must be #RRGGBB.' };
+    }
+    o.gradientEnd = ge.toLowerCase();
+  }
+  if (form.theme_font_preset === 'system') o.fontPreset = 'system';
+  const rp = form.theme_radius_px;
+  if (rp !== '' && rp != null && String(rp).trim() !== '') {
+    const n = parseInt(String(rp).trim(), 10);
+    if (Number.isNaN(n) || n < 4 || n > 24) {
+      return { value: null, error: 'Corner radius must be between 4 and 24 (pixels).' };
+    }
+    o.radiusPx = n;
+  }
+  if (Object.keys(o).length === 0) return { value: null };
+  return { value: o };
+}
+
 const defaultForm = () => ({
   name: '',
   slug: '',
@@ -50,6 +136,7 @@ const defaultForm = () => ({
   email_communication_enabled: false,
   email_module_enabled: false,
   email_automation_enabled: false,
+  ...emptyThemeFormFields(),
 });
 
 const SLUG_DEBOUNCE_MS = 400;
@@ -288,6 +375,7 @@ export function TenantsPage() {
       email_communication_enabled: !!row.email_communication_enabled,
       email_module_enabled: !!row.email_module_enabled,
       email_automation_enabled: !!row.email_automation_enabled,
+      ...themeFieldsFromRow(row),
     });
     setFormErrors({});
     setModalOpen(true);
@@ -356,6 +444,14 @@ export function TenantsPage() {
       }
     }
     const payload = payloadFromForm();
+    if (editing) {
+      const tp = themePayloadFromForm(form);
+      if (tp.error) {
+        setFormErrors({ submit: tp.error });
+        return;
+      }
+      payload.theme = tp.value;
+    }
     const result = editing
       ? await updateMutation.mutate(editing.id, payload)
       : await createMutation.mutate(payload);
@@ -730,6 +826,109 @@ export function TenantsPage() {
               onChange={(e) => setForm((f) => ({ ...f, is_enabled: e.target.checked }))}
             />
           </div>
+
+          {editing && (
+            <div className={styles.formSection}>
+              <h3 className={styles.formSectionTitle}>Workspace appearance</h3>
+              <p className={styles.formSectionHint}>
+                Colors and logo apply to this tenant&apos;s app after sign-in. Users see updates on their
+                next session refresh. Logo URL must use HTTPS.
+              </p>
+              <div className={styles.themeColorRow}>
+                <label className={styles.colorPickerLabel}>
+                  <span className={styles.colorPickerLabelText}>Swatch</span>
+                  <input
+                    type="color"
+                    className={styles.colorPicker}
+                    aria-label="Pick brand color"
+                    value={
+                      /^#[0-9A-Fa-f]{6}$/.test(form.theme_primary || '')
+                        ? form.theme_primary
+                        : '#6366f1'
+                    }
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, theme_primary: e.target.value.toLowerCase() }))
+                    }
+                  />
+                </label>
+                <div className={styles.themeColorInputGrow}>
+                  <Input
+                    label="Brand color"
+                    value={form.theme_primary}
+                    onChange={(e) => {
+                      clearFormErr('submit');
+                      setForm((f) => ({ ...f, theme_primary: e.target.value }));
+                    }}
+                    placeholder="#8A3FFC"
+                    hint="Six-digit hex. Drives buttons, focus rings, and accent UI."
+                  />
+                </div>
+              </div>
+              <Input
+                label="Logo URL (HTTPS)"
+                value={form.theme_logo_url}
+                onChange={(e) => {
+                  clearFormErr('submit');
+                  setForm((f) => ({ ...f, theme_logo_url: e.target.value }));
+                }}
+                placeholder="https://cdn.example.com/logo.png"
+              />
+              <Input
+                label="Sidebar title (optional)"
+                value={form.theme_workspace_title}
+                onChange={(e) => setForm((f) => ({ ...f, theme_workspace_title: e.target.value }))}
+                placeholder="Defaults to company name if empty"
+              />
+              <div className={styles.themeSplitRow}>
+                <Input
+                  label="Corner radius (px)"
+                  type="number"
+                  min={4}
+                  max={24}
+                  step={1}
+                  value={form.theme_radius_px}
+                  onChange={(e) => {
+                    clearFormErr('submit');
+                    setForm((f) => ({ ...f, theme_radius_px: e.target.value }));
+                  }}
+                  placeholder="e.g. 12"
+                  hint="4–24. Leave empty for default."
+                  className={styles.themeRadiusInput}
+                />
+                <Select
+                  label="Font"
+                  className={styles.themeFontSelect}
+                  options={[
+                    { value: 'inter', label: 'Inter' },
+                    { value: 'system', label: 'System UI' },
+                  ]}
+                  value={form.theme_font_preset}
+                  onChange={(e) => setForm((f) => ({ ...f, theme_font_preset: e.target.value }))}
+                />
+              </div>
+              <div className={styles.themeSplitRow}>
+                <Input
+                  label="Gradient start (optional)"
+                  value={form.theme_gradient_start}
+                  onChange={(e) => {
+                    clearFormErr('submit');
+                    setForm((f) => ({ ...f, theme_gradient_start: e.target.value }));
+                  }}
+                  placeholder="#4c1d95"
+                  hint="For future dashboard cards; exposed as CSS variables."
+                />
+                <Input
+                  label="Gradient end (optional)"
+                  value={form.theme_gradient_end}
+                  onChange={(e) => {
+                    clearFormErr('submit');
+                    setForm((f) => ({ ...f, theme_gradient_end: e.target.value }));
+                  }}
+                  placeholder="#7c3aed"
+                />
+              </div>
+            </div>
+          )}
 
           {!editing && (
             <div className={styles.formSection}>

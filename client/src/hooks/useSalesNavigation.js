@@ -11,12 +11,14 @@ import { PERMISSIONS } from '../utils/permissionUtils';
  * Super Admin (Platform Admin) navigation items.
  */
 const PLATFORM_NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', path: '/' },
+  { key: 'dashboard', label: 'Dashboard', path: '/', section: 'Main' },
   { key: 'tenants', label: 'Tenants', path: '/admin/tenants' },
   { key: 'users', label: 'Users', path: '/admin/users' },
+  { key: 'workflow-map', label: 'Workflow', path: '/admin/workflow/map' },
   {
     key: 'masters',
     label: 'System Masters',
+    section: 'Masters',
     children: [
       { key: 'industries', label: 'Industries', path: '/admin/masters/industries' },
       { key: 'dispo-types', label: 'Dispo Types', path: '/admin/masters/dispo-types' },
@@ -29,6 +31,7 @@ const PLATFORM_NAV_ITEMS = [
   {
     key: 'dialer-workflow',
     label: 'Dialer Workflow',
+    section: 'Workflow',
     children: [
       { key: 'default-dispositions', label: 'Default Dispositions', path: '/admin/workflow/default-dispositions' },
       { key: 'default-dialing-sets', label: 'Default Dialing Sets', path: '/admin/workflow/default-dialing-sets' },
@@ -40,7 +43,7 @@ const PLATFORM_NAV_ITEMS = [
  * Tenant Admin navigation items.
  */
 const TENANT_ADMIN_NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW },
+  { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW, section: 'Main' },
   { key: 'users', label: 'Users', path: '/users', permissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM] },
   { key: 'leads', label: 'Leads', path: '/leads', permission: PERMISSIONS.LEADS_READ },
   {
@@ -53,9 +56,11 @@ const TENANT_ADMIN_NAV_ITEMS = [
   { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
   { key: 'activities', label: 'Activities', path: '/activities', permission: PERMISSIONS.DIAL_EXECUTE },
   { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
+  { key: 'workflow-map', label: 'Workflow', path: '/workflow/map', permission: PERMISSIONS.DASHBOARD_VIEW },
   {
     key: 'dialer-workflow',
     label: 'Dialer Workflow',
+    section: 'Dialer',
     permission: PERMISSIONS.DISPOSITIONS_MANAGE,
     children: [
       { key: 'dispositions', label: 'Dispositions', path: '/workflow/dispositions', permission: PERMISSIONS.DISPOSITIONS_MANAGE },
@@ -73,6 +78,7 @@ const TENANT_ADMIN_NAV_ITEMS = [
   {
     key: 'whatsapp',
     label: 'WhatsApp',
+    section: 'Messaging',
     permission: PERMISSIONS.SETTINGS_MANAGE,
     children: [
       { key: 'whatsapp-accounts', label: 'Accounts', path: '/whatsapp/accounts', permission: PERMISSIONS.SETTINGS_MANAGE },
@@ -95,6 +101,7 @@ const TENANT_ADMIN_NAV_ITEMS = [
     key: 'settings',
     label: 'Settings',
     path: '/settings',
+    section: 'Workspace',
     permission: PERMISSIONS.SETTINGS_MANAGE,
     children: [
       { key: 'settings-main', label: 'Company', path: '/settings', permission: PERMISSIONS.SETTINGS_MANAGE },
@@ -114,7 +121,7 @@ const TENANT_ADMIN_NAV_ITEMS = [
  * Manager navigation items.
  */
 const MANAGER_NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW },
+  { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW, section: 'Main' },
   { key: 'leads', label: 'Leads', path: '/leads', permission: PERMISSIONS.LEADS_READ },
   {
     key: 'campaigns',
@@ -133,9 +140,11 @@ const MANAGER_NAV_ITEMS = [
   { key: 'activities', label: 'Activities', path: '/activities', permission: PERMISSIONS.DIAL_EXECUTE },
   { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
   { key: 'users', label: 'My team', path: '/users', permissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM] },
+  { key: 'workflow-map', label: 'Workflow', path: '/workflow/map', permission: PERMISSIONS.DASHBOARD_VIEW },
   {
     key: 'dialer-workflow',
     label: 'Dialer Workflow',
+    section: 'Dialer',
     permission: PERMISSIONS.DISPOSITIONS_MANAGE,
     children: [
       { key: 'dispositions', label: 'Dispositions', path: '/workflow/dispositions', permission: PERMISSIONS.DISPOSITIONS_MANAGE },
@@ -153,6 +162,7 @@ const MANAGER_NAV_ITEMS = [
   {
     key: 'whatsapp',
     label: 'WhatsApp',
+    section: 'Messaging',
     permission: PERMISSIONS.SETTINGS_MANAGE,
     children: [
       { key: 'whatsapp-accounts', label: 'Accounts', path: '/whatsapp/accounts', permission: PERMISSIONS.SETTINGS_MANAGE },
@@ -177,7 +187,7 @@ const MANAGER_NAV_ITEMS = [
  * Agent navigation items.
  */
 const AGENT_NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW },
+  { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW, section: 'Main' },
   { key: 'leads', label: 'Leads', path: '/leads', permission: PERMISSIONS.LEADS_READ },
   {
     key: 'campaigns',
@@ -187,9 +197,11 @@ const AGENT_NAV_ITEMS = [
   },
   { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
   { key: 'activities', label: 'Activities', path: '/activities', permission: PERMISSIONS.DIAL_EXECUTE },
+  { key: 'workflow-map', label: 'Workflow', path: '/workflow/map', permission: PERMISSIONS.DASHBOARD_VIEW },
   {
     key: 'dialer-workflow',
     label: 'Dialer Workflow',
+    section: 'Dialer',
     children: [
       { key: 'dispositions', label: 'Dispositions', path: '/workflow/dispositions' },
       { key: 'dialing-sets', label: 'Dialing Sets', path: '/workflow/dialing-sets' },
@@ -205,6 +217,7 @@ const AGENT_NAV_ITEMS = [
   {
     key: 'whatsapp',
     label: 'WhatsApp',
+    section: 'Messaging',
     children: [
       { key: 'whatsapp-accounts', label: 'Accounts', path: '/whatsapp/accounts' },
       { key: 'whatsapp-templates', label: 'Templates', path: '/whatsapp/templates' },

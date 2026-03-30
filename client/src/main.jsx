@@ -6,6 +6,7 @@ import { store } from './app/store';
 import { setAccessTokenGetter, setRefreshTokenGetter } from './services/axiosInstance';
 import App from './App';
 import { TenantProvider } from './context/TenantContext';
+import { ToastProvider } from './context/ToastContext';
 import './styles/global.scss';
 
 // Axios reads tokens from Redux (memory only)
@@ -23,7 +24,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <Provider store={store}>
       <TenantProvider>
         <BrowserRouter>
-          <App />
+          <ToastProvider>
+            <App />
+          </ToastProvider>
         </BrowserRouter>
       </TenantProvider>
     </Provider>

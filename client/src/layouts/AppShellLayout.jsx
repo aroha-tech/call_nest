@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSalesNavigation } from '../hooks/useSalesNavigation';
 import { SidebarUserPanel } from './SidebarUserPanel';
 import { useAppSelector } from '../app/hooks';
 import { selectTenant, selectUser } from '../features/auth/authSelectors';
+import { NavIcon, NavChevron } from '../components/navigation/NavIcon';
 import styles from './AppShellLayout.module.scss';
 
 /** Sidebar line under company name: human-readable role (not workspace slug). */
@@ -33,10 +34,11 @@ function NavGroup({ item, activeKey, activeParentKey, onNavigate, expandedGroups
         onClick={() => toggleGroup(item.key)}
         aria-expanded={isExpanded}
       >
-        <span className={styles.navLabel}>{item.label}</span>
-        <span className={`${styles.navChevron} ${isExpanded ? styles.expanded : ''}`}>
-          ▸
+        <span className={styles.navItemMain}>
+          <NavIcon navKey={item.key} className={styles.navItemIcon} />
+          <span className={styles.navLabel}>{item.label}</span>
         </span>
+        <NavChevron className={`${styles.navChevronSvg} ${isExpanded ? styles.navChevronExpanded : ''}`} />
       </button>
       {isExpanded && (
         <div className={styles.navGroupChildren}>
@@ -47,6 +49,7 @@ function NavGroup({ item, activeKey, activeParentKey, onNavigate, expandedGroups
               className={`${styles.navChild} ${activeKey === child.key ? styles.navChildActive : ''}`}
               onClick={() => onNavigate(child.path)}
             >
+              <NavIcon navKey={child.key} className={styles.navChildIcon} />
               <span className={styles.navLabel}>{child.label}</span>
             </button>
           ))}
@@ -69,10 +72,13 @@ export function AppShellLayout({ children }) {
 
   const name = tenant?.name?.trim();
   const slug = tenantSlug ?? tenant?.slug ?? null;
+  const theme = tenant?.theme;
+  const titleOverride = theme?.workspaceTitle?.trim();
   const workspaceTitle = isPlatform
     ? 'Call Nest'
-    : name || slug || 'Workspace';
+    : titleOverride || name || slug || 'Workspace';
   const workspaceSubtitle = roleLabelForSidebar(user, isPlatform);
+  const logoUrl = !isPlatform && theme?.logoUrl ? String(theme.logoUrl).trim() : '';
 
   useEffect(() => {
     if (activeParentKey) {
@@ -113,34 +119,47 @@ export function AppShellLayout({ children }) {
       {/* Sidebar */}
       <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''}`}>
         <div className={styles.sidebarHeader}>
-          <span className={styles.brand}>{workspaceTitle}</span>
+          {logoUrl ? (
+            <div className={styles.brandRow}>
+              <img src={logoUrl} alt="" className={styles.brandLogo} />
+              <span className={styles.brand}>{workspaceTitle}</span>
+            </div>
+          ) : (
+            <span className={styles.brand}>{workspaceTitle}</span>
+          )}
           {workspaceSubtitle != null && workspaceSubtitle !== '' && (
             <span className={styles.tenant}>{workspaceSubtitle}</span>
           )}
         </div>
         <nav className={styles.nav}>
-          {items.map((item) =>
-            item.children ? (
-              <NavGroup
-                key={item.key}
-                item={item}
-                activeKey={activeKey}
-                activeParentKey={activeParentKey}
-                onNavigate={handleNavClick}
-                expandedGroups={expandedGroups}
-                toggleGroup={toggleGroup}
-              />
-            ) : (
-              <button
-                key={item.key}
-                type="button"
-                className={`${styles.navItem} ${activeKey === item.key ? styles.navItemActive : ''}`}
-                onClick={() => handleNavClick(item.path)}
-              >
-                <span className={styles.navLabel}>{item.label}</span>
-              </button>
-            )
-          )}
+          {items.map((item) => (
+            <Fragment key={item.key}>
+              {item.section ? (
+                <div className={styles.navSectionLabel}>{item.section}</div>
+              ) : null}
+              {item.children ? (
+                <NavGroup
+                  item={item}
+                  activeKey={activeKey}
+                  activeParentKey={activeParentKey}
+                  onNavigate={handleNavClick}
+                  expandedGroups={expandedGroups}
+                  toggleGroup={toggleGroup}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className={`${styles.navItem} ${activeKey === item.key ? styles.navItemActive : ''}`}
+                  onClick={() => handleNavClick(item.path)}
+                >
+                  <span className={styles.navItemMain}>
+                    <NavIcon navKey={item.key} className={styles.navItemIcon} />
+                    <span className={styles.navLabel}>{item.label}</span>
+                  </span>
+                </button>
+              )}
+            </Fragment>
+          ))}
         </nav>
         <SidebarUserPanel onNavigate={() => setSidebarOpen(false)} />
       </aside>

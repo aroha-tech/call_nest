@@ -2,6 +2,7 @@ import { query } from '../../config/db.js';
 import { registerTenant, registerUser } from '../authService.js';
 import { cloneDefaultsForTenant } from '../dispositionCloneService.js';
 import { validateTenantSlugFormat } from '../../utils/tenantSlugRules.js';
+import { sanitizeThemePayload } from '../../utils/tenantTheme.js';
 
 const TENANT_USER_COUNT_SQL = `(SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id AND (u.is_platform_admin = 0 OR u.is_platform_admin IS NULL))`;
 
@@ -85,6 +86,7 @@ export async function findAll({
     `SELECT t.id, t.name, t.slug, t.industry_id, t.is_enabled, t.created_at, t.updated_at,
             t.whatsapp_send_mode, t.whatsapp_module_enabled, t.whatsapp_automation_enabled,
             t.email_communication_enabled, t.email_module_enabled, t.email_automation_enabled,
+            t.theme_json,
             ${TENANT_USER_COUNT_SQL} AS user_count
      FROM tenants t
      ${whereSQL}
@@ -108,7 +110,8 @@ export async function findById(id) {
   const [row] = await query(
     `SELECT id, name, slug, industry_id, is_enabled, created_at, updated_at,
             whatsapp_send_mode, whatsapp_module_enabled, whatsapp_automation_enabled,
-            email_communication_enabled, email_module_enabled, email_automation_enabled
+            email_communication_enabled, email_module_enabled, email_automation_enabled,
+            theme_json
      FROM tenants WHERE id = ? AND is_deleted = 0`,
     [id]
   );
@@ -134,6 +137,7 @@ export async function create(payload, createdBy) {
     email_communication_enabled,
     email_module_enabled,
     email_automation_enabled,
+    theme,
   } = payload;
 
   const tenant = await registerTenant(name, slug, industry_id || null);
@@ -164,6 +168,10 @@ export async function create(payload, createdBy) {
     await update(tenant.id, updatePayload);
   }
 
+  if (theme !== undefined) {
+    await update(tenant.id, { theme });
+  }
+
   return findById(tenant.id);
 }
 
@@ -188,6 +196,7 @@ export async function update(id, payload) {
     email_communication_enabled,
     email_module_enabled,
     email_automation_enabled,
+    theme,
   } = payload;
 
   if (slug !== undefined && slug !== existing.slug) {
@@ -246,6 +255,16 @@ export async function update(id, payload) {
   if (email_automation_enabled !== undefined) {
     updates.push('email_automation_enabled = ?');
     params.push(email_automation_enabled ? 1 : 0);
+  }
+
+  if (theme !== undefined) {
+    const sanitized = sanitizeThemePayload(theme);
+    if (sanitized === null) {
+      updates.push('theme_json = NULL');
+    } else if (sanitized !== undefined) {
+      updates.push('theme_json = ?');
+      params.push(JSON.stringify(sanitized));
+    }
   }
 
   if (updates.length === 0) return existing;

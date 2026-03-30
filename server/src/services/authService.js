@@ -8,6 +8,7 @@ import { redis, isRedisAvailable, refreshTokenKey, userSessionsKey } from '../co
 import { getUserPermissions, createSystemRolesForTenant, getRoleByTenantAndName } from './rbacService.js';
 import { cloneDefaultsForTenant } from './dispositionCloneService.js';
 import { validateTenantSlugFormat } from '../utils/tenantSlugRules.js';
+import { themeForJwt } from '../utils/tenantTheme.js';
 
 function ttlFromString(expiresIn) {
   if (typeof expiresIn !== 'string') {
@@ -39,13 +40,16 @@ async function tenantClaimsForJwt(tenantId, isPlatformAdmin) {
     return {};
   }
   const [row] = await query(
-    'SELECT name, slug FROM tenants WHERE id = ? AND is_deleted = 0',
+    'SELECT name, slug, theme_json FROM tenants WHERE id = ? AND is_deleted = 0',
     [tenantId]
   );
-  return {
+  const claims = {
     tenant_name: row?.name ?? null,
     tenant_slug: row?.slug ?? null,
   };
+  const jwtTheme = themeForJwt(row?.theme_json);
+  if (jwtTheme) claims.tenant_theme = jwtTheme;
+  return claims;
 }
 
 /**

@@ -1,0 +1,50 @@
+@use '../styles/variables' as *;
+
+.region {
+  position: fixed;
+  top: $space-4;
+  right: $space-4;
+  z-index: 10050;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: $space-2;
+  pointer-events: none;
+  max-width: min(100vw - 24px, 360px);
+}
+
+.toast {
+  pointer-events: none;
+  padding: $space-3 $space-4;
+  font-size: $font-size-sm;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-md;
+  box-shadow: $shadow-lg;
+  animation: toastIn 0.2s ease-out;
+
+  &.warning {
+    border-inline-start: 3px solid var(--color-warning);
+  }
+
+  &.error {
+    border-inline-start: 3px solid var(--color-danger);
+  }
+
+  &.info {
+    border-inline-start: 3px solid var(--color-info);
+  }
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

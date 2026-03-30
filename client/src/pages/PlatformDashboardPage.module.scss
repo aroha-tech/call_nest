@@ -21,6 +21,160 @@
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
+.dateFilter {
+  margin-bottom: $space-6;
+  padding: $space-5 $space-6;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-lg;
+}
+
+// Compact dashboard date range (PageHeader actions) — single bordered box
+.dateFilterBox {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 6px 8px 0;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-md;
+  max-width: 100%;
+}
+
+.dateFilterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: $space-2;
+  padding-bottom: 6px;
+}
+
+.dateFieldInline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dateLabelCompact {
+  font-size: 10px;
+  font-weight: $font-weight-semibold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.dateInputCompact {
+  box-sizing: border-box;
+  width: 112px;
+  min-width: 112px;
+  min-height: 26px;
+  padding: 2px 6px;
+  font-size: $font-size-xs;
+  line-height: 1.25;
+  color: var(--color-text-primary);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-sm;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 1px;
+  }
+}
+
+.dateFilterActionsCompact {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding-left: 2px;
+}
+
+// Legacy / full-width variants (unused on dashboards; kept for reuse)
+.dateFilterInner {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+  max-width: 960px;
+}
+
+.dateFilterControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: $space-4 $space-5;
+}
+
+.dateField {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+  flex: 1 1 180px;
+  min-width: min(100%, 200px);
+  max-width: 260px;
+}
+
+.dateLabel {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.dateInput {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 46px;
+  padding: $space-3 $space-4;
+  font-size: $font-size-base;
+  line-height: 1.35;
+  color: var(--color-text-primary);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-md;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 2px;
+  }
+}
+
+.dateFilterActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $space-3;
+  flex: 0 1 auto;
+  padding-bottom: 2px;
+}
+
+.dateFilterHint {
+  margin: 0;
+  font-size: $font-size-sm;
+  line-height: $line-height-relaxed;
+  color: var(--color-text-muted);
+  max-width: 52rem;
+}
+
+.dateRangeNotice {
+  margin: 0;
+  padding: $space-3 $space-4;
+  font-size: $font-size-sm;
+  line-height: $line-height-relaxed;
+  color: var(--color-text-secondary);
+  background: var(--color-warning-subtle);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: $radius-md;
+}
+
+.statsRefreshing {
+  opacity: 0.65;
+  pointer-events: none;
+  transition: opacity $transition-fast;
+}
+
 // —— KPI cards ——
 .kpiSection {
   display: grid;

@@ -1,0 +1,10 @@
+@use '../styles/variables' as *;
+
+.wrapper {
+  padding: $space-5;
+  max-width: 1280px;
+}
+
+.intro {
+  margin-bottom: $space-5;
+}

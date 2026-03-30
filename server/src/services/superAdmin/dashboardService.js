@@ -1,25 +1,42 @@
 import { query } from '../../config/db.js';
+import { sqlDateBetweenInclusive } from '../../utils/dateRangeQuery.js';
 
 /**
  * Stats for super admin dashboard: customer tenant count, tenant user count, users by role.
  * Excludes platform tenant (id=1) and super admin users so the picture is tenants + their users only.
+ * @param {{ fromDate: string, toDate: string } | null} dateRange - optional inclusive calendar range on created_at
  */
-export async function getStats() {
-  const [tenantsRow] = await query(
-    'SELECT COUNT(*) AS total FROM tenants WHERE is_deleted = 0 AND id > 1'
-  );
+export async function getStats(dateRange = null) {
+  let tenantSql =
+    'SELECT COUNT(*) AS total FROM tenants WHERE is_deleted = 0 AND id > 1';
+  let tenantParams = [];
 
-  const [usersRow] = await query(
-    'SELECT COUNT(*) AS total FROM users WHERE is_deleted = 0 AND is_platform_admin = 0'
-  );
+  let userSql = `SELECT COUNT(*) AS total FROM users WHERE is_deleted = 0 AND is_platform_admin = 0`;
+  let userParams = [];
 
-  const roleRows = await query(
-    `SELECT role, COUNT(*) AS count
+  let roleSql = `SELECT role, COUNT(*) AS count
      FROM users
-     WHERE is_deleted = 0 AND is_platform_admin = 0 AND role IS NOT NULL
-     GROUP BY role
-     ORDER BY role`
-  );
+     WHERE is_deleted = 0 AND is_platform_admin = 0 AND role IS NOT NULL`;
+  const roleParams = [];
+
+  if (dateRange) {
+    const t = sqlDateBetweenInclusive('created_at', dateRange);
+    tenantSql += t.clause;
+    tenantParams = [...t.params];
+
+    const u = sqlDateBetweenInclusive('created_at', dateRange);
+    userSql += u.clause;
+    userParams = [...u.params];
+
+    roleSql += u.clause;
+    roleParams.push(...u.params);
+  }
+
+  roleSql += ' GROUP BY role ORDER BY role';
+
+  const [tenantsRow] = await query(tenantSql, tenantParams);
+  const [usersRow] = await query(userSql, userParams);
+  const roleRows = await query(roleSql, roleParams);
 
   const usersByRole = roleRows.reduce((acc, row) => {
     acc[row.role] = row.count;
@@ -27,6 +44,7 @@ export async function getStats() {
   }, {});
 
   return {
+    dateRange: dateRange ? { from: dateRange.fromDate, to: dateRange.toDate } : null,
     tenantsTotal: tenantsRow?.total ?? 0,
     usersTotal: usersRow?.total ?? 0,
     usersByRole: {

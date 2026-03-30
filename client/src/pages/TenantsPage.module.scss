@@ -273,3 +273,55 @@
     text-decoration: underline;
   }
 }
+
+.themeColorRow {
+  display: flex;
+  align-items: flex-end;
+  gap: $space-3;
+}
+
+.themeColorInputGrow {
+  flex: 1;
+  min-width: 0;
+}
+
+.colorPickerLabel {
+  display: flex;
+  flex-direction: column;
+  gap: $space-1;
+  flex-shrink: 0;
+}
+
+.colorPickerLabelText {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  color: var(--color-text-secondary);
+}
+
+.colorPicker {
+  width: 44px;
+  height: 36px;
+  padding: 2px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-sm;
+  background: var(--color-bg-elevated);
+  cursor: pointer;
+}
+
+.themeSplitRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $space-3;
+
+  @media (max-width: 560px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.themeRadiusInput {
+  min-width: 0;
+}
+
+.themeFontSelect {
+  min-width: 0;
+}

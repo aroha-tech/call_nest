@@ -10,6 +10,7 @@ import { HomePage } from '../pages/HomePage';
 import { TenantDashboardPage } from '../pages/TenantDashboardPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { PlatformDashboardPage } from '../pages/PlatformDashboardPage';
+import { WorkflowMapPage } from '../pages/WorkflowMapPage';
 import { TenantsPage } from '../pages/TenantsPage';
 import { UsersPage } from '../pages/UsersPage';
 import { TenantUsersPage } from '../pages/TenantUsersPage';
@@ -162,6 +163,16 @@ function TenantRoutes() {
           <ProtectedRoute permission={PERMISSIONS.DASHBOARD_VIEW}>
             <AppShellLayout>
               <TenantDashboardPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/workflow/map"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.DASHBOARD_VIEW}>
+            <AppShellLayout>
+              <WorkflowMapPage variant="tenant" />
             </AppShellLayout>
           </ProtectedRoute>
         }
@@ -537,6 +548,16 @@ function PlatformRoutes() {
           <ProtectedRoute>
             <AppShellLayout>
               <PlatformDashboardPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/workflow/map"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <WorkflowMapPage variant="platform" />
             </AppShellLayout>
           </ProtectedRoute>
         }

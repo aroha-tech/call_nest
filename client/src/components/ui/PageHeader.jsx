@@ -7,11 +7,14 @@ export function PageHeader({
   actions,
   breadcrumbs,
   className = '',
+  actionsAlign = 'start',
 }) {
   return (
     <div className={`${styles.header} ${className}`}>
       {breadcrumbs && <div className={styles.breadcrumbs}>{breadcrumbs}</div>}
-      <div className={styles.row}>
+      <div
+        className={`${styles.row} ${actionsAlign === 'center' ? styles.rowActionsCenter : ''}`}
+      >
         <div className={styles.info}>
           <h1 className={styles.title}>{title}</h1>
           {description && <p className={styles.description}>{description}</p>}

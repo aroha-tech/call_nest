@@ -1,0 +1,214 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.wrap {
+  margin-bottom: $space-8;
+}
+
+.header {
+  margin-bottom: $space-4;
+}
+
+.title {
+  font-size: $font-size-base;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  margin: 0 0 $space-1;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: $font-size-sm;
+  color: var(--color-text-muted);
+  margin: 0;
+  line-height: $line-height-relaxed;
+  max-width: 52rem;
+}
+
+.panel {
+  position: relative;
+  padding: $space-5 $space-5 $space-6;
+  border-radius: $radius-xl;
+  border: 1px solid var(--color-border-subtle);
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--color-primary-600) 12%, var(--color-bg-elevated)) 0%,
+    var(--color-bg-surface) 42%,
+    var(--color-bg-surface) 100%
+  );
+  box-shadow: $shadow-sm;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse 80% 50% at 50% -20%,
+      color-mix(in srgb, var(--color-primary-500) 18%, transparent),
+      transparent 55%
+    );
+    pointer-events: none;
+  }
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: $space-2;
+  margin-bottom: $space-2;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.rowSpaced {
+  margin-top: $space-3;
+}
+
+.node {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: min(100%, 140px);
+  max-width: 200px;
+  padding: $space-3 $space-4;
+  border-radius: $radius-lg;
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-bg-elevated) 88%, transparent);
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color $transition-fast,
+    box-shadow $transition-fast,
+    transform $transition-fast;
+  cursor: default;
+
+  &.clickable {
+    cursor: pointer;
+
+    &:hover {
+      border-color: color-mix(in srgb, var(--color-primary-500) 45%, var(--color-border));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-500) 25%, transparent);
+      transform: translateY(-1px);
+    }
+  }
+}
+
+.nodeLabel {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.nodeHint {
+  font-size: $font-size-2xs;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+.connectorH {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+  padding: 0 $space-1;
+  user-select: none;
+}
+
+.connectorV {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+  padding: $space-1 0;
+  user-select: none;
+}
+
+.arrowSvg {
+  width: 28px;
+  height: 14px;
+  opacity: 0.85;
+}
+
+.arrowSvgDown {
+  width: 14px;
+  height: 28px;
+  opacity: 0.85;
+}
+
+.merge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin: $space-1 0;
+}
+
+.mergeCap {
+  width: 2px;
+  height: $space-3;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-primary-500) 55%, transparent),
+    color-mix(in srgb, var(--color-primary-400) 35%, transparent)
+  );
+  border-radius: 1px;
+}
+
+.branchRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: $space-3;
+  margin-top: $space-2;
+}
+
+.branchCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $space-2;
+  flex: 1;
+  min-width: min(100%, 200px);
+}
+
+.note {
+  margin-top: $space-5;
+  padding-top: $space-4;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: $font-size-2xs;
+  color: var(--color-text-tertiary);
+  line-height: 1.5;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .connectorH {
+    transform: rotate(90deg);
+    padding: $space-2 0;
+    align-self: center;
+  }
+
+  .node {
+    max-width: none;
+  }
+}

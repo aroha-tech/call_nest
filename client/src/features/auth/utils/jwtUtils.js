@@ -35,12 +35,22 @@ export function userAndTenantFromToken(accessToken) {
     isPlatformAdmin: Boolean(payload.is_platform_admin),
   };
 
+  let theme = null;
+  if (
+    payload.tenant_theme != null &&
+    typeof payload.tenant_theme === 'object' &&
+    !Array.isArray(payload.tenant_theme)
+  ) {
+    theme = payload.tenant_theme;
+  }
+
   const tenant =
     payload.tenant_id != null
       ? {
           id: payload.tenant_id,
           name: payload.tenant_name ?? null,
           slug: payload.tenant_slug ?? null,
+          theme,
         }
       : null;
   const permissions = Array.isArray(payload.permissions) ? payload.permissions : [];

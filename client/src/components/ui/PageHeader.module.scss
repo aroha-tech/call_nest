@@ -24,6 +24,12 @@
   }
 }
 
+.rowActionsCenter {
+  @include sm {
+    align-items: center;
+  }
+}
+
 .info {
   flex: 1;
   min-width: 0;

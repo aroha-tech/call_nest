@@ -56,6 +56,7 @@ export async function create(req, res, next) {
       email_communication_enabled,
       email_module_enabled,
       email_automation_enabled,
+      theme,
     } = req.body;
     if (!name || !slug) {
       return res.status(400).json({ error: 'name and slug are required' });
@@ -78,6 +79,7 @@ export async function create(req, res, next) {
         email_communication_enabled,
         email_module_enabled,
         email_automation_enabled,
+        theme,
       },
       req.user?.id
     );
@@ -100,6 +102,7 @@ export async function update(req, res, next) {
       email_communication_enabled,
       email_module_enabled,
       email_automation_enabled,
+      theme,
     } = req.body;
     const tenant = await tenantsService.update(req.params.id, {
       name,
@@ -112,6 +115,7 @@ export async function update(req, res, next) {
       email_communication_enabled,
       email_module_enabled,
       email_automation_enabled,
+      theme,
     });
     if (!tenant) {
       return res.status(404).json({ error: 'Tenant not found' });

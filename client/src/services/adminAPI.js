@@ -5,7 +5,9 @@ import { axiosInstance } from './axiosInstance';
  */
 
 export const dashboardAPI = {
-  getStats: () => axiosInstance.get('/api/admin/dashboard/stats'),
+  /** @param {{ from?: string, to?: string }} [params] */
+  getStats: (params) =>
+    axiosInstance.get('/api/admin/dashboard/stats', { params: params || {} }),
 };
 
 export const tenantsAPI = {

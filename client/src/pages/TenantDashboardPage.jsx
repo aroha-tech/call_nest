@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppSelector } from '../app/hooks';
 import { selectUser } from '../features/auth/authSelectors';
@@ -6,7 +6,10 @@ import { usePermissions } from '../hooks/usePermission';
 import { tenantDashboardAPI } from '../services/tenantAPI';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
+import { Button } from '../components/ui/Button';
+import { TenantDataCharts } from '../components/dashboard/DashboardDataCharts';
 import { PERMISSIONS } from '../utils/permissionUtils';
+import { useToast } from '../context/ToastContext';
 import styles from './TenantDashboardPage.module.scss';
 import platformStyles from './PlatformDashboardPage.module.scss';
 
@@ -73,31 +76,74 @@ function buildShortcuts(canPerm, canAnyPerm, role) {
 }
 
 export function TenantDashboardPage() {
+  const { showToast } = useToast();
   const user = useAppSelector(selectUser);
   const { can, canAny } = usePermissions();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [rangeFrom, setRangeFrom] = useState('');
+  const [rangeTo, setRangeTo] = useState('');
+  const [activeRange, setActiveRange] = useState(null);
+  const initialFetch = useRef(true);
 
   const role = user?.role ?? 'agent';
 
   useEffect(() => {
     let mounted = true;
+    const params = activeRange ? { from: activeRange.from, to: activeRange.to } : {};
+    if (initialFetch.current) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     tenantDashboardAPI
-      .get()
+      .get({ params })
       .then((res) => {
-        if (mounted) setData(res.data?.data ?? null);
+        if (mounted) {
+          setData(res.data?.data ?? null);
+          setError(null);
+        }
       })
       .catch((err) => {
         if (mounted) setError(err.response?.data?.error || err.message);
       })
       .finally(() => {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          initialFetch.current = false;
+          setLoading(false);
+          setRefreshing(false);
+        }
       });
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [activeRange]);
+
+  function applyDateRange() {
+    const from = rangeFrom.trim();
+    const to = rangeTo.trim();
+    if (!from || !to) {
+      showToast(
+        'Pick a start and end date, then Apply. Or tap Reset for all-time totals.',
+        'warning'
+      );
+      return;
+    }
+    if (from > to) {
+      showToast('End date must be on or after the start date.', 'warning');
+      return;
+    }
+    setActiveRange({ from, to });
+  }
+
+  function clearDateRange() {
+    setRangeFrom('');
+    setRangeTo('');
+    setActiveRange(null);
+    setError(null);
+  }
 
   const shortcuts = useMemo(
     () => buildShortcuts(can, canAny, role),
@@ -128,13 +174,74 @@ export function TenantDashboardPage() {
   const usersTotal = data?.usersTotal ?? 0;
   const usersByRole = data?.usersByRole ?? {};
 
+  const dr = data?.dateRange;
+  const headerDescription = dr
+    ? `${data?.headline ?? 'Workspace overview'} · ${dr.from} → ${dr.to}`
+    : data?.headline ?? 'Workspace health and quick access';
+
   return (
     <div className={platformStyles.wrapper}>
       <PageHeader
         title="Dashboard"
-        description={data?.headline ?? 'Workspace health and quick access'}
+        description={headerDescription}
+        actionsAlign="center"
+        actions={
+          <div
+            className={platformStyles.dateFilterBox}
+            title="Filter KPIs and charts by record creation date (inclusive). Recent users use the same range."
+          >
+            <div className={platformStyles.dateFilterRow}>
+              <span className={platformStyles.dateFieldInline}>
+                <label className={platformStyles.dateLabelCompact} htmlFor="tenant-dash-from">
+                  From
+                </label>
+                <input
+                  id="tenant-dash-from"
+                  className={platformStyles.dateInputCompact}
+                  type="date"
+                  value={rangeFrom}
+                  onChange={(e) => setRangeFrom(e.target.value)}
+                />
+              </span>
+              <span className={platformStyles.dateFieldInline}>
+                <label className={platformStyles.dateLabelCompact} htmlFor="tenant-dash-to">
+                  To
+                </label>
+                <input
+                  id="tenant-dash-to"
+                  className={platformStyles.dateInputCompact}
+                  type="date"
+                  value={rangeTo}
+                  onChange={(e) => setRangeTo(e.target.value)}
+                />
+              </span>
+              <div className={platformStyles.dateFilterActionsCompact}>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="xs"
+                  onClick={applyDateRange}
+                  loading={refreshing}
+                >
+                  Apply
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="xs"
+                  title="Clear dates and show all-time totals"
+                  onClick={clearDateRange}
+                  disabled={refreshing}
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </div>
+        }
       />
 
+      <div className={refreshing ? platformStyles.statsRefreshing : undefined}>
       <section className={platformStyles.kpiSection}>
         {scope === 'tenant' && (
           <>
@@ -215,6 +322,16 @@ export function TenantDashboardPage() {
           </>
         )}
       </section>
+
+      <TenantDataCharts
+        scope={scope}
+        leadsTotal={data?.leadsTotal ?? 0}
+        contactsTotal={data?.contactsTotal ?? 0}
+        campaignsTotal={data?.campaignsTotal ?? 0}
+        usersTotal={usersTotal}
+        usersByRole={usersByRole}
+      />
+      </div>
 
       <div className={platformStyles.grid}>
         {(scope === 'tenant' || scope === 'team') && usersTotal > 0 && (
