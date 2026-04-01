@@ -12,6 +12,7 @@ import { contactsAPI } from '../../services/contactsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
 import { campaignsAPI } from '../../services/campaignsAPI';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
+import { ContactOpportunitiesSection } from './ContactOpportunitiesSection';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import styles from './ContactFormPage.module.scss';
 
@@ -953,6 +954,10 @@ export function ContactFormPage({ defaultType }) {
           </div>
         </section>
       </form>
+
+      {!isNew && contact ? (
+        <ContactOpportunitiesSection contactId={id} contactType={contact.type || type} />
+      ) : null}
     </div>
   );
 }

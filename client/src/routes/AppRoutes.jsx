@@ -46,6 +46,7 @@ import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
 import { TenantCompanySettingsPage } from '../pages/TenantCompanySettingsPage';
 import { CampaignsPage } from '../features/campaigns/CampaignsPage';
 import { CampaignOpenPage } from '../features/campaigns/CampaignOpenPage';
+import { DealsPage } from '../pages/DealsPage';
 import { useEmailModuleEnabled } from '../hooks/useEmailModuleEnabled';
 
 /**
@@ -423,7 +424,7 @@ function TenantRoutes() {
         element={
           <ProtectedRoute permission={PERMISSIONS.PIPELINES_MANAGE}>
             <AppShellLayout>
-              <PlaceholderPage title="Deals" />
+              <DealsPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

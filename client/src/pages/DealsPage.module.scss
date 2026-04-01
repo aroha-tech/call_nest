@@ -1,0 +1,159 @@
+@import '../styles/variables.scss';
+
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--color-border-subtle, #e5e7eb);
+  padding-bottom: 0;
+}
+
+.tab {
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  font-weight: 500;
+  color: var(--color-text-secondary, #64748b);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+
+  &:hover {
+    color: var(--color-text-primary, #0f172a);
+  }
+}
+
+.tabActive {
+  color: var(--color-primary-600, #2563eb);
+  border-bottom-color: var(--color-primary-600, #2563eb);
+}
+
+.dealCard {
+  border: 1px solid var(--color-border-subtle, #e5e7eb);
+  border-radius: var(--radius-md, 8px);
+  padding: 16px;
+  margin-bottom: 16px;
+  background: var(--color-bg-surface, #fff);
+}
+
+.dealHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.dealTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.dealActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stageTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+
+  th,
+  td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--color-border-subtle, #f1f5f9);
+  }
+
+  th {
+    color: var(--color-text-secondary, #64748b);
+    font-weight: 500;
+  }
+}
+
+.boardToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.boardScroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  min-height: 200px;
+}
+
+.boardCol {
+  flex: 0 0 260px;
+  min-width: 220px;
+  background: var(--color-bg-muted, #f8fafc);
+  border-radius: var(--radius-md, 8px);
+  padding: 10px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.boardColTitle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--color-text-primary, #0f172a);
+}
+
+.boardColMeta {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #64748b);
+  margin-bottom: 10px;
+}
+
+.oppCard {
+  display: block;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: var(--color-bg-surface, #fff);
+  border: 1px solid var(--color-border-subtle, #e5e7eb);
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+
+  &:hover {
+    border-color: var(--color-primary-400, #60a5fa);
+  }
+}
+
+.oppName {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.oppMeta {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #64748b);
+  margin-top: 4px;
+}
+
+.inlineForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+  margin-top: 12px;
+}
+
+.emptyHint {
+  color: var(--color-text-secondary, #64748b);
+  font-size: 0.875rem;
+}

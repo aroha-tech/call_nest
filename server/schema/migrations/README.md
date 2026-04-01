@@ -28,6 +28,7 @@ Schema migrations for upgrading existing Call Nest databases.
 | `021_campaigns_audit_columns.sql` | campaigns: add `updated_by`, `deleted_at`, `deleted_by` + FKs (skip if 020 already defined them) |
 | `022_contacts_deleted_by.sql` | contacts: `deleted_by`, `deleted_source` + FK (for soft delete) |
 | `023_users_team_permission.sql` | permission `users.team` + grant to manager role (team user assign) |
+| `030_deals_and_opportunities.sql` | `deals`, `deal_stages`, `opportunities` (pipelines, stages with progression %, one opportunity per contact per pipeline) |
 
 ## Usage
 
