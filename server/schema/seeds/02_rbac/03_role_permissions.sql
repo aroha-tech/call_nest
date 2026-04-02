@@ -60,7 +60,9 @@ WHERE r.name = 'agent'
     'contacts.read',
     'leads.read',
     'leads.update',
-    'dial.execute'
+    'dial.execute',
+    'workflow.view',
+    'scripts.self'
   );
 
 SELECT 'Role permissions mapped' AS status;

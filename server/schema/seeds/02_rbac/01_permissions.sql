@@ -39,6 +39,8 @@ INSERT IGNORE INTO permissions (code, description) VALUES
 
   -- Disposition management
   ('dispositions.manage', 'Manage call dispositions'),
+  ('workflow.view', 'View dispositions and dialing sets (read-only)'),
+  ('scripts.self', 'Create call scripts; edit or delete only own scripts'),
 
   -- Telephony configuration
   ('telephony.manage', 'Manage telephony settings and configurations');

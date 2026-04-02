@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { PageHeader } from '../../../../components/ui/PageHeader';
 import { Button } from '../../../../components/ui/Button';
 import { Input } from '../../../../components/ui/Input';
@@ -13,9 +13,10 @@ import { Alert } from '../../../../components/ui/Alert';
 import { useDialingSets, useDialingSetDispositions, useDispositions } from '../../hooks/useTenantData';
 import { useTableLoadingState } from '../../../../hooks/useTableLoadingState';
 import { TableDataRegion } from '../../../../components/admin/TableDataRegion';
+import { dialerPreferencesAPI } from '../../../../services/dialerPreferencesAPI';
 import styles from '../../components/MasterCRUDPage.module.scss';
 
-export function DialingSetsPage() {
+export function DialingSetsPage({ readOnly = false }) {
   const {
     dialingSets,
     loading,
@@ -51,6 +52,37 @@ export function DialingSetsPage() {
 
   const [showDispoModal, setShowDispoModal] = useState(false);
   const [selectedDispoId, setSelectedDispoId] = useState('');
+  const [myDefaultSetId, setMyDefaultSetId] = useState(null);
+  const [myDefaultSaving, setMyDefaultSaving] = useState(false);
+
+  const loadMyDefault = useCallback(async () => {
+    try {
+      const res = await dialerPreferencesAPI.get();
+      const id = res.data?.data?.default_dialing_set_id;
+      setMyDefaultSetId(id != null && id !== '' ? String(id) : null);
+    } catch {
+      setMyDefaultSetId(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMyDefault();
+  }, [loadMyDefault]);
+
+  const handleSetMyDefault = async (e, item) => {
+    e.stopPropagation();
+    if (myDefaultSaving) return;
+    setMyDefaultSaving(true);
+    try {
+      const nextId = String(myDefaultSetId ?? '') === String(item.id ?? '') ? null : item.id;
+      await dialerPreferencesAPI.update({ default_dialing_set_id: nextId });
+      setMyDefaultSetId(nextId != null ? String(nextId) : null);
+    } catch {
+      /* surface via toast if needed */
+    } finally {
+      setMyDefaultSaving(false);
+    }
+  };
 
   const filteredData = useMemo(() => {
     if (!search) return dialingSets;
@@ -152,8 +184,12 @@ export function DialingSetsPage() {
     <div className={styles.page}>
       <PageHeader
         title="Dialing Sets"
-        description="Organize dispositions into sets for different calling campaigns"
-        actions={<Button onClick={openCreateModal}>+ Create Dialing Set</Button>}
+        description={
+          readOnly
+            ? 'View dialing sets and how dispositions are ordered (read-only).'
+            : 'Organize dispositions into sets for different calling campaigns'
+        }
+        actions={!readOnly ? <Button onClick={openCreateModal}>+ Create Dialing Set</Button> : undefined}
       />
 
       {error && <Alert variant="error">{error}</Alert>}
@@ -167,7 +203,13 @@ export function DialingSetsPage() {
         <div className={styles.listPanel}>
           <h3 className={styles.panelTitle}>Dialing Sets</h3>
           {filteredData.length === 0 ? (
-            <EmptyState icon="📁" title="No dialing sets" description="Create your first dialing set." action={openCreateModal} actionLabel="Create Set" />
+            <EmptyState
+              icon="📁"
+              title="No dialing sets"
+              description="Create your first dialing set."
+              action={!readOnly ? openCreateModal : undefined}
+              actionLabel="Create Set"
+            />
           ) : (
             <div className={styles.list}>
               {filteredData.map((item) => (
@@ -178,21 +220,41 @@ export function DialingSetsPage() {
                 >
                   <div className={styles.listItemContent}>
                     <span className={styles.listItemName}>{item.name}</span>
-                    {item.is_default === 1 && <Badge variant="success">Default</Badge>}
+                    {item.is_default === 1 && <Badge variant="success">Team default</Badge>}
+                    {String(myDefaultSetId ?? '') === String(item.id ?? '') && (
+                      <Badge variant="primary">My default</Badge>
+                    )}
                     {item.is_system_generated === 1 && <Badge variant="muted">System</Badge>}
                   </div>
                   <div className={styles.listItemActions}>
                     <IconButton
                       size="sm"
                       variant="subtle"
-                      title={item.is_default === 1 ? 'Default set' : 'Set as default'}
-                      onClick={(e) => { e.stopPropagation(); if (item.is_default !== 1) handleSetDefault(item.id); }}
-                      disabled={item.is_default === 1}
+                      title={
+                        String(myDefaultSetId ?? '') === String(item.id ?? '')
+                          ? 'Clear as my personal default'
+                          : 'Use as my personal default when dialing'
+                      }
+                      onClick={(e) => handleSetMyDefault(e, item)}
+                      disabled={myDefaultSaving}
                     >
-                      {item.is_default === 1 ? '★' : '☆'}
+                      {String(myDefaultSetId ?? '') === String(item.id ?? '') ? '★' : '☆'}
                     </IconButton>
-                    <IconButton size="sm" title="Edit" onClick={(e) => { e.stopPropagation(); openEditModal(item); }}>✏️</IconButton>
-                    <IconButton size="sm" variant="danger" title={item.is_default === 1 ? 'Default set cannot be deleted' : 'Delete'} disabled={item.is_default === 1} onClick={(e) => { e.stopPropagation(); setDeleteItem(item); setDeleteError(null); }}>🗑️</IconButton>
+                    {!readOnly && (
+                      <>
+                        <IconButton
+                          size="sm"
+                          variant="subtle"
+                          title={item.is_default === 1 ? 'Team default set' : 'Set as team default (admin)'}
+                          onClick={(e) => { e.stopPropagation(); if (item.is_default !== 1) handleSetDefault(item.id); }}
+                          disabled={item.is_default === 1}
+                        >
+                          {item.is_default === 1 ? '★' : '☆'}
+                        </IconButton>
+                        <IconButton size="sm" title="Edit" onClick={(e) => { e.stopPropagation(); openEditModal(item); }}>✏️</IconButton>
+                        <IconButton size="sm" variant="danger" title={item.is_default === 1 ? 'Default set cannot be deleted' : 'Delete'} disabled={item.is_default === 1} onClick={(e) => { e.stopPropagation(); setDeleteItem(item); setDeleteError(null); }}>🗑️</IconButton>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -205,7 +267,9 @@ export function DialingSetsPage() {
             <>
               <div className={styles.detailHeader}>
                 <h3>{selectedSet.name}</h3>
-                <Button size="sm" onClick={() => setShowDispoModal(true)}>+ Add Disposition</Button>
+                {!readOnly && (
+                  <Button size="sm" onClick={() => setShowDispoModal(true)}>+ Add Disposition</Button>
+                )}
               </div>
               <div className={styles.detailContent}>
               {setDispositions.length === 0 ? (
@@ -214,26 +278,30 @@ export function DialingSetsPage() {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableHeaderCell width="60px">Order</TableHeaderCell>
+                      {!readOnly && <TableHeaderCell width="60px">Order</TableHeaderCell>}
                       <TableHeaderCell>Disposition</TableHeaderCell>
                       <TableHeaderCell width="100px">Code</TableHeaderCell>
-                      <TableHeaderCell width="60px" align="center">Remove</TableHeaderCell>
+                      {!readOnly && <TableHeaderCell width="60px" align="center">Remove</TableHeaderCell>}
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {setDispositions.map((d, idx) => (
                       <TableRow key={d.id}>
-                        <TableCell>
-                          <div className={styles.actions}>
-                            <IconButton size="sm" onClick={() => handleMoveDisposition(d.id, 'up')} disabled={idx === 0}>↑</IconButton>
-                            <IconButton size="sm" onClick={() => handleMoveDisposition(d.id, 'down')} disabled={idx === setDispositions.length - 1}>↓</IconButton>
-                          </div>
-                        </TableCell>
+                        {!readOnly && (
+                          <TableCell>
+                            <div className={styles.actions}>
+                              <IconButton size="sm" onClick={() => handleMoveDisposition(d.id, 'up')} disabled={idx === 0}>↑</IconButton>
+                              <IconButton size="sm" onClick={() => handleMoveDisposition(d.id, 'down')} disabled={idx === setDispositions.length - 1}>↓</IconButton>
+                            </div>
+                          </TableCell>
+                        )}
                         <TableCell>{d.disposition_name}</TableCell>
                         <TableCell><code>{d.disposition_code}</code></TableCell>
-                        <TableCell align="center">
-                          <IconButton size="sm" variant="danger" onClick={() => handleRemoveDisposition(d.id)}>✕</IconButton>
-                        </TableCell>
+                        {!readOnly && (
+                          <TableCell align="center">
+                            <IconButton size="sm" variant="danger" onClick={() => handleRemoveDisposition(d.id)}>✕</IconButton>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>

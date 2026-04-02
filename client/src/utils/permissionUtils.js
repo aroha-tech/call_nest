@@ -88,6 +88,8 @@ export const PERMISSIONS = {
 
   // Dispositions
   DISPOSITIONS_MANAGE: 'dispositions.manage',
+  /** View dispositions & dialing sets (read-only); agents */
+  WORKFLOW_VIEW: 'workflow.view',
 
   // Dialing Sets
   DIALING_SETS_MANAGE: 'dialing_sets.manage',
@@ -95,6 +97,8 @@ export const PERMISSIONS = {
   // Templates & Resources
   TEMPLATES_MANAGE: 'templates.manage',
   SCRIPTS_MANAGE: 'scripts.manage',
+  /** Create scripts; edit/delete only own (server-enforced) */
+  SCRIPTS_SELF: 'scripts.self',
 
   // Telephony
   TELEPHONY_MANAGE: 'telephony.manage',

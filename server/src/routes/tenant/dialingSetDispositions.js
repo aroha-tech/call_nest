@@ -1,14 +1,17 @@
 import { Router } from 'express';
 import * as dialingSetDispositionsController from '../../controllers/tenant/dialingSetDispositionsController.js';
-import { tenantAuthMiddleware } from '../../middleware/auth.js';
+import { tenantAuthMiddleware, requirePermission } from '../../middleware/auth.js';
 
 const router = Router();
 
 router.use(tenantAuthMiddleware);
 
-router.get('/', dialingSetDispositionsController.getAll);
-router.post('/', dialingSetDispositionsController.create);
-router.delete('/:id', dialingSetDispositionsController.remove);
-router.post('/:id/move', dialingSetDispositionsController.move);
+const viewOrManage = requirePermission(['dispositions.manage', 'workflow.view', 'dial.execute']);
+const manageOnly = requirePermission(['dispositions.manage']);
+
+router.get('/', viewOrManage, dialingSetDispositionsController.getAll);
+router.post('/', manageOnly, dialingSetDispositionsController.create);
+router.delete('/:id', manageOnly, dialingSetDispositionsController.remove);
+router.post('/:id/move', manageOnly, dialingSetDispositionsController.move);
 
 export default router;

@@ -116,7 +116,11 @@ async function detectAndValidateVariables(scriptBody) {
   return { variables_used: keys, validationError: null };
 }
 
-export async function create(tenantId, data, createdBy) {
+/**
+ * @param {{ skipAutoDefault?: boolean }} [options] - if true, never set is_default (agent-owned creates)
+ */
+export async function create(tenantId, data, createdBy, options = {}) {
+  const { skipAutoDefault = false } = options;
   const { script_name, script_body, status = 1 } = data;
 
   if (!script_name || !script_body) {
@@ -144,7 +148,10 @@ export async function create(tenantId, data, createdBy) {
     'SELECT id FROM call_scripts WHERE tenant_id = ? AND is_deleted = 0 AND is_default = 1 LIMIT 1',
     [tenantId]
   );
-  const isDefault = countRow.total === 0 || !defaultRow?.id ? 1 : 0;
+  let isDefault = countRow.total === 0 || !defaultRow?.id ? 1 : 0;
+  if (skipAutoDefault) {
+    isDefault = 0;
+  }
 
   const result = await query(
     `INSERT INTO call_scripts (tenant_id, script_name, script_body, variables_used, status, is_default, created_by, updated_by)

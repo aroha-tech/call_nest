@@ -22,10 +22,28 @@ import styles from './CallScriptsPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
+import { usePermissions } from '../../hooks/usePermission';
+import { PERMISSIONS } from '../../utils/permissionUtils';
+import { useAppSelector } from '../../app/hooks';
+import { selectUser } from '../../features/auth/authSelectors';
+import { dialerPreferencesAPI } from '../../services/dialerPreferencesAPI';
 
 const defaultPagination = { page: 1, limit: 10, total: 0, totalPages: 1 };
 
 export function CallScriptsPage() {
+  const { can } = usePermissions();
+  const user = useAppSelector(selectUser);
+  const canManageAll = can(PERMISSIONS.SETTINGS_MANAGE);
+  const canSelf = can(PERMISSIONS.SCRIPTS_SELF);
+  const canAddScript = canManageAll || canSelf;
+
+  const canEditScript = (script) => {
+    if (canManageAll) return true;
+    if (!canSelf || !script) return false;
+    if (script.created_by == null) return false;
+    return Number(script.created_by) === Number(user?.id);
+  };
+
   const [scripts, setScripts] = useState([]);
   const [pagination, setPagination] = useState(defaultPagination);
   const [loading, setLoading] = useState(true);
@@ -46,6 +64,9 @@ export function CallScriptsPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [toggleTarget, setToggleTarget] = useState(null);
   const [toggleLoading, setToggleLoading] = useState(false);
+  const [myDefaultScriptId, setMyDefaultScriptId] = useState(null);
+  const [myDefaultSaving, setMyDefaultSaving] = useState(false);
+  const [viewScript, setViewScript] = useState(null);
   const editorRef = useRef(null);
 
   const fetchScripts = useCallback(async () => {
@@ -71,6 +92,32 @@ export function CallScriptsPage() {
   useEffect(() => {
     fetchScripts();
   }, [fetchScripts]);
+
+  const loadMyDefault = useCallback(async () => {
+    try {
+      const res = await dialerPreferencesAPI.get();
+      const id = res.data?.data?.default_call_script_id;
+      setMyDefaultScriptId(id != null ? Number(id) : null);
+    } catch {
+      setMyDefaultScriptId(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMyDefault();
+  }, [loadMyDefault]);
+
+  const handleSetMyDefault = async (script) => {
+    if (myDefaultSaving) return;
+    setMyDefaultSaving(true);
+    try {
+      const nextId = Number(myDefaultScriptId) === Number(script.id) ? null : script.id;
+      await dialerPreferencesAPI.update({ default_call_script_id: nextId });
+      setMyDefaultScriptId(nextId != null ? Number(nextId) : null);
+    } finally {
+      setMyDefaultSaving(false);
+    }
+  };
 
   const { hasCompletedInitialFetch } = useTableLoadingState(loading);
 
@@ -113,14 +160,6 @@ export function CallScriptsPage() {
       fetchScripts();
     }
   }, [toggleTarget, updateMutation, fetchScripts]);
-
-  const handleSetDefault = useCallback(
-    async (script) => {
-      const result = await updateMutation.mutate(script.id, { is_default: 1 });
-      if (result?.success !== false) fetchScripts();
-    },
-    [updateMutation, fetchScripts]
-  );
 
   const { active: autocompleteActive, suggestions, context: autocompleteContext } = useTemplateVariableAutocomplete(
     editorPlainText,
@@ -206,8 +245,12 @@ export function CallScriptsPage() {
     <div className={styles.page}>
       <PageHeader
         title="Call Scripts"
-        description="Create scripts with variables like {{contact_first_name}} for use in the dialer."
-        actions={<Button onClick={openCreate}>+ Add Script</Button>}
+        description={
+          canManageAll
+            ? 'Create scripts with variables like {{contact_first_name}} for use in the dialer.'
+            : 'View team scripts. You can add scripts and edit only scripts you created.'
+        }
+        actions={canAddScript ? <Button onClick={openCreate}>+ Add Script</Button> : undefined}
       />
 
       {error && <Alert variant="error">{error}</Alert>}
@@ -239,7 +282,7 @@ export function CallScriptsPage() {
                 icon="📜"
                 title={search || showInactive ? 'No results found' : 'No call scripts yet'}
                 description={search || showInactive ? 'Try a different search or clear filters.' : 'Add a script to guide agents during calls. Use variables for dynamic content.'}
-                action={!search && !showInactive ? openCreate : undefined}
+                action={canAddScript && !search && !showInactive ? openCreate : undefined}
                 actionLabel="Add Script"
               />
             </div>
@@ -250,13 +293,16 @@ export function CallScriptsPage() {
                 <TableRow>
                   <TableHeaderCell>Script Name</TableHeaderCell>
                   <TableHeaderCell>Variables</TableHeaderCell>
-                  <TableHeaderCell width="80px">Default</TableHeaderCell>
+                  <TableHeaderCell width="96px">Team default</TableHeaderCell>
+                  <TableHeaderCell width="88px" align="center">My default</TableHeaderCell>
                   <TableHeaderCell width="100px">Status</TableHeaderCell>
-                  <TableHeaderCell width="180px" align="center">Actions</TableHeaderCell>
+                  <TableHeaderCell width="200px" align="center">Actions</TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {scripts.map((script) => (
+                {scripts.map((script) => {
+                  const editable = canEditScript(script);
+                  return (
                   <TableRow key={script.id}>
                     <TableCell>{script.script_name}</TableCell>
                     <TableCell>
@@ -266,43 +312,71 @@ export function CallScriptsPage() {
                     </TableCell>
                     <TableCell>
                       {script.is_default === 1 ? (
-                        <Badge variant="primary" size="sm">Default</Badge>
+                        <Badge variant="primary" size="sm">Yes</Badge>
                       ) : (
                         '—'
                       )}
                     </TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        variant="subtle"
+                        title={
+                          Number(myDefaultScriptId) === Number(script.id)
+                            ? 'Clear as my personal default'
+                            : 'Use as my personal default when calling'
+                        }
+                        onClick={() => handleSetMyDefault(script)}
+                        disabled={myDefaultSaving}
+                      >
+                        {Number(myDefaultScriptId) === Number(script.id) ? '★' : '☆'}
+                      </IconButton>
+                    </TableCell>
                     <TableCell><StatusBadge isActive={script.status === 1} /></TableCell>
                     <TableCell align="center">
                       <div className={styles.actions}>
-                        <IconButton
-                          title={script.is_default === 1 ? 'Default script' : 'Set as default'}
-                          variant="subtle"
-                          onClick={() => script.is_default !== 1 && handleSetDefault(script)}
-                          disabled={updateMutation.loading || script.is_default === 1}
-                        >
-                          {script.is_default === 1 ? '★' : '☆'}
+                        <IconButton title="View script" onClick={() => setViewScript(script)}>
+                          👁️
                         </IconButton>
-                        <IconButton title="Edit" onClick={() => openEdit(script)}>✏️</IconButton>
                         <IconButton
-                          title={script.status === 1 ? 'Deactivate' : 'Activate'}
+                          title={editable ? 'Edit' : 'You can only edit scripts you created'}
+                          onClick={() => openEdit(script)}
+                          disabled={!editable}
+                        >
+                          ✏️
+                        </IconButton>
+                        <IconButton
+                          title={
+                            !editable
+                              ? 'You can only change status on scripts you created'
+                              : script.status === 1
+                                ? 'Deactivate'
+                                : 'Activate'
+                          }
                           variant={script.status === 1 ? 'warning' : 'success'}
                           onClick={() => setToggleTarget(script)}
-                          disabled={toggleLoading}
+                          disabled={!editable || toggleLoading}
                         >
                           {script.status === 1 ? '⏸️' : '▶️'}
                         </IconButton>
                         <IconButton
-                          title={script.is_default === 1 ? 'Default script cannot be deleted' : 'Delete'}
+                          title={
+                            script.is_default === 1
+                              ? 'Team default script cannot be deleted'
+                              : !editable
+                                ? 'You can only delete scripts you created'
+                                : 'Delete'
+                          }
                           variant="danger"
                           onClick={() => setDeleteTarget(script)}
-                          disabled={script.is_default === 1}
+                          disabled={!editable || script.is_default === 1}
                         >
                           🗑️
                         </IconButton>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
             </div>
@@ -408,6 +482,34 @@ export function CallScriptsPage() {
             __html: previewText ? previewHtml : '<span class="preview-empty">(empty)</span>',
           }}
         />
+      </Modal>
+
+      <Modal
+        isOpen={!!viewScript}
+        onClose={() => setViewScript(null)}
+        title={viewScript ? `View: ${viewScript.script_name}` : 'View script'}
+        size="lg"
+        footer={
+          <ModalFooter>
+            <Button variant="ghost" onClick={() => setViewScript(null)}>
+              Close
+            </Button>
+          </ModalFooter>
+        }
+      >
+        {viewScript && (
+          <div
+            className={styles.previewModalContent}
+            dangerouslySetInnerHTML={{
+              __html: (() => {
+                const sample = previewSampleData || DEFAULT_PREVIEW_DATA;
+                const rendered = renderPreview(viewScript.script_body || '', sample);
+                const isHtml = /<[a-z][\s\S]*>/i.test(viewScript.script_body || '');
+                return isHtml ? linkifyHtml(rendered) : linkify(rendered);
+              })(),
+            }}
+          />
+        )}
       </Modal>
 
       <ConfirmModal

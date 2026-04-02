@@ -202,6 +202,8 @@ const AGENT_NAV_ITEMS = [
     key: 'dialer-workflow',
     label: 'Dialer Workflow',
     section: 'Dialer',
+    // workflow.view (after migration) or dial.execute — all agents can open read-only workflow screens
+    permissions: [PERMISSIONS.WORKFLOW_VIEW, PERMISSIONS.DIAL_EXECUTE],
     children: [
       { key: 'dispositions', label: 'Dispositions', path: '/workflow/dispositions' },
       { key: 'dialing-sets', label: 'Dialing Sets', path: '/workflow/dialing-sets' },
@@ -210,6 +212,7 @@ const AGENT_NAV_ITEMS = [
   {
     key: 'dialer-resources',
     label: 'Dialer Resources',
+    permissions: [PERMISSIONS.WORKFLOW_VIEW, PERMISSIONS.DIAL_EXECUTE],
     children: [
       { key: 'dialer-scripts', label: 'Dialer Scripts', path: '/resources/dialer-scripts' },
     ],

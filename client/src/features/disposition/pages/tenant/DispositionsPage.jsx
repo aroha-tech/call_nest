@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { PageHeader } from '../../../../components/ui/PageHeader';
 import { Button } from '../../../../components/ui/Button';
 import { Input } from '../../../../components/ui/Input';
@@ -30,7 +30,30 @@ import { TableDataRegion } from '../../../../components/admin/TableDataRegion';
 const ACTION_CODES_REQUIRING_EMAIL_TEMPLATE = ['send_email'];
 const ACTION_CODES_REQUIRING_WHATSAPP_TEMPLATE = ['send_whatsapp'];
 
-export function DispositionsPage() {
+function dispositionItemToFormData(item) {
+  if (!item) return null;
+  let parsedActions = [];
+  if (item.actions) {
+    try {
+      parsedActions = typeof item.actions === 'string' ? JSON.parse(item.actions) : item.actions;
+    } catch {
+      parsedActions = [];
+    }
+  }
+  return {
+    dispo_type_id: item.dispo_type_id,
+    contact_status_id: item.contact_status_id ?? '',
+    contact_temperature_id: item.contact_temperature_id ?? '',
+    name: item.name,
+    code: item.code,
+    next_action: item.next_action || '',
+    is_connected: item.is_connected === 1,
+    is_active: item.is_active !== 0,
+    actions: Array.isArray(parsedActions) ? parsedActions : [],
+  };
+}
+
+export function DispositionsPage({ readOnly = false }) {
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [page, setPage] = useState(1);
@@ -79,6 +102,7 @@ export function DispositionsPage() {
   const [cloneIndustryId, setCloneIndustryId] = useState('');
   const [formErrors, setFormErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
+  const [viewItem, setViewItem] = useState(null);
 
   const handlePageChange = useCallback((newPage) => setPage(newPage), []);
   const handleLimitChange = useCallback((newLimit) => {
@@ -127,29 +151,13 @@ export function DispositionsPage() {
 
   const openEditModal = (item) => {
     setEditingItem(item);
-    let parsedActions = [];
-    if (item.actions) {
-      try {
-        parsedActions = typeof item.actions === 'string' ? JSON.parse(item.actions) : item.actions;
-      } catch (e) {
-        parsedActions = [];
-      }
-    }
-    setFormData({
-      dispo_type_id: item.dispo_type_id,
-      contact_status_id: item.contact_status_id ?? '',
-      contact_temperature_id: item.contact_temperature_id ?? '',
-      name: item.name,
-      code: item.code,
-      next_action: item.next_action || '',
-      is_connected: item.is_connected === 1,
-      is_active: item.is_active !== 0,
-      actions: parsedActions,
-    });
+    setFormData(dispositionItemToFormData(item));
     setFormErrors({});
     setSubmitError(null);
     setShowModal(true);
   };
+
+  const viewFormData = useMemo(() => dispositionItemToFormData(viewItem), [viewItem]);
 
   const getActionById = (actionId) => dispoActions.find(a => a.id === actionId);
 
@@ -289,16 +297,22 @@ export function DispositionsPage() {
     <div className={styles.page}>
       <PageHeader
         title="Dispositions"
-        description="Manage call outcome dispositions for your team"
+        description={
+          readOnly
+            ? 'View call outcome dispositions (read-only).'
+            : 'Manage call outcome dispositions for your team'
+        }
         actions={
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {hasNoDispositions && (
-              <Button variant="secondary" onClick={() => setShowCloneModal(true)}>
-                Import from Template
-              </Button>
-            )}
-            <Button onClick={openCreateModal}>+ Add Disposition</Button>
-          </div>
+          !readOnly ? (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {hasNoDispositions && (
+                <Button variant="secondary" onClick={() => setShowCloneModal(true)}>
+                  Import from Template
+                </Button>
+              )}
+              <Button onClick={openCreateModal}>+ Add Disposition</Button>
+            </div>
+          ) : undefined
         }
       />
 
@@ -331,7 +345,7 @@ export function DispositionsPage() {
                 icon="📋"
                 title={search || showInactive ? 'No results found' : 'No dispositions yet'}
                 description={search || showInactive ? 'Try a different search or clear filters.' : 'Create dispositions or import from industry templates (only when you have none).'}
-                action={hasNoDispositions ? () => setShowCloneModal(true) : undefined}
+                action={!readOnly && hasNoDispositions ? () => setShowCloneModal(true) : undefined}
                 actionLabel="Import from Template"
               />
             </div>
@@ -347,7 +361,8 @@ export function DispositionsPage() {
               <TableHeaderCell width="90px">Connected</TableHeaderCell>
               <TableHeaderCell>Actions</TableHeaderCell>
               <TableHeaderCell width="80px">Active</TableHeaderCell>
-              <TableHeaderCell width="100px" align="center">Manage</TableHeaderCell>
+              {readOnly && <TableHeaderCell width="72px" align="center">View</TableHeaderCell>}
+              {!readOnly && <TableHeaderCell width="100px" align="center">Manage</TableHeaderCell>}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -375,20 +390,30 @@ export function DispositionsPage() {
                   </span>
                 </TableCell>
                 <TableCell><StatusBadge isActive={item.is_active === 1} /></TableCell>
-                <TableCell align="center">
-                  <div className={styles.actions}>
-                    <IconButton title="Edit" onClick={() => openEditModal(item)}>✏️</IconButton>
-                    <IconButton
-                      title={item.is_active === 1 ? 'Deactivate' : 'Activate'}
-                      variant={item.is_active === 1 ? 'warning' : 'success'}
-                      onClick={() => setToggleItem(item)}
-                      disabled={toggleLoading}
-                    >
-                      {item.is_active === 1 ? '⏸️' : '▶️'}
+                {readOnly && (
+                  <TableCell align="center">
+                    <IconButton title="View disposition details" onClick={() => setViewItem(item)}>
+                      👁️
                     </IconButton>
-                    <IconButton title="Delete" variant="danger" onClick={() => setDeleteItem(item)}>🗑️</IconButton>
-                  </div>
-                </TableCell>
+                  </TableCell>
+                )}
+                {!readOnly && (
+                  <TableCell align="center">
+                    <div className={styles.actions}>
+                      <IconButton title="View" onClick={() => setViewItem(item)}>👁️</IconButton>
+                      <IconButton title="Edit" onClick={() => openEditModal(item)}>✏️</IconButton>
+                      <IconButton
+                        title={item.is_active === 1 ? 'Deactivate' : 'Activate'}
+                        variant={item.is_active === 1 ? 'warning' : 'success'}
+                        onClick={() => setToggleItem(item)}
+                        disabled={toggleLoading}
+                      >
+                        {item.is_active === 1 ? '⏸️' : '▶️'}
+                      </IconButton>
+                      <IconButton title="Delete" variant="danger" onClick={() => setDeleteItem(item)}>🗑️</IconButton>
+                    </div>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>
@@ -410,6 +435,154 @@ export function DispositionsPage() {
           </div>
         )}
       </div>
+
+      {/* Read-only: same layout as edit/add, all fields disabled, Close only */}
+      <Modal
+        isOpen={!!viewItem}
+        onClose={() => setViewItem(null)}
+        title="View disposition"
+        size="lg"
+        footer={
+          <ModalFooter>
+            <Button variant="ghost" onClick={() => setViewItem(null)}>
+              Close
+            </Button>
+          </ModalFooter>
+        }
+      >
+        {viewFormData && (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+              <Input
+                label="Name"
+                value={viewFormData.name || ''}
+                disabled
+                readOnly
+                placeholder="e.g. Interested - Call Back"
+              />
+              <Input
+                label="Code"
+                value={viewFormData.code || ''}
+                disabled
+                readOnly
+                placeholder="e.g. interested_callback"
+              />
+              <Select
+                label="Disposition Type"
+                value={viewFormData.dispo_type_id || ''}
+                onChange={() => {}}
+                options={dispoTypeOptions}
+                disabled
+                placeholder="Select..."
+              />
+              <Select
+                label="Contact Status (optional)"
+                value={viewFormData.contact_status_id || ''}
+                onChange={() => {}}
+                options={statusOptions}
+                disabled
+                placeholder="Select..."
+              />
+              <Select
+                label="Contact Temperature (optional)"
+                value={viewFormData.contact_temperature_id || ''}
+                onChange={() => {}}
+                options={tempOptions}
+                disabled
+                placeholder="Select..."
+              />
+              <Select
+                label="Next Action (optional)"
+                value={viewFormData.next_action || ''}
+                onChange={() => {}}
+                options={NEXT_ACTION_OPTIONS}
+                disabled
+                placeholder="Select next action..."
+              />
+            </div>
+
+            <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+              <Checkbox
+                label="Connected (Agent talked with customer)"
+                checked={viewFormData.is_connected || false}
+                onChange={() => {}}
+                disabled
+              />
+              <Checkbox label="Active" checked={viewFormData.is_active !== false} onChange={() => {}} disabled />
+            </div>
+
+            <div style={{ marginTop: '24px', borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
+              <label style={{ fontWeight: 500, fontSize: '14px', display: 'block', marginBottom: '12px' }}>
+                Actions (max 3)
+              </label>
+              {(viewFormData.actions || []).length === 0 ? (
+                <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>No actions configured.</p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                  {viewFormData.actions.map((action, index) => {
+                    const actionDef = getActionById(action.action_id);
+                    const requiresEmail =
+                      actionDef && ACTION_CODES_REQUIRING_EMAIL_TEMPLATE.includes(actionDef.code);
+                    const requiresWhatsapp =
+                      actionDef && ACTION_CODES_REQUIRING_WHATSAPP_TEMPLATE.includes(actionDef.code);
+                    return (
+                      <div
+                        key={index}
+                        style={{
+                          display: 'flex',
+                          gap: '8px',
+                          alignItems: 'flex-end',
+                          background: 'var(--color-surface)',
+                          padding: '12px',
+                          borderRadius: '6px',
+                          flex: '1 1 280px',
+                          minWidth: '280px',
+                          maxWidth: '100%',
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: '100px' }}>
+                          <Select
+                            label={`Action ${index + 1}`}
+                            value={action.action_id || ''}
+                            onChange={() => {}}
+                            options={actionOptions}
+                            disabled
+                            placeholder="Select action..."
+                          />
+                        </div>
+                        {requiresEmail && (
+                          <div style={{ flex: 1, minWidth: '100px' }}>
+                            <Select
+                              label="Email Template *"
+                              value={action.email_template_id || ''}
+                              onChange={() => {}}
+                              options={emailTemplateOptions}
+                              disabled
+                              placeholder="Select template..."
+                            />
+                          </div>
+                        )}
+                        {requiresWhatsapp && (
+                          <div style={{ flex: 1, minWidth: '100px' }}>
+                            <Select
+                              label="WhatsApp Template *"
+                              value={action.whatsapp_template_id || ''}
+                              onChange={() => {}}
+                              options={whatsappTemplateOptions}
+                              disabled
+                              placeholder="Select template..."
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Create/Edit Modal */}
       <Modal

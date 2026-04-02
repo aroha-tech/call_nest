@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { usePermissions } from '../../../../hooks/usePermission';
+import { PERMISSIONS } from '../../../../utils/permissionUtils';
 import { PageHeader } from '../../../../components/ui/PageHeader';
 import { Tabs, TabList, Tab, TabPanel } from '../../../../components/ui/Tabs';
 import { DispositionsPage } from './DispositionsPage';
@@ -12,6 +14,8 @@ const TAB_FROM_PATH = {
 };
 
 export function DispositionSettingsPage() {
+  const { can } = usePermissions();
+  const readOnly = !can(PERMISSIONS.DISPOSITIONS_MANAGE);
   const location = useLocation();
   const navigate = useNavigate();
   const pathTab = TAB_FROM_PATH[location.pathname];
@@ -31,7 +35,11 @@ export function DispositionSettingsPage() {
     <div className={styles.page}>
       <PageHeader
         title="Disposition Settings"
-        description="Configure dispositions and dialing sets for your team"
+        description={
+          readOnly
+            ? 'View dispositions and dialing sets. Only administrators can add or edit.'
+            : 'Configure dispositions and dialing sets for your team'
+        }
       />
 
       <Tabs>
@@ -45,11 +53,11 @@ export function DispositionSettingsPage() {
         </TabList>
 
         <TabPanel isActive={activeTab === 'dispositions'}>
-          <DispositionsPage />
+          <DispositionsPage readOnly={readOnly} />
         </TabPanel>
 
         <TabPanel isActive={activeTab === 'dialing-sets'}>
-          <DialingSetsPage />
+          <DialingSetsPage readOnly={readOnly} />
         </TabPanel>
       </Tabs>
     </div>

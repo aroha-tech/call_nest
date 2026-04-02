@@ -182,7 +182,9 @@ function TenantRoutes() {
       <Route
         path="/workflow/dispositions"
         element={
-          <ProtectedRoute permission={PERMISSIONS.DISPOSITIONS_MANAGE}>
+          <ProtectedRoute
+            permissions={[PERMISSIONS.DISPOSITIONS_MANAGE, PERMISSIONS.WORKFLOW_VIEW, PERMISSIONS.DIAL_EXECUTE]}
+          >
             <AppShellLayout>
               <DispositionSettingsPage />
             </AppShellLayout>
@@ -192,7 +194,9 @@ function TenantRoutes() {
       <Route
         path="/workflow/dialing-sets"
         element={
-          <ProtectedRoute permission={PERMISSIONS.DISPOSITIONS_MANAGE}>
+          <ProtectedRoute
+            permissions={[PERMISSIONS.DISPOSITIONS_MANAGE, PERMISSIONS.WORKFLOW_VIEW, PERMISSIONS.DIAL_EXECUTE]}
+          >
             <AppShellLayout>
               <DispositionSettingsPage />
             </AppShellLayout>
@@ -204,7 +208,14 @@ function TenantRoutes() {
       <Route
         path="/resources/dialer-scripts"
         element={
-          <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+          <ProtectedRoute
+            permissions={[
+              PERMISSIONS.SETTINGS_MANAGE,
+              PERMISSIONS.WORKFLOW_VIEW,
+              PERMISSIONS.DIAL_EXECUTE,
+              PERMISSIONS.SCRIPTS_SELF,
+            ]}
+          >
             <AppShellLayout>
               <CallScriptsPage />
             </AppShellLayout>

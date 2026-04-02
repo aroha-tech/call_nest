@@ -210,6 +210,8 @@ async function mapSystemRolePermissions(tenantId) {
       'contacts.read',
       'leads.read', 'leads.update',
       'dial.execute',
+      'workflow.view',
+      'scripts.self',
     ],
   };
 
