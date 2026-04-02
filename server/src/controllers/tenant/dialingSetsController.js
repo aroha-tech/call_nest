@@ -27,7 +27,7 @@ export async function getById(req, res, next) {
 export async function create(req, res, next) {
   try {
     const tenantId = req.tenant.id;
-    const { name, description, is_default, is_active } = req.body;
+    const { name, description, is_active } = req.body;
     
     if (!name) {
       return res.status(400).json({ error: 'name is required' });
@@ -35,7 +35,7 @@ export async function create(req, res, next) {
     
     const dialingSet = await dialingSetsService.create(
       tenantId,
-      { name, description, is_default, is_active },
+      { name, description, is_active },
       req.user.id
     );
     
@@ -48,12 +48,12 @@ export async function create(req, res, next) {
 export async function update(req, res, next) {
   try {
     const tenantId = req.tenant.id;
-    const { name, description, is_default, is_active } = req.body;
+    const { name, description, is_active } = req.body;
     
     const dialingSet = await dialingSetsService.update(
       tenantId,
       req.params.id,
-      { name, description, is_default, is_active },
+      { name, description, is_active },
       req.user.id
     );
     
@@ -66,19 +66,12 @@ export async function update(req, res, next) {
 export async function remove(req, res, next) {
   try {
     const tenantId = req.tenant.id;
-    await dialingSetsService.remove(tenantId, req.params.id);
+    await dialingSetsService.remove(tenantId, req.params.id, { userId: req.user.id });
     res.json({ message: 'Dialing set deleted successfully' });
   } catch (err) {
-    next(err);
-  }
-}
-
-export async function setDefault(req, res, next) {
-  try {
-    const tenantId = req.tenant.id;
-    const dialingSet = await dialingSetsService.setDefault(tenantId, req.params.id);
-    res.json({ data: dialingSet, message: 'Default dialing set updated' });
-  } catch (err) {
+    if (err.code === 'PERSONAL_DEFAULT_DIALING_SET_CANNOT_DELETE') {
+      return res.status(400).json({ error: err.message, code: err.code });
+    }
     next(err);
   }
 }

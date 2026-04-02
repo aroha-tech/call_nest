@@ -181,35 +181,22 @@ async function listCampaignsManager(tenantId, user, q) {
   };
 }
 
+/**
+ * Agents see: campaigns with no owning manager (tenant pool), plus campaigns owned by their manager.
+ * Agents without a manager only see the unassigned (manager_id IS NULL) pool.
+ */
 async function listCampaignsAgent(tenantId, user, q) {
   const managerId = await getUserManagerId(tenantId, user.id);
-  if (!managerId) {
-    return {
-      data: [],
-      pagination: { page: q.page, limit: q.limit, total: 0, totalPages: 1 },
-    };
+
+  const where = ['c.tenant_id = ?', 'c.deleted_at IS NULL'];
+  const params = [tenantId];
+
+  if (managerId != null) {
+    where.push('(c.manager_id IS NULL OR c.manager_id = ?)');
+    params.push(managerId);
+  } else {
+    where.push('c.manager_id IS NULL');
   }
-
-  const visibilitySql = `(
-    c.type = 'filter'
-    OR (
-      c.type = 'static'
-      AND EXISTS (
-        SELECT 1 FROM contacts ct
-        WHERE ct.tenant_id = c.tenant_id
-          AND ct.campaign_id = c.id
-          AND ct.assigned_user_id = ?
-      )
-    )
-  )`;
-
-  const where = [
-    'c.tenant_id = ?',
-    '(c.manager_id IS NULL OR c.manager_id = ?)',
-    'c.deleted_at IS NULL',
-    visibilitySql,
-  ];
-  const params = [tenantId, managerId, user.id];
 
   if (q.show_paused) {
     where.push("c.status IN ('active','paused')");
@@ -359,28 +346,22 @@ export async function getCampaign(tenantId, user, campaignId) {
   }
 
   const managerId = await getUserManagerId(tenantId, user.id);
-  if (!managerId) return null;
-
+  if (managerId != null) {
+    const [row] = await query(
+      `SELECT * FROM campaigns
+       WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+         AND (manager_id IS NULL OR manager_id = ?)
+       LIMIT 1`,
+      [id, tenantId, managerId]
+    );
+    return row || null;
+  }
   const [row] = await query(
-    `SELECT c.*
-     FROM campaigns c
-     WHERE c.id = ? AND c.tenant_id = ?
-       AND (c.manager_id IS NULL OR c.manager_id = ?)
-       AND c.deleted_at IS NULL
-       AND (
-         c.type = 'filter'
-         OR (
-           c.type = 'static'
-           AND EXISTS (
-             SELECT 1 FROM contacts ct
-             WHERE ct.tenant_id = c.tenant_id
-               AND ct.campaign_id = c.id
-               AND ct.assigned_user_id = ?
-           )
-         )
-       )
+    `SELECT * FROM campaigns
+     WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+       AND manager_id IS NULL
      LIMIT 1`,
-    [id, tenantId, managerId, user.id]
+    [id, tenantId]
   );
   return row || null;
 }
@@ -557,18 +538,22 @@ export async function openCampaignForAgent(tenantId, user, campaignId, { page = 
   }
 
   const agentManagerId = await getUserManagerId(tenantId, user.id);
-  if (!agentManagerId) {
-    const err = new Error('Agent must have manager_id assigned');
-    err.status = 400;
-    throw err;
-  }
+
+  const scopeSql =
+    agentManagerId != null
+      ? '(manager_id IS NULL OR manager_id = ?)'
+      : 'manager_id IS NULL';
+  const scopeParams =
+    agentManagerId != null
+      ? [campaignId, tenantId, agentManagerId]
+      : [campaignId, tenantId];
 
   const [campaign] = await query(
     `SELECT * FROM campaigns
      WHERE id = ? AND tenant_id = ? AND status = 'active' AND deleted_at IS NULL
-       AND (manager_id IS NULL OR manager_id = ?)
+       AND ${scopeSql}
      LIMIT 1`,
-    [campaignId, tenantId, agentManagerId]
+    scopeParams
   );
 
   if (!campaign) return null;

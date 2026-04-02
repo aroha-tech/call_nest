@@ -17,7 +17,8 @@ export const campaignsAPI = {
 
   /** Agent workspace: contacts in this campaign assigned to current user (scenarios 4 & 9). */
   open: (id, { page = 1, limit = 20, search = '' } = {}) =>
-    axiosInstance.post(`${BASE}/${id}/open`, null, {
+    // Use `{}` not `null`: express/body-parser strict JSON only allows `{` or `[` as first char; `null` rejects with SyntaxError.
+    axiosInstance.post(`${BASE}/${id}/open`, {}, {
       params: { page, limit, search: search || undefined },
     }),
 

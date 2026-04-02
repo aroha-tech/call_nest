@@ -96,31 +96,19 @@ export async function cloneDefaultsForTenant(tenantId, industryId, createdBy = n
     dispositionIdMap.set(defaultDispo.id, newDispoId);
   }
 
-  // Step 5: Clone dialing sets and their disposition mappings
-  let isFirstDefault = true;
-  
+  // Step 5: Clone dialing sets and their disposition mappings (tenant has no team-wide default; agents use users.default_dialing_set_id)
   for (const dialingSet of dialingSets) {
     const newDialingSetId = uuidv4();
-    
-    // First dialing set marked as default gets is_default = 1
-    // Or if none marked, the first one gets it
-    const shouldBeDefault = (dialingSet.is_default === 1 && isFirstDefault) || 
-                           (isFirstDefault && dialingSets.every(ds => ds.is_default !== 1));
-    
-    if (shouldBeDefault) {
-      isFirstDefault = false;
-    }
 
     await query(
       `INSERT INTO dialing_sets 
        (id, tenant_id, name, description, is_default, is_active, is_system_generated, created_from_default_id, created_by)
-       VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?)`,
+       VALUES (?, ?, ?, ?, 0, 1, 1, ?, ?)`,
       [
         newDialingSetId,
         tenantId,
         dialingSet.name,
         dialingSet.description,
-        shouldBeDefault ? 1 : 0,
         dialingSet.id,
         createdBy
       ]

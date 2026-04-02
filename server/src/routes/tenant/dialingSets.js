@@ -16,6 +16,5 @@ router.get('/:id', viewOrManage, dialingSetsController.getById);
 router.post('/', manageOnly, dialingSetsController.create);
 router.put('/:id', manageOnly, dialingSetsController.update);
 router.delete('/:id', manageOnly, dialingSetsController.remove);
-router.post('/:id/set-default', manageOnly, dialingSetsController.setDefault);
 
 export default router;

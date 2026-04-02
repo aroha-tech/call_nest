@@ -8,7 +8,8 @@
 .breadcrumbs {
   margin-bottom: $space-2;
   font-size: $font-size-xs;
-  color: var(--color-text-muted);
+  font-weight: $font-weight-medium;
+  color: var(--color-text-tertiary);
 }
 
 .row {
@@ -49,8 +50,10 @@
 
 .description {
   font-size: $font-size-sm;
-  color: var(--color-text-tertiary);
+  font-weight: $font-weight-medium;
+  color: var(--color-text-secondary);
   margin: $space-1 0 0;
+  line-height: $line-height-snug;
 }
 
 .actions {

@@ -25,14 +25,18 @@
   height: 34px;
   padding: 0 $space-3;
   font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
   color: var(--color-text-primary);
-  background: var(--color-input-bg);
+  background-color: var(--color-input-bg);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.055) 0%, transparent 46%);
   border: 1px solid var(--color-input-border);
   border-radius: $radius-sm;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
   transition: all $transition-fast;
 
   &::placeholder {
     color: var(--color-input-placeholder);
+    font-weight: $font-weight-semibold;
   }
 
   &:hover:not(:disabled):not(:focus) {
@@ -42,7 +46,9 @@
   &:focus {
     outline: none;
     border-color: var(--color-input-border-focus);
-    box-shadow: 0 0 0 3px var(--color-focus-ring);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.05) inset,
+      0 0 0 3px var(--color-focus-ring);
   }
 
   &:disabled {
@@ -54,7 +60,9 @@
     border-color: var(--color-danger);
 
     &:focus {
-      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.05) inset,
+        0 0 0 3px rgba(239, 68, 68, 0.22);
     }
   }
 

@@ -86,10 +86,11 @@ code {
   @include focus-ring;
 }
 
-// Placeholder
+// Placeholder — stronger weight + dedicated token for contrast on dark fields
 ::placeholder {
   color: var(--color-input-placeholder);
   opacity: 1;
+  font-weight: $font-weight-medium;
 }
 
 // Remove number input spinners

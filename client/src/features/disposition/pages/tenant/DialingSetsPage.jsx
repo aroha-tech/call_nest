@@ -25,7 +25,6 @@ export function DialingSetsPage({ readOnly = false }) {
     create,
     update,
     delete: deleteFn,
-    setDefault,
   } = useDialingSets(true);
 
   const { hasCompletedInitialFetch } = useTableLoadingState(loading);
@@ -66,12 +65,16 @@ export function DialingSetsPage({ readOnly = false }) {
   }, []);
 
   useEffect(() => {
+    if (!readOnly) {
+      setMyDefaultSetId(null);
+      return;
+    }
     loadMyDefault();
-  }, [loadMyDefault]);
+  }, [loadMyDefault, readOnly]);
 
   const handleSetMyDefault = async (e, item) => {
     e.stopPropagation();
-    if (myDefaultSaving) return;
+    if (!readOnly || myDefaultSaving) return;
     setMyDefaultSaving(true);
     try {
       const nextId = String(myDefaultSetId ?? '') === String(item.id ?? '') ? null : item.id;
@@ -101,7 +104,7 @@ export function DialingSetsPage({ readOnly = false }) {
 
   const openCreateModal = () => {
     setEditingItem(null);
-    setFormData({ name: '', description: '', is_default: 0 });
+    setFormData({ name: '', description: '' });
     setFormErrors({});
     setSubmitError(null);
     setShowModal(true);
@@ -112,7 +115,6 @@ export function DialingSetsPage({ readOnly = false }) {
     setFormData({
       name: item.name,
       description: item.description || '',
-      is_default: item.is_default,
     });
     setFormErrors({});
     setSubmitError(null);
@@ -150,11 +152,6 @@ export function DialingSetsPage({ readOnly = false }) {
     } else {
       setDeleteError(result.error || 'Delete failed');
     }
-  };
-
-  const handleSetDefault = async (id) => {
-    await setDefault.mutate(id);
-    refetch();
   };
 
   const handleAddDisposition = async () => {
@@ -212,7 +209,9 @@ export function DialingSetsPage({ readOnly = false }) {
             />
           ) : (
             <div className={styles.list}>
-              {filteredData.map((item) => (
+              {filteredData.map((item) => {
+                const isMyDefault = readOnly && String(myDefaultSetId ?? '') === String(item.id ?? '');
+                return (
                 <div
                   key={item.id}
                   className={`${styles.listItem} ${selectedSet?.id === item.id ? styles.selected : ''}`}
@@ -220,44 +219,47 @@ export function DialingSetsPage({ readOnly = false }) {
                 >
                   <div className={styles.listItemContent}>
                     <span className={styles.listItemName}>{item.name}</span>
-                    {item.is_default === 1 && <Badge variant="success">Team default</Badge>}
-                    {String(myDefaultSetId ?? '') === String(item.id ?? '') && (
-                      <Badge variant="primary">My default</Badge>
-                    )}
+                    {isMyDefault && <Badge variant="primary">My default</Badge>}
                     {item.is_system_generated === 1 && <Badge variant="muted">System</Badge>}
                   </div>
                   <div className={styles.listItemActions}>
-                    <IconButton
-                      size="sm"
-                      variant="subtle"
-                      title={
-                        String(myDefaultSetId ?? '') === String(item.id ?? '')
-                          ? 'Clear as my personal default'
-                          : 'Use as my personal default when dialing'
-                      }
-                      onClick={(e) => handleSetMyDefault(e, item)}
-                      disabled={myDefaultSaving}
-                    >
-                      {String(myDefaultSetId ?? '') === String(item.id ?? '') ? '★' : '☆'}
-                    </IconButton>
+                    {readOnly && (
+                      <IconButton
+                        size="sm"
+                        variant="subtle"
+                        title={
+                          isMyDefault
+                            ? 'Clear as my personal default'
+                            : 'Use as my personal default when dialing'
+                        }
+                        onClick={(e) => handleSetMyDefault(e, item)}
+                        disabled={myDefaultSaving}
+                      >
+                        {isMyDefault ? '★' : '☆'}
+                      </IconButton>
+                    )}
                     {!readOnly && (
                       <>
+                        <IconButton size="sm" title="Edit" onClick={(e) => { e.stopPropagation(); openEditModal(item); }}>✏️</IconButton>
                         <IconButton
                           size="sm"
-                          variant="subtle"
-                          title={item.is_default === 1 ? 'Team default set' : 'Set as team default (admin)'}
-                          onClick={(e) => { e.stopPropagation(); if (item.is_default !== 1) handleSetDefault(item.id); }}
-                          disabled={item.is_default === 1}
+                          variant="danger"
+                          title={
+                            isMyDefault
+                              ? 'Choose another set as your default before deleting this one'
+                              : 'Delete'
+                          }
+                          disabled={isMyDefault}
+                          onClick={(e) => { e.stopPropagation(); setDeleteItem(item); setDeleteError(null); }}
                         >
-                          {item.is_default === 1 ? '★' : '☆'}
+                          🗑️
                         </IconButton>
-                        <IconButton size="sm" title="Edit" onClick={(e) => { e.stopPropagation(); openEditModal(item); }}>✏️</IconButton>
-                        <IconButton size="sm" variant="danger" title={item.is_default === 1 ? 'Default set cannot be deleted' : 'Delete'} disabled={item.is_default === 1} onClick={(e) => { e.stopPropagation(); setDeleteItem(item); setDeleteError(null); }}>🗑️</IconButton>
                       </>
                     )}
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </div>

@@ -161,7 +161,6 @@ export const dialingSetsAPI = {
   create: (data) => axiosInstance.post('/api/tenant/dialing-sets', data),
   update: (id, data) => axiosInstance.put(`/api/tenant/dialing-sets/${id}`, data),
   delete: (id) => axiosInstance.delete(`/api/tenant/dialing-sets/${id}`),
-  setDefault: (id) => axiosInstance.post(`/api/tenant/dialing-sets/${id}/set-default`),
   clone: (defaultDialingSetId) =>
     axiosInstance.post('/api/tenant/dialing-sets/clone', { default_dialing_set_id: defaultDialingSetId }),
 };

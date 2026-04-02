@@ -20,7 +20,6 @@ export function useDialingSets(includeInactive = false) {
   const createMutation = useMutation(dialingSetsAPI.create);
   const updateMutation = useMutation((id, data) => dialingSetsAPI.update(id, data));
   const deleteMutation = useMutation(dialingSetsAPI.delete);
-  const setDefaultMutation = useMutation(dialingSetsAPI.setDefault);
   const cloneMutation = useMutation(dialingSetsAPI.clone);
 
   return {
@@ -31,7 +30,6 @@ export function useDialingSets(includeInactive = false) {
     create: createMutation,
     update: updateMutation,
     delete: deleteMutation,
-    setDefault: setDefaultMutation,
     clone: cloneMutation,
   };
 }

@@ -14,9 +14,10 @@
 .bg {
   position: absolute;
   inset: 0;
-  background: var(--color-bg-body);
+  background-color: #010101;
+  background-image: linear-gradient(172deg, #010101 0%, #060608 52%, #020203 100%);
   z-index: 0;
-  
+
   &::before {
     content: '';
     position: absolute;
@@ -26,23 +27,18 @@
     height: 200%;
     background: radial-gradient(
       circle at 30% 20%,
-      rgba(99, 102, 241, 0.08) 0%,
+      rgba(var(--color-primary-rgb), 0.1) 0%,
       transparent 50%
     );
   }
-  
+
   &::after {
     content: '';
     position: absolute;
-    top: 50%;
-    right: -25%;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(
-      circle,
-      rgba(99, 102, 241, 0.05) 0%,
-      transparent 50%
-    );
+    inset: 0;
+    background:
+      radial-gradient(circle at 85% 55%, rgba(var(--color-primary-rgb), 0.06) 0%, transparent 45%),
+      radial-gradient(ellipse 120% 80% at 50% 110%, rgba(0, 0, 0, 0.55) 0%, transparent 42%);
   }
 }
 

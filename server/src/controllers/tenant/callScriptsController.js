@@ -57,12 +57,10 @@ export async function create(req, res, next) {
       });
     }
 
-    const manage = canManageAllScripts(req);
     const script = await callScriptsService.create(
       tenantId,
       { script_name, script_body, status },
-      req.user.id,
-      { skipAutoDefault: !manage }
+      req.user.id
     );
 
     res.status(201).json({ data: script });
@@ -80,7 +78,7 @@ export async function create(req, res, next) {
 export async function update(req, res, next) {
   try {
     const tenantId = req.tenant.id;
-    const { script_name, script_body, status, is_default } = req.body;
+    const { script_name, script_body, status } = req.body;
 
     const existing = await callScriptsService.findById(tenantId, req.params.id);
     if (!existing) {
@@ -92,15 +90,12 @@ export async function update(req, res, next) {
       if (!canEditOwnScript(req, existing)) {
         return res.status(403).json({ error: 'You can only edit call scripts you created.' });
       }
-      if (is_default !== undefined) {
-        return res.status(403).json({ error: 'Only an administrator can change the default script.' });
-      }
     }
 
     const script = await callScriptsService.update(
       tenantId,
       req.params.id,
-      { script_name, script_body, status, is_default },
+      { script_name, script_body, status },
       req.user.id
     );
 
@@ -127,10 +122,10 @@ export async function remove(req, res, next) {
     if (!manage && !canEditOwnScript(req, existing)) {
       return res.status(403).json({ error: 'You can only delete call scripts you created.' });
     }
-    await callScriptsService.remove(tenantId, req.params.id);
+    await callScriptsService.remove(tenantId, req.params.id, { userId: req.user.id });
     res.json({ message: 'Call script deleted successfully' });
   } catch (err) {
-    if (err.code === 'DEFAULT_SCRIPT_CANNOT_DELETE') {
+    if (err.code === 'PERSONAL_DEFAULT_SCRIPT_CANNOT_DELETE') {
       return res.status(400).json({ error: err.message, code: err.code });
     }
     next(err);

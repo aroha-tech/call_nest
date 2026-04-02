@@ -9,7 +9,7 @@ import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } fro
 import { IconButton } from '../../components/ui/IconButton';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
-import { StatusBadge, Badge } from '../../components/ui/Badge';
+import { StatusBadge } from '../../components/ui/Badge';
 import { Pagination, PaginationPageSize } from '../../components/ui/Pagination';
 import { VariableSelector } from '../../components/VariableSelector';
 import { callScriptsAPI } from '../../services/dispositionAPI';
@@ -36,6 +36,8 @@ export function CallScriptsPage() {
   const canManageAll = can(PERMISSIONS.SETTINGS_MANAGE);
   const canSelf = can(PERMISSIONS.SCRIPTS_SELF);
   const canAddScript = canManageAll || canSelf;
+  /** Personal default star: agents only, not tenant admins/managers with settings.manage */
+  const canSetPersonalDefault = canSelf && !canManageAll;
 
   const canEditScript = (script) => {
     if (canManageAll) return true;
@@ -104,11 +106,15 @@ export function CallScriptsPage() {
   }, []);
 
   useEffect(() => {
+    if (!canSetPersonalDefault) {
+      setMyDefaultScriptId(null);
+      return;
+    }
     loadMyDefault();
-  }, [loadMyDefault]);
+  }, [loadMyDefault, canSetPersonalDefault]);
 
   const handleSetMyDefault = async (script) => {
-    if (myDefaultSaving) return;
+    if (!canSetPersonalDefault || myDefaultSaving) return;
     setMyDefaultSaving(true);
     try {
       const nextId = Number(myDefaultScriptId) === Number(script.id) ? null : script.id;
@@ -228,10 +234,13 @@ export function CallScriptsPage() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
+    setError(null);
     const result = await deleteMutation.mutate(deleteTarget.id);
     if (result?.success) {
       setDeleteTarget(null);
       fetchScripts();
+    } else {
+      setError(result?.error || 'Delete failed');
     }
   };
 
@@ -293,8 +302,9 @@ export function CallScriptsPage() {
                 <TableRow>
                   <TableHeaderCell>Script Name</TableHeaderCell>
                   <TableHeaderCell>Variables</TableHeaderCell>
-                  <TableHeaderCell width="96px">Team default</TableHeaderCell>
-                  <TableHeaderCell width="88px" align="center">My default</TableHeaderCell>
+                  {canSetPersonalDefault && (
+                    <TableHeaderCell width="88px" align="center">My default</TableHeaderCell>
+                  )}
                   <TableHeaderCell width="100px">Status</TableHeaderCell>
                   <TableHeaderCell width="200px" align="center">Actions</TableHeaderCell>
                 </TableRow>
@@ -302,6 +312,8 @@ export function CallScriptsPage() {
               <TableBody>
                 {scripts.map((script) => {
                   const editable = canEditScript(script);
+                  const isMyDefault =
+                    canSetPersonalDefault && Number(myDefaultScriptId) === Number(script.id);
                   return (
                   <TableRow key={script.id}>
                     <TableCell>{script.script_name}</TableCell>
@@ -310,27 +322,22 @@ export function CallScriptsPage() {
                         ? script.variables_used.join(', ')
                         : '—'}
                     </TableCell>
-                    <TableCell>
-                      {script.is_default === 1 ? (
-                        <Badge variant="primary" size="sm">Yes</Badge>
-                      ) : (
-                        '—'
-                      )}
-                    </TableCell>
+                    {canSetPersonalDefault && (
                     <TableCell align="center">
                       <IconButton
                         variant="subtle"
                         title={
-                          Number(myDefaultScriptId) === Number(script.id)
+                          isMyDefault
                             ? 'Clear as my personal default'
                             : 'Use as my personal default when calling'
                         }
                         onClick={() => handleSetMyDefault(script)}
                         disabled={myDefaultSaving}
                       >
-                        {Number(myDefaultScriptId) === Number(script.id) ? '★' : '☆'}
+                        {isMyDefault ? '★' : '☆'}
                       </IconButton>
                     </TableCell>
+                    )}
                     <TableCell><StatusBadge isActive={script.status === 1} /></TableCell>
                     <TableCell align="center">
                       <div className={styles.actions}>
@@ -360,15 +367,15 @@ export function CallScriptsPage() {
                         </IconButton>
                         <IconButton
                           title={
-                            script.is_default === 1
-                              ? 'Team default script cannot be deleted'
+                            isMyDefault
+                              ? 'Choose another script as your default before deleting this one'
                               : !editable
                                 ? 'You can only delete scripts you created'
                                 : 'Delete'
                           }
                           variant="danger"
                           onClick={() => setDeleteTarget(script)}
-                          disabled={!editable || script.is_default === 1}
+                          disabled={!editable || isMyDefault}
                         >
                           🗑️
                         </IconButton>

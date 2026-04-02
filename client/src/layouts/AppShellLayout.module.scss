@@ -12,7 +12,12 @@
   top: 0;
   bottom: 0;
   width: 240px;
-  background: #050507;
+  background-color: #020202;
+  background-image:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.5) 0%, transparent 52%),
+    radial-gradient(ellipse 95% 52% at 50% -6%, rgba(var(--color-primary-rgb), 0.09) 0%, transparent 52%),
+    radial-gradient(ellipse 125% 72% at 50% 112%, rgba(0, 0, 0, 0.58) 0%, transparent 44%),
+    linear-gradient(180deg, #050506 0%, #020203 45%, #010101 100%);
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
@@ -32,6 +37,7 @@
 .sidebarHeader {
   padding: $space-4;
   border-bottom: 1px solid var(--color-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, transparent 100%);
 }
 
 .brandRow {
@@ -265,6 +271,13 @@
   flex-direction: column;
   min-width: 0;
   width: 100%;
+  // Near-black canvas + layered shading (edge vignette, top wash, bottom weight) for a premium admin feel
+  background-color: #010101;
+  background-image:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.35) 0%, transparent 14%, transparent 86%, rgba(0, 0, 0, 0.35) 100%),
+    radial-gradient(ellipse 125% 70% at 50% 108%, rgba(0, 0, 0, 0.65) 0%, transparent 46%),
+    radial-gradient(ellipse 100% 56% at 50% -6%, rgba(var(--color-primary-rgb), 0.11) 0%, transparent 52%),
+    linear-gradient(172deg, #010101 0%, #060608 46%, #030304 100%);
 
   @include lg {
     margin-left: 240px;
@@ -281,9 +294,9 @@
   gap: $space-4;
   min-height: 52px;
   padding: $space-2 $space-4;
-  background: var(--color-bg-surface);
+  background: linear-gradient(180deg, rgba(8, 8, 10, 0.97) 0%, rgba(5, 5, 7, 0.98) 100%);
   border-bottom: 1px solid var(--color-border);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(14px);
 
   @include md {
     padding: 0 $space-5;

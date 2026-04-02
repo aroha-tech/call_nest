@@ -29,6 +29,8 @@ Schema migrations for upgrading existing Call Nest databases.
 | `022_contacts_deleted_by.sql` | contacts: `deleted_by`, `deleted_source` + FK (for soft delete) |
 | `023_users_team_permission.sql` | permission `users.team` + grant to manager role (team user assign) |
 | `030_deals_and_opportunities.sql` | `deals`, `deal_stages`, `opportunities` (pipelines, stages with progression %, one opportunity per contact per pipeline) |
+| `033_call_scripts_clear_team_default.sql` | Clear deprecated tenant-wide `call_scripts.is_default`; personal default is `users.default_call_script_id` only |
+| `034_dialing_sets_clear_team_default.sql` | Clear deprecated tenant-wide `dialing_sets.is_default`; personal default is `users.default_dialing_set_id` only |
 
 ## Usage
 

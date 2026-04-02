@@ -79,8 +79,8 @@ export async function cloneDefaultsToTenant(tenantId, industryId, createdBy, inc
       await query(
         `INSERT INTO dialing_sets 
          (id, tenant_id, name, description, is_default, is_active, is_system_generated, created_from_default_id, created_by, updated_by)
-         VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?, ?)`,
-        [newSetId, tenantId, dds.name, dds.description, dds.is_default, dds.id, createdBy, createdBy]
+         VALUES (?, ?, ?, ?, 0, 1, 1, ?, ?, ?)`,
+        [newSetId, tenantId, dds.name, dds.description, dds.id, createdBy, createdBy]
       );
       
       result.dialing_sets.push({ id: newSetId, name: dds.name });

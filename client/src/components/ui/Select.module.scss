@@ -19,6 +19,7 @@
   height: 34px;
   padding: 0 $space-8 0 $space-3;
   font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
   color: var(--color-text-primary);
   background-color: var(--color-input-bg);
   border: 1px solid var(--color-input-border);
@@ -26,9 +27,13 @@
   cursor: pointer;
   transition: all $transition-fast;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right $space-3 center;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239b9ba8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055) 0%, transparent 46%);
+  background-repeat: no-repeat, no-repeat;
+  background-position: right $space-3 center, 0 0;
+  background-size: 12px 12px, 100% 100%;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
 
   &:hover:not(:disabled):not(:focus) {
     border-color: var(--color-input-border-hover);
@@ -37,7 +42,9 @@
   &:focus {
     outline: none;
     border-color: var(--color-input-border-focus);
-    box-shadow: 0 0 0 3px var(--color-focus-ring);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.05) inset,
+      0 0 0 3px var(--color-focus-ring);
   }
 
   &:disabled {
@@ -49,7 +56,9 @@
     border-color: var(--color-danger);
 
     &:focus {
-      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.05) inset,
+        0 0 0 3px rgba(239, 68, 68, 0.22);
     }
   }
 

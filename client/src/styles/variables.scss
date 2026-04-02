@@ -85,6 +85,8 @@ $bp-2xl: 1536px;
   --color-primary-700: #4338ca;
   --color-primary-800: #3730a3;
   --color-primary-900: #312e81;
+  // Comma-separated for `rgba(var(--color-primary-rgb), a)` (JS may override from tenant theme)
+  --color-primary-rgb: 99, 102, 241;
 
   // Surfaces (dark theme)
   --color-bg-body: #060608;
@@ -101,11 +103,12 @@ $bp-2xl: 1536px;
   --color-border-strong: rgba(255, 255, 255, 0.12);
   --color-border-focus: var(--color-primary-500);
 
-  // Text
+  // Text (slightly brighter mid-tones for dark UI legibility)
   --color-text-primary: #fafafa;
-  --color-text-secondary: #a1a1aa;
-  --color-text-tertiary: #71717a;
-  --color-text-muted: #52525b;
+  --color-text-secondary: #c4c4d0;
+  --color-text-tertiary: #9b9ba8;
+  --color-text-muted: #7a7a88;
+  --color-text-placeholder: #adadb8;
   --color-text-inverse: #09090b;
 
   // Status colors
@@ -126,7 +129,7 @@ $bp-2xl: 1536px;
   --color-input-border: var(--color-border);
   --color-input-border-hover: var(--color-border-strong);
   --color-input-border-focus: var(--color-primary-500);
-  --color-input-placeholder: var(--color-text-muted);
+  --color-input-placeholder: var(--color-text-placeholder);
 
   // Scrollbar
   --scrollbar-thumb: rgba(255, 255, 255, 0.1);

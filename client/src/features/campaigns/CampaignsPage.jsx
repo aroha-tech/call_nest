@@ -215,8 +215,12 @@ export function CampaignsPage() {
     let cancelled = false;
     (async () => {
       try {
+        // Agents cannot list tenant users (requires users.manage / users.team); skip to avoid breaking the whole page.
+        const needsUserDirectory = role !== 'agent';
         const [uRes, stRes, tagRes, cRes] = await Promise.all([
-          tenantUsersAPI.getAll({ page: 1, limit: 500, includeDisabled: false }),
+          needsUserDirectory
+            ? tenantUsersAPI.getAll({ page: 1, limit: 500, includeDisabled: false })
+            : Promise.resolve({ data: { data: [] } }),
           contactStatusesAPI.getOptions().catch(() => ({ data: { data: [] } })),
           contactTagsAPI.list().catch(() => ({ data: { data: [] } })),
           campaignsAPI.list({ page: 1, limit: 500, show_paused: true }).catch(() => ({ data: { data: [] } })),
@@ -247,7 +251,7 @@ export function CampaignsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [role]);
 
   const createMut = useMutation((body) => campaignsAPI.create(body));
   const updateMut = useMutation((id, body) => campaignsAPI.update(id, body));
@@ -472,7 +476,11 @@ export function CampaignsPage() {
     <div className={listStyles.page}>
       <PageHeader
         title="Campaigns"
-        description="Static campaigns tag contacts with campaign_id. Filter campaigns use rules (Tag uses multi-select: is any of). Owning manager: if set, only that manager sees the campaign; if empty, all managers see it. Agents only see assigned records when opening a campaign."
+        description={
+          role === 'agent'
+            ? 'Campaigns in the tenant pool (no owning manager) and campaigns assigned to your manager. Open a campaign to work contacts assigned to you.'
+            : 'Static campaigns tag contacts with campaign_id. Filter campaigns use rules (Tag uses multi-select: is any of). Owning manager: if set, only that manager sees the campaign; if empty, all managers see it. Agents only see assigned records when opening a campaign.'
+        }
         actions={
           isAdmin && canCreate ? (
             <Button onClick={openCreate}>+ New campaign</Button>
@@ -620,8 +628,10 @@ export function CampaignsPage() {
                         <TableCell>{c.type}</TableCell>
                         <TableCell>
                           {c.manager_id
-                            ? managerMap[c.manager_id] || `#${c.manager_id}`
-                            : 'All managers'}
+                            ? managerMap[c.manager_id] || (role === 'agent' ? `Manager #${c.manager_id}` : `#${c.manager_id}`)
+                            : role === 'agent'
+                              ? 'Tenant pool (all managers)'
+                              : 'All managers'}
                         </TableCell>
                         <TableCell>
                           {isArchived ? (

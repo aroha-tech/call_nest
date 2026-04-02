@@ -116,11 +116,7 @@ async function detectAndValidateVariables(scriptBody) {
   return { variables_used: keys, validationError: null };
 }
 
-/**
- * @param {{ skipAutoDefault?: boolean }} [options] - if true, never set is_default (agent-owned creates)
- */
-export async function create(tenantId, data, createdBy, options = {}) {
-  const { skipAutoDefault = false } = options;
+export async function create(tenantId, data, createdBy) {
   const { script_name, script_body, status = 1 } = data;
 
   if (!script_name || !script_body) {
@@ -139,24 +135,10 @@ export async function create(tenantId, data, createdBy, options = {}) {
 
   const variablesUsedJson = JSON.stringify(variables_used || []);
 
-  // One script per tenant is default: first created gets is_default=1; if none is default, new one becomes default
-  const [countRow] = await query(
-    'SELECT COUNT(*) AS total FROM call_scripts WHERE tenant_id = ? AND is_deleted = 0',
-    [tenantId]
-  );
-  const [defaultRow] = await query(
-    'SELECT id FROM call_scripts WHERE tenant_id = ? AND is_deleted = 0 AND is_default = 1 LIMIT 1',
-    [tenantId]
-  );
-  let isDefault = countRow.total === 0 || !defaultRow?.id ? 1 : 0;
-  if (skipAutoDefault) {
-    isDefault = 0;
-  }
-
   const result = await query(
     `INSERT INTO call_scripts (tenant_id, script_name, script_body, variables_used, status, is_default, created_by, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [tenantId, script_name.trim(), script_body, variablesUsedJson, status ? 1 : 0, isDefault, createdBy, createdBy]
+     VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
+    [tenantId, script_name.trim(), script_body, variablesUsedJson, status ? 1 : 0, createdBy, createdBy]
   );
 
   return findById(tenantId, result.insertId);
@@ -170,7 +152,7 @@ export async function update(tenantId, id, data, updatedBy) {
     throw err;
   }
 
-  const { script_name, script_body, status, is_default } = data;
+  const { script_name, script_body, status } = data;
 
   let variables_used = script.variables_used;
   if (script_body !== undefined) {
@@ -182,13 +164,6 @@ export async function update(tenantId, id, data, updatedBy) {
       throw err;
     }
     variables_used = out.variables_used || [];
-  }
-
-  if (is_default === 1) {
-    await query(
-      'UPDATE call_scripts SET is_default = 0 WHERE tenant_id = ? AND is_deleted = 0',
-      [tenantId]
-    );
   }
 
   const updates = [];
@@ -210,10 +185,6 @@ export async function update(tenantId, id, data, updatedBy) {
     updates.push('status = ?');
     params.push(status ? 1 : 0);
   }
-  if (is_default !== undefined) {
-    updates.push('is_default = ?');
-    params.push(is_default ? 1 : 0);
-  }
 
   updates.push('updated_by = ?');
   params.push(updatedBy);
@@ -228,7 +199,11 @@ export async function update(tenantId, id, data, updatedBy) {
   return findById(tenantId, id);
 }
 
-export async function remove(tenantId, id) {
+/**
+ * @param {{ userId?: number }} [options] - if userId set, block delete when that user’s personal default is this script
+ */
+export async function remove(tenantId, id, options = {}) {
+  const { userId } = options;
   const script = await findById(tenantId, id);
   if (!script) {
     const err = new Error('Call script not found');
@@ -236,11 +211,19 @@ export async function remove(tenantId, id) {
     throw err;
   }
 
-  if (script.is_default === 1) {
-    const err = new Error('Default script cannot be deleted. Set another script as default first.');
-    err.status = 400;
-    err.code = 'DEFAULT_SCRIPT_CANNOT_DELETE';
-    throw err;
+  if (userId != null) {
+    const [u] = await query(
+      'SELECT default_call_script_id FROM users WHERE id = ? AND tenant_id = ? AND is_deleted = 0',
+      [userId, tenantId]
+    );
+    if (u && Number(u.default_call_script_id) === Number(id)) {
+      const err = new Error(
+        'This script is your personal default. Choose another script as your default before deleting it.'
+      );
+      err.status = 400;
+      err.code = 'PERSONAL_DEFAULT_SCRIPT_CANNOT_DELETE';
+      throw err;
+    }
   }
 
   await query(
