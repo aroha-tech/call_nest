@@ -8,6 +8,7 @@ import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } fro
 import { Modal, ConfirmModal, ModalFooter } from '../../../../components/ui/Modal';
 import { StatusBadge, Badge } from '../../../../components/ui/Badge';
 import { IconButton } from '../../../../components/ui/IconButton';
+import { EditIcon, TrashIcon, StarIcon } from '../../../../components/ui/ActionIcons';
 import { EmptyState } from '../../../../components/ui/EmptyState';
 import { Alert } from '../../../../components/ui/Alert';
 import { useDialingSets, useDialingSetDispositions, useDispositions } from '../../hooks/useTenantData';
@@ -235,12 +236,14 @@ export function DialingSetsPage({ readOnly = false }) {
                         onClick={(e) => handleSetMyDefault(e, item)}
                         disabled={myDefaultSaving}
                       >
-                        {isMyDefault ? '★' : '☆'}
+                        <StarIcon filled={isMyDefault} />
                       </IconButton>
                     )}
                     {!readOnly && (
                       <>
-                        <IconButton size="sm" title="Edit" onClick={(e) => { e.stopPropagation(); openEditModal(item); }}>✏️</IconButton>
+                        <IconButton size="sm" title="Edit" onClick={(e) => { e.stopPropagation(); openEditModal(item); }}>
+                          <EditIcon />
+                        </IconButton>
                         <IconButton
                           size="sm"
                           variant="danger"
@@ -252,7 +255,7 @@ export function DialingSetsPage({ readOnly = false }) {
                           disabled={isMyDefault}
                           onClick={(e) => { e.stopPropagation(); setDeleteItem(item); setDeleteError(null); }}
                         >
-                          🗑️
+                          <TrashIcon />
                         </IconButton>
                       </>
                     )}

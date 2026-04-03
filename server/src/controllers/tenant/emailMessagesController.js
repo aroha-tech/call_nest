@@ -23,6 +23,11 @@ export async function getAll(req, res, next) {
       }
     }
 
+    const createdByUserIds =
+      folder === 'sent'
+        ? await emailMessageService.getCreatedByUserIdsForScope(tenantId, req.user)
+        : undefined;
+
     const [messages, total] = await Promise.all([
       emailMessageService.findAll(tenantId, {
         contact_id,
@@ -33,6 +38,7 @@ export async function getAll(req, res, next) {
         search,
         limit,
         offset,
+        createdByUserIds,
       }),
       emailMessageService.countAll(tenantId, {
         contact_id,
@@ -41,6 +47,7 @@ export async function getAll(req, res, next) {
         status,
         folder,
         search,
+        createdByUserIds,
       }),
     ]);
     res.json({ data: messages, total });
@@ -56,6 +63,10 @@ export async function getById(req, res, next) {
     if (!message) {
       return res.status(404).json({ error: 'Email message not found' });
     }
+    const visible = await emailMessageService.isEmailMessageVisibleToUser(tenantId, message, req.user);
+    if (!visible) {
+      return res.status(403).json({ error: 'You do not have access to this message' });
+    }
     const attachments = await emailMessageService.getAttachments(tenantId, message.id);
     res.json({ data: { ...message, attachments } });
   } catch (err) {
@@ -68,7 +79,11 @@ export async function getThread(req, res, next) {
     const tenantId = req.tenant.id;
     const threadId = req.params.threadId;
     const messages = await emailMessageService.findByThreadId(tenantId, threadId);
-    res.json({ data: messages });
+    const visibility = await Promise.all(
+      messages.map((m) => emailMessageService.isEmailMessageVisibleToUser(tenantId, m, req.user))
+    );
+    const filtered = messages.filter((_, i) => visibility[i]);
+    res.json({ data: filtered });
   } catch (err) {
     next(err);
   }

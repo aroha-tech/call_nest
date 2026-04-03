@@ -17,6 +17,7 @@ import { Modal, ModalFooter } from '../components/ui/Modal';
 import { SearchInput } from '../components/ui/SearchInput';
 import { StatusBadge } from '../components/ui/Badge';
 import { IconButton } from '../components/ui/IconButton';
+import { EditIcon } from '../components/ui/ActionIcons';
 import { Pagination, PaginationPageSize } from '../components/ui/Pagination';
 import { Alert } from '../components/ui/Alert';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -703,7 +704,7 @@ export function TenantsPage() {
                   </TableCell>
                   <TableCell align="right">
                     {t.id !== 1 && (
-                      <IconButton title="Edit" onClick={() => openEdit(t)} size="sm">✏️</IconButton>
+                      <IconButton title="Edit" onClick={() => openEdit(t)} size="sm"><EditIcon /></IconButton>
                     )}
                   </TableCell>
                 </TableRow>

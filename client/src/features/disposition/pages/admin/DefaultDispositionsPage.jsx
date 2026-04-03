@@ -9,6 +9,7 @@ import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } fro
 import { Modal, ConfirmModal, ModalFooter } from '../../../../components/ui/Modal';
 import { StatusBadge, Badge } from '../../../../components/ui/Badge';
 import { IconButton } from '../../../../components/ui/IconButton';
+import { EditIcon, PauseIcon, PlayIcon, TrashIcon } from '../../../../components/ui/ActionIcons';
 import { EmptyState } from '../../../../components/ui/EmptyState';
 import { Alert } from '../../../../components/ui/Alert';
 import { Pagination, PaginationPageSize } from '../../../../components/ui/Pagination';
@@ -349,16 +350,20 @@ export function DefaultDispositionsPage() {
                       <TableCell><StatusBadge isActive={item.is_active === 1} /></TableCell>
                       <TableCell align="center">
                         <div className={styles.actions}>
-                          <IconButton title="Edit" onClick={() => openEditModal(item)}>✏️</IconButton>
+                          <IconButton title="Edit" onClick={() => openEditModal(item)}>
+                            <EditIcon />
+                          </IconButton>
                           <IconButton
                             title={item.is_active === 1 ? 'Deactivate' : 'Activate'}
                             variant={item.is_active === 1 ? 'warning' : 'success'}
                             onClick={() => setToggleItem(item)}
                             disabled={toggleLoading}
                           >
-                            {item.is_active === 1 ? '⏸️' : '▶️'}
+                            {item.is_active === 1 ? <PauseIcon /> : <PlayIcon />}
                           </IconButton>
-                          <IconButton title="Delete" variant="danger" onClick={() => { setDeleteItem(item); setDeleteError(null); }}>🗑️</IconButton>
+                          <IconButton title="Delete" variant="danger" onClick={() => { setDeleteItem(item); setDeleteError(null); }}>
+                            <TrashIcon />
+                          </IconButton>
                         </div>
                       </TableCell>
                     </TableRow>

@@ -161,13 +161,17 @@ export function ContactFormPage({ defaultType }) {
 
   useEffect(() => {
     let cancelled = false;
-    if (role !== 'admin' && role !== 'manager') return;
+    const loadUsers = role === 'admin' || role === 'manager';
+    const loadCampaigns = role === 'admin' || role === 'manager' || (role === 'agent' && type === 'lead');
+    if (!loadUsers && !loadCampaigns) return;
     (async () => {
       try {
-        const [uRes, cRes] = await Promise.all([
-          tenantUsersAPI.getAll({ page: 1, limit: 500, includeDisabled: false }),
-          campaignsAPI.list({ page: 1, limit: 500, show_paused: true }).catch(() => ({ data: { data: [] } })),
-        ]);
+        const uRes = loadUsers
+          ? await tenantUsersAPI.getAll({ page: 1, limit: 500, includeDisabled: false })
+          : { data: { data: [] } };
+        const cRes = loadCampaigns
+          ? await campaignsAPI.list({ page: 1, limit: 500, show_paused: true }).catch(() => ({ data: { data: [] } }))
+          : { data: { data: [] } };
         if (cancelled) return;
         setTenantUsers(uRes?.data?.data ?? []);
         setCampaignList(cRes?.data?.data ?? []);
@@ -181,7 +185,7 @@ export function ContactFormPage({ defaultType }) {
     return () => {
       cancelled = true;
     };
-  }, [role]);
+  }, [role, type]);
 
   // Load contact into form when editing
   useEffect(() => {
@@ -419,6 +423,15 @@ export function ContactFormPage({ defaultType }) {
       if (formData.campaign_id) base.campaign_id = Number(formData.campaign_id);
     }
 
+    if (role === 'manager' && isNew) {
+      if (formData.campaign_id) base.campaign_id = Number(formData.campaign_id);
+      if (formData.assigned_user_id) base.assigned_user_id = Number(formData.assigned_user_id);
+    }
+
+    if (role === 'agent' && isNew && type === 'lead') {
+      if (formData.campaign_id) base.campaign_id = Number(formData.campaign_id);
+    }
+
     if (!isNew && (role === 'admin' || role === 'manager')) {
       if (role === 'admin') {
         base.manager_id = formData.manager_id ? Number(formData.manager_id) : null;
@@ -479,7 +492,13 @@ export function ContactFormPage({ defaultType }) {
   const isLeadRoute = location.pathname.startsWith('/leads');
   const recordLabel = type === 'lead' ? 'lead' : 'contact';
   const pageDescription = isNew
-    ? `Create a ${recordLabel}: name, tags, phones${role === 'admin' ? ', and optional ownership' : ''}.`
+    ? `Create a ${recordLabel}: name, tags, phones${
+        role === 'admin' ? ', and optional ownership' : ''
+      }${
+        role === 'manager' && type === 'lead'
+          ? '. New leads default to you as manager unless you assign a team agent'
+          : ''
+      }${role === 'agent' && type === 'lead' ? '. Assignment defaults to you and your manager' : ''}.`
     : `Update ${recordLabel} profile, tags, assignment, and phone numbers.`;
 
   if (!isNew && loadingContact && !contact) {
@@ -724,6 +743,53 @@ export function ContactFormPage({ defaultType }) {
                 placeholder="— None —"
                 options={[{ value: '', label: '— None —' }, ...agentSelectOptions]}
               />
+              <Select
+                label="Campaign"
+                value={formData.campaign_id}
+                onChange={(e) => setFormData((p) => ({ ...p, campaign_id: e.target.value }))}
+                placeholder="— None —"
+                options={[{ value: '', label: '— None —' }, ...campaignSelectOptions]}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {role === 'manager' && isNew ? (
+          <section className={styles.section} aria-labelledby="contact-section-new-manager-assign">
+            <h2 id="contact-section-new-manager-assign" className={styles.sectionTitle}>
+              Campaign &amp; assignment (optional)
+            </h2>
+            <p className={styles.sectionDesc}>
+              By default this {recordLabel} is owned by you as manager. Optionally assign a team agent and/or a campaign; leave agent empty to keep it assigned to yourself.
+            </p>
+            <div className={styles.assignGrid}>
+              <Select
+                label="Assigned agent"
+                value={formData.assigned_user_id}
+                onChange={(e) => setFormData((p) => ({ ...p, assigned_user_id: e.target.value }))}
+                placeholder="— Myself (default) —"
+                options={[{ value: '', label: '— Myself (default) —' }, ...agentSelectOptions]}
+              />
+              <Select
+                label="Campaign"
+                value={formData.campaign_id}
+                onChange={(e) => setFormData((p) => ({ ...p, campaign_id: e.target.value }))}
+                placeholder="— None —"
+                options={[{ value: '', label: '— None —' }, ...campaignSelectOptions]}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {role === 'agent' && isNew && type === 'lead' ? (
+          <section className={styles.section} aria-labelledby="contact-section-new-agent-campaign">
+            <h2 id="contact-section-new-agent-campaign" className={styles.sectionTitle}>
+              Campaign (optional)
+            </h2>
+            <p className={styles.sectionDesc}>
+              New leads are assigned to you with your manager set automatically. You can attach an optional campaign.
+            </p>
+            <div className={styles.assignGrid}>
               <Select
                 label="Campaign"
                 value={formData.campaign_id}

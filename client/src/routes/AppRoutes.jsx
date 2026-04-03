@@ -222,11 +222,17 @@ function TenantRoutes() {
           </ProtectedRoute>
         }
       />
-      {/* WhatsApp module */}
+      {/* WhatsApp module (granular RBAC; settings.manage retains full access) */}
       <Route
         path="/whatsapp/accounts"
         element={
-          <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+          <ProtectedRoute
+            permissions={[
+              PERMISSIONS.WHATSAPP_TEMPLATES_MANAGE,
+              PERMISSIONS.WHATSAPP_ACCOUNTS_MANAGE,
+              PERMISSIONS.SETTINGS_MANAGE,
+            ]}
+          >
             <AppShellLayout>
               <WhatsAppAccountsPage />
             </AppShellLayout>
@@ -236,7 +242,13 @@ function TenantRoutes() {
       <Route
         path="/whatsapp/templates"
         element={
-          <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+          <ProtectedRoute
+            permissions={[
+              PERMISSIONS.WHATSAPP_VIEW,
+              PERMISSIONS.SETTINGS_MANAGE,
+              PERMISSIONS.DIAL_EXECUTE,
+            ]}
+          >
             <AppShellLayout>
               <WhatsAppTemplatesPage />
             </AppShellLayout>
@@ -246,7 +258,13 @@ function TenantRoutes() {
       <Route
         path="/whatsapp/messages"
         element={
-          <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+          <ProtectedRoute
+            permissions={[
+              PERMISSIONS.WHATSAPP_VIEW,
+              PERMISSIONS.SETTINGS_MANAGE,
+              PERMISSIONS.DIAL_EXECUTE,
+            ]}
+          >
             <AppShellLayout>
               <WhatsAppMessagesPage />
             </AppShellLayout>
@@ -256,7 +274,9 @@ function TenantRoutes() {
       <Route
         path="/whatsapp/logs"
         element={
-          <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+          <ProtectedRoute
+            permissions={[PERMISSIONS.WHATSAPP_LOGS_VIEW, PERMISSIONS.SETTINGS_MANAGE]}
+          >
             <AppShellLayout>
               <WhatsAppLogsPage />
             </AppShellLayout>
@@ -269,7 +289,13 @@ function TenantRoutes() {
         path="/email/sent"
         element={
           <EmailModuleGate>
-            <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+            <ProtectedRoute
+              permissions={[
+                PERMISSIONS.EMAIL_VIEW,
+                PERMISSIONS.SETTINGS_MANAGE,
+                PERMISSIONS.DIAL_EXECUTE,
+              ]}
+            >
               <AppShellLayout>
                 <EmailLayout>
                   <EmailSentPage />
@@ -283,7 +309,13 @@ function TenantRoutes() {
         path="/email/templates"
         element={
           <EmailModuleGate>
-            <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+            <ProtectedRoute
+              permissions={[
+                PERMISSIONS.EMAIL_VIEW,
+                PERMISSIONS.SETTINGS_MANAGE,
+                PERMISSIONS.DIAL_EXECUTE,
+              ]}
+            >
               <AppShellLayout>
                 <EmailLayout>
                   <EmailTemplatesPage />
@@ -297,7 +329,13 @@ function TenantRoutes() {
         path="/email/accounts"
         element={
           <EmailModuleGate>
-            <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+            <ProtectedRoute
+              permissions={[
+                PERMISSIONS.EMAIL_TEMPLATES_MANAGE,
+                PERMISSIONS.EMAIL_ACCOUNTS_MANAGE,
+                PERMISSIONS.SETTINGS_MANAGE,
+              ]}
+            >
               <AppShellLayout>
                 <EmailLayout>
                   <EmailAccountsPage />

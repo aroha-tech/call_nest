@@ -1,0 +1,15 @@
+.rowActionGroup {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.glyph {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  display: block;
+  pointer-events: none;
+}

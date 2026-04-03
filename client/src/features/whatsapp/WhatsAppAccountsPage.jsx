@@ -6,12 +6,15 @@ import { Select } from '../../components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { Modal, ConfirmModal, ModalFooter } from '../../components/ui/Modal';
 import { IconButton } from '../../components/ui/IconButton';
+import { EditIcon, PauseIcon, PlayIcon, TrashIcon } from '../../components/ui/ActionIcons';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Checkbox } from '../../components/ui/Checkbox';
 import { whatsappAccountsAPI } from '../../services/whatsappAPI';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
+import { usePermissions } from '../../hooks/usePermission';
+import { PERMISSIONS } from '../../utils/permissionUtils';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
@@ -64,6 +67,10 @@ const defaultFormData = () => ({
 });
 
 export function WhatsAppAccountsPage() {
+  const { can } = usePermissions();
+  const canManageAccounts =
+    can(PERMISSIONS.WHATSAPP_ACCOUNTS_MANAGE) || can(PERMISSIONS.SETTINGS_MANAGE);
+
   const [showInactive, setShowInactive] = useState(false);
   const fetchFn = useCallback(
     () => whatsappAccountsAPI.getAll(showInactive),
@@ -267,8 +274,12 @@ export function WhatsAppAccountsPage() {
     <div className={styles.page}>
       <PageHeader
         title="WhatsApp Accounts"
-        description="Connect and manage WhatsApp Business API accounts"
-        actions={<Button onClick={openCreate}>+ Add Account</Button>}
+        description={
+          canManageAccounts
+            ? 'Connect and manage WhatsApp Business API accounts'
+            : 'View connected WhatsApp accounts. Only an admin can add or edit connections.'
+        }
+        actions={canManageAccounts ? <Button onClick={openCreate}>+ Add Account</Button> : null}
       />
 
       {error && <Alert variant="error">{error}</Alert>}
@@ -287,9 +298,13 @@ export function WhatsAppAccountsPage() {
           <EmptyState
             icon="📱"
             title="No WhatsApp accounts"
-            description="Add an account to connect your WhatsApp Business API."
-            action={openCreate}
-            actionLabel="Add Account"
+            description={
+              canManageAccounts
+                ? 'Add an account to connect your WhatsApp Business API.'
+                : 'No accounts are configured yet. Ask an admin to connect WhatsApp.'
+            }
+            action={canManageAccounts ? openCreate : undefined}
+            actionLabel={canManageAccounts ? 'Add Account' : undefined}
           />
         ) : (
           <Table>
@@ -299,7 +314,9 @@ export function WhatsAppAccountsPage() {
               <TableHeaderCell>Phone / ID</TableHeaderCell>
               <TableHeaderCell>Provider</TableHeaderCell>
               <TableHeaderCell>Status</TableHeaderCell>
-              <TableHeaderCell width="180px" align="center">Actions</TableHeaderCell>
+              {canManageAccounts ? (
+                <TableHeaderCell width="180px" align="center">Actions</TableHeaderCell>
+              ) : null}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -318,17 +335,27 @@ export function WhatsAppAccountsPage() {
                 <TableCell>
                   <Badge variant={row.status === 'active' ? 'success' : 'muted'}>{row.status}</Badge>
                 </TableCell>
+                {canManageAccounts ? (
                 <TableCell align="center">
                   <div className={styles.actions}>
                     {row.status === 'inactive' ? (
-                      <IconButton size="sm" variant="success" title="Activate" onClick={() => setConfirmAction({ id: row.id, action: 'activate', name: row.account_name || row.phone_number })}>▶️</IconButton>
+                      <IconButton size="sm" variant="success" title="Activate" onClick={() => setConfirmAction({ id: row.id, action: 'activate', name: row.account_name || row.phone_number })}>
+                        <PlayIcon />
+                      </IconButton>
                     ) : (
-                      <IconButton size="sm" variant="warning" title="Deactivate" onClick={() => setConfirmAction({ id: row.id, action: 'deactivate', name: row.account_name || row.phone_number })}>⏸️</IconButton>
+                      <IconButton size="sm" variant="warning" title="Deactivate" onClick={() => setConfirmAction({ id: row.id, action: 'deactivate', name: row.account_name || row.phone_number })}>
+                        <PauseIcon />
+                      </IconButton>
                     )}
-                    <IconButton size="sm" title="Edit" onClick={() => openEdit(row)}>✏️</IconButton>
-                    <IconButton size="sm" variant="danger" title="Delete" onClick={() => { setDeleteItem(row); setDeleteError(null); }}>🗑️</IconButton>
+                    <IconButton size="sm" title="Edit" onClick={() => openEdit(row)}>
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton size="sm" variant="danger" title="Delete" onClick={() => { setDeleteItem(row); setDeleteError(null); }}>
+                      <TrashIcon />
+                    </IconButton>
                   </div>
                 </TableCell>
+                ) : null}
               </TableRow>
             ))}
           </TableBody>

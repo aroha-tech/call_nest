@@ -3,6 +3,8 @@ import { useAppSelector } from '../../app/hooks';
 import { selectUser } from '../../features/auth/authSelectors';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
+import { IconButton } from '../../components/ui/IconButton';
+import { EditIcon, ArchiveIcon, RowActionGroup } from '../../components/ui/ActionIcons';
 import { Input } from '../../components/ui/Input';
 import { Alert } from '../../components/ui/Alert';
 import { Modal, ModalFooter } from '../../components/ui/Modal';
@@ -133,14 +135,20 @@ export function ContactTagsPage() {
                       <TableCell>{t.created_by_name || (t.created_by ? `#${t.created_by}` : '—')}</TableCell>
                       <TableCell align="center">
                         {canEditRow(t) ? (
-                          <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
-                            <Button variant="ghost" size="sm" onClick={() => openEdit(t)}>
-                              Edit
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleArchive(t)} disabled={deleteMut.loading}>
-                              Archive
-                            </Button>
-                          </div>
+                          <RowActionGroup>
+                            <IconButton size="sm" title="Edit" onClick={() => openEdit(t)}>
+                              <EditIcon />
+                            </IconButton>
+                            <IconButton
+                              size="sm"
+                              variant="warning"
+                              title="Archive"
+                              onClick={() => handleArchive(t)}
+                              disabled={deleteMut.loading}
+                            >
+                              <ArchiveIcon />
+                            </IconButton>
+                          </RowActionGroup>
                         ) : (
                           <span style={{ opacity: 0.6 }}>—</span>
                         )}

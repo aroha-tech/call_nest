@@ -420,10 +420,15 @@ export async function createContact(tenantId, user, payload) {
     }
   }
 
-  // If a manager creates contacts/leads, default ownership to themselves
-  // when manager_id is not explicitly provided.
-  if (user.role === 'manager' && !resolvedManagerId) {
-    resolvedManagerId = user.id;
+  // Manager-created leads/contacts: default owning manager and assignee to self when not provided.
+  // (Optional assigned_user_id in payload assigns to a team agent instead.)
+  if (user.role === 'manager') {
+    if (!resolvedManagerId) {
+      resolvedManagerId = user.id;
+    }
+    if (!resolvedAssignedUserId) {
+      resolvedAssignedUserId = user.id;
+    }
   }
 
   const dob = date_of_birth !== undefined && date_of_birth !== null ? normalizeDateOfBirthForDb(date_of_birth) : null;

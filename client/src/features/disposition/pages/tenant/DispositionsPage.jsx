@@ -9,6 +9,7 @@ import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } fro
 import { Modal, ConfirmModal, ModalFooter } from '../../../../components/ui/Modal';
 import { StatusBadge, Badge } from '../../../../components/ui/Badge';
 import { IconButton } from '../../../../components/ui/IconButton';
+import { ViewIcon, EditIcon, PauseIcon, PlayIcon, TrashIcon } from '../../../../components/ui/ActionIcons';
 import { EmptyState } from '../../../../components/ui/EmptyState';
 import { Alert } from '../../../../components/ui/Alert';
 import { Pagination, PaginationPageSize } from '../../../../components/ui/Pagination';
@@ -361,7 +362,7 @@ export function DispositionsPage({ readOnly = false }) {
               <TableHeaderCell width="90px">Connected</TableHeaderCell>
               <TableHeaderCell>Actions</TableHeaderCell>
               <TableHeaderCell width="80px">Active</TableHeaderCell>
-              {readOnly && <TableHeaderCell width="72px" align="center">View</TableHeaderCell>}
+              {readOnly && <TableHeaderCell width="72px" align="center">Actions</TableHeaderCell>}
               {!readOnly && <TableHeaderCell width="100px" align="center">Manage</TableHeaderCell>}
             </TableRow>
           </TableHead>
@@ -393,24 +394,30 @@ export function DispositionsPage({ readOnly = false }) {
                 {readOnly && (
                   <TableCell align="center">
                     <IconButton title="View disposition details" onClick={() => setViewItem(item)}>
-                      👁️
+                      <ViewIcon />
                     </IconButton>
                   </TableCell>
                 )}
                 {!readOnly && (
                   <TableCell align="center">
                     <div className={styles.actions}>
-                      <IconButton title="View" onClick={() => setViewItem(item)}>👁️</IconButton>
-                      <IconButton title="Edit" onClick={() => openEditModal(item)}>✏️</IconButton>
+                      <IconButton title="View" onClick={() => setViewItem(item)}>
+                        <ViewIcon />
+                      </IconButton>
+                      <IconButton title="Edit" onClick={() => openEditModal(item)}>
+                        <EditIcon />
+                      </IconButton>
                       <IconButton
                         title={item.is_active === 1 ? 'Deactivate' : 'Activate'}
                         variant={item.is_active === 1 ? 'warning' : 'success'}
                         onClick={() => setToggleItem(item)}
                         disabled={toggleLoading}
                       >
-                        {item.is_active === 1 ? '⏸️' : '▶️'}
+                        {item.is_active === 1 ? <PauseIcon /> : <PlayIcon />}
                       </IconButton>
-                      <IconButton title="Delete" variant="danger" onClick={() => setDeleteItem(item)}>🗑️</IconButton>
+                      <IconButton title="Delete" variant="danger" onClick={() => setDeleteItem(item)}>
+                        <TrashIcon />
+                      </IconButton>
                     </div>
                   </TableCell>
                 )}

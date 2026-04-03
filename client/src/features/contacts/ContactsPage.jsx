@@ -9,6 +9,8 @@ import { campaignsAPI } from '../../services/campaignsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
+import { IconButton } from '../../components/ui/IconButton';
+import { EditIcon, TrashIcon, RowActionGroup } from '../../components/ui/ActionIcons';
 import { Select } from '../../components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { ConfirmModal } from '../../components/ui/Modal';
@@ -500,18 +502,22 @@ export function ContactsPage({ type }) {
                       </>
                     ) : null}
                     <TableCell align="center">
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
+                      <RowActionGroup>
                         {canUpdate && (
-                          <Button variant="ghost" size="sm" onClick={() => navigate(type === 'lead' ? `/leads/${c.id}` : `/contacts/${c.id}`)}>
-                            Edit
-                          </Button>
+                          <IconButton
+                            size="sm"
+                            title="Edit"
+                            onClick={() => navigate(type === 'lead' ? `/leads/${c.id}` : `/contacts/${c.id}`)}
+                          >
+                            <EditIcon />
+                          </IconButton>
                         )}
                         {canDelete && (
-                          <Button variant="danger" size="sm" onClick={() => setDeleteItem(c)}>
-                            Delete
-                          </Button>
+                          <IconButton size="sm" variant="danger" title="Delete" onClick={() => setDeleteItem(c)}>
+                            <TrashIcon />
+                          </IconButton>
                         )}
-                      </div>
+                      </RowActionGroup>
                     </TableCell>
                   </TableRow>
                 ))}

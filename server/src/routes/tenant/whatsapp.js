@@ -5,46 +5,57 @@ import * as whatsappMessagesController from '../../controllers/tenant/whatsappMe
 import * as whatsappSendController from '../../controllers/tenant/whatsappSendController.js';
 import * as whatsappSettingsController from '../../controllers/tenant/whatsappSettingsController.js';
 import * as whatsappApiLogsController from '../../controllers/tenant/whatsappApiLogsController.js';
-import { tenantAuthMiddleware } from '../../middleware/auth.js';
+import { tenantAuthMiddleware, requirePermission } from '../../middleware/auth.js';
 
 const router = Router();
 
 router.use(tenantAuthMiddleware);
 
+/** Read WhatsApp UI data (templates list, accounts list, message log, settings read). */
+const waView = requirePermission(['whatsapp.view', 'settings.manage', 'dial.execute']);
+/** Send template / text messages. */
+const waSend = requirePermission(['whatsapp.send', 'settings.manage', 'dial.execute']);
+/** Create/edit templates, import from provider, tenant message templates, WhatsApp send settings. */
+const waTemplatesManage = requirePermission(['whatsapp.templates.manage', 'settings.manage']);
+/** Connect/edit WhatsApp Business accounts. */
+const waAccountsManage = requirePermission(['whatsapp.accounts.manage', 'settings.manage']);
+/** API request/response logs. */
+const waLogsView = requirePermission(['whatsapp.logs.view', 'settings.manage']);
+
 // Accounts (connect WhatsApp Business API)
-router.post('/accounts/test-connection', whatsappAccountsController.testConnection);
-router.get('/accounts', whatsappAccountsController.getAll);
-router.get('/accounts/:id/templates', whatsappAccountsController.getTemplatesFromProvider);
-router.get('/accounts/:id', whatsappAccountsController.getById);
-router.post('/accounts', whatsappAccountsController.create);
-router.put('/accounts/:id', whatsappAccountsController.update);
-router.delete('/accounts/:id', whatsappAccountsController.remove);
-router.post('/accounts/:id/activate', whatsappAccountsController.activate);
-router.post('/accounts/:id/deactivate', whatsappAccountsController.deactivate);
+router.post('/accounts/test-connection', waAccountsManage, whatsappAccountsController.testConnection);
+router.get('/accounts', waView, whatsappAccountsController.getAll);
+router.get('/accounts/:id/templates', waTemplatesManage, whatsappAccountsController.getTemplatesFromProvider);
+router.get('/accounts/:id', waView, whatsappAccountsController.getById);
+router.post('/accounts', waAccountsManage, whatsappAccountsController.create);
+router.put('/accounts/:id', waAccountsManage, whatsappAccountsController.update);
+router.delete('/accounts/:id', waAccountsManage, whatsappAccountsController.remove);
+router.post('/accounts/:id/activate', waAccountsManage, whatsappAccountsController.activate);
+router.post('/accounts/:id/deactivate', waAccountsManage, whatsappAccountsController.deactivate);
 
 // Templates (Meta Business API templates)
-router.get('/templates', whatsappTemplatesController.getAll);
-router.get('/templates/:id', whatsappTemplatesController.getById);
-router.post('/templates', whatsappTemplatesController.create);
-router.put('/templates/:id', whatsappTemplatesController.update);
-router.delete('/templates/:id', whatsappTemplatesController.remove);
-router.post('/templates/:id/activate', whatsappTemplatesController.activate);
-router.post('/templates/:id/deactivate', whatsappTemplatesController.deactivate);
+router.get('/templates', waView, whatsappTemplatesController.getAll);
+router.get('/templates/:id', waView, whatsappTemplatesController.getById);
+router.post('/templates', waTemplatesManage, whatsappTemplatesController.create);
+router.put('/templates/:id', waTemplatesManage, whatsappTemplatesController.update);
+router.delete('/templates/:id', waTemplatesManage, whatsappTemplatesController.remove);
+router.post('/templates/:id/activate', waTemplatesManage, whatsappTemplatesController.activate);
+router.post('/templates/:id/deactivate', waTemplatesManage, whatsappTemplatesController.deactivate);
 
 // Tenant WhatsApp settings (manual vs automatic send)
-router.get('/settings', whatsappSettingsController.getSettings);
-router.put('/settings', whatsappSettingsController.updateSettings);
+router.get('/settings', waView, whatsappSettingsController.getSettings);
+router.put('/settings', waTemplatesManage, whatsappSettingsController.updateSettings);
 
 // Messages (log)
-router.get('/messages', whatsappMessagesController.getAll);
-router.get('/messages/:id', whatsappMessagesController.getById);
+router.get('/messages', waView, whatsappMessagesController.getAll);
+router.get('/messages/:id', waView, whatsappMessagesController.getById);
 
 // Send messages
-router.post('/send', whatsappSendController.sendTemplate);
-router.post('/send-text', whatsappSendController.sendText);
+router.post('/send', waSend, whatsappSendController.sendTemplate);
+router.post('/send-text', waSend, whatsappSendController.sendText);
 
 // API request/response logs
-router.get('/logs', whatsappApiLogsController.getAll);
-router.get('/logs/:id', whatsappApiLogsController.getById);
+router.get('/logs', waLogsView, whatsappApiLogsController.getAll);
+router.get('/logs/:id', waLogsView, whatsappApiLogsController.getById);
 
 export default router;

@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
+import { IconButton } from '../components/ui/IconButton';
+import { EditIcon, TrashIcon, RowActionGroup } from '../components/ui/ActionIcons';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Alert } from '../components/ui/Alert';
@@ -254,10 +256,10 @@ export function DealsPage() {
                   {d.description ? <p className={styles.emptyHint}>{d.description}</p> : null}
                 </div>
                 <div className={styles.dealActions}>
-                  <Button
-                    type="button"
+                  <IconButton
                     size="sm"
-                    variant="secondary"
+                    variant="subtle"
+                    title="Edit pipeline"
                     onClick={() =>
                       setDealModal({
                         mode: 'edit',
@@ -268,8 +270,8 @@ export function DealsPage() {
                       })
                     }
                   >
-                    Edit pipeline
-                  </Button>
+                    <EditIcon />
+                  </IconButton>
                   <Button type="button" size="sm" variant="secondary" onClick={() => setStageModal({ mode: 'create', dealId: d.id, name: '', progression_percent: 0, is_closed_won: false, is_closed_lost: false })}>
                     Add stage
                   </Button>
@@ -309,27 +311,33 @@ export function DealsPage() {
                           {!s.is_closed_won && !s.is_closed_lost ? '—' : null}
                         </td>
                         <td>
-                          <Button
-                            type="button"
-                            size="xs"
-                            variant="ghost"
-                            onClick={() =>
-                              setStageModal({
-                                mode: 'edit',
-                                dealId: d.id,
-                                stageId: s.id,
-                                name: s.name,
-                                progression_percent: s.progression_percent,
-                                is_closed_won: !!s.is_closed_won,
-                                is_closed_lost: !!s.is_closed_lost,
-                              })
-                            }
-                          >
-                            Edit
-                          </Button>
-                          <Button type="button" size="xs" variant="ghost" onClick={() => setDeleteStage({ dealId: d.id, stageId: s.id, name: s.name })}>
-                            Remove
-                          </Button>
+                          <RowActionGroup>
+                            <IconButton
+                              size="sm"
+                              title="Edit stage"
+                              onClick={() =>
+                                setStageModal({
+                                  mode: 'edit',
+                                  dealId: d.id,
+                                  stageId: s.id,
+                                  name: s.name,
+                                  progression_percent: s.progression_percent,
+                                  is_closed_won: !!s.is_closed_won,
+                                  is_closed_lost: !!s.is_closed_lost,
+                                })
+                              }
+                            >
+                              <EditIcon />
+                            </IconButton>
+                            <IconButton
+                              size="sm"
+                              variant="danger"
+                              title="Remove stage"
+                              onClick={() => setDeleteStage({ dealId: d.id, stageId: s.id, name: s.name })}
+                            >
+                              <TrashIcon />
+                            </IconButton>
+                          </RowActionGroup>
                         </td>
                       </tr>
                     ))}

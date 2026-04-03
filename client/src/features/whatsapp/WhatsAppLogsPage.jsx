@@ -4,6 +4,8 @@ import { Select } from '../../components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { Modal, ModalFooter } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
+import { IconButton } from '../../components/ui/IconButton';
+import { ViewIcon } from '../../components/ui/ActionIcons';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Spinner } from '../../components/ui/Spinner';
 import { Alert } from '../../components/ui/Alert';
@@ -137,7 +139,7 @@ export function WhatsAppLogsPage() {
                   <TableHeaderCell>Method</TableHeaderCell>
                   <TableHeaderCell>Status</TableHeaderCell>
                   <TableHeaderCell>Account</TableHeaderCell>
-                  <TableHeaderCell width="80px" align="center">View</TableHeaderCell>
+                  <TableHeaderCell width="72px" align="center">Actions</TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -157,7 +159,9 @@ export function WhatsAppLogsPage() {
                     </TableCell>
                     <TableCell>{row.account_phone || '—'}</TableCell>
                     <TableCell align="center">
-                      <Button size="sm" variant="ghost" onClick={() => setSelectedLog(row)}>Details</Button>
+                      <IconButton size="sm" title="View details" onClick={() => setSelectedLog(row)}>
+                        <ViewIcon />
+                      </IconButton>
                     </TableCell>
                   </TableRow>
                 ))}

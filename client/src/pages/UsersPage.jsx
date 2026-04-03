@@ -17,6 +17,7 @@ import { Modal, ModalFooter } from '../components/ui/Modal';
 import { SearchInput } from '../components/ui/SearchInput';
 import { StatusBadge } from '../components/ui/Badge';
 import { IconButton } from '../components/ui/IconButton';
+import { EditIcon } from '../components/ui/ActionIcons';
 import { Pagination, PaginationPageSize } from '../components/ui/Pagination';
 import { Alert } from '../components/ui/Alert';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -385,7 +386,7 @@ export function UsersPage() {
                   </TableCell>
                   <TableCell className={styles.dateCell}>{formatDateTime(u.last_login_at)}</TableCell>
                   <TableCell align="right">
-                    <IconButton title="Edit" onClick={() => openEdit(u)} size="sm">✏️</IconButton>
+                    <IconButton title="Edit" onClick={() => openEdit(u)} size="sm"><EditIcon /></IconButton>
                   </TableCell>
                 </TableRow>
             ))}

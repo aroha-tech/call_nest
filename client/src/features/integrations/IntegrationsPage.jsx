@@ -2,6 +2,8 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
+import { IconButton } from '../../components/ui/IconButton';
+import { EditIcon, RowActionGroup } from '../../components/ui/ActionIcons';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
@@ -167,10 +169,10 @@ export function IntegrationsPage() {
                       <TableCell>{it.is_active === 0 ? 'Inactive' : 'Active'}</TableCell>
                       <TableCell style={{ wordBreak: 'break-word' }}>{webhookUrl}</TableCell>
                       <TableCell align="center">
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
-                          <Button variant="secondary" size="sm" onClick={() => openEdit(it)}>
-                            Edit
-                          </Button>
+                        <RowActionGroup>
+                          <IconButton size="sm" variant="subtle" title="Edit" onClick={() => openEdit(it)}>
+                            <EditIcon />
+                          </IconButton>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -184,7 +186,7 @@ export function IntegrationsPage() {
                           >
                             Copy URL
                           </Button>
-                        </div>
+                        </RowActionGroup>
                       </TableCell>
                     </TableRow>
                   );

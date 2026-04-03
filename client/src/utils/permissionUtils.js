@@ -86,6 +86,22 @@ export const PERMISSIONS = {
   // Settings
   SETTINGS_MANAGE: 'settings.manage',
 
+  /** View WhatsApp screens (templates, messages, account list). */
+  WHATSAPP_VIEW: 'whatsapp.view',
+  /** Send WhatsApp messages (same capability scope as admin for sending). */
+  WHATSAPP_SEND: 'whatsapp.send',
+  /** Edit Meta templates, message templates, and WhatsApp send settings (not accounts for managers). */
+  WHATSAPP_TEMPLATES_MANAGE: 'whatsapp.templates.manage',
+  /** Add/edit/delete WhatsApp Business connections (tenant admin). */
+  WHATSAPP_ACCOUNTS_MANAGE: 'whatsapp.accounts.manage',
+  /** API request logs (admin and manager; not agents). */
+  WHATSAPP_LOGS_VIEW: 'whatsapp.logs.view',
+
+  EMAIL_VIEW: 'email.view',
+  EMAIL_SEND: 'email.send',
+  EMAIL_TEMPLATES_MANAGE: 'email.templates.manage',
+  EMAIL_ACCOUNTS_MANAGE: 'email.accounts.manage',
+
   // Dispositions
   DISPOSITIONS_MANAGE: 'dispositions.manage',
   /** View dispositions & dialing sets (read-only); agents */

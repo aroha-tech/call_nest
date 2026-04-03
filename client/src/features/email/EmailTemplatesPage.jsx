@@ -6,6 +6,7 @@ import { Select } from '../../components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { Modal, ConfirmModal, ModalFooter } from '../../components/ui/Modal';
 import { IconButton } from '../../components/ui/IconButton';
+import { EditIcon, PauseIcon, PlayIcon, TrashIcon } from '../../components/ui/ActionIcons';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
@@ -22,8 +23,14 @@ import listStyles from '../../components/admin/adminDataList.module.scss';
 import { FilterBar } from '../../components/admin/FilterBar';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
+import { usePermissions } from '../../hooks/usePermission';
+import { PERMISSIONS } from '../../utils/permissionUtils';
 
 export function EmailTemplatesPage() {
+  const { can } = usePermissions();
+  const canManageTemplates =
+    can(PERMISSIONS.EMAIL_TEMPLATES_MANAGE) || can(PERMISSIONS.SETTINGS_MANAGE);
+
   const [showInactive, setShowInactive] = useState(false);
   const [appliedAccountId, setAppliedAccountId] = useState('__all__');
   const [draftAccountId, setDraftAccountId] = useState('__all__');
@@ -181,8 +188,12 @@ export function EmailTemplatesPage() {
     <div className={styles.page}>
       <PageHeader
         title="Email Templates"
-        description="Reusable email templates with subject and body"
-        actions={<Button onClick={openCreate}>+ Add Template</Button>}
+        description={
+          canManageTemplates
+            ? 'Reusable email templates with subject and body'
+            : 'View email templates. Only managers and admins can add or edit templates.'
+        }
+        actions={canManageTemplates ? <Button onClick={openCreate}>+ Add Template</Button> : null}
       />
 
       {error && <Alert variant="error">{error}</Alert>}
@@ -219,9 +230,13 @@ export function EmailTemplatesPage() {
           <EmptyState
             icon="📄"
             title="No email templates"
-            description="Create a template to reuse subject and body."
-            action={openCreate}
-            actionLabel="Add Template"
+            description={
+              canManageTemplates
+                ? 'Create a template to reuse subject and body.'
+                : 'No templates yet. A manager or admin can add templates when ready.'
+            }
+            action={canManageTemplates ? openCreate : undefined}
+            actionLabel={canManageTemplates ? 'Add Template' : undefined}
           />
         ) : (
           <div className={listStyles.tableScrollAreaNatural}>
@@ -232,7 +247,9 @@ export function EmailTemplatesPage() {
               <TableHeaderCell>Name</TableHeaderCell>
               <TableHeaderCell>Subject</TableHeaderCell>
               <TableHeaderCell>Status</TableHeaderCell>
-              <TableHeaderCell width="180px" align="center">Actions</TableHeaderCell>
+              {canManageTemplates ? (
+                <TableHeaderCell width="180px" align="center">Actions</TableHeaderCell>
+              ) : null}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -244,17 +261,27 @@ export function EmailTemplatesPage() {
                 <TableCell>
                   <Badge variant={row.status === 'active' ? 'success' : 'muted'}>{row.status}</Badge>
                 </TableCell>
+                {canManageTemplates ? (
                 <TableCell align="center">
                   <div className={styles.actions}>
                     {row.status === 'inactive' ? (
-                      <IconButton size="sm" variant="success" title="Activate" onClick={() => setConfirmAction({ id: row.id, action: 'activate', name: row.name })}>▶️</IconButton>
+                      <IconButton size="sm" variant="success" title="Activate" onClick={() => setConfirmAction({ id: row.id, action: 'activate', name: row.name })}>
+                        <PlayIcon />
+                      </IconButton>
                     ) : (
-                      <IconButton size="sm" variant="warning" title="Deactivate" onClick={() => setConfirmAction({ id: row.id, action: 'deactivate', name: row.name })}>⏸️</IconButton>
+                      <IconButton size="sm" variant="warning" title="Deactivate" onClick={() => setConfirmAction({ id: row.id, action: 'deactivate', name: row.name })}>
+                        <PauseIcon />
+                      </IconButton>
                     )}
-                    <IconButton size="sm" title="Edit" onClick={() => openEdit(row)}>✏️</IconButton>
-                    <IconButton size="sm" variant="danger" title="Delete" onClick={() => { setDeleteItem(row); setDeleteError(null); }}>🗑️</IconButton>
+                    <IconButton size="sm" title="Edit" onClick={() => openEdit(row)}>
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton size="sm" variant="danger" title="Delete" onClick={() => { setDeleteItem(row); setDeleteError(null); }}>
+                      <TrashIcon />
+                    </IconButton>
                   </div>
                 </TableCell>
+                ) : null}
               </TableRow>
             ))}
           </TableBody>

@@ -1,4 +1,32 @@
 import { query } from '../../config/db.js';
+import {
+  getCreatedByUserIdsForScope,
+  isOutboundRecordVisibleByCreatedBy,
+} from './userMessageScopeService.js';
+
+export { getCreatedByUserIdsForScope };
+
+/** Sent/outbound: same scope as WhatsApp. Inbound: any user with email access (synced mail). */
+export async function isEmailMessageVisibleToUser(tenantId, message, user) {
+  if (user?.role === 'admin') return true;
+  if (!message) return false;
+  if (message.direction !== 'outbound') return true;
+  return isOutboundRecordVisibleByCreatedBy(tenantId, user, message.created_by);
+}
+
+function applySentCreatedByScope(sql, params, folder, createdByUserIds) {
+  if (folder !== 'sent') return;
+  if (createdByUserIds === undefined || createdByUserIds === null) {
+    return;
+  }
+  if (!Array.isArray(createdByUserIds) || createdByUserIds.length === 0) {
+    sql.ref += ' AND 1=0';
+    return;
+  }
+  const placeholders = createdByUserIds.map(() => '?').join(',');
+  sql.ref += ` AND m.created_by IN (${placeholders})`;
+  params.push(...createdByUserIds);
+}
 
 export async function findAll(tenantId, filters = {}) {
   const {
@@ -10,103 +38,120 @@ export async function findAll(tenantId, filters = {}) {
     search,
     limit = 50,
     offset = 0,
+    createdByUserIds,
   } = filters;
 
   const limitNum = Math.min(parseInt(limit, 10) || 50, 100);
   const offsetNum = Math.max(0, parseInt(offset, 10) || 0);
 
-  let sql = `
+  let sql = {
+    ref: `
     SELECT m.*, ea.email_address AS account_email, ea.display_name AS account_display_name,
-           et.name AS template_name
+           et.name AS template_name,
+           u.name AS sender_name, u.email AS sender_email
     FROM email_messages m
     LEFT JOIN email_accounts ea ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id
     LEFT JOIN email_module_templates et ON et.id = m.template_id AND et.tenant_id = m.tenant_id
+    LEFT JOIN users u ON u.id = m.created_by AND u.tenant_id = m.tenant_id AND u.is_deleted = 0
     WHERE m.tenant_id = ?
-  `;
+  `,
+  };
   const params = [tenantId];
 
   if (folder === 'sent') {
-    sql += ' AND m.direction = ?';
+    sql.ref += ' AND m.direction = ?';
     params.push('outbound');
+    applySentCreatedByScope(sql, params, folder, createdByUserIds);
   } else if (folder === 'inbox') {
-    sql += ' AND m.direction = ?';
+    sql.ref += ' AND m.direction = ?';
     params.push('inbound');
   }
 
   if (contact_id != null && contact_id !== '') {
-    sql += ' AND m.contact_id = ?';
+    sql.ref += ' AND m.contact_id = ?';
     params.push(contact_id);
   }
   if (email_account_id != null && email_account_id !== '') {
-    sql += ' AND m.email_account_id = ?';
+    sql.ref += ' AND m.email_account_id = ?';
     params.push(email_account_id);
   }
   if (direction != null && direction !== '') {
-    sql += ' AND m.direction = ?';
+    sql.ref += ' AND m.direction = ?';
     params.push(direction);
   }
   if (status != null && status !== '') {
-    sql += ' AND m.status = ?';
+    sql.ref += ' AND m.status = ?';
     params.push(status);
   }
   if (search && String(search).trim() !== '') {
     const term = `%${String(search).trim().replace(/%/g, '\\%')}%`;
-    sql +=
+    sql.ref +=
       ' AND (m.from_email LIKE ? OR m.to_email LIKE ? OR m.subject LIKE ? OR m.body_text LIKE ?)';
     params.push(term, term, term, term);
   }
 
-  sql += ` ORDER BY m.sent_at DESC, m.received_at DESC, m.created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
-  return query(sql, params);
+  sql.ref += ` ORDER BY m.sent_at DESC, m.received_at DESC, m.created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
+  return query(sql.ref, params);
 }
 
 export async function countAll(tenantId, filters = {}) {
-  const { contact_id, email_account_id, direction, status, folder, search } = filters;
+  const {
+    contact_id,
+    email_account_id,
+    direction,
+    status,
+    folder,
+    search,
+    createdByUserIds,
+  } = filters;
 
-  let sql = 'SELECT COUNT(*) AS total FROM email_messages m WHERE m.tenant_id = ?';
+  let sql = { ref: 'SELECT COUNT(*) AS total FROM email_messages m WHERE m.tenant_id = ?' };
   const params = [tenantId];
 
   if (folder === 'sent') {
-    sql += ' AND m.direction = ?';
+    sql.ref += ' AND m.direction = ?';
     params.push('outbound');
+    applySentCreatedByScope(sql, params, folder, createdByUserIds);
   } else if (folder === 'inbox') {
-    sql += ' AND m.direction = ?';
+    sql.ref += ' AND m.direction = ?';
     params.push('inbound');
   }
   if (contact_id != null && contact_id !== '') {
-    sql += ' AND m.contact_id = ?';
+    sql.ref += ' AND m.contact_id = ?';
     params.push(contact_id);
   }
   if (email_account_id != null && email_account_id !== '') {
-    sql += ' AND m.email_account_id = ?';
+    sql.ref += ' AND m.email_account_id = ?';
     params.push(email_account_id);
   }
   if (direction != null && direction !== '') {
-    sql += ' AND m.direction = ?';
+    sql.ref += ' AND m.direction = ?';
     params.push(direction);
   }
   if (status != null && status !== '') {
-    sql += ' AND m.status = ?';
+    sql.ref += ' AND m.status = ?';
     params.push(status);
   }
   if (search && String(search).trim() !== '') {
     const term = `%${String(search).trim().replace(/%/g, '\\%')}%`;
-    sql +=
+    sql.ref +=
       ' AND (m.from_email LIKE ? OR m.to_email LIKE ? OR m.subject LIKE ? OR m.body_text LIKE ?)';
     params.push(term, term, term, term);
   }
 
-  const [row] = await query(sql, params);
+  const [row] = await query(sql.ref, params);
   return row?.total ?? 0;
 }
 
 export async function findById(tenantId, id) {
   const [row] = await query(
     `SELECT m.*, ea.email_address AS account_email, ea.display_name AS account_display_name,
-            et.name AS template_name, et.subject AS template_subject
+            et.name AS template_name, et.subject AS template_subject,
+            u.name AS sender_name, u.email AS sender_email
      FROM email_messages m
      LEFT JOIN email_accounts ea ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id
      LEFT JOIN email_module_templates et ON et.id = m.template_id AND et.tenant_id = m.tenant_id
+     LEFT JOIN users u ON u.id = m.created_by AND u.tenant_id = m.tenant_id AND u.is_deleted = 0
      WHERE m.id = ? AND m.tenant_id = ?`,
     [id, tenantId]
   );

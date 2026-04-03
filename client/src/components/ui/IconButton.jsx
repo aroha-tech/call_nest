@@ -8,6 +8,7 @@ export function IconButton({
   size = 'md',
   disabled = false,
   title,
+  'aria-label': ariaLabel,
   className = '',
   ...props
 }) {
@@ -18,6 +19,7 @@ export function IconButton({
       onClick={onClick}
       disabled={disabled}
       title={title}
+      aria-label={ariaLabel ?? title}
       {...props}
     >
       {children}

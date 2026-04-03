@@ -30,6 +30,8 @@ import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { Pagination, PaginationPageSize } from '../../components/ui/Pagination';
 import { Checkbox } from '../../components/ui/Checkbox';
+import { IconButton } from '../../components/ui/IconButton';
+import { EditIcon, ViewIcon, ArchiveIcon, RowActionGroup } from '../../components/ui/ActionIcons';
 import { CampaignFilterBuilder } from './CampaignFilterBuilder';
 import { defaultRule, getPropertyMeta, ruleNeedsValue, validateRulesForSave } from './campaignFilterConfig';
 import listStyles from '../../components/admin/adminDataList.module.scss';
@@ -644,36 +646,41 @@ export function CampaignsPage() {
                         </TableCell>
                         <TableCell>{campaignRulesSummary(c)}</TableCell>
                         <TableCell align="center">
-                          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <RowActionGroup>
                             {role === 'agent' && c.status === 'active' && !isArchived ? (
-                              <Button variant="secondary" size="sm" onClick={() => navigate(`/campaigns/${c.id}/open`)}>
-                                Open
-                              </Button>
+                              <IconButton
+                                size="sm"
+                                variant="subtle"
+                                title="Open campaign"
+                                onClick={() => navigate(`/campaigns/${c.id}/open`)}
+                              >
+                                <ViewIcon />
+                              </IconButton>
                             ) : null}
                             {isAdmin ? (
                               <>
-                                <Button
-                                  variant="ghost"
+                                <IconButton
                                   size="sm"
+                                  title={isArchived ? 'Archived campaigns cannot be edited' : 'Edit'}
                                   onClick={() => openEdit(c)}
                                   disabled={isArchived}
-                                  title={isArchived ? 'Archived campaigns cannot be edited' : undefined}
                                 >
-                                  Edit
-                                </Button>
+                                  <EditIcon />
+                                </IconButton>
                                 {canDelete && !isArchived ? (
-                                  <Button
-                                    variant="ghost"
+                                  <IconButton
                                     size="sm"
+                                    variant="warning"
+                                    title="Archive"
                                     onClick={() => openArchiveConfirm(c)}
                                     disabled={deleteMut.loading}
                                   >
-                                    Archive
-                                  </Button>
+                                    <ArchiveIcon />
+                                  </IconButton>
                                 ) : null}
                               </>
                             ) : null}
-                          </div>
+                          </RowActionGroup>
                         </TableCell>
                       </TableRow>
                     );

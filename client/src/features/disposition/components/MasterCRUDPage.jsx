@@ -8,6 +8,7 @@ import { SearchInput } from '../../../components/ui/SearchInput';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../../components/ui/Table';
 import { Modal, ConfirmModal, ModalFooter } from '../../../components/ui/Modal';
 import { IconButton } from '../../../components/ui/IconButton';
+import { EditIcon, PauseIcon, PlayIcon, TrashIcon } from '../../../components/ui/ActionIcons';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { Alert } from '../../../components/ui/Alert';
 import { Pagination, PaginationPageSize } from '../../../components/ui/Pagination';
@@ -222,7 +223,7 @@ export function MasterCRUDPage({
                     <TableCell align="center">
                       <div className={styles.actions}>
                         <IconButton title="Edit" onClick={() => openEditModal(item)}>
-                          ✏️
+                          <EditIcon />
                         </IconButton>
                         {onToggleActive && (
                           <IconButton
@@ -230,11 +231,11 @@ export function MasterCRUDPage({
                             variant={item.is_active === 1 ? 'warning' : 'success'}
                             onClick={() => setToggleItem(item)}
                           >
-                            {item.is_active === 1 ? '⏸️' : '▶️'}
+                            {item.is_active === 1 ? <PauseIcon /> : <PlayIcon />}
                           </IconButton>
                         )}
                         <IconButton title="Delete" variant="danger" onClick={() => setDeleteItem(item)}>
-                          🗑️
+                          <TrashIcon />
                         </IconButton>
                       </div>
                     </TableCell>

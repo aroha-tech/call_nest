@@ -19,6 +19,10 @@ import { useTableLoadingState } from '../../hooks/useTableLoadingState';
 import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
 import { Spinner } from '../../components/ui/Spinner';
+import { usePermissions } from '../../hooks/usePermission';
+import { PERMISSIONS } from '../../utils/permissionUtils';
+import { useAppSelector } from '../../app/hooks';
+import { selectUser } from '../../features/auth/authSelectors';
 
 const STATUS_VARIANTS = {
   pending: 'muted',
@@ -93,6 +97,11 @@ function buildPreviewText(bodyText, paramValues) {
 const PAGE_SIZE = 20;
 
 export function WhatsAppMessagesPage() {
+  const { can } = usePermissions();
+  const canSend = can(PERMISSIONS.WHATSAPP_SEND) || can(PERMISSIONS.SETTINGS_MANAGE);
+  const user = useAppSelector(selectUser);
+  const showSentByColumn = user?.role === 'manager' || user?.role === 'admin';
+
   const { formatDateTime } = useDateTimeDisplay();
   const [appliedStatus, setAppliedStatus] = useState('all');
   const [appliedAccount, setAppliedAccount] = useState('__all__');
@@ -319,8 +328,16 @@ export function WhatsAppMessagesPage() {
     <div className={styles.page}>
       <PageHeader
         title="WhatsApp Messages"
-        description="View sent messages and send template messages"
-        actions={<Button onClick={() => openSend()}>Send template message</Button>}
+        description={
+          showSentByColumn
+            ? 'Messages sent by you and your team. Send template or text messages from here.'
+            : 'Your sent messages. Send template or text messages from here.'
+        }
+        actions={
+          canSend ? (
+            <Button onClick={() => openSend()}>Send template message</Button>
+          ) : null
+        }
       />
 
       {error && <Alert variant="error">{error}</Alert>}
@@ -404,9 +421,13 @@ export function WhatsAppMessagesPage() {
               <EmptyState
                 icon="💬"
                 title="No messages yet"
-                description="Send a template message to get started."
-                action={() => openSend()}
-                actionLabel="Send message"
+                description={
+                  canSend
+                    ? 'Send a template message to get started.'
+                    : 'No messages have been sent yet.'
+                }
+                action={canSend ? () => openSend() : undefined}
+                actionLabel={canSend ? 'Send message' : undefined}
               />
             </div>
           ) : (
@@ -415,6 +436,7 @@ export function WhatsAppMessagesPage() {
               <TableHead>
                 <TableRow>
                   <TableHeaderCell>Phone</TableHeaderCell>
+                  {showSentByColumn ? <TableHeaderCell>Sent by</TableHeaderCell> : null}
                   <TableHeaderCell>Template</TableHeaderCell>
                   <TableHeaderCell>Status</TableHeaderCell>
                   <TableHeaderCell>Sent at</TableHeaderCell>
@@ -426,6 +448,11 @@ export function WhatsAppMessagesPage() {
                 {messages.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell>{row.phone || '—'}</TableCell>
+                    {showSentByColumn ? (
+                      <TableCell>
+                        {row.sender_name || row.sender_email || (row.created_by ? `User #${row.created_by}` : '—')}
+                      </TableCell>
+                    ) : null}
                     <TableCell>{row.template_name ? row.template_name : (row.message_text ? '(Text)' : '—')}</TableCell>
                     <TableCell>
                       <Badge variant={STATUS_VARIANTS[row.status] || 'muted'}>{row.status}</Badge>
@@ -474,6 +501,14 @@ export function WhatsAppMessagesPage() {
             <div>
               <strong>Template:</strong> {selectedMessage.template_name || (selectedMessage.message_text ? '(Text message)' : '—')}
             </div>
+            {showSentByColumn && (
+              <div>
+                <strong>Sent by:</strong>{' '}
+                {selectedMessage.sender_name ||
+                  selectedMessage.sender_email ||
+                  (selectedMessage.created_by ? `User #${selectedMessage.created_by}` : '—')}
+              </div>
+            )}
             <div>
               <strong>Status:</strong>{' '}
               <Badge variant={STATUS_VARIANTS[selectedMessage.status] || 'muted'}>{selectedMessage.status}</Badge>

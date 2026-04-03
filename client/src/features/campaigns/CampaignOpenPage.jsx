@@ -7,6 +7,8 @@ import { useAsyncData } from '../../hooks/useAsyncData';
 import { campaignsAPI } from '../../services/campaignsAPI';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
+import { IconButton } from '../../components/ui/IconButton';
+import { ViewIcon, RowActionGroup } from '../../components/ui/ActionIcons';
 import {
   Table,
   TableHead,
@@ -140,15 +142,21 @@ export function CampaignOpenPage() {
                     <TableCell>{c.tag_names || '—'}</TableCell>
                     <TableCell>{c.type}</TableCell>
                     <TableCell align="center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          navigate(c.type === 'lead' ? `/leads/${c.id}` : `/contacts/${c.id}`)
-                        }
-                      >
-                        {(c.type === 'lead' ? canUpdateLead : canUpdateContact) ? 'Open' : 'View'}
-                      </Button>
+                      <RowActionGroup>
+                        <IconButton
+                          size="sm"
+                          title={
+                            (c.type === 'lead' ? canUpdateLead : canUpdateContact)
+                              ? 'Open record'
+                              : 'View record'
+                          }
+                          onClick={() =>
+                            navigate(c.type === 'lead' ? `/leads/${c.id}` : `/contacts/${c.id}`)
+                          }
+                        >
+                          <ViewIcon />
+                        </IconButton>
+                      </RowActionGroup>
                     </TableCell>
                   </TableRow>
                 ))}

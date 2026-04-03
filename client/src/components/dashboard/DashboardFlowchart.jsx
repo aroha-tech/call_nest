@@ -75,8 +75,16 @@ function TenantFlow() {
     dialing: can(PERMISSIONS.DISPOSITIONS_MANAGE),
     scripts: can(PERMISSIONS.SETTINGS_MANAGE),
     settings: can(PERMISSIONS.SETTINGS_MANAGE),
-    wa: can(PERMISSIONS.SETTINGS_MANAGE),
-    email: can(PERMISSIONS.SETTINGS_MANAGE),
+    wa: canAny([
+      PERMISSIONS.WHATSAPP_VIEW,
+      PERMISSIONS.SETTINGS_MANAGE,
+      PERMISSIONS.DIAL_EXECUTE,
+    ]),
+    email: canAny([
+      PERMISSIONS.EMAIL_VIEW,
+      PERMISSIONS.SETTINGS_MANAGE,
+      PERMISSIONS.DIAL_EXECUTE,
+    ]),
   };
 
   return (
@@ -137,9 +145,9 @@ function TenantFlow() {
           />
         </div>
         <div className={styles.branchCol}>
-          <Node title="WhatsApp" hint="Accounts & templates" to="/whatsapp/accounts" canAccess={p.wa} />
+          <Node title="WhatsApp" hint="Templates & messages" to="/whatsapp/messages" canAccess={p.wa} />
           {emailModuleEnabled ? (
-            <Node title="Email" hint="Accounts & templates" to="/email/sent" canAccess={p.email} />
+            <Node title="Email" hint="Sent & templates" to="/email/sent" canAccess={p.email} />
           ) : null}
         </div>
       </div>

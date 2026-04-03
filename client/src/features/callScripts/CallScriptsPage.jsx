@@ -7,6 +7,7 @@ import { SearchInput } from '../../components/ui/SearchInput';
 import { Modal, ConfirmModal, ModalFooter } from '../../components/ui/Modal';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { IconButton } from '../../components/ui/IconButton';
+import { ViewIcon, EditIcon, PauseIcon, PlayIcon, TrashIcon, StarIcon } from '../../components/ui/ActionIcons';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
 import { StatusBadge } from '../../components/ui/Badge';
@@ -334,7 +335,7 @@ export function CallScriptsPage() {
                         onClick={() => handleSetMyDefault(script)}
                         disabled={myDefaultSaving}
                       >
-                        {isMyDefault ? '★' : '☆'}
+                        <StarIcon filled={isMyDefault} />
                       </IconButton>
                     </TableCell>
                     )}
@@ -342,14 +343,14 @@ export function CallScriptsPage() {
                     <TableCell align="center">
                       <div className={styles.actions}>
                         <IconButton title="View script" onClick={() => setViewScript(script)}>
-                          👁️
+                          <ViewIcon />
                         </IconButton>
                         <IconButton
                           title={editable ? 'Edit' : 'You can only edit scripts you created'}
                           onClick={() => openEdit(script)}
                           disabled={!editable}
                         >
-                          ✏️
+                          <EditIcon />
                         </IconButton>
                         <IconButton
                           title={
@@ -363,7 +364,7 @@ export function CallScriptsPage() {
                           onClick={() => setToggleTarget(script)}
                           disabled={!editable || toggleLoading}
                         >
-                          {script.status === 1 ? '⏸️' : '▶️'}
+                          {script.status === 1 ? <PauseIcon /> : <PlayIcon />}
                         </IconButton>
                         <IconButton
                           title={
@@ -377,7 +378,7 @@ export function CallScriptsPage() {
                           onClick={() => setDeleteTarget(script)}
                           disabled={!editable || isMyDefault}
                         >
-                          🗑️
+                          <TrashIcon />
                         </IconButton>
                       </div>
                     </TableCell>

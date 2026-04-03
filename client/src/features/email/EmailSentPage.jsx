@@ -23,6 +23,10 @@ import { FilterBar } from '../../components/admin/FilterBar';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
 import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
+import { usePermissions } from '../../hooks/usePermission';
+import { PERMISSIONS } from '../../utils/permissionUtils';
+import { useAppSelector } from '../../app/hooks';
+import { selectUser } from '../../features/auth/authSelectors';
 
 const PAGE_SIZE = 20;
 
@@ -30,6 +34,11 @@ const ACCOUNT_ALL_VALUE = '__all__';
 const TEMPLATE_ALL_VALUE = 'all';
 
 export function EmailSentPage() {
+  const { can } = usePermissions();
+  const canSend = can(PERMISSIONS.EMAIL_SEND) || can(PERMISSIONS.SETTINGS_MANAGE);
+  const user = useAppSelector(selectUser);
+  const showSentByColumn = user?.role === 'manager' || user?.role === 'admin';
+
   const { formatDateTime } = useDateTimeDisplay();
   const [searchQuery, setSearchQuery] = useState('');
   const [appliedAccountId, setAppliedAccountId] = useState(ACCOUNT_ALL_VALUE);
@@ -212,8 +221,12 @@ export function EmailSentPage() {
     <div className={styles.page}>
       <PageHeader
         title="Sent"
-        description="Sent emails"
-        actions={<Button onClick={openCompose}>Compose</Button>}
+        description={
+          showSentByColumn
+            ? 'Outbound mail from you and your team.'
+            : 'Your sent emails.'
+        }
+        actions={canSend ? <Button onClick={openCompose}>Compose</Button> : null}
       />
 
       {error && <Alert variant="error">{error}</Alert>}
@@ -268,9 +281,13 @@ export function EmailSentPage() {
               <EmptyState
                 icon="📤"
                 title="No sent emails"
-                description="Sent emails will appear here."
-                action={openCompose}
-                actionLabel="Compose"
+                description={
+                  canSend
+                    ? 'Sent emails will appear here.'
+                    : 'No sent emails yet.'
+                }
+                action={canSend ? openCompose : undefined}
+                actionLabel={canSend ? 'Compose' : undefined}
               />
             </div>
           ) : (
@@ -279,6 +296,7 @@ export function EmailSentPage() {
           <TableHead>
             <TableRow>
               <TableHeaderCell>Account</TableHeaderCell>
+              {showSentByColumn ? <TableHeaderCell>Sent by</TableHeaderCell> : null}
               <TableHeaderCell>To</TableHeaderCell>
               <TableHeaderCell>Subject</TableHeaderCell>
               <TableHeaderCell>Template</TableHeaderCell>
@@ -290,6 +308,11 @@ export function EmailSentPage() {
             {filteredMessages.map((row) => (
               <TableRow key={row.id}>
                 <TableCell>{row.account_email || '—'}</TableCell>
+                {showSentByColumn ? (
+                  <TableCell>
+                    {row.sender_name || row.sender_email || (row.created_by ? `User #${row.created_by}` : '—')}
+                  </TableCell>
+                ) : null}
                 <TableCell>{row.to_email || '—'}</TableCell>
                 <TableCell>{row.subject || '—'}</TableCell>
                 <TableCell>{row.template_name || '—'}</TableCell>
@@ -332,6 +355,14 @@ export function EmailSentPage() {
           <div className={styles.form} style={{ gap: 12 }}>
             <div><strong>From:</strong> {selectedMessage.from_email}</div>
             <div><strong>To:</strong> {selectedMessage.to_email}</div>
+            {showSentByColumn && (
+              <div>
+                <strong>Sent by:</strong>{' '}
+                {selectedMessage.sender_name ||
+                  selectedMessage.sender_email ||
+                  (selectedMessage.created_by ? `User #${selectedMessage.created_by}` : '—')}
+              </div>
+            )}
             <div><strong>Subject:</strong> {selectedMessage.subject}</div>
             <div><strong>Sent:</strong> {selectedMessage.sent_at ? formatDateTime(selectedMessage.sent_at) : '—'}</div>
             <div>

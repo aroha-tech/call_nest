@@ -43,6 +43,18 @@ INSERT IGNORE INTO permissions (code, description) VALUES
   ('scripts.self', 'Create call scripts; edit or delete only own scripts'),
 
   -- Telephony configuration
-  ('telephony.manage', 'Manage telephony settings and configurations');
+  ('telephony.manage', 'Manage telephony settings and configurations'),
+
+  -- WhatsApp (granular; settings.manage still grants full module access in API checks)
+  ('whatsapp.view', 'View WhatsApp templates, messages, and account list'),
+  ('whatsapp.send', 'Send WhatsApp template and text messages'),
+  ('whatsapp.templates.manage', 'Create and edit WhatsApp templates and message templates'),
+  ('whatsapp.accounts.manage', 'Connect and manage WhatsApp Business accounts'),
+  ('whatsapp.logs.view', 'View WhatsApp API request logs'),
+
+  ('email.view', 'View email templates, sent mail, and account list'),
+  ('email.send', 'Send email from tenant accounts'),
+  ('email.templates.manage', 'Create and edit email module templates'),
+  ('email.accounts.manage', 'Connect and manage email accounts (SMTP/OAuth)');
 
 SELECT CONCAT('Inserted ', ROW_COUNT(), ' permissions') AS status;

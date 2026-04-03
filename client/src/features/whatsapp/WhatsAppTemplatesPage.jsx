@@ -6,6 +6,7 @@ import { Select } from '../../components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { Modal, ConfirmModal, ModalFooter } from '../../components/ui/Modal';
 import { IconButton } from '../../components/ui/IconButton';
+import { EditIcon, PauseIcon, PlayIcon, TrashIcon } from '../../components/ui/ActionIcons';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
@@ -18,6 +19,8 @@ import { FilterBar } from '../../components/admin/FilterBar';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
 import { Spinner } from '../../components/ui/Spinner';
+import { usePermissions } from '../../hooks/usePermission';
+import { PERMISSIONS } from '../../utils/permissionUtils';
 
 const COMPONENT_TYPES = [
   { value: 'HEADER', label: 'HEADER' },
@@ -62,6 +65,10 @@ const TEMPLATE_LANGUAGES = [
 ];
 
 export function WhatsAppTemplatesPage() {
+  const { can } = usePermissions();
+  const canManageTemplates =
+    can(PERMISSIONS.WHATSAPP_TEMPLATES_MANAGE) || can(PERMISSIONS.SETTINGS_MANAGE);
+
   const [showInactive, setShowInactive] = useState(false);
   const [appliedAccount, setAppliedAccount] = useState('__all__');
   const [draftAccount, setDraftAccount] = useState('__all__');
@@ -362,14 +369,20 @@ export function WhatsAppTemplatesPage() {
     <div className={styles.page}>
       <PageHeader
         title="WhatsApp Templates"
-        description="Manage Meta-approved templates for template messages"
+        description={
+          canManageTemplates
+            ? 'Manage Meta-approved templates for template messages'
+            : 'View Meta-approved templates. Only managers and admins can add or edit templates.'
+        }
         actions={
-          <div style={{ display: 'flex', gap: 8 }}>
-            {moduleEnabled && (
-              <Button variant="secondary" onClick={openFetchModal}>Fetch from provider</Button>
-            )}
-            <Button onClick={openCreate}>+ Add Template</Button>
-          </div>
+          canManageTemplates ? (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {moduleEnabled && (
+                <Button variant="secondary" onClick={openFetchModal}>Fetch from provider</Button>
+              )}
+              <Button onClick={openCreate}>+ Add Template</Button>
+            </div>
+          ) : null
         }
       />
 
@@ -408,9 +421,13 @@ export function WhatsAppTemplatesPage() {
           <EmptyState
             icon="📄"
             title="No WhatsApp templates"
-            description="Add a template to send template messages."
-            action={openCreate}
-            actionLabel="Add Template"
+            description={
+              canManageTemplates
+                ? 'Add a template to send template messages.'
+                : 'No templates yet. A manager or admin can add templates when they are ready.'
+            }
+            action={canManageTemplates ? openCreate : undefined}
+            actionLabel={canManageTemplates ? 'Add Template' : undefined}
           />
         ) : (
           <div className={listStyles.tableScrollAreaNatural}>
@@ -423,7 +440,9 @@ export function WhatsAppTemplatesPage() {
               <TableHeaderCell>Language</TableHeaderCell>
               <TableHeaderCell>Category</TableHeaderCell>
               <TableHeaderCell>Status</TableHeaderCell>
-              <TableHeaderCell width="180px" align="center">Actions</TableHeaderCell>
+              {canManageTemplates ? (
+                <TableHeaderCell width="180px" align="center">Actions</TableHeaderCell>
+              ) : null}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -437,17 +456,27 @@ export function WhatsAppTemplatesPage() {
                 <TableCell>
                   <Badge variant={row.status === 'active' ? 'success' : 'muted'}>{row.status}</Badge>
                 </TableCell>
+                {canManageTemplates ? (
                 <TableCell align="center">
                   <div className={styles.actions}>
                     {row.status === 'inactive' ? (
-                      <IconButton size="sm" variant="success" title="Activate" onClick={() => setConfirmAction({ id: row.id, action: 'activate', name: row.template_name })}>▶️</IconButton>
+                      <IconButton size="sm" variant="success" title="Activate" onClick={() => setConfirmAction({ id: row.id, action: 'activate', name: row.template_name })}>
+                        <PlayIcon />
+                      </IconButton>
                     ) : (
-                      <IconButton size="sm" variant="warning" title="Deactivate" onClick={() => setConfirmAction({ id: row.id, action: 'deactivate', name: row.template_name })}>⏸️</IconButton>
+                      <IconButton size="sm" variant="warning" title="Deactivate" onClick={() => setConfirmAction({ id: row.id, action: 'deactivate', name: row.template_name })}>
+                        <PauseIcon />
+                      </IconButton>
                     )}
-                    <IconButton size="sm" title="Edit" onClick={() => openEdit(row)} disabled={editLoading}>✏️</IconButton>
-                    <IconButton size="sm" variant="danger" title="Delete" onClick={() => { setDeleteItem(row); setDeleteError(null); }}>🗑️</IconButton>
+                    <IconButton size="sm" title="Edit" onClick={() => openEdit(row)} disabled={editLoading}>
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton size="sm" variant="danger" title="Delete" onClick={() => { setDeleteItem(row); setDeleteError(null); }}>
+                      <TrashIcon />
+                    </IconButton>
                   </div>
                 </TableCell>
+                ) : null}
               </TableRow>
             ))}
           </TableBody>

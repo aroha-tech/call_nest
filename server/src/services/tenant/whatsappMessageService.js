@@ -1,79 +1,130 @@
 import { query } from '../../config/db.js';
+import {
+  getCreatedByUserIdsForScope,
+  isOutboundRecordVisibleByCreatedBy,
+} from './userMessageScopeService.js';
+
+export { getCreatedByUserIdsForScope };
+
+/**
+ * Single-row access: agents see own sends; managers see team + self; admins see all.
+ */
+export async function isMessageVisibleToUser(tenantId, message, user) {
+  if (user?.role === 'admin') return true;
+  if (!message) return false;
+  return isOutboundRecordVisibleByCreatedBy(tenantId, user, message.created_by);
+}
+
+function applyCreatedByScope(sql, params, createdByUserIds) {
+  if (createdByUserIds === undefined || createdByUserIds === null) {
+    return;
+  }
+  if (!Array.isArray(createdByUserIds) || createdByUserIds.length === 0) {
+    sql.ref += ' AND 1=0';
+    return;
+  }
+  const placeholders = createdByUserIds.map(() => '?').join(',');
+  sql.ref += ` AND m.created_by IN (${placeholders})`;
+  params.push(...createdByUserIds);
+}
 
 export async function findAll(tenantId, filters = {}) {
-  const { contact_id, status, search, whatsapp_account_id, template_id, limit = 50, offset = 0 } =
-    filters;
+  const {
+    contact_id,
+    status,
+    search,
+    whatsapp_account_id,
+    template_id,
+    limit = 50,
+    offset = 0,
+    createdByUserIds,
+  } = filters;
   const limitNum = Math.min(parseInt(limit, 10) || 50, 100);
   const offsetNum = Math.max(0, parseInt(offset, 10) || 0);
 
-  let sql = `
-    SELECT m.*, t.template_name, wa.phone_number AS account_phone
+  let sql = {
+    ref: `
+    SELECT m.*, t.template_name, wa.phone_number AS account_phone,
+           u.name AS sender_name, u.email AS sender_email
     FROM whatsapp_messages m
     LEFT JOIN whatsapp_business_templates t ON t.id = m.template_id
     LEFT JOIN whatsapp_accounts wa ON wa.id = m.whatsapp_account_id
+    LEFT JOIN users u ON u.id = m.created_by AND u.tenant_id = m.tenant_id AND u.is_deleted = 0
     WHERE m.tenant_id = ?
-  `;
+  `,
+  };
   const params = [tenantId];
+  applyCreatedByScope(sql, params, createdByUserIds);
   if (contact_id != null && contact_id !== '') {
-    sql += ' AND m.contact_id = ?';
+    sql.ref += ' AND m.contact_id = ?';
     params.push(contact_id);
   }
   if (status != null && status !== '') {
-    sql += ' AND m.status = ?';
+    sql.ref += ' AND m.status = ?';
     params.push(status);
   }
   if (whatsapp_account_id != null && whatsapp_account_id !== '') {
-    sql += ' AND m.whatsapp_account_id = ?';
+    sql.ref += ' AND m.whatsapp_account_id = ?';
     params.push(whatsapp_account_id);
   }
   if (template_id != null && template_id !== '') {
-    sql += ' AND m.template_id = ?';
+    sql.ref += ' AND m.template_id = ?';
     params.push(template_id);
   }
   if (search && String(search).trim() !== '') {
     const term = `%${String(search).trim().replace(/%/g, '\\%')}%`;
-    sql += ' AND (m.phone LIKE ? OR m.message_text LIKE ? OR m.provider_message_id LIKE ?)';
+    sql.ref += ' AND (m.phone LIKE ? OR m.message_text LIKE ? OR m.provider_message_id LIKE ?)';
     params.push(term, term, term);
   }
-  sql += ` ORDER BY m.created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
-  return query(sql, params);
+  sql.ref += ` ORDER BY m.created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
+  return query(sql.ref, params);
 }
 
 export async function countAll(tenantId, filters = {}) {
-  const { contact_id, status, search, whatsapp_account_id, template_id } = filters;
-  let sql = 'SELECT COUNT(*) AS total FROM whatsapp_messages m WHERE m.tenant_id = ?';
+  const {
+    contact_id,
+    status,
+    search,
+    whatsapp_account_id,
+    template_id,
+    createdByUserIds,
+  } = filters;
+  let sql = { ref: 'SELECT COUNT(*) AS total FROM whatsapp_messages m WHERE m.tenant_id = ?' };
   const params = [tenantId];
+  applyCreatedByScope(sql, params, createdByUserIds);
   if (contact_id != null && contact_id !== '') {
-    sql += ' AND m.contact_id = ?';
+    sql.ref += ' AND m.contact_id = ?';
     params.push(contact_id);
   }
   if (status != null && status !== '') {
-    sql += ' AND m.status = ?';
+    sql.ref += ' AND m.status = ?';
     params.push(status);
   }
   if (whatsapp_account_id != null && whatsapp_account_id !== '') {
-    sql += ' AND m.whatsapp_account_id = ?';
+    sql.ref += ' AND m.whatsapp_account_id = ?';
     params.push(whatsapp_account_id);
   }
   if (template_id != null && template_id !== '') {
-    sql += ' AND m.template_id = ?';
+    sql.ref += ' AND m.template_id = ?';
     params.push(template_id);
   }
   if (search && String(search).trim() !== '') {
     const term = `%${String(search).trim().replace(/%/g, '\\%')}%`;
-    sql += ' AND (m.phone LIKE ? OR m.message_text LIKE ? OR m.provider_message_id LIKE ?)';
+    sql.ref += ' AND (m.phone LIKE ? OR m.message_text LIKE ? OR m.provider_message_id LIKE ?)';
     params.push(term, term, term);
   }
-  const [row] = await query(sql, params);
+  const [row] = await query(sql.ref, params);
   return row?.total ?? 0;
 }
 
 export async function findById(tenantId, id) {
   const [row] = await query(
-    `SELECT m.*, t.template_name, t.language AS template_language, wa.phone_number AS account_phone
+    `SELECT m.*, t.template_name, t.language AS template_language, wa.phone_number AS account_phone,
+            u.name AS sender_name, u.email AS sender_email
      FROM whatsapp_messages m
      LEFT JOIN whatsapp_business_templates t ON t.id = m.template_id
      LEFT JOIN whatsapp_accounts wa ON wa.id = m.whatsapp_account_id
+     LEFT JOIN users u ON u.id = m.created_by AND u.tenant_id = m.tenant_id AND u.is_deleted = 0
      WHERE m.id = ? AND m.tenant_id = ?`,
     [id, tenantId]
   );

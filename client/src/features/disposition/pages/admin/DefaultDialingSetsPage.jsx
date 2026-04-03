@@ -8,6 +8,7 @@ import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } fro
 import { Modal, ConfirmModal, ModalFooter } from '../../../../components/ui/Modal';
 import { StatusBadge, Badge } from '../../../../components/ui/Badge';
 import { IconButton } from '../../../../components/ui/IconButton';
+import { EditIcon, TrashIcon } from '../../../../components/ui/ActionIcons';
 import { EmptyState } from '../../../../components/ui/EmptyState';
 import { Alert } from '../../../../components/ui/Alert';
 import { useDefaultDialingSets, useDefaultDialingSetDispositions, useDefaultDispositions } from '../../hooks/useDefaultData';
@@ -206,8 +207,12 @@ export function DefaultDialingSetsPage() {
                       {item.is_default === 1 && <Badge variant="primary">Default</Badge>}
                     </div>
                     <div className={styles.listItemActions}>
-                      <IconButton size="sm" title="Edit" onClick={(e) => { e.stopPropagation(); openEditModal(item); }}>✏️</IconButton>
-                      <IconButton size="sm" variant="danger" title={item.is_default === 1 ? 'Default set cannot be deleted' : 'Delete'} disabled={item.is_default === 1} onClick={(e) => { e.stopPropagation(); setDeleteItem(item); setDeleteError(null); }}>🗑️</IconButton>
+                      <IconButton size="sm" title="Edit" onClick={(e) => { e.stopPropagation(); openEditModal(item); }}>
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton size="sm" variant="danger" title={item.is_default === 1 ? 'Default set cannot be deleted' : 'Delete'} disabled={item.is_default === 1} onClick={(e) => { e.stopPropagation(); setDeleteItem(item); setDeleteError(null); }}>
+                        <TrashIcon />
+                      </IconButton>
                     </div>
                   </div>
                 ))}

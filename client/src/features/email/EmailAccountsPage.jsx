@@ -6,6 +6,7 @@ import { Select } from '../../components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { Modal, ConfirmModal, ModalFooter } from '../../components/ui/Modal';
 import { IconButton } from '../../components/ui/IconButton';
+import { EditIcon, PauseIcon, PlayIcon, TrashIcon, RefreshIcon } from '../../components/ui/ActionIcons';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
@@ -16,6 +17,8 @@ import styles from '../../features/disposition/components/MasterCRUDPage.module.
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
+import { usePermissions } from '../../hooks/usePermission';
+import { PERMISSIONS } from '../../utils/permissionUtils';
 
 const PROVIDER_OPTIONS = [
   { value: 'smtp', label: 'SMTP (Custom)' },
@@ -37,6 +40,10 @@ const defaultFormData = () => ({
 });
 
 export function EmailAccountsPage() {
+  const { can } = usePermissions();
+  const canManageAccounts =
+    can(PERMISSIONS.EMAIL_ACCOUNTS_MANAGE) || can(PERMISSIONS.SETTINGS_MANAGE);
+
   const [showInactive, setShowInactive] = useState(false);
   const fetchFn = useCallback(
     () => emailAccountsAPI.getAll(showInactive),
@@ -223,17 +230,23 @@ export function EmailAccountsPage() {
     <div className={styles.page}>
       <PageHeader
         title="Email Accounts"
-        description="Connect Gmail, Outlook, or SMTP to send email from your accounts"
+        description={
+          canManageAccounts
+            ? 'Connect Gmail, Outlook, or SMTP to send email from your accounts'
+            : 'View connected email accounts. Only an admin can add or edit connections.'
+        }
         actions={
-          <>
-            <Button variant="secondary" onClick={handleConnectGoogle} loading={oauthLoading === 'google'} disabled={!!oauthLoading}>
-              Connect with Google
-            </Button>
-            <Button variant="secondary" onClick={handleConnectOutlook} loading={oauthLoading === 'outlook'} disabled={!!oauthLoading}>
-              Connect with Microsoft
-            </Button>
-            <Button onClick={openCreate}>+ Add Account</Button>
-          </>
+          canManageAccounts ? (
+            <>
+              <Button variant="secondary" onClick={handleConnectGoogle} loading={oauthLoading === 'google'} disabled={!!oauthLoading}>
+                Connect with Google
+              </Button>
+              <Button variant="secondary" onClick={handleConnectOutlook} loading={oauthLoading === 'outlook'} disabled={!!oauthLoading}>
+                Connect with Microsoft
+              </Button>
+              <Button onClick={openCreate}>+ Add Account</Button>
+            </>
+          ) : null
         }
       />
 
@@ -255,9 +268,13 @@ export function EmailAccountsPage() {
           <EmptyState
             icon="✉️"
             title="No email accounts"
-            description="Add an account to send and receive email."
-            action={openCreate}
-            actionLabel="Add Account"
+            description={
+              canManageAccounts
+                ? 'Add an account to send and receive email.'
+                : 'No accounts are configured yet. Ask an admin to connect email.'
+            }
+            action={canManageAccounts ? openCreate : undefined}
+            actionLabel={canManageAccounts ? 'Add Account' : undefined}
           />
         ) : (
           <div className={listStyles.tableScrollAreaNatural}>
@@ -268,7 +285,9 @@ export function EmailAccountsPage() {
               <TableHeaderCell>Email</TableHeaderCell>
               <TableHeaderCell>Provider</TableHeaderCell>
               <TableHeaderCell>Status</TableHeaderCell>
-              <TableHeaderCell width="180px" align="center">Actions</TableHeaderCell>
+              {canManageAccounts ? (
+                <TableHeaderCell width="180px" align="center">Actions</TableHeaderCell>
+              ) : null}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -284,6 +303,7 @@ export function EmailAccountsPage() {
                 <TableCell>
                   <Badge variant={row.status === 'active' ? 'success' : 'muted'}>{row.status}</Badge>
                 </TableCell>
+                {canManageAccounts ? (
                 <TableCell align="center">
                   <div className={styles.actions}>
                     {(row.provider === 'gmail' || row.provider === 'outlook') && (
@@ -293,18 +313,27 @@ export function EmailAccountsPage() {
                         onClick={() => handleReconnect(row)}
                         disabled={!!oauthLoading}
                       >
-                        🔄
+                        <RefreshIcon />
                       </IconButton>
                     )}
                     {row.status === 'inactive' ? (
-                      <IconButton size="sm" variant="success" title="Activate" onClick={() => setConfirmAction({ id: row.id, action: 'activate', name: row.account_name || row.email_address })}>▶️</IconButton>
+                      <IconButton size="sm" variant="success" title="Activate" onClick={() => setConfirmAction({ id: row.id, action: 'activate', name: row.account_name || row.email_address })}>
+                        <PlayIcon />
+                      </IconButton>
                     ) : (
-                      <IconButton size="sm" variant="warning" title="Deactivate" onClick={() => setConfirmAction({ id: row.id, action: 'deactivate', name: row.account_name || row.email_address })}>⏸️</IconButton>
+                      <IconButton size="sm" variant="warning" title="Deactivate" onClick={() => setConfirmAction({ id: row.id, action: 'deactivate', name: row.account_name || row.email_address })}>
+                        <PauseIcon />
+                      </IconButton>
                     )}
-                    <IconButton size="sm" title="Edit" onClick={() => openEdit(row)}>✏️</IconButton>
-                    <IconButton size="sm" variant="danger" title="Delete" onClick={() => { setDeleteItem(row); setDeleteError(null); }}>🗑️</IconButton>
+                    <IconButton size="sm" title="Edit" onClick={() => openEdit(row)}>
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton size="sm" variant="danger" title="Delete" onClick={() => { setDeleteItem(row); setDeleteError(null); }}>
+                      <TrashIcon />
+                    </IconButton>
                   </div>
                 </TableCell>
+                ) : null}
               </TableRow>
             ))}
           </TableBody>
