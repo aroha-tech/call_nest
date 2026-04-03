@@ -1,6 +1,10 @@
 @use '../styles/variables' as *;
 @use '../styles/mixins' as *;
 
+// Shell sidebar / main column — matched duration + easing so motion stays in sync (GPU-friendly transform on rail)
+$shell-sidebar-duration: 240ms;
+$shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
+
 .shell {
   display: flex;
   min-height: 100vh;
@@ -22,15 +26,12 @@
   display: flex;
   flex-direction: column;
   z-index: 100;
-  transform: translateX(-100%);
-  transition: transform $transition-normal;
-
-  @include lg {
-    transform: translateX(0);
-  }
+  transform: translate3d(-100%, 0, 0);
+  backface-visibility: hidden;
+  transition: transform $shell-sidebar-duration $shell-sidebar-ease;
 
   &.open {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -367,6 +368,14 @@
     radial-gradient(ellipse 100% 56% at 50% -6%, rgba(var(--color-primary-rgb), 0.11) 0%, transparent 52%),
     linear-gradient(172deg, #010101 0%, #060608 46%, #030304 100%);
 
+  transition: margin-left $shell-sidebar-duration $shell-sidebar-ease;
+
+  @include lg {
+    margin-left: 0;
+  }
+}
+
+.shellSidebarOpen .mainColumn {
   @include lg {
     margin-left: 240px;
   }
@@ -545,8 +554,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   background: none;
   border: none;
   border-radius: $radius-sm;
@@ -558,9 +569,17 @@
     color: var(--color-text-primary);
   }
 
-  @include lg {
-    display: none;
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-primary-500) 65%, transparent);
+    outline-offset: 2px;
   }
+}
+
+.menuBtnIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
 }
 
 .content {
@@ -584,7 +603,7 @@
   z-index: 99;
   opacity: 0;
   pointer-events: none;
-  transition: opacity $transition-normal;
+  transition: opacity $shell-sidebar-duration $shell-sidebar-ease;
 
   &.visible {
     opacity: 1;
@@ -593,6 +612,14 @@
 
   @include lg {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .mainColumn,
+  .mobileOverlay {
+    transition-duration: 0.01ms;
   }
 }
 

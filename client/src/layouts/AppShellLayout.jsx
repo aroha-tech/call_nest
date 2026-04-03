@@ -9,6 +9,32 @@ import { useColorScheme } from '../context/ColorSchemeContext';
 import { getBreadcrumbItems } from './breadcrumbUtils';
 import styles from './AppShellLayout.module.scss';
 
+/** Survives route changes: each `<Route>` wraps its own `AppShellLayout`, so the component remounts on navigation. */
+const SIDEBAR_OPEN_STORAGE_KEY = 'callnest.shell.sidebarOpen';
+
+function readStoredSidebarOpen() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const v = sessionStorage.getItem(SIDEBAR_OPEN_STORAGE_KEY);
+    if (v === 'true') return true;
+    if (v === 'false') return false;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function getInitialSidebarOpen() {
+  const stored = readStoredSidebarOpen();
+  if (stored !== null) return stored;
+  if (typeof window === 'undefined') return true;
+  return window.matchMedia('(min-width: 1024px)').matches;
+}
+
+function isDesktopSidebarBreakpoint() {
+  return typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+}
+
 /** Filter sidebar items by query (labels, section headings, child items). */
 function filterNavMenuBySearch(items, query) {
   const q = query.trim().toLowerCase();
@@ -120,7 +146,22 @@ export function AppShellLayout({ children }) {
   const { scheme, setScheme } = useColorScheme();
   const tenant = useAppSelector(selectTenant);
   const user = useAppSelector(selectUser);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(getInitialSidebarOpen);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SIDEBAR_OPEN_STORAGE_KEY, sidebarOpen ? 'true' : 'false');
+    } catch {
+      /* ignore */
+    }
+  }, [sidebarOpen]);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = () => setSidebarOpen(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
   const [expandedGroups, setExpandedGroups] = useState({});
   const [navSearchQuery, setNavSearchQuery] = useState('');
 
@@ -162,7 +203,11 @@ export function AppShellLayout({ children }) {
 
   const handleNavClick = (path) => {
     goTo(path);
-    setSidebarOpen(false);
+    if (!isDesktopSidebarBreakpoint()) setSidebarOpen(false);
+  };
+
+  const closeSidebarIfMobileOverlay = () => {
+    if (!isDesktopSidebarBreakpoint()) setSidebarOpen(false);
   };
 
   const toggleGroup = (key) => {
@@ -170,7 +215,7 @@ export function AppShellLayout({ children }) {
   };
 
   return (
-    <div className={styles.shell}>
+    <div className={`${styles.shell} ${sidebarOpen ? styles.shellSidebarOpen : ''}`}>
       {/* Mobile overlay */}
       <div 
         className={`${styles.mobileOverlay} ${sidebarOpen ? styles.visible : ''}`}
@@ -253,7 +298,7 @@ export function AppShellLayout({ children }) {
             </Fragment>
           ))}
         </nav>
-        <SidebarUserPanel onNavigate={() => setSidebarOpen(false)} />
+        <SidebarUserPanel onNavigate={closeSidebarIfMobileOverlay} />
       </aside>
 
       {/* Main content */}
@@ -263,10 +308,17 @@ export function AppShellLayout({ children }) {
             <button
               type="button"
               className={styles.menuBtn}
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open menu"
+              onClick={() => setSidebarOpen((v) => !v)}
+              aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={sidebarOpen}
             >
-              ☰
+              <span className={styles.menuBtnIcon} aria-hidden>
+                <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="4" y1="6" x2="20" y2="6" />
+                  <line x1="4" y1="12" x2="20" y2="12" />
+                  <line x1="4" y1="18" x2="20" y2="18" />
+                </svg>
+              </span>
             </button>
             <nav className={styles.breadcrumbs} aria-label="Breadcrumb">
               {breadcrumbItems.map((crumb, index) => (
