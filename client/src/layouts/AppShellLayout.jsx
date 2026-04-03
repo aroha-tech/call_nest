@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo, Fragment } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useSalesNavigation } from '../hooks/useSalesNavigation';
 import { SidebarUserPanel } from './SidebarUserPanel';
 import { useAppSelector } from '../app/hooks';
 import { selectTenant, selectUser } from '../features/auth/authSelectors';
 import { NavIcon, NavChevron } from '../components/navigation/NavIcon';
+import { useColorScheme } from '../context/ColorSchemeContext';
+import { getBreadcrumbItems } from './breadcrumbUtils';
 import styles from './AppShellLayout.module.scss';
 
 /** Filter sidebar items by query (labels, section headings, child items). */
@@ -30,6 +32,31 @@ function filterNavMenuBySearch(items, query) {
       return itemMatches(item) ? item : null;
     })
     .filter(Boolean);
+}
+
+function ThemeSunIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width={11} height={11} aria-hidden fill="none">
+      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
+      <path
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+      />
+    </svg>
+  );
+}
+
+function ThemeMoonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width={11} height={11} aria-hidden>
+      <path
+        fill="currentColor"
+        d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
+      />
+    </svg>
+  );
 }
 
 /** Sidebar line under company name: human-readable role (not workspace slug). */
@@ -90,6 +117,7 @@ function NavGroup({ item, activeKey, activeParentKey, onNavigate, expandedGroups
 export function AppShellLayout({ children }) {
   const location = useLocation();
   const { items, activeKey, activeParentKey, goTo, tenantSlug, isPlatform } = useSalesNavigation();
+  const { scheme, setScheme } = useColorScheme();
   const tenant = useAppSelector(selectTenant);
   const user = useAppSelector(selectUser);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -110,6 +138,11 @@ export function AppShellLayout({ children }) {
     });
     return next;
   }, [navSearchQuery, expandedGroups, filteredNavItems]);
+
+  const breadcrumbItems = useMemo(
+    () => getBreadcrumbItems(location.pathname, items, isPlatform),
+    [location.pathname, items, isPlatform]
+  );
 
   const name = tenant?.name?.trim();
   const slug = tenantSlug ?? tenant?.slug ?? null;
@@ -134,19 +167,6 @@ export function AppShellLayout({ children }) {
 
   const toggleGroup = (key) => {
     setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const findCurrentLabel = () => {
-    if (location.pathname === '/profile') return 'Profile';
-    for (const item of items) {
-      if (item.children) {
-        const child = item.children.find((c) => c.key === activeKey);
-        if (child) return child.label;
-      } else if (item.key === activeKey) {
-        return item.label;
-      }
-    }
-    return 'Dashboard';
   };
 
   return (
@@ -240,14 +260,54 @@ export function AppShellLayout({ children }) {
       <div className={styles.mainColumn}>
         <header className={styles.topbar}>
           <div className={styles.topbarLeft}>
-            <button 
+            <button
+              type="button"
               className={styles.menuBtn}
               onClick={() => setSidebarOpen(true)}
               aria-label="Open menu"
             >
               ☰
             </button>
-            <h1 className={styles.topbarTitle}>{findCurrentLabel()}</h1>
+            <nav className={styles.breadcrumbs} aria-label="Breadcrumb">
+              {breadcrumbItems.map((crumb, index) => (
+                <Fragment key={`${crumb.path}-${index}`}>
+                  {index > 0 ? (
+                    <span className={styles.breadcrumbSep} aria-hidden>
+                      /
+                    </span>
+                  ) : null}
+                  {crumb.isCurrent ? (
+                    <span className={styles.breadcrumbCurrent} aria-current="page">
+                      {crumb.label}
+                    </span>
+                  ) : (
+                    <Link className={styles.breadcrumbLink} to={crumb.path}>
+                      {crumb.label}
+                    </Link>
+                  )}
+                </Fragment>
+              ))}
+            </nav>
+          </div>
+          <div className={styles.topbarRight}>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={scheme === 'dark'}
+              aria-label={scheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              className={styles.themeSwitch}
+              onClick={() => setScheme(scheme === 'light' ? 'dark' : 'light')}
+            >
+              <span className={styles.themeSwitchTrack}>
+                <span className={`${styles.themeSwitchIcon} ${styles.themeSwitchIconSun}`}>
+                  <ThemeSunIcon />
+                </span>
+                <span className={`${styles.themeSwitchIcon} ${styles.themeSwitchIconMoon}`}>
+                  <ThemeMoonIcon />
+                </span>
+                <span className={styles.themeSwitchThumb} />
+              </span>
+            </button>
           </div>
         </header>
         <main className={styles.content}>{children}</main>

@@ -34,6 +34,43 @@ function ttlFromString(expiresIn) {
   }
 }
 
+/**
+ * Manager name/email for agents (reporting line). Omitted for platform admins.
+ * Always returns manager_id / manager_name / manager_email keys (nulls when not applicable).
+ */
+async function managerClaimsForJwt(user) {
+  const empty = {
+    manager_id: null,
+    manager_name: null,
+    manager_email: null,
+  };
+  if (!user || user.is_platform_admin || user.tenant_id == null) {
+    return empty;
+  }
+  const mid = user.manager_id;
+  if (mid == null || mid === '') {
+    return empty;
+  }
+  const [m] = await query(
+    `SELECT id, name, email FROM users
+     WHERE id = ? AND tenant_id = ? AND is_deleted = 0 AND is_enabled = 1`,
+    [mid, user.tenant_id]
+  );
+  if (!m) {
+    return {
+      manager_id: Number(mid),
+      manager_name: null,
+      manager_email: null,
+    };
+  }
+  const rawName = m.name != null ? String(m.name).trim() : '';
+  return {
+    manager_id: m.id,
+    manager_name: rawName !== '' ? rawName.slice(0, 255) : null,
+    manager_email: m.email ?? null,
+  };
+}
+
 /** Claims for workspace branding in the client (sidebar). Omitted for platform admins. */
 async function tenantClaimsForJwt(tenantId, isPlatformAdmin) {
   if (isPlatformAdmin || tenantId == null) {
@@ -190,6 +227,7 @@ export async function login(email, password, hostContext = {}) {
   // Find user by email (tenantId derived from user record)
   const [user] = await query(
     `SELECT id, tenant_id, email, password_hash, name, role, role_id, is_enabled, is_platform_admin, token_version,
+            manager_id,
             COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode
      FROM users 
      WHERE email = ? AND is_deleted = 0`,
@@ -276,6 +314,7 @@ export async function login(email, password, hostContext = {}) {
   const jwtTenantId = isPlatformAdmin ? null : user.tenant_id;
   const tokenVersion = user.token_version ?? 1;
   const tenantBranding = await tenantClaimsForJwt(user.tenant_id, isPlatformAdmin);
+  const managerBranding = await managerClaimsForJwt(user);
   const accessToken = jwt.sign(
     {
       sub: user.id,
@@ -289,6 +328,7 @@ export async function login(email, password, hostContext = {}) {
       permissions,
       token_version: tokenVersion,
       datetime_display_mode: user.datetime_display_mode ?? 'ist_fixed',
+      ...managerBranding,
       ...tenantBranding,
     },
     env.jwtSecret,
@@ -449,6 +489,7 @@ export async function refreshAccessToken(refreshToken) {
   // 4) Load user info for new tokens
   const [user] = await query(
     `SELECT id, tenant_id, email, name, role, role_id, is_enabled, is_platform_admin, token_version,
+            manager_id,
             COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode
      FROM users
      WHERE id = ? AND is_deleted = 0`,
@@ -470,6 +511,7 @@ export async function refreshAccessToken(refreshToken) {
   // 5) Generate new access + refresh tokens with permissions and token_version
   const jwtTenantId = isPlatformAdmin ? null : user.tenant_id;
   const tenantBranding = await tenantClaimsForJwt(user.tenant_id, isPlatformAdmin);
+  const managerBranding = await managerClaimsForJwt(user);
   const accessToken = jwt.sign(
     {
       sub: user.id,
@@ -483,6 +525,7 @@ export async function refreshAccessToken(refreshToken) {
       permissions,
       token_version: tokenVersion,
       datetime_display_mode: user.datetime_display_mode ?? 'ist_fixed',
+      ...managerBranding,
       ...tenantBranding,
     },
     env.jwtSecret,
@@ -611,6 +654,7 @@ export async function updateProfile(userId, payload) {
 
   const [user] = await query(
     `SELECT id, tenant_id, email, name, password_hash, role, role_id, is_enabled, is_platform_admin, token_version,
+            manager_id,
             COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode
      FROM users WHERE id = ? AND is_deleted = 0`,
     [userId]
@@ -697,6 +741,7 @@ export async function updateProfile(userId, payload) {
 
   const [updated] = await query(
     `SELECT id, tenant_id, email, name, role, role_id, is_enabled, is_platform_admin, token_version,
+            manager_id,
             COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode
      FROM users WHERE id = ? AND is_deleted = 0`,
     [userId]
@@ -707,6 +752,7 @@ export async function updateProfile(userId, payload) {
   const jwtTenantId = isPlatformAdmin ? null : updated.tenant_id;
   const tokenVersion = updated.token_version ?? 1;
   const tenantBranding = await tenantClaimsForJwt(updated.tenant_id, isPlatformAdmin);
+  const managerBranding = await managerClaimsForJwt(updated);
 
   const accessToken = jwt.sign(
     {
@@ -721,6 +767,7 @@ export async function updateProfile(userId, payload) {
       permissions,
       token_version: tokenVersion,
       datetime_display_mode: updated.datetime_display_mode ?? 'ist_fixed',
+      ...managerBranding,
       ...tenantBranding,
     },
     env.jwtSecret,

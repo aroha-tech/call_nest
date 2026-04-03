@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from '../app/hooks';
 import { selectUser, selectTenant, selectRefreshToken } from '../features/auth/authSelectors';
 import { setTokens } from '../features/auth/authSlice';
 import { userAndTenantFromToken } from '../features/auth/utils/jwtUtils';
-import { getUserDisplayName, getUserInitials } from '../features/auth/utils/userDisplay';
+import { getUserDisplayName, getUserInitials, getManagerDisplayLabel } from '../features/auth/utils/userDisplay';
 import { updateProfile as updateProfileAPI } from '../features/auth/authAPI';
 import { DATETIME_DISPLAY_BROWSER, DATETIME_DISPLAY_IST } from '../utils/dateTimeDisplay';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -196,6 +196,35 @@ export function ProfilePage() {
           <Alert variant="error" className={styles.alert}>
             {apiError}
           </Alert>
+        )}
+
+        {user.role === 'agent' && !user.isPlatformAdmin && tenant?.id != null && (
+          <div className={styles.managerCard}>
+            <h3 className={styles.managerCardTitle}>Your manager</h3>
+            {user.manager === undefined ? (
+              <p className={styles.managerCardBody}>
+                Sign out and sign in again to load your manager details.
+              </p>
+            ) : user.manager && (user.manager.email || user.manager.name) ? (
+              <>
+                <p className={styles.managerCardBody}>
+                  Your manager is your main point of contact for leads, assignments, and questions about your
+                  work in this workspace. Reach them by email below.
+                </p>
+                <p className={styles.managerName}>{getManagerDisplayLabel(user.manager)}</p>
+                {user.manager.email ? (
+                  <a className={styles.managerMailto} href={`mailto:${user.manager.email}`}>
+                    {user.manager.email}
+                  </a>
+                ) : null}
+              </>
+            ) : (
+              <p className={styles.managerCardBody}>
+                You are not assigned to a single manager right now. You are in the shared lead pool — any
+                manager in your workspace may assign or work leads with you.
+              </p>
+            )}
+          </div>
         )}
 
         <div className={styles.form}>

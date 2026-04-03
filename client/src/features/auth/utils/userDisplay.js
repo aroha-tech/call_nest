@@ -23,3 +23,13 @@ export function getUserInitials(user) {
   }
   return display.slice(0, 2).toUpperCase() || '?';
 }
+
+/** Label for reporting manager (sidebar / profile). */
+export function getManagerDisplayLabel(manager) {
+  if (!manager) return '';
+  const n = typeof manager.name === 'string' ? manager.name.trim() : '';
+  if (n) return n;
+  if (manager.email) return manager.email;
+  if (manager.id != null) return `Manager #${manager.id}`;
+  return '';
+}

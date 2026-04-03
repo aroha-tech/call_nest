@@ -4,7 +4,6 @@ import { useAppSelector } from '../app/hooks';
 import { selectUser } from '../features/auth/authSelectors';
 import { getUserDisplayName, getUserInitials } from '../features/auth/utils/userDisplay';
 import { useLogout } from '../hooks/useLogout';
-import { useColorScheme } from '../context/ColorSchemeContext';
 import styles from './SidebarUserPanel.module.scss';
 
 function SettingsIcon() {
@@ -35,7 +34,6 @@ export function SidebarUserPanel({ onNavigate }) {
   const user = useAppSelector(selectUser);
   const navigate = useNavigate();
   const logout = useLogout();
-  const { scheme, setScheme } = useColorScheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const wrapRef = useRef(null);
 
@@ -94,17 +92,6 @@ export function SidebarUserPanel({ onNavigate }) {
             <div className={styles.menu} role="menu">
               <button type="button" className={styles.menuItem} role="menuitem" onClick={goProfile}>
                 Show profile
-              </button>
-              <button
-                type="button"
-                className={styles.menuItem}
-                role="menuitem"
-                onClick={() => {
-                  setScheme(scheme === 'light' ? 'dark' : 'light');
-                  setMenuOpen(false);
-                }}
-              >
-                {scheme === 'light' ? 'Dark mode' : 'Light mode'}
               </button>
             </div>
           )}

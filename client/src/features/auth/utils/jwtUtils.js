@@ -25,6 +25,21 @@ export function userAndTenantFromToken(accessToken) {
     return { user: null, tenant: null, permissions: [], tokenVersion: null };
   }
 
+  let manager;
+  if (Object.prototype.hasOwnProperty.call(payload, 'manager_id')) {
+    if (payload.manager_id != null && payload.manager_id !== '') {
+      manager = {
+        id: Number(payload.manager_id),
+        name: payload.manager_name ?? null,
+        email: payload.manager_email ?? null,
+      };
+    } else {
+      manager = null;
+    }
+  } else {
+    manager = undefined;
+  }
+
   const user = {
     id: payload.user_id ?? payload.sub,
     email: payload.email,
@@ -35,6 +50,7 @@ export function userAndTenantFromToken(accessToken) {
     isPlatformAdmin: Boolean(payload.is_platform_admin),
     datetimeDisplayMode:
       payload.datetime_display_mode === 'browser_local' ? 'browser_local' : 'ist_fixed',
+    manager,
   };
 
   let theme = null;
