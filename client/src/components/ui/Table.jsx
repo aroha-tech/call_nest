@@ -1,11 +1,15 @@
 import React from 'react';
 import styles from './Table.module.scss';
 
-export function Table({ children, className = '', variant = 'default' }) {
+export function Table({ children, className = '', tableClassName = '', variant = 'default' }) {
   const admin = variant === 'adminList';
   return (
     <div className={`${styles.wrapper} ${admin ? styles.wrapperAdminList : ''} ${className}`}>
-      <table className={`${styles.table} ${admin ? styles.tableAdminList : ''}`}>{children}</table>
+      <table
+        className={`${styles.table} ${admin ? styles.tableAdminList : ''} ${tableClassName}`.trim()}
+      >
+        {children}
+      </table>
     </div>
   );
 }
@@ -40,12 +44,23 @@ export function TableCell({ children, align = 'left', width, className = '', noT
   );
 }
 
-export function TableHeaderCell({ children, align = 'left', width, sortable, sorted, onSort, noTruncate = false }) {
+export function TableHeaderCell({
+  children,
+  align = 'left',
+  width,
+  sortable,
+  sorted,
+  onSort,
+  noTruncate = false,
+  className = '',
+  onClick,
+}) {
+  const handleClick = onClick ?? (sortable ? onSort : undefined);
   return (
     <th 
-      className={`${styles.headerCell} ${styles[align]} ${sortable ? styles.sortable : ''} ${noTruncate ? styles.noTruncate : ''}`.trim()}
+      className={`${styles.headerCell} ${styles[align]} ${sortable ? styles.sortable : ''} ${handleClick ? styles.headerCellInteractive : ''} ${noTruncate ? styles.noTruncate : ''} ${className}`.trim()}
       style={width ? { width } : undefined}
-      onClick={sortable ? onSort : undefined}
+      onClick={handleClick}
     >
       <span className={styles.headerContent}>
         {children}

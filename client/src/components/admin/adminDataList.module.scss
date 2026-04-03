@@ -139,6 +139,23 @@
   @include admin-table-scroll;
 }
 
+/**
+ * Leads grid: scroll area uses --color-bg-subtle so there is no white (surface) seam between
+ * the toolbar and thead — tbody cells paint their own --color-bg-surface per cell.
+ */
+.tableCardBodyLead {
+  margin-top: 0;
+  padding: 0;
+  background-color: var(--color-bg-subtle);
+  /* Avoid layout jump when scrollbar track appears; keeps header edge stable */
+  scrollbar-gutter: stable;
+  scrollbar-color: var(--scrollbar-thumb) var(--color-bg-surface);
+
+  &::-webkit-scrollbar-track {
+    background: var(--color-bg-subtle);
+  }
+}
+
 /** Same scroll behavior for pages without full tableCard (email accounts, WA templates, …) */
 .tableScrollArea {
   @include admin-table-scroll;
@@ -179,6 +196,22 @@
   min-height: clamp(320px, calc(100vh - 268px), 560px);
 }
 
+/**
+ * Leads: region must not stay transparent — otherwise .tableCard’s --color-bg-surface shows as a
+ * white seam between the toolbar and the scroll body (vertical rules “stop” at that slit).
+ */
+.tableDataRegionLead {
+  background-color: var(--color-bg-subtle);
+}
+
+/**
+ * Leads: admin-table-scroll forces `> :first-child { background: transparent !important }`
+ * which beats .leadTableOuter — restore opaque wrapper so nothing bleeds from the card.
+ */
+.tableCardBody.tableCardBodyLead > :first-child {
+  background-color: var(--color-bg-subtle) !important;
+}
+
 .tableRefreshingOverlay {
   position: absolute;
   inset: 0;
@@ -209,6 +242,12 @@
   padding: $space-3 $space-4;
   border-bottom: 1px solid var(--color-border-subtle);
   background: var(--color-bg-subtle);
+}
+
+/** Leads: toolbar + table body share one seam (no hairline gap under search) */
+.tableCardToolbarTopLead {
+  margin-bottom: 0;
+  border-bottom-color: var(--color-border);
 }
 
 .tableCardToolbarTopSearch {

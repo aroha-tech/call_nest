@@ -551,6 +551,7 @@ export function ContactFormPage({ defaultType }) {
           </h2>
           <p className={styles.sectionDesc}>
             Display name is required. Provide at least first name or email. Display name updates from first and last name until you edit it directly.
+            Company, role, and website are optional standard fields used in lists and exports.
           </p>
           <div className={styles.fieldGrid}>
             <Input
@@ -580,50 +581,6 @@ export function ContactFormPage({ defaultType }) {
               onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
               type="email"
               autoComplete="email"
-            />
-          </div>
-        </section>
-
-        <section className={styles.section} aria-labelledby="contact-section-location">
-          <h2 id="contact-section-location" className={styles.sectionTitle}>
-            Location &amp; professional
-          </h2>
-          <p className={styles.sectionDesc}>
-            Standard fields stored on the contact record (not custom fields). Used in lists, export, and imports.
-          </p>
-          <div className={styles.fieldGrid}>
-            <Input
-              label="Country"
-              value={formData.country}
-              onChange={(e) => setFormData((p) => ({ ...p, country: e.target.value }))}
-              autoComplete="country-name"
-            />
-            <Input
-              label="State / region"
-              value={formData.state}
-              onChange={(e) => setFormData((p) => ({ ...p, state: e.target.value }))}
-            />
-            <Input
-              label="City"
-              value={formData.city}
-              onChange={(e) => setFormData((p) => ({ ...p, city: e.target.value }))}
-            />
-            <Input
-              label="PIN / postal code"
-              value={formData.pin_code}
-              onChange={(e) => setFormData((p) => ({ ...p, pin_code: e.target.value }))}
-            />
-            <Input
-              label="Address line 1"
-              value={formData.address}
-              onChange={(e) => setFormData((p) => ({ ...p, address: e.target.value }))}
-              className={styles.fullWidthField}
-            />
-            <Input
-              label="Address line 2"
-              value={formData.address_line_2}
-              onChange={(e) => setFormData((p) => ({ ...p, address_line_2: e.target.value }))}
-              className={styles.fullWidthField}
             />
             <Input
               label="Company"
@@ -657,6 +614,162 @@ export function ContactFormPage({ defaultType }) {
               label="GST / PAN / Tax ID"
               value={formData.tax_id}
               onChange={(e) => setFormData((p) => ({ ...p, tax_id: e.target.value }))}
+            />
+          </div>
+        </section>
+
+        <section className={styles.section} aria-labelledby="contact-section-phones">
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionHeaderText}>
+              <h2 id="contact-section-phones" className={styles.sectionTitle}>
+                Phone numbers
+              </h2>
+              <p className={`${styles.sectionDesc} ${styles.sectionDescTight}`}>
+                One row per line type (e.g. mobile vs WhatsApp). Mark exactly one as primary when possible.
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={availableLabelOptions.length === 0}
+              onClick={() => {
+                const nextLabel = availableLabelOptions[0]?.value || 'other';
+                setFormData((prev) => ({
+                  ...prev,
+                  phones: [...(prev.phones || []), { country_code: DEFAULT_COUNTRY_CODE, number: '', label: nextLabel, is_primary: false }],
+                }));
+              }}
+            >
+              + Add phone
+            </Button>
+          </div>
+
+          <div className={styles.phoneList}>
+            {(formData.phones || []).map((p, idx) => {
+              const used = new Set((formData.phones || []).map((x, i) => (i === idx ? null : (x.label || 'mobile').toLowerCase())).filter(Boolean));
+              const labelOptionsForRow = PHONE_LABEL_OPTIONS.filter((o) => !used.has(o.value) || o.value === (p.label || 'mobile'));
+              return (
+                <div key={idx} className={styles.phoneRow}>
+                  <div className={styles.phoneCc}>
+                    <Input
+                      label={idx === 0 ? 'Country code' : undefined}
+                      value={p.country_code || DEFAULT_COUNTRY_CODE}
+                      onChange={(e) => {
+                        const next = [...formData.phones];
+                        next[idx] = { ...next[idx], country_code: e.target.value };
+                        setFormData((prev) => ({ ...prev, phones: next }));
+                      }}
+                      placeholder="+91"
+                    />
+                  </div>
+                  <div className={styles.phoneNum}>
+                    <Input
+                      label={idx === 0 ? 'Number' : undefined}
+                      value={p.number || ''}
+                      onChange={(e) => {
+                        const next = [...formData.phones];
+                        next[idx] = { ...next[idx], number: e.target.value };
+                        setFormData((prev) => ({ ...prev, phones: next }));
+                      }}
+                      placeholder="9876543210"
+                      inputMode="tel"
+                    />
+                  </div>
+                  <div className={styles.phoneLabel}>
+                    <Select
+                      label={idx === 0 ? 'Label' : undefined}
+                      value={p.label || 'mobile'}
+                      onChange={(e) => {
+                        const next = [...formData.phones];
+                        next[idx] = { ...next[idx], label: e.target.value };
+                        setFormData((prev) => ({ ...prev, phones: next }));
+                      }}
+                      options={labelOptionsForRow}
+                    />
+                  </div>
+                  <div className={styles.phoneTail}>
+                    <label className={styles.primaryCheck}>
+                      <input
+                        type="checkbox"
+                        checked={!!p.is_primary}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          const next = [...formData.phones];
+                          if (checked) {
+                            next.forEach((row, i) => {
+                              next[i] = { ...row, is_primary: i === idx };
+                            });
+                          } else {
+                            next[idx] = { ...next[idx], is_primary: false };
+                          }
+                          setFormData((prev) => ({ ...prev, phones: next }));
+                        }}
+                      />
+                      Primary
+                    </label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={(formData.phones || []).length <= 1}
+                      onClick={() => {
+                        const next = (formData.phones || []).filter((_, i) => i !== idx);
+                        if (next.length > 0 && !next.some((x) => x.is_primary)) {
+                          next[0].is_primary = true;
+                        }
+                        setFormData((prev) => ({ ...prev, phones: next }));
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className={styles.section} aria-labelledby="contact-section-location">
+          <h2 id="contact-section-location" className={styles.sectionTitle}>
+            Location
+          </h2>
+          <p className={styles.sectionDesc}>
+            Address and country fields on the contact record (not custom fields). Used in lists, export, and imports.
+          </p>
+          <div className={styles.fieldGrid}>
+            <Input
+              label="Address line 1"
+              value={formData.address}
+              onChange={(e) => setFormData((p) => ({ ...p, address: e.target.value }))}
+              className={styles.fullWidthField}
+            />
+            <Input
+              label="Address line 2"
+              value={formData.address_line_2}
+              onChange={(e) => setFormData((p) => ({ ...p, address_line_2: e.target.value }))}
+              className={styles.fullWidthField}
+            />
+            <Input
+              label="City"
+              value={formData.city}
+              onChange={(e) => setFormData((p) => ({ ...p, city: e.target.value }))}
+            />
+            <Input
+              label="State / region"
+              value={formData.state}
+              onChange={(e) => setFormData((p) => ({ ...p, state: e.target.value }))}
+            />
+            <Input
+              label="Country"
+              value={formData.country}
+              onChange={(e) => setFormData((p) => ({ ...p, country: e.target.value }))}
+              autoComplete="country-name"
+            />
+            <Input
+              label="PIN / postal code"
+              value={formData.pin_code}
+              onChange={(e) => setFormData((p) => ({ ...p, pin_code: e.target.value }))}
             />
           </div>
         </section>
@@ -838,118 +951,6 @@ export function ContactFormPage({ defaultType }) {
             </div>
           </section>
         ) : null}
-
-        <section className={styles.section} aria-labelledby="contact-section-phones">
-          <div className={styles.sectionHeader}>
-            <div className={styles.sectionHeaderText}>
-              <h2 id="contact-section-phones" className={styles.sectionTitle}>
-                Phone numbers
-              </h2>
-              <p className={`${styles.sectionDesc} ${styles.sectionDescTight}`}>
-                One row per line type (e.g. mobile vs WhatsApp). Mark exactly one as primary when possible.
-              </p>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              disabled={availableLabelOptions.length === 0}
-              onClick={() => {
-                const nextLabel = availableLabelOptions[0]?.value || 'other';
-                setFormData((prev) => ({
-                  ...prev,
-                  phones: [...(prev.phones || []), { country_code: DEFAULT_COUNTRY_CODE, number: '', label: nextLabel, is_primary: false }],
-                }));
-              }}
-            >
-              + Add phone
-            </Button>
-          </div>
-
-          <div className={styles.phoneList}>
-            {(formData.phones || []).map((p, idx) => {
-              const used = new Set((formData.phones || []).map((x, i) => (i === idx ? null : (x.label || 'mobile').toLowerCase())).filter(Boolean));
-              const labelOptionsForRow = PHONE_LABEL_OPTIONS.filter((o) => !used.has(o.value) || o.value === (p.label || 'mobile'));
-              return (
-                <div key={idx} className={styles.phoneRow}>
-                  <div className={styles.phoneCc}>
-                    <Input
-                      label={idx === 0 ? 'Country code' : undefined}
-                      value={p.country_code || DEFAULT_COUNTRY_CODE}
-                      onChange={(e) => {
-                        const next = [...formData.phones];
-                        next[idx] = { ...next[idx], country_code: e.target.value };
-                        setFormData((prev) => ({ ...prev, phones: next }));
-                      }}
-                      placeholder="+91"
-                    />
-                  </div>
-                  <div className={styles.phoneNum}>
-                    <Input
-                      label={idx === 0 ? 'Number' : undefined}
-                      value={p.number || ''}
-                      onChange={(e) => {
-                        const next = [...formData.phones];
-                        next[idx] = { ...next[idx], number: e.target.value };
-                        setFormData((prev) => ({ ...prev, phones: next }));
-                      }}
-                      placeholder="9876543210"
-                      inputMode="tel"
-                    />
-                  </div>
-                  <div className={styles.phoneLabel}>
-                    <Select
-                      label={idx === 0 ? 'Label' : undefined}
-                      value={p.label || 'mobile'}
-                      onChange={(e) => {
-                        const next = [...formData.phones];
-                        next[idx] = { ...next[idx], label: e.target.value };
-                        setFormData((prev) => ({ ...prev, phones: next }));
-                      }}
-                      options={labelOptionsForRow}
-                    />
-                  </div>
-                  <div className={styles.phoneTail}>
-                    <label className={styles.primaryCheck}>
-                      <input
-                        type="checkbox"
-                        checked={!!p.is_primary}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          const next = [...formData.phones];
-                          if (checked) {
-                            next.forEach((row, i) => {
-                              next[i] = { ...row, is_primary: i === idx };
-                            });
-                          } else {
-                            next[idx] = { ...next[idx], is_primary: false };
-                          }
-                          setFormData((prev) => ({ ...prev, phones: next }));
-                        }}
-                      />
-                      Primary
-                    </label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={(formData.phones || []).length <= 1}
-                      onClick={() => {
-                        const next = (formData.phones || []).filter((_, i) => i !== idx);
-                        if (next.length > 0 && !next.some((x) => x.is_primary)) {
-                          next[0].is_primary = true;
-                        }
-                        setFormData((prev) => ({ ...prev, phones: next }));
-                      }}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
 
         <section className={styles.section} aria-labelledby="contact-section-custom">
           <h2 id="contact-section-custom" className={styles.sectionTitle}>

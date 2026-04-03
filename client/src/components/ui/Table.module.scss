@@ -124,6 +124,15 @@
   }
 }
 
+.headerCellInteractive {
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    color: var(--color-text-secondary);
+  }
+}
+
 .headerContent {
   display: inline-flex;
   align-items: center;

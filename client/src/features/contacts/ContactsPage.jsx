@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { selectUser } from '../../features/auth/authSelectors';
@@ -22,6 +22,16 @@ import { FilterBar } from '../../components/admin/FilterBar';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
 import { AssignContactsBulkModal } from './AssignContactsBulkModal';
+import { LeadDataTable } from './LeadDataTable';
+import { LeadColumnCustomizeModal } from './LeadColumnCustomizeModal';
+import { LeadColumnSortFilterModal } from './LeadColumnSortFilterModal';
+import {
+  getApplicableLeadColumns,
+  leadCustomFieldColumnId,
+  loadLeadVisibleColumnIds,
+  mergeApplicableLeadColumnsWithCustomFields,
+  saveLeadVisibleColumnIds,
+} from './leadTableConfig';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import pageStyles from './ContactsPage.module.scss';
 
@@ -46,8 +56,46 @@ export function ContactsPage({ type }) {
   const [unassignConfirmOpen, setUnassignConfirmOpen] = useState(false);
   const [unassignError, setUnassignError] = useState('');
 
-  const showOwnershipFilters = canRead && (role === 'admin' || role === 'manager');
   const showCampaign = type === 'lead' && canRead;
+  const showManagerAgentColumns = (role === 'admin' || role === 'manager') && canRead;
+  /** Tenant-defined contact custom fields — columns in Customize + values from list API `custom_field_values`. */
+  const [leadCustomFieldDefs, setLeadCustomFieldDefs] = useState([]);
+  const leadApplicableColumns = useMemo(
+    () =>
+      type === 'lead'
+        ? mergeApplicableLeadColumnsWithCustomFields(
+            getApplicableLeadColumns({
+              showCampaign,
+              showManagerAgent: showManagerAgentColumns,
+            }),
+            leadCustomFieldDefs
+          )
+        : [],
+    [type, showCampaign, showManagerAgentColumns, leadCustomFieldDefs]
+  );
+  const [leadVisibleColumnIds, setLeadVisibleColumnIds] = useState(() =>
+    type === 'lead'
+      ? loadLeadVisibleColumnIds(
+          mergeApplicableLeadColumnsWithCustomFields(
+            getApplicableLeadColumns({
+              showCampaign: type === 'lead' && canRead,
+              showManagerAgent: (role === 'admin' || role === 'manager') && canRead,
+            }),
+            []
+          )
+        )
+      : []
+  );
+  const [leadCustomizeOpen, setLeadCustomizeOpen] = useState(false);
+  const [leadColumnPanelCol, setLeadColumnPanelCol] = useState(null);
+  const [leadColumnFilters, setLeadColumnFilters] = useState([]);
+  const leadTableScrollRef = useRef(null);
+  /** When table is wider than the viewport (horizontal scrollbar), use ⋮ menu; else show Edit/Delete icons. */
+  const [leadTableHasHorizontalOverflow, setLeadTableHasHorizontalOverflow] = useState(false);
+  const [leadSortBy, setLeadSortBy] = useState(null);
+  const [leadSortDir, setLeadSortDir] = useState('desc');
+
+  const showOwnershipFilters = canRead && (role === 'admin' || role === 'manager');
 
   const [tenantUsers, setTenantUsers] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
@@ -89,6 +137,29 @@ export function ContactsPage({ type }) {
     };
   }, [showCampaign]);
 
+  useEffect(() => {
+    if (type !== 'lead' || !canRead) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await contactsAPI.getCustomFields();
+        const list = res?.data?.data ?? res?.data ?? [];
+        if (!cancelled) setLeadCustomFieldDefs(Array.isArray(list) ? list : []);
+      } catch {
+        if (!cancelled) setLeadCustomFieldDefs([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [type, canRead]);
+
+  /** Re-read localStorage when applicable set grows (e.g. custom fields loaded) so `cf:*` prefs apply. */
+  useEffect(() => {
+    if (type !== 'lead') return;
+    setLeadVisibleColumnIds(loadLeadVisibleColumnIds(leadApplicableColumns));
+  }, [type, leadApplicableColumns]);
+
   const filterParamsForApi = useMemo(() => {
     const mid = role === 'manager' ? FILTER_ALL : appliedManagerFilter;
     const aid = appliedAgentFilter;
@@ -129,8 +200,12 @@ export function ContactsPage({ type }) {
         limit,
         type,
         ...filterParamsForApi,
+        ...(type === 'lead' && leadSortBy
+          ? { sort_by: leadSortBy, sort_dir: leadSortDir }
+          : {}),
+        ...(type === 'lead' && leadColumnFilters.length > 0 ? { column_filters: leadColumnFilters } : {}),
       }),
-    [searchQuery, page, limit, type, filterParamsForApi]
+    [searchQuery, page, limit, type, filterParamsForApi, leadSortBy, leadSortDir, leadColumnFilters]
   );
 
   const {
@@ -144,6 +219,53 @@ export function ContactsPage({ type }) {
 
   const contacts = contactsResponse?.data ?? [];
   const pagination = contactsResponse?.pagination ?? { total: 0, totalPages: 1, page, limit };
+
+  const handleLeadCustomFieldCreated = useCallback(
+    (created) => {
+      const fid = created?.field_id ?? created?.id;
+      if (fid == null) return;
+      const colId = leadCustomFieldColumnId(fid);
+      setLeadCustomFieldDefs((prev) => {
+        if (prev.some((f) => Number(f.field_id ?? f.id) === Number(fid))) return prev;
+        return [
+          ...prev,
+          {
+            field_id: fid,
+            name: created.name,
+            label: created.label,
+            type: created.type,
+          },
+        ];
+      });
+      setLeadVisibleColumnIds((prev) => {
+        if (prev.includes(colId)) return prev;
+        const next = [...prev, colId];
+        saveLeadVisibleColumnIds(next);
+        return next;
+      });
+      refetch();
+    },
+    [refetch]
+  );
+
+  useEffect(() => {
+    if (type !== 'lead') return;
+    const el = leadTableScrollRef.current;
+    if (!el) return;
+    const measure = () => {
+      setLeadTableHasHorizontalOverflow(el.scrollWidth > el.clientWidth + 1);
+    };
+    measure();
+    const t = window.requestAnimationFrame(() => measure());
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      window.cancelAnimationFrame(t);
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [type, contacts.length, leadVisibleColumnIds, loadingContacts]);
 
   const { hasCompletedInitialFetch } = useTableLoadingState(loadingContacts);
 
@@ -237,6 +359,9 @@ export function ContactsPage({ type }) {
     setCampaignFilter(FILTER_ALL);
     setPage(1);
     clearSelection();
+    setLeadSortBy(null);
+    setLeadSortDir('desc');
+    setLeadColumnFilters([]);
   }, [clearSelection]);
 
   const onCampaignFilterChange = (e) => {
@@ -280,6 +405,26 @@ export function ContactsPage({ type }) {
     clearSelection();
   };
 
+  const applyLeadColumnPanel = useCallback(
+    (col, { sort, filter }) => {
+      if (sort === 'default') {
+        setLeadSortBy(null);
+        setLeadSortDir('desc');
+      } else {
+        setLeadSortBy(col.sortKey);
+        setLeadSortDir(sort);
+      }
+      setLeadColumnFilters((prev) => {
+        const rest = prev.filter((r) => r.field !== col.id);
+        if (!filter || !filter.op) return rest;
+        return [...rest, { field: col.id, op: filter.op, value: filter.value || '' }];
+      });
+      setPage(1);
+      clearSelection();
+    },
+    [clearSelection]
+  );
+
   const confirmUnassignAgents = async () => {
     if (selectedIds.size === 0) return;
     setUnassignError('');
@@ -308,6 +453,7 @@ export function ContactsPage({ type }) {
   const totalPages = Math.max(1, pagination.totalPages || 1);
 
   const hasActiveFilters =
+    (type === 'lead' && leadColumnFilters.length > 0) ||
     (role === 'admin' && (appliedManagerFilter !== FILTER_ALL || appliedAgentFilter !== FILTER_ALL)) ||
     (role === 'manager' && appliedAgentFilter !== FILTER_ALL) ||
     (showCampaign && campaignFilter !== FILTER_ALL);
@@ -385,7 +531,13 @@ export function ContactsPage({ type }) {
       ) : null}
 
       <div className={listStyles.tableCard}>
-        <div className={listStyles.tableCardToolbarTop}>
+        <div
+          className={
+            type === 'lead'
+              ? `${listStyles.tableCardToolbarTop} ${listStyles.tableCardToolbarTopLead}`
+              : listStyles.tableCardToolbarTop
+          }
+        >
           <div className={listStyles.tableCardToolbarLeft}>
             {canBulkAssign && contacts.length > 0 ? (
               <div className={listStyles.bulkToolbarSlot}>
@@ -411,7 +563,11 @@ export function ContactsPage({ type }) {
           <SearchInput value={searchQuery} onSearch={handleSearch} className={listStyles.searchInToolbar} placeholder="Search... (press Enter)" />
         </div>
 
-        <TableDataRegion loading={loadingContacts} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        <TableDataRegion
+          loading={loadingContacts}
+          hasCompletedInitialFetch={hasCompletedInitialFetch}
+          className={type === 'lead' ? listStyles.tableDataRegionLead : undefined}
+        >
           {contacts.length === 0 ? (
             <div className={listStyles.tableCardEmpty}>
               <EmptyState
@@ -439,7 +595,36 @@ export function ContactsPage({ type }) {
               />
             </div>
           ) : (
-            <div className={listStyles.tableCardBody}>
+            <div
+              className={
+                type === 'lead'
+                  ? `${listStyles.tableCardBody} ${listStyles.tableCardBodyLead}`
+                  : listStyles.tableCardBody
+              }
+              ref={type === 'lead' ? leadTableScrollRef : undefined}
+            >
+            {type === 'lead' ? (
+              <LeadDataTable
+                contacts={contacts}
+                applicableColumns={leadApplicableColumns}
+                visibleColumnIds={leadVisibleColumnIds}
+                columnFilters={leadColumnFilters}
+                canBulkAssign={canBulkAssign}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onToggleSelectAllOnPage={toggleSelectAllOnPage}
+                sortBy={leadSortBy}
+                sortDir={leadSortDir}
+                onColumnHeaderClick={(col) => setLeadColumnPanelCol(col)}
+                onOpenCustomizeColumns={() => setLeadCustomizeOpen(true)}
+                useCompactRowActions={leadTableHasHorizontalOverflow}
+                tableScrollContainerRef={leadTableScrollRef}
+                canUpdate={canUpdate}
+                canDelete={canDelete}
+                onEdit={(c) => navigate(`/leads/${c.id}`)}
+                onDelete={setDeleteItem}
+              />
+            ) : (
             <Table variant="adminList">
               <TableHead>
                 <TableRow>
@@ -507,7 +692,7 @@ export function ContactsPage({ type }) {
                           <IconButton
                             size="sm"
                             title="Edit"
-                            onClick={() => navigate(type === 'lead' ? `/leads/${c.id}` : `/contacts/${c.id}`)}
+                            onClick={() => navigate(`/contacts/${c.id}`)}
                           >
                             <EditIcon />
                           </IconButton>
@@ -523,6 +708,7 @@ export function ContactsPage({ type }) {
                 ))}
               </TableBody>
             </Table>
+            )}
             </div>
           )}
         </TableDataRegion>
@@ -588,6 +774,32 @@ export function ContactsPage({ type }) {
           refetch();
         }}
       />
+
+      {type === 'lead' ? (
+        <LeadColumnCustomizeModal
+          isOpen={leadCustomizeOpen}
+          onClose={() => setLeadCustomizeOpen(false)}
+          applicableColumns={leadApplicableColumns}
+          visibleColumnIds={leadVisibleColumnIds}
+          onSave={setLeadVisibleColumnIds}
+          canAddCustomField={canUpdate}
+          onCustomFieldCreated={handleLeadCustomFieldCreated}
+        />
+      ) : null}
+
+      {type === 'lead' ? (
+        <LeadColumnSortFilterModal
+          isOpen={!!leadColumnPanelCol}
+          onClose={() => setLeadColumnPanelCol(null)}
+          column={leadColumnPanelCol}
+          sortBy={leadSortBy}
+          sortDir={leadSortDir}
+          filterRule={leadColumnFilters.find((r) => r.field === leadColumnPanelCol?.id)}
+          onApply={(payload) => {
+            if (leadColumnPanelCol) applyLeadColumnPanel(leadColumnPanelCol, payload);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,0 +1,163 @@
+@use '../../styles/variables' as *;
+
+.modalSubtitle {
+  margin: 0 0 $space-4;
+  font-size: $font-size-sm;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.statusBanner {
+  display: flex;
+  flex-direction: column;
+  gap: $space-1;
+  margin-bottom: $space-5;
+  padding: $space-3 $space-4;
+  border-radius: $radius-md;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-subtle);
+  font-size: $font-size-xs;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.statusLine {
+  display: block;
+}
+
+.panels {
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
+}
+
+.panel {
+  margin: 0;
+  padding: $space-4;
+  border-radius: $radius-lg;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+}
+
+.panelHead {
+  display: flex;
+  gap: $space-3;
+  align-items: flex-start;
+  margin-bottom: $space-4;
+}
+
+.panelIcon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: $radius-md;
+  font-size: 16px;
+  line-height: 1;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+}
+
+.panelTitle {
+  margin: 0 0 $space-1;
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+}
+
+.panelHint {
+  margin: 0;
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.radioCards {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
+.radioCard {
+  display: flex;
+  align-items: flex-start;
+  gap: $space-3;
+  margin: 0;
+  padding: $space-3 $space-4;
+  border-radius: $radius-md;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  cursor: pointer;
+  transition: border-color $transition-fast, background $transition-fast;
+
+  input {
+    margin-top: 4px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  &:hover {
+    border-color: var(--color-border-strong, var(--color-border));
+    background: var(--color-bg-subtle);
+  }
+}
+
+.radioCardActive {
+  border-color: var(--color-accent, #6366f1);
+  background: color-mix(in srgb, var(--color-accent, #6366f1) 8%, var(--color-bg-elevated));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent, #6366f1) 35%, transparent);
+}
+
+.radioCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.radioCardTitle {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: var(--color-text-primary);
+}
+
+.radioCardMeta {
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+.filterFields {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+}
+
+.inlineError {
+  margin: 0;
+  font-size: $font-size-xs;
+  color: var(--color-danger, #dc2626);
+}
+
+.footerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-3;
+  width: 100%;
+}
+
+.footerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2;
+  margin-left: auto;
+}
+
+.footerReset {
+  margin-right: auto;
+}

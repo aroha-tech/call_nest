@@ -1,0 +1,403 @@
+@use '../../styles/variables' as *;
+
+/**
+ * Wrapper: flush with scroll area (no double border/radius). Grid lives on <table> only.
+ */
+.leadTableOuter {
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  /* Opaque fill: see adminDataList `.tableCardBody.tableCardBodyLead > :first-child` override */
+  background-color: var(--color-bg-subtle) !important;
+  width: 100%;
+  min-width: 100%;
+}
+
+/**
+ * Sticky thead must use top:0 only. Negative `top` + extra padding made thead paint differently
+ * at scrollTop=0 vs when scrolling (line/jump above header). Ghost text is handled by opaque th bg.
+ */
+:global(.tableCardBodyLead) .leadTableOuter :global(thead th) {
+  top: 0 !important;
+  box-shadow: 0 1px 0 var(--color-border-subtle) !important;
+}
+
+/* No top cell border — avoids a “double line” / flicker at the scroll viewport edge */
+.leadTable :global(thead th) {
+  border-top: none !important;
+}
+
+/**
+ * Excel-style grid + sticky columns. Plain buttons for actions (no IconButton “pill” hover box).
+ *
+ * Important: Table.module .tableAdminList .cell:not(:last-child) sets overflow:visible — we must
+ * override with !important or long text paints over the sticky Actions column.
+ */
+.leadTable {
+  border-collapse: collapse;
+  border-spacing: 0;
+  /* Transparent so we never get a surface “cap” above thead; tbody cells set their own fill */
+  background-color: transparent;
+
+  :global(tbody td) {
+    background-color: var(--color-bg-surface);
+  }
+
+  :global(tbody tr:hover td) {
+    background-color: var(--color-bg-subtle) !important;
+  }
+
+  thead th,
+  tbody td {
+    border: 1px solid var(--color-border, rgba(0, 0, 0, 0.12));
+    box-sizing: border-box;
+  }
+
+  :global(thead th:not(:last-child)),
+  :global(tbody td:not(:last-child)) {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    max-width: min(420px, 55vw) !important;
+  }
+
+  :global(thead th:first-child):has(input[type='checkbox']),
+  :global(tbody td:first-child):has(input[type='checkbox']) {
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    overflow: visible !important;
+  }
+
+  thead th {
+    background-color: var(--color-bg-subtle);
+    vertical-align: middle;
+  }
+
+  tbody td {
+    vertical-align: middle;
+  }
+
+  tbody tr {
+    border-bottom: none !important;
+  }
+
+  /**
+   * Actions column — must use !important: Table.module `.tableAdminList .headerCell:last-child`
+   * sets 140px and was overriding our width (table looked “stuck” wide).
+   */
+  /**
+   * Default: no horizontal scrollbar — comfortable Actions column (icons + “Actions” + gear).
+   * Narrow 40px only when `.leadTableCompactActions` is set (horizontal overflow / ⋮ mode).
+   */
+  thead th:last-child,
+  tbody td:last-child {
+    min-width: 120px !important;
+    width: 120px !important;
+    max-width: 120px !important;
+  }
+
+  :global(thead th),
+  :global(tbody td) {
+    padding-left: $space-2 !important;
+    padding-right: $space-2 !important;
+  }
+}
+
+/** Last column padding: comfortable when no h-scroll; flush when ⋮ compact mode */
+.leadTableOuter:not(.leadTableCompactActions) .leadTable :global(thead th:last-child),
+.leadTableOuter:not(.leadTableCompactActions) .leadTable :global(tbody td:last-child) {
+  padding-left: 4px !important;
+  padding-right: 0 !important;
+}
+
+/** Horizontal overflow: ⋮ only — minimal width + no side padding */
+.leadTableOuter.leadTableCompactActions .leadTable :global(thead th:last-child),
+.leadTableOuter.leadTableCompactActions .leadTable :global(tbody td:last-child) {
+  min-width: 40px !important;
+  width: 40px !important;
+  max-width: 40px !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+/**
+ * Sticky first column: `border-collapse: collapse` + horizontal scroll can drop the outer
+ * left border on the sticky layer (tiny gap + “missing” line). Inset shadow paints on the
+ * cell layer; we drop border-left here to avoid a double line next to the inset.
+ */
+.stickyFirst {
+  position: sticky;
+  left: 0;
+  z-index: 28;
+  box-sizing: border-box;
+  background-color: var(--color-bg-surface);
+  border-left: none !important;
+  box-shadow:
+    inset 1px 0 0 var(--color-border, rgba(0, 0, 0, 0.12)),
+    4px 0 6px -4px rgba(0, 0, 0, 0.35);
+}
+
+.stickyLast {
+  position: sticky;
+  right: 0;
+  z-index: 28;
+  background-color: var(--color-bg-surface);
+  box-shadow: -4px 0 6px -4px rgba(0, 0, 0, 0.35);
+}
+
+.leadTable :global(thead) .stickyFirst,
+.leadTable :global(thead) .stickyLast {
+  z-index: 36;
+  background-color: var(--color-bg-subtle);
+}
+
+.leadTable :global(tbody) .stickyFirst,
+.leadTable :global(tbody) .stickyLast {
+  z-index: 30;
+  background-color: var(--color-bg-surface);
+  isolation: isolate;
+}
+
+/** Opaque surfaces only — --color-bg-hover is rgba and shows text bleeding from adjacent cells */
+.leadTable :global(tbody tr:hover) .stickyFirst,
+.leadTable :global(tbody tr:hover) .stickyLast {
+  background-color: var(--color-bg-subtle) !important;
+}
+
+.actionsTh {
+  vertical-align: middle;
+  background-color: var(--color-bg-subtle) !important;
+}
+
+.actionsHead {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-2;
+  width: 100%;
+  min-width: 0;
+}
+
+.actionsHeadCompact {
+  gap: 0;
+}
+
+.actionsHeadLabel {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+  line-height: 1.2;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/** Narrow mode: header is gear only; label for screen readers */
+.actionsSrOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+}
+
+.actionsRowGroup {
+  gap: 2px !important;
+  flex-wrap: nowrap !important;
+}
+
+.gearBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 2px;
+  border: none;
+  border-radius: 2px;
+  background-color: var(--color-bg-subtle);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  line-height: 1;
+
+  &:hover {
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-muted);
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--color-border);
+    outline-offset: 1px;
+    background-color: var(--color-bg-subtle);
+  }
+}
+
+.gearIcon {
+  font-size: 14px;
+  line-height: 1;
+  display: block;
+}
+
+.headerInner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.sortMark {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.filterMark {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary, #3b82f6);
+  flex-shrink: 0;
+}
+
+.actionsTd {
+  vertical-align: middle;
+  background-color: var(--color-bg-surface) !important;
+}
+
+.actionMenuWrap {
+  position: relative;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.leadTable :global(tbody tr:hover) .actionsTd {
+  background-color: var(--color-bg-subtle) !important;
+}
+
+.actionsTd .moreBtn {
+  padding: 1px 2px;
+  min-width: 28px;
+  min-height: 24px;
+}
+
+.moreBtn {
+  direction: ltr;
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 4px 8px;
+  min-width: 32px;
+  min-height: 28px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-md;
+  background-color: var(--color-bg-surface);
+  background-clip: padding-box;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  line-height: 1;
+  font: inherit;
+  box-shadow: none;
+
+  &:hover {
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-subtle);
+    border-color: var(--color-border);
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary, #3b82f6);
+    outline-offset: 1px;
+    background-color: var(--color-bg-subtle);
+    border-color: var(--color-border);
+  }
+
+  &:active,
+  &[aria-expanded='true'] {
+    background-color: var(--color-bg-muted);
+    border-color: var(--color-border-strong);
+  }
+}
+
+.leadTable :global(tbody tr:hover) .moreBtn {
+  background-color: var(--color-bg-subtle);
+  border-color: var(--color-border);
+}
+
+.leadTable :global(tbody tr:hover) .moreBtn:active,
+.leadTable :global(tbody tr:hover) .moreBtn[aria-expanded='true'] {
+  background-color: var(--color-bg-muted);
+  border-color: var(--color-border-strong);
+}
+
+/** Horizontal kebab — three dots in a row */
+.moreDotsRow {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.moreDot {
+  display: block;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background-color: currentColor;
+  flex-shrink: 0;
+}
+
+.actionMenu {
+  position: fixed;
+  z-index: 10050;
+  margin: 0;
+  padding: $space-1 0;
+  min-width: 160px;
+  list-style: none;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-md;
+  box-shadow: $shadow-lg;
+}
+
+.actionMenuItem,
+.actionMenuItemDanger {
+  display: block;
+  width: 100%;
+  padding: $space-2 $space-4;
+  text-align: left;
+  font-size: $font-size-sm;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg-hover);
+  }
+}
+
+.actionMenuItemDanger {
+  color: var(--color-danger, #c00);
+}

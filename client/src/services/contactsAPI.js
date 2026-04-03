@@ -24,6 +24,9 @@ export const contactsAPI = {
     filter_manager_id,
     filter_assigned_user_id,
     campaign_id,
+    sort_by,
+    sort_dir,
+    column_filters,
   } = {}) =>
     axiosInstance.get(`${BASE}`, {
       params: {
@@ -35,6 +38,14 @@ export const contactsAPI = {
         filter_manager_id: contactFilterParam(filter_manager_id),
         filter_assigned_user_id: contactFilterParam(filter_assigned_user_id),
         campaign_id: campaignFilterParam(campaign_id),
+        sort_by: sort_by || undefined,
+        sort_dir: sort_dir || undefined,
+        column_filters:
+          column_filters && (Array.isArray(column_filters) ? column_filters.length : String(column_filters).length)
+            ? typeof column_filters === 'string'
+              ? column_filters
+              : JSON.stringify(column_filters)
+            : undefined,
       },
     }),
 

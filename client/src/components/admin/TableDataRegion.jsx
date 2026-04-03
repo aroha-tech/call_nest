@@ -6,11 +6,11 @@ import listStyles from './adminDataList.module.scss';
  * Wraps table empty state + scroll body. First load: centered spinner in this band only.
  * Later refetches: semi-transparent overlay while keeping previous rows/empty state underneath.
  */
-export function TableDataRegion({ loading, hasCompletedInitialFetch, children }) {
+export function TableDataRegion({ loading, hasCompletedInitialFetch, children, className = '' }) {
   const showOverlay = loading && hasCompletedInitialFetch;
   const showFirstOnlySpinner = !hasCompletedInitialFetch && loading;
   return (
-    <div className={listStyles.tableDataRegion}>
+    <div className={[listStyles.tableDataRegion, className].filter(Boolean).join(' ')}>
       {showOverlay ? (
         <div
           className={listStyles.tableRefreshingOverlay}

@@ -30,6 +30,47 @@ function parseCampaignIdFilterParam(raw) {
   return n;
 }
 
+const CONTACT_LIST_SORT_KEYS = new Set([
+  'display_name',
+  'primary_phone',
+  'email',
+  'tag_names',
+  'campaign_name',
+  'type',
+  'manager_name',
+  'assigned_user_name',
+  'source',
+  'city',
+  'company',
+  'website',
+  'job_title',
+  'industry',
+  'state',
+  'country',
+  'pin_code',
+  'address',
+  'address_line_2',
+  'tax_id',
+  'date_of_birth',
+  'created_at',
+]);
+
+function parseContactListSort(reqQuery) {
+  const raw = reqQuery.sort_by ?? reqQuery.sortBy;
+  if (raw === undefined || raw === null || String(raw).trim() === '') {
+    return { sortBy: undefined, sortDir: undefined };
+  }
+  const sortBy = String(raw).trim();
+  if (!CONTACT_LIST_SORT_KEYS.has(sortBy)) {
+    const err = new Error('Invalid sort_by');
+    err.status = 400;
+    throw err;
+  }
+  const dirRaw = String(reqQuery.sort_dir ?? reqQuery.sortDir ?? 'desc').toLowerCase();
+  const sortDir = dirRaw === 'asc' ? 'asc' : 'desc';
+  return { sortBy, sortDir };
+}
+
 export async function list(req, res, next) {
   try {
     const tenantId = req.tenant?.id;
@@ -41,6 +82,9 @@ export async function list(req, res, next) {
 
     const filterManagerId = parseContactListFilterParam(req.query.filter_manager_id);
     const filterAssignedUserId = parseContactListFilterParam(req.query.filter_assigned_user_id);
+    const campaignIdFilter = parseCampaignIdFilterParam(req.query.campaign_id);
+    const { sortBy, sortDir } = parseContactListSort(req.query);
+    const columnFilters = contactsService.normalizeContactListColumnFilters(req.query.column_filters);
 
     const result = await contactsService.listContacts(tenantId, req.user, {
       search,
@@ -50,6 +94,10 @@ export async function list(req, res, next) {
       statusId: status_id || undefined,
       filterManagerId,
       filterAssignedUserId,
+      campaignIdFilter,
+      sortBy,
+      sortDir,
+      columnFilters,
     });
 
     res.json(result);

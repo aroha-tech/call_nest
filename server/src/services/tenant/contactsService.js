@@ -175,6 +175,392 @@ export async function syncContactsManagerForAgent(tenantId, agentUserId, newMana
   );
 }
 
+/** Whitelist for GET /contacts list sorting (SQL fragments). */
+const CONTACT_LIST_SORT_COLUMNS = {
+  display_name: 'c.display_name',
+  primary_phone: 'p.phone',
+  email: 'c.email',
+  tag_names: 'tag_names',
+  campaign_name: 'cam.name',
+  type: 'c.type',
+  manager_name: 'mgr.name',
+  assigned_user_name: 'ag.name',
+  source: 'c.source',
+  city: 'c.city',
+  company: 'c.company',
+  website: 'c.website',
+  job_title: 'c.job_title',
+  industry: 'c.industry',
+  state: 'c.state',
+  country: 'c.country',
+  pin_code: 'c.pin_code',
+  address: 'c.address',
+  address_line_2: 'c.address_line_2',
+  tax_id: 'c.tax_id',
+  date_of_birth: 'c.date_of_birth',
+  created_at: 'c.created_at',
+};
+
+/** Column filters: simple `c.*` string fields (shared handler) */
+const CONTACT_LIST_SIMPLE_TEXT_FILTER_COL = {
+  source: 'c.source',
+  city: 'c.city',
+  company: 'c.company',
+  website: 'c.website',
+  job_title: 'c.job_title',
+  industry: 'c.industry',
+  state: 'c.state',
+  country: 'c.country',
+  pin_code: 'c.pin_code',
+  address: 'c.address',
+  address_line_2: 'c.address_line_2',
+  tax_id: 'c.tax_id',
+};
+
+function resolveContactListOrderBy(sortBy, sortDir) {
+  const col = sortBy && CONTACT_LIST_SORT_COLUMNS[sortBy];
+  if (!col) {
+    return 'c.created_at DESC, c.id DESC';
+  }
+  const dir = sortDir === 'asc' ? 'ASC' : 'DESC';
+  return `${col} ${dir}, c.id ASC`;
+}
+
+const CONTACT_LIST_JOIN_FROM = `
+     FROM contacts c
+     LEFT JOIN contact_phones p
+       ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id
+     LEFT JOIN campaigns cam
+       ON cam.id = c.campaign_id AND cam.tenant_id = c.tenant_id AND cam.deleted_at IS NULL
+     LEFT JOIN users mgr
+       ON mgr.id = c.manager_id AND mgr.tenant_id = c.tenant_id AND mgr.is_deleted = 0
+     LEFT JOIN users ag
+       ON ag.id = c.assigned_user_id AND ag.tenant_id = c.tenant_id AND ag.is_deleted = 0`;
+
+const COLUMN_FILTER_FIELDS = new Set([
+  'display_name',
+  'primary_phone',
+  'email',
+  'tag_names',
+  'campaign_name',
+  'type',
+  'manager_name',
+  'assigned_user_name',
+  'source',
+  'city',
+  'company',
+  'website',
+  'job_title',
+  'industry',
+  'state',
+  'country',
+  'pin_code',
+  'address',
+  'address_line_2',
+  'tax_id',
+  'date_of_birth',
+  'created_at',
+]);
+
+const COLUMN_FILTER_OPS = new Set(['empty', 'not_empty', 'contains', 'not_contains', 'starts_with', 'ends_with']);
+
+/**
+ * @param {unknown} raw
+ * @returns {Array<{ field: string, op: string, value?: string }>}
+ */
+export function normalizeContactListColumnFilters(raw) {
+  if (raw === undefined || raw === null || raw === '') return [];
+  let arr;
+  try {
+    arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(arr)) return [];
+  const byField = new Map();
+  for (const item of arr) {
+    if (!item || typeof item !== 'object') continue;
+    const field = String(item.field || '').trim();
+    const op = String(item.op || '').trim();
+    if (!COLUMN_FILTER_FIELDS.has(field) || !COLUMN_FILTER_OPS.has(op)) continue;
+    const value = item.value == null ? '' : String(item.value).trim();
+    if (value.length > 200) continue;
+    if (['contains', 'not_contains', 'starts_with', 'ends_with'].includes(op) && value === '') continue;
+    byField.set(field, { field, op, value });
+  }
+  return [...byField.values()].slice(0, 12);
+}
+
+/**
+ * @param {string[]} whereClauses
+ * @param {unknown[]} params
+ * @param {Array<{ field: string, op: string, value?: string }>} rules
+ */
+function applyContactListColumnFilters(whereClauses, params, rules) {
+  if (!rules || rules.length === 0) return;
+
+  const likeWord = (v) => `%${v}%`;
+  const starts = (v) => `${v}%`;
+  const ends = (v) => `%${v}`;
+
+  for (const { field, op, value } of rules) {
+    switch (field) {
+      case 'display_name':
+        if (op === 'empty') {
+          whereClauses.push(
+            `((c.display_name IS NULL OR TRIM(c.display_name) = '')
+              AND (c.first_name IS NULL OR TRIM(c.first_name) = '')
+              AND (c.last_name IS NULL OR TRIM(c.last_name) = '')
+              AND (c.email IS NULL OR TRIM(c.email) = ''))`
+          );
+        } else if (op === 'not_empty') {
+          whereClauses.push(
+            `((c.display_name IS NOT NULL AND TRIM(c.display_name) != '')
+              OR (c.first_name IS NOT NULL AND TRIM(c.first_name) != '')
+              OR (c.last_name IS NOT NULL AND TRIM(c.last_name) != '')
+              OR (c.email IS NOT NULL AND TRIM(c.email) != ''))`
+          );
+        } else if (op === 'contains') {
+          const q = likeWord(value);
+          whereClauses.push(
+            `(c.display_name LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ?)`
+          );
+          params.push(q, q, q, q);
+        } else if (op === 'not_contains') {
+          const q = likeWord(value);
+          whereClauses.push(
+            `NOT (c.display_name LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ?)`
+          );
+          params.push(q, q, q, q);
+        } else if (op === 'starts_with') {
+          const q = starts(value);
+          whereClauses.push(
+            `(c.display_name LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ?)`
+          );
+          params.push(q, q, q, q);
+        } else if (op === 'ends_with') {
+          const q = ends(value);
+          whereClauses.push(
+            `(c.display_name LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ?)`
+          );
+          params.push(q, q, q, q);
+        }
+        break;
+      case 'primary_phone':
+        if (op === 'empty') {
+          whereClauses.push(`(p.phone IS NULL OR TRIM(p.phone) = '')`);
+        } else if (op === 'not_empty') {
+          whereClauses.push(`(p.phone IS NOT NULL AND TRIM(p.phone) != '')`);
+        } else if (op === 'contains') {
+          whereClauses.push(`(p.phone LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'not_contains') {
+          whereClauses.push(`(p.phone IS NULL OR p.phone NOT LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'starts_with') {
+          whereClauses.push(`(p.phone LIKE ?)`);
+          params.push(starts(value));
+        } else if (op === 'ends_with') {
+          whereClauses.push(`(p.phone LIKE ?)`);
+          params.push(ends(value));
+        }
+        break;
+      case 'email':
+        if (op === 'empty') {
+          whereClauses.push(`(c.email IS NULL OR TRIM(c.email) = '')`);
+        } else if (op === 'not_empty') {
+          whereClauses.push(`(c.email IS NOT NULL AND TRIM(c.email) != '')`);
+        } else if (op === 'contains') {
+          whereClauses.push(`(c.email LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'not_contains') {
+          whereClauses.push(`(c.email IS NULL OR c.email NOT LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'starts_with') {
+          whereClauses.push(`(c.email LIKE ?)`);
+          params.push(starts(value));
+        } else if (op === 'ends_with') {
+          whereClauses.push(`(c.email LIKE ?)`);
+          params.push(ends(value));
+        }
+        break;
+      case 'tag_names': {
+        const tagFrom = `
+          SELECT 1 FROM contact_tag_assignments cta_f
+          INNER JOIN contact_tags ct_f ON ct_f.id = cta_f.tag_id AND ct_f.tenant_id = cta_f.tenant_id
+          WHERE cta_f.contact_id = c.id AND cta_f.tenant_id = c.tenant_id AND ct_f.deleted_at IS NULL`;
+        if (op === 'empty') {
+          whereClauses.push(`NOT EXISTS (${tagFrom})`);
+        } else if (op === 'not_empty') {
+          whereClauses.push(`EXISTS (${tagFrom})`);
+        } else if (op === 'contains') {
+          whereClauses.push(`EXISTS (${tagFrom} AND ct_f.name LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'not_contains') {
+          whereClauses.push(`NOT EXISTS (${tagFrom} AND ct_f.name LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'starts_with') {
+          whereClauses.push(`EXISTS (${tagFrom} AND ct_f.name LIKE ?)`);
+          params.push(starts(value));
+        } else if (op === 'ends_with') {
+          whereClauses.push(`EXISTS (${tagFrom} AND ct_f.name LIKE ?)`);
+          params.push(ends(value));
+        }
+        break;
+      }
+      case 'campaign_name':
+        if (op === 'empty') {
+          whereClauses.push(`(c.campaign_id IS NULL OR cam.name IS NULL OR TRIM(cam.name) = '')`);
+        } else if (op === 'not_empty') {
+          whereClauses.push(`(c.campaign_id IS NOT NULL AND cam.name IS NOT NULL AND TRIM(cam.name) != '')`);
+        } else if (op === 'contains') {
+          whereClauses.push(`(cam.name LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'not_contains') {
+          whereClauses.push(`(cam.name IS NULL OR cam.name NOT LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'starts_with') {
+          whereClauses.push(`(cam.name LIKE ?)`);
+          params.push(starts(value));
+        } else if (op === 'ends_with') {
+          whereClauses.push(`(cam.name LIKE ?)`);
+          params.push(ends(value));
+        }
+        break;
+      case 'type':
+        if (op === 'empty') {
+          whereClauses.push(`(c.type IS NULL OR TRIM(c.type) = '')`);
+        } else if (op === 'not_empty') {
+          whereClauses.push(`(c.type IS NOT NULL AND TRIM(c.type) != '')`);
+        } else if (op === 'contains') {
+          whereClauses.push(`(c.type LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'not_contains') {
+          whereClauses.push(`(c.type IS NULL OR c.type NOT LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'starts_with') {
+          whereClauses.push(`(c.type LIKE ?)`);
+          params.push(starts(value));
+        } else if (op === 'ends_with') {
+          whereClauses.push(`(c.type LIKE ?)`);
+          params.push(ends(value));
+        }
+        break;
+      case 'manager_name':
+        if (op === 'empty') {
+          whereClauses.push(`(c.manager_id IS NULL)`);
+        } else if (op === 'not_empty') {
+          whereClauses.push(`(c.manager_id IS NOT NULL)`);
+        } else if (op === 'contains') {
+          whereClauses.push(`(mgr.name LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'not_contains') {
+          whereClauses.push(`(mgr.name IS NULL OR mgr.name NOT LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'starts_with') {
+          whereClauses.push(`(mgr.name LIKE ?)`);
+          params.push(starts(value));
+        } else if (op === 'ends_with') {
+          whereClauses.push(`(mgr.name LIKE ?)`);
+          params.push(ends(value));
+        }
+        break;
+      case 'assigned_user_name':
+        if (op === 'empty') {
+          whereClauses.push(`(c.assigned_user_id IS NULL)`);
+        } else if (op === 'not_empty') {
+          whereClauses.push(`(c.assigned_user_id IS NOT NULL)`);
+        } else if (op === 'contains') {
+          whereClauses.push(`(ag.name LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'not_contains') {
+          whereClauses.push(`(ag.name IS NULL OR ag.name NOT LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'starts_with') {
+          whereClauses.push(`(ag.name LIKE ?)`);
+          params.push(starts(value));
+        } else if (op === 'ends_with') {
+          whereClauses.push(`(ag.name LIKE ?)`);
+          params.push(ends(value));
+        }
+        break;
+      case 'source':
+      case 'city':
+      case 'company':
+      case 'website':
+      case 'job_title':
+      case 'industry':
+      case 'state':
+      case 'country':
+      case 'pin_code':
+      case 'address':
+      case 'address_line_2':
+      case 'tax_id': {
+        const col = CONTACT_LIST_SIMPLE_TEXT_FILTER_COL[field];
+        if (!col) break;
+        if (op === 'empty') {
+          whereClauses.push(`(${col} IS NULL OR TRIM(${col}) = '')`);
+        } else if (op === 'not_empty') {
+          whereClauses.push(`(${col} IS NOT NULL AND TRIM(${col}) != '')`);
+        } else if (op === 'contains') {
+          whereClauses.push(`(${col} LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'not_contains') {
+          whereClauses.push(`(${col} IS NULL OR ${col} NOT LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'starts_with') {
+          whereClauses.push(`(${col} LIKE ?)`);
+          params.push(starts(value));
+        } else if (op === 'ends_with') {
+          whereClauses.push(`(${col} LIKE ?)`);
+          params.push(ends(value));
+        }
+        break;
+      }
+      case 'date_of_birth':
+        if (op === 'empty') {
+          whereClauses.push(`(c.date_of_birth IS NULL)`);
+        } else if (op === 'not_empty') {
+          whereClauses.push(`(c.date_of_birth IS NOT NULL)`);
+        } else if (op === 'contains') {
+          whereClauses.push(`(CAST(c.date_of_birth AS CHAR) LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'not_contains') {
+          whereClauses.push(`(c.date_of_birth IS NULL OR CAST(c.date_of_birth AS CHAR) NOT LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'starts_with') {
+          whereClauses.push(`(CAST(c.date_of_birth AS CHAR) LIKE ?)`);
+          params.push(starts(value));
+        } else if (op === 'ends_with') {
+          whereClauses.push(`(CAST(c.date_of_birth AS CHAR) LIKE ?)`);
+          params.push(ends(value));
+        }
+        break;
+      case 'created_at':
+        if (op === 'empty') {
+          whereClauses.push(`(c.created_at IS NULL)`);
+        } else if (op === 'not_empty') {
+          whereClauses.push(`(c.created_at IS NOT NULL)`);
+        } else if (op === 'contains') {
+          whereClauses.push(`(CAST(c.created_at AS CHAR) LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'not_contains') {
+          whereClauses.push(`(c.created_at IS NULL OR CAST(c.created_at AS CHAR) NOT LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'starts_with') {
+          whereClauses.push(`(CAST(c.created_at AS CHAR) LIKE ?)`);
+          params.push(starts(value));
+        } else if (op === 'ends_with') {
+          whereClauses.push(`(CAST(c.created_at AS CHAR) LIKE ?)`);
+          params.push(ends(value));
+        }
+        break;
+      default:
+        break;
+    }
+  }
+}
+
 export async function listContacts(
   tenantId,
   user,
@@ -187,6 +573,9 @@ export async function listContacts(
     filterManagerId,
     filterAssignedUserId,
     campaignIdFilter,
+    sortBy,
+    sortDir,
+    columnFilters,
   } = {}
 ) {
   const pageNum = parseInt(page, 10) || 1;
@@ -194,6 +583,7 @@ export async function listContacts(
   const offset = (pageNum - 1) * limitNum;
   const limitInt = Math.floor(Number(limitNum)) || 20;
   const offsetInt = Math.floor(Number(offset)) || 0;
+  const orderBySQL = resolveContactListOrderBy(sortBy, sortDir);
 
   const { whereSQL, params } = buildOwnershipWhere(user);
   const whereClauses = [whereSQL];
@@ -233,11 +623,14 @@ export async function listContacts(
     filterAssignedUserId,
   });
 
+  const normalizedColumnFilters = normalizeContactListColumnFilters(columnFilters);
+  applyContactListColumnFilters(whereClauses, params, normalizedColumnFilters);
+
   const finalWhere = `WHERE ${whereClauses.join(' AND ')}`;
 
   const [countRow] = await query(
-    `SELECT COUNT(*) AS total
-     FROM contacts c
+    `SELECT COUNT(DISTINCT c.id) AS total
+     ${CONTACT_LIST_JOIN_FROM}
      ${finalWhere}`,
     params
   );
@@ -283,20 +676,36 @@ export async function listContacts(
         c.created_by,
         c.updated_by,
         c.created_at
-     FROM contacts c
-     LEFT JOIN contact_phones p
-       ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id
-     LEFT JOIN campaigns cam
-       ON cam.id = c.campaign_id AND cam.tenant_id = c.tenant_id AND cam.deleted_at IS NULL
-     LEFT JOIN users mgr
-       ON mgr.id = c.manager_id AND mgr.tenant_id = c.tenant_id AND mgr.is_deleted = 0
-     LEFT JOIN users ag
-       ON ag.id = c.assigned_user_id AND ag.tenant_id = c.tenant_id AND ag.is_deleted = 0
+     ${CONTACT_LIST_JOIN_FROM}
      ${finalWhere}
-     ORDER BY c.created_at DESC
+     ORDER BY ${orderBySQL}
      LIMIT ${limitInt} OFFSET ${offsetInt}`,
     params
   );
+
+  /** field_id → value_text per contact for list columns (Customize columns → tenant custom fields). */
+  if (data.length > 0) {
+    const contactIds = data.map((row) => row.id);
+    const placeholders = contactIds.map(() => '?').join(',');
+    const cfRows = await query(
+      `SELECT contact_id, field_id, value_text
+       FROM contact_custom_field_values
+       WHERE tenant_id = ? AND contact_id IN (${placeholders})`,
+      [tenantId, ...contactIds]
+    );
+    const byContact = new Map();
+    for (const r of cfRows) {
+      let m = byContact.get(r.contact_id);
+      if (!m) {
+        m = {};
+        byContact.set(r.contact_id, m);
+      }
+      m[String(r.field_id)] = r.value_text;
+    }
+    for (const row of data) {
+      row.custom_field_values = byContact.get(row.id) || {};
+    }
+  }
 
   return {
     data,
