@@ -7,6 +7,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Pagination } from '../../components/ui/Pagination';
 import { contactsAPI } from '../../services/contactsAPI';
 import listStyles from '../../components/admin/adminDataList.module.scss';
+import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 import styles from './ContactImportPage.module.scss';
 
 function formatErrorsJson(raw) {
@@ -24,6 +25,7 @@ function formatErrorsJson(raw) {
 }
 
 export function ContactImportHistoryPage({ type }) {
+  const { formatDateTime } = useDateTimeDisplay();
   const navigate = useNavigate();
   const title = type === 'lead' ? 'Lead import history' : 'Contact import history';
   const importPath = type === 'lead' ? '/leads/import' : '/contacts/import';
@@ -109,7 +111,7 @@ export function ContactImportHistoryPage({ type }) {
                       const errs = formatErrorsJson(r.error_sample_json);
                       return (
                         <tr key={r.id}>
-                          <td>{r.created_at ? new Date(r.created_at).toLocaleString() : '—'}</td>
+                          <td>{r.created_at ? formatDateTime(r.created_at) : '—'}</td>
                           <td>{r.original_filename || '—'}</td>
                           <td>{r.mode}</td>
                           <td>{r.row_count}</td>

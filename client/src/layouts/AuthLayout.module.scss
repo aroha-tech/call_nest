@@ -42,6 +42,19 @@
   }
 }
 
+:global(html[data-color-scheme='light']) {
+  .bg {
+    background-color: #f1f5f9;
+    background-image: linear-gradient(172deg, #f8fafc 0%, #f1f5f9 52%, #e2e8f0 100%);
+
+    &::after {
+      background:
+        radial-gradient(circle at 85% 55%, rgba(var(--color-primary-rgb), 0.1) 0%, transparent 45%),
+        radial-gradient(ellipse 120% 80% at 50% 110%, rgba(15, 23, 42, 0.06) 0%, transparent 42%);
+    }
+  }
+}
+
 .main {
   position: relative;
   z-index: 1;

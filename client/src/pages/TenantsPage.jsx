@@ -25,6 +25,7 @@ import { FilterBar } from '../components/admin/FilterBar';
 import { tenantsAPI } from '../services/adminAPI';
 import { industriesAPI } from '../services/dispositionAPI';
 import { getTenantSlugStatus } from '../features/auth/authAPI';
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import {
   slugFromCompanyName,
   validateSlug,
@@ -143,20 +144,6 @@ const SLUG_DEBOUNCE_MS = 400;
 
 const FILTER_ALL = '__all__';
 
-function formatTenantDate(iso) {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    return (
-      d.toLocaleDateString(undefined, { dateStyle: 'medium' }) +
-      ' ' +
-      d.toLocaleTimeString(undefined, { timeStyle: 'short' })
-    );
-  } catch {
-    return '—';
-  }
-}
-
 /** Parsed non-negative int, or undefined if empty/invalid */
 function parseUsersFilterInt(s) {
   if (s == null || String(s).trim() === '') return undefined;
@@ -190,6 +177,7 @@ function getActiveUserSizePreset(minS, maxS) {
 }
 
 export function TenantsPage() {
+  const { formatDateTime } = useDateTimeDisplay();
   const [tenants, setTenants] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [loading, setLoading] = useState(true);
@@ -689,7 +677,7 @@ export function TenantsPage() {
                   <TableCell>{t.name}</TableCell>
                   <TableCell>{t.slug}</TableCell>
                   <TableCell>
-                    <span className={styles.createdCell}>{formatTenantDate(t.created_at)}</span>
+                    <span className={styles.createdCell}>{formatDateTime(t.created_at)}</span>
                   </TableCell>
                   <TableCell>
                     <TenantWorkspaceUrlCopy tenantId={t.id} slug={t.slug} />

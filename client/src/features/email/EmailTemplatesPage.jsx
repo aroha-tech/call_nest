@@ -240,7 +240,7 @@ export function EmailTemplatesPage() {
               <TableRow key={row.id}>
                 <TableCell>{row.account_email || '—'}</TableCell>
                 <TableCell>{row.name}</TableCell>
-                <TableCell style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.subject}</TableCell>
+                <TableCell>{row.subject}</TableCell>
                 <TableCell>
                   <Badge variant={row.status === 'active' ? 'success' : 'muted'}>{row.status}</Badge>
                 </TableCell>

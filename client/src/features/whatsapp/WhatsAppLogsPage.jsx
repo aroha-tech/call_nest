@@ -15,11 +15,13 @@ import { useAsyncData } from '../../hooks/useAsyncData';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
+import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
 
 const LOGS_PAGE_SIZE = 20;
 
 export function WhatsAppLogsPage() {
+  const { formatDateTime } = useDateTimeDisplay();
   const [moduleEnabled, setModuleEnabled] = useState(true);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -141,7 +143,7 @@ export function WhatsAppLogsPage() {
               <TableBody>
                 {logs.map((row) => (
                   <TableRow key={row.id}>
-                    <TableCell>{row.created_at ? new Date(row.created_at).toLocaleString() : '—'}</TableCell>
+                    <TableCell>{row.created_at ? formatDateTime(row.created_at) : '—'}</TableCell>
                     <TableCell>{row.direction || 'outbound'}</TableCell>
                     <TableCell>{row.method || '—'}</TableCell>
                     <TableCell>

@@ -7,6 +7,7 @@ import { setAccessTokenGetter, setRefreshTokenGetter } from './services/axiosIns
 import App from './App';
 import { TenantProvider } from './context/TenantContext';
 import { ToastProvider } from './context/ToastContext';
+import { ColorSchemeProvider } from './context/ColorSchemeContext';
 import './styles/global.scss';
 
 // Axios reads tokens from Redux (memory only)
@@ -22,13 +23,15 @@ setRefreshTokenGetter(() => store.getState().auth?.refreshToken ?? null);
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <Provider store={store}>
-      <TenantProvider>
-        <BrowserRouter>
-          <ToastProvider>
-            <App />
-          </ToastProvider>
-        </BrowserRouter>
-      </TenantProvider>
+      <ColorSchemeProvider>
+        <TenantProvider>
+          <BrowserRouter>
+            <ToastProvider>
+              <App />
+            </ToastProvider>
+          </BrowserRouter>
+        </TenantProvider>
+      </ColorSchemeProvider>
     </Provider>
   </React.StrictMode>
 );

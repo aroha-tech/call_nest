@@ -1,34 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { MasterCRUDPage } from '../../components/MasterCRUDPage';
 import { useContactTemperatures } from '../../hooks/useMasterData';
 import { StatusBadge } from '../../../../components/ui/Badge';
-
-const fmtDate = (v) =>
-  v ? new Date(v).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '—';
-
-const columns = [
-  { key: 'name', label: 'Name', width: '16%' },
-  { key: 'code', label: 'Code', width: '140px' },
-  { key: 'priority_order', label: 'Priority', width: '80px' },
-  {
-    key: 'is_active',
-    label: 'Status',
-    width: '100px',
-    render: (value) => <StatusBadge isActive={value === 1} />,
-  },
-  {
-    key: 'created_at',
-    label: 'Created',
-    width: '120px',
-    render: (v) => fmtDate(v),
-  },
-  {
-    key: 'updated_at',
-    label: 'Updated',
-    width: '120px',
-    render: (v) => fmtDate(v),
-  },
-];
+import { useDateTimeDisplay } from '../../../../hooks/useDateTimeDisplay';
 
 const formFields = [
   { name: 'name', label: 'Name', required: true, placeholder: 'e.g. Hot' },
@@ -36,6 +10,34 @@ const formFields = [
 ];
 
 export function ContactTemperaturesPage() {
+  const { formatDateTime } = useDateTimeDisplay();
+  const columns = useMemo(
+    () => [
+      { key: 'name', label: 'Name', width: '16%' },
+      { key: 'code', label: 'Code', width: '140px' },
+      { key: 'priority_order', label: 'Priority', width: '80px' },
+      {
+        key: 'is_active',
+        label: 'Status',
+        width: '100px',
+        render: (value) => <StatusBadge isActive={value === 1} />,
+      },
+      {
+        key: 'created_at',
+        label: 'Created',
+        width: '120px',
+        render: (v) => formatDateTime(v),
+      },
+      {
+        key: 'updated_at',
+        label: 'Updated',
+        width: '120px',
+        render: (v) => formatDateTime(v),
+      },
+    ],
+    [formatDateTime]
+  );
+
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [page, setPage] = useState(1);

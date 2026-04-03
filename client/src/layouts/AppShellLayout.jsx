@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Fragment } from 'react';
+import React, { useState, useEffect, useMemo, Fragment } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSalesNavigation } from '../hooks/useSalesNavigation';
 import { SidebarUserPanel } from './SidebarUserPanel';
@@ -6,6 +6,31 @@ import { useAppSelector } from '../app/hooks';
 import { selectTenant, selectUser } from '../features/auth/authSelectors';
 import { NavIcon, NavChevron } from '../components/navigation/NavIcon';
 import styles from './AppShellLayout.module.scss';
+
+/** Filter sidebar items by query (labels, section headings, child items). */
+function filterNavMenuBySearch(items, query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return items;
+
+  const itemMatches = (item) =>
+    item.label.toLowerCase().includes(q) || (item.section && item.section.toLowerCase().includes(q));
+
+  return items
+    .map((item) => {
+      if (item.children?.length) {
+        if (itemMatches(item)) {
+          return { ...item, children: [...item.children] };
+        }
+        const matchingChildren = item.children.filter((c) => c.label.toLowerCase().includes(q));
+        if (matchingChildren.length > 0) {
+          return { ...item, children: matchingChildren };
+        }
+        return null;
+      }
+      return itemMatches(item) ? item : null;
+    })
+    .filter(Boolean);
+}
 
 /** Sidebar line under company name: human-readable role (not workspace slug). */
 function roleLabelForSidebar(user, isPlatform) {
@@ -69,6 +94,22 @@ export function AppShellLayout({ children }) {
   const user = useAppSelector(selectUser);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState({});
+  const [navSearchQuery, setNavSearchQuery] = useState('');
+
+  const filteredNavItems = useMemo(
+    () => filterNavMenuBySearch(items, navSearchQuery),
+    [items, navSearchQuery]
+  );
+
+  const navExpandedGroups = useMemo(() => {
+    const q = navSearchQuery.trim();
+    if (!q) return expandedGroups;
+    const next = { ...expandedGroups };
+    filteredNavItems.forEach((item) => {
+      if (item.children?.length) next[item.key] = true;
+    });
+    return next;
+  }, [navSearchQuery, expandedGroups, filteredNavItems]);
 
   const name = tenant?.name?.trim();
   const slug = tenantSlug ?? tenant?.slug ?? null;
@@ -131,8 +172,39 @@ export function AppShellLayout({ children }) {
             <span className={styles.tenant}>{workspaceSubtitle}</span>
           )}
         </div>
-        <nav className={styles.nav}>
-          {items.map((item) => (
+        <div className={styles.navSearch}>
+          <div className={styles.navSearchInner}>
+            <span className={styles.navSearchIcon} aria-hidden>
+              🔍
+            </span>
+            <input
+              type="text"
+              inputMode="search"
+              className={styles.navSearchInput}
+              placeholder="Search menu…"
+              value={navSearchQuery}
+              onChange={(e) => setNavSearchQuery(e.target.value)}
+              aria-label="Search menu"
+              autoComplete="off"
+              spellCheck="false"
+            />
+            {navSearchQuery.trim() ? (
+              <button
+                type="button"
+                className={styles.navSearchClear}
+                onClick={() => setNavSearchQuery('')}
+                aria-label="Clear menu search"
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
+        </div>
+        <nav className={styles.nav} aria-label="Main navigation">
+          {filteredNavItems.length === 0 && navSearchQuery.trim() ? (
+            <div className={styles.navSearchEmpty}>No menu items match</div>
+          ) : null}
+          {filteredNavItems.map((item) => (
             <Fragment key={item.key}>
               {item.section ? (
                 <div className={styles.navSectionLabel}>{item.section}</div>
@@ -143,7 +215,7 @@ export function AppShellLayout({ children }) {
                   activeKey={activeKey}
                   activeParentKey={activeParentKey}
                   onNavigate={handleNavClick}
-                  expandedGroups={expandedGroups}
+                  expandedGroups={navExpandedGroups}
                   toggleGroup={toggleGroup}
                 />
               ) : (

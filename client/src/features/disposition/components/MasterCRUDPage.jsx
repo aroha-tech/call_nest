@@ -150,14 +150,8 @@ export function MasterCRUDPage({
         },
       ];
 
-  const columnsWithoutWidth = columnsWithStatus.filter((c) => !c.width).length;
-  const defaultFlexPct =
-    columnsWithoutWidth > 0
-      ? Math.min(26, Math.max(12, Math.floor(48 / columnsWithoutWidth)))
-      : 0;
-  const columnsForTable = columnsWithStatus.map((col) =>
-    col.width ? col : { ...col, width: `${defaultFlexPct}%` }
-  );
+  /** Table uses auto layout + content width — do not inject % widths (they fight horizontal scroll on narrow screens). */
+  const columnsForTable = columnsWithStatus;
 
   return (
     <div className={styles.page}>

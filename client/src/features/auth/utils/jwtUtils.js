@@ -33,6 +33,8 @@ export function userAndTenantFromToken(accessToken) {
     role: payload.role,
     roleId: payload.role_id ?? null,
     isPlatformAdmin: Boolean(payload.is_platform_admin),
+    datetimeDisplayMode:
+      payload.datetime_display_mode === 'browser_local' ? 'browser_local' : 'ist_fixed',
   };
 
   let theme = null;

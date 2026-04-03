@@ -16,21 +16,36 @@
   font-size: $font-size-sm;
 }
 
-/** Master / admin data lists: columns stay aligned, no giant gap before narrow cols */
+/**
+ * Admin/data lists: auto-sized columns (not fixed grid). Table grows with content → scroll
+ * .tableCardBody / .wrapper horizontally instead of squeezing or clipping headers ("DISPLAY NA").
+ */
 .tableAdminList {
-  table-layout: fixed;
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
 }
 
 .wrapperAdminList {
   width: 100%;
+  max-width: 100%;
 }
 
+/** One line per cell: full labels + emails/phones; wide table + horizontal scroll on narrow screens */
 .tableAdminList .cell:not(:last-child),
 .tableAdminList .headerCell:not(:last-child) {
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 0; /* lets fixed-layout + % widths shrink correctly */
+  max-width: none;
+  overflow: visible;
+  vertical-align: middle;
+}
+
+@media (max-width: $bp-md) {
+  .tableAdminList .cell,
+  .tableAdminList .headerCell {
+    padding-left: $space-3;
+    padding-right: $space-3;
+  }
 }
 
 .tableAdminList .cell:last-child,
@@ -40,16 +55,16 @@
   max-width: 140px;
   box-sizing: border-box;
   overflow: visible;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
-/** Preserve full label (e.g. Status / Active) — default admin cells use ellipsis + max-width: 0 */
+/** Badge / status columns: explicit min width for narrow content */
 .tableAdminList .cell.noTruncate,
 .tableAdminList .headerCell.noTruncate {
-  overflow: visible;
-  text-overflow: clip;
   white-space: nowrap;
-  max-width: none;
   min-width: 100px;
+  vertical-align: middle;
 }
 
 .thead {
@@ -122,5 +137,10 @@
 
 .cell {
   color: var(--color-text-primary);
-  height: 48px;
+  min-height: 48px;
+  vertical-align: top;
+}
+
+.tableAdminList .cell {
+  height: auto;
 }

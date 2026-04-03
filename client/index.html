@@ -5,6 +5,25 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Call Nest</title>
+    <script>
+      (function () {
+        try {
+          var k = 'callnest-color-scheme';
+          var s = localStorage.getItem(k);
+          if (s === 'light' || s === 'dark') {
+            document.documentElement.setAttribute('data-color-scheme', s);
+            document.documentElement.style.colorScheme = s === 'light' ? 'light' : 'dark';
+            return;
+          }
+        } catch (e) {}
+        try {
+          if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+            document.documentElement.setAttribute('data-color-scheme', 'light');
+            document.documentElement.style.colorScheme = 'light';
+          }
+        } catch (e2) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

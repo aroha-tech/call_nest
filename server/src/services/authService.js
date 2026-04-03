@@ -189,7 +189,8 @@ export async function login(email, password, hostContext = {}) {
 
   // Find user by email (tenantId derived from user record)
   const [user] = await query(
-    `SELECT id, tenant_id, email, password_hash, name, role, role_id, is_enabled, is_platform_admin, token_version 
+    `SELECT id, tenant_id, email, password_hash, name, role, role_id, is_enabled, is_platform_admin, token_version,
+            COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode
      FROM users 
      WHERE email = ? AND is_deleted = 0`,
     [email]
@@ -287,6 +288,7 @@ export async function login(email, password, hostContext = {}) {
       is_platform_admin: isPlatformAdmin,
       permissions,
       token_version: tokenVersion,
+      datetime_display_mode: user.datetime_display_mode ?? 'ist_fixed',
       ...tenantBranding,
     },
     env.jwtSecret,
@@ -446,7 +448,8 @@ export async function refreshAccessToken(refreshToken) {
 
   // 4) Load user info for new tokens
   const [user] = await query(
-    `SELECT id, tenant_id, email, name, role, role_id, is_enabled, is_platform_admin, token_version
+    `SELECT id, tenant_id, email, name, role, role_id, is_enabled, is_platform_admin, token_version,
+            COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode
      FROM users
      WHERE id = ? AND is_deleted = 0`,
     [userId]
@@ -479,6 +482,7 @@ export async function refreshAccessToken(refreshToken) {
       is_platform_admin: isPlatformAdmin,
       permissions,
       token_version: tokenVersion,
+      datetime_display_mode: user.datetime_display_mode ?? 'ist_fixed',
       ...tenantBranding,
     },
     env.jwtSecret,
@@ -586,21 +590,28 @@ export async function revokeAllUserTokens(tenantId, userId) {
  * Returns a new access token so the client can refresh JWT claims without re-login.
  */
 export async function updateProfile(userId, payload) {
-  const { name, currentPassword, newPassword } = payload;
+  const { name, currentPassword, newPassword, datetimeDisplayMode, datetime_display_mode } = payload;
+  const modeInput =
+    datetimeDisplayMode !== undefined ? datetimeDisplayMode : datetime_display_mode;
 
   const wantsPasswordChange =
     newPassword !== undefined &&
     newPassword !== null &&
     String(newPassword).trim() !== '';
 
-  if (name === undefined && !wantsPasswordChange) {
+  const hasDatetimeField =
+    Object.prototype.hasOwnProperty.call(payload, 'datetimeDisplayMode') ||
+    Object.prototype.hasOwnProperty.call(payload, 'datetime_display_mode');
+
+  if (name === undefined && !wantsPasswordChange && !hasDatetimeField) {
     const err = new Error('No fields to update');
     err.status = 400;
     throw err;
   }
 
   const [user] = await query(
-    `SELECT id, tenant_id, email, name, password_hash, role, role_id, is_enabled, is_platform_admin, token_version
+    `SELECT id, tenant_id, email, name, password_hash, role, role_id, is_enabled, is_platform_admin, token_version,
+            COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode
      FROM users WHERE id = ? AND is_deleted = 0`,
     [userId]
   );
@@ -661,6 +672,20 @@ export async function updateProfile(userId, payload) {
     params.push(passwordHash);
   }
 
+  if (hasDatetimeField) {
+    const raw = modeInput === undefined || modeInput === null ? '' : String(modeInput).trim();
+    if (raw !== 'ist_fixed' && raw !== 'browser_local') {
+      const err = new Error('datetimeDisplayMode must be ist_fixed or browser_local');
+      err.status = 400;
+      throw err;
+    }
+    const prev = user.datetime_display_mode ?? 'ist_fixed';
+    if (raw !== prev) {
+      updates.push('datetime_display_mode = ?');
+      params.push(raw);
+    }
+  }
+
   if (updates.length === 0) {
     const err = new Error('No changes to save');
     err.status = 400;
@@ -671,7 +696,8 @@ export async function updateProfile(userId, payload) {
   await query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
 
   const [updated] = await query(
-    `SELECT id, tenant_id, email, name, role, role_id, is_enabled, is_platform_admin, token_version
+    `SELECT id, tenant_id, email, name, role, role_id, is_enabled, is_platform_admin, token_version,
+            COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode
      FROM users WHERE id = ? AND is_deleted = 0`,
     [userId]
   );
@@ -694,6 +720,7 @@ export async function updateProfile(userId, payload) {
       is_platform_admin: isPlatformAdmin,
       permissions,
       token_version: tokenVersion,
+      datetime_display_mode: updated.datetime_display_mode ?? 'ist_fixed',
       ...tenantBranding,
     },
     env.jwtSecret,

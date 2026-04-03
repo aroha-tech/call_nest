@@ -21,6 +21,7 @@ import styles from '../../features/disposition/components/MasterCRUDPage.module.
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { FilterBar } from '../../components/admin/FilterBar';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
+import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
 
 const PAGE_SIZE = 20;
@@ -29,6 +30,7 @@ const ACCOUNT_ALL_VALUE = '__all__';
 const TEMPLATE_ALL_VALUE = 'all';
 
 export function EmailSentPage() {
+  const { formatDateTime } = useDateTimeDisplay();
   const [searchQuery, setSearchQuery] = useState('');
   const [appliedAccountId, setAppliedAccountId] = useState(ACCOUNT_ALL_VALUE);
   const [appliedTemplateId, setAppliedTemplateId] = useState(TEMPLATE_ALL_VALUE);
@@ -287,11 +289,11 @@ export function EmailSentPage() {
           <TableBody>
             {filteredMessages.map((row) => (
               <TableRow key={row.id}>
-                <TableCell style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.account_email || '—'}</TableCell>
-                <TableCell style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.to_email || '—'}</TableCell>
-                <TableCell style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.subject || '—'}</TableCell>
-                <TableCell style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.template_name || '—'}</TableCell>
-                <TableCell>{row.sent_at ? new Date(row.sent_at).toLocaleString() : (row.created_at ? new Date(row.created_at).toLocaleString() : '—')}</TableCell>
+                <TableCell>{row.account_email || '—'}</TableCell>
+                <TableCell>{row.to_email || '—'}</TableCell>
+                <TableCell>{row.subject || '—'}</TableCell>
+                <TableCell>{row.template_name || '—'}</TableCell>
+                <TableCell>{row.sent_at ? formatDateTime(row.sent_at) : (row.created_at ? formatDateTime(row.created_at) : '—')}</TableCell>
                 <TableCell>
                   <Button size="sm" variant="ghost" onClick={() => setSelectedMessage(row)}>Open</Button>
                 </TableCell>
@@ -331,7 +333,7 @@ export function EmailSentPage() {
             <div><strong>From:</strong> {selectedMessage.from_email}</div>
             <div><strong>To:</strong> {selectedMessage.to_email}</div>
             <div><strong>Subject:</strong> {selectedMessage.subject}</div>
-            <div><strong>Sent:</strong> {selectedMessage.sent_at ? new Date(selectedMessage.sent_at).toLocaleString() : '—'}</div>
+            <div><strong>Sent:</strong> {selectedMessage.sent_at ? formatDateTime(selectedMessage.sent_at) : '—'}</div>
             <div>
               <strong>Body</strong>
               <div

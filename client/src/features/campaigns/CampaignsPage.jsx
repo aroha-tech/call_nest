@@ -26,6 +26,7 @@ import { Alert } from '../../components/ui/Alert';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
 import { FilterBar } from '../../components/admin/FilterBar';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
+import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { Pagination, PaginationPageSize } from '../../components/ui/Pagination';
 import { Checkbox } from '../../components/ui/Checkbox';
@@ -118,6 +119,7 @@ const TYPE_FILTER_OPTIONS = [
 
 export function CampaignsPage() {
   const navigate = useNavigate();
+  const { formatDateTime } = useDateTimeDisplay();
   const user = useAppSelector(selectUser);
   const role = user?.role ?? 'agent';
 
@@ -635,12 +637,12 @@ export function CampaignsPage() {
                         </TableCell>
                         <TableCell>
                           {isArchived ? (
-                            <span title={c.deleted_at ? new Date(c.deleted_at).toLocaleString() : ''}>Archived</span>
+                            <span title={c.deleted_at ? formatDateTime(c.deleted_at) : ''}>Archived</span>
                           ) : (
                             c.status
                           )}
                         </TableCell>
-                        <TableCell style={{ maxWidth: 320 }}>{campaignRulesSummary(c)}</TableCell>
+                        <TableCell>{campaignRulesSummary(c)}</TableCell>
                         <TableCell align="center">
                           <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
                             {role === 'agent' && c.status === 'active' && !isArchived ? (
@@ -790,8 +792,8 @@ export function CampaignsPage() {
           ) : null}
           {editing ? (
             <p style={{ margin: '12px 0 0', fontSize: 12, opacity: 0.7 }}>
-              Created {editing.created_at ? new Date(editing.created_at).toLocaleString() : '—'}
-              {editing.updated_at ? ` · Updated ${new Date(editing.updated_at).toLocaleString()}` : ''}
+              Created {editing.created_at ? formatDateTime(editing.created_at) : '—'}
+              {editing.updated_at ? ` · Updated ${formatDateTime(editing.updated_at)}` : ''}
             </p>
           ) : null}
         </div>

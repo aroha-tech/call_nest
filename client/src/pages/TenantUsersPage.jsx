@@ -28,6 +28,7 @@ import listStyles from '../components/admin/adminDataList.module.scss';
 import { tenantUsersAPI } from '../services/tenantUsersAPI';
 import { useMutation } from '../hooks/useAsyncData';
 import { useTableLoadingState } from '../hooks/useTableLoadingState';
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import { TableDataRegion } from '../components/admin/TableDataRegion';
 import styles from './TenantUsersPage.module.scss';
 
@@ -46,17 +47,8 @@ const ROLE_FILTER_OPTIONS = [
 
 const AGENT_ONLY_ROLE_OPTIONS = [{ value: 'agent', label: 'Agent' }];
 
-function formatDate(iso) {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString(undefined, { dateStyle: 'short' }) + ' ' + d.toLocaleTimeString(undefined, { timeStyle: 'short' });
-  } catch {
-    return '—';
-  }
-}
-
 export function TenantUsersPage() {
+  const { formatDateTime } = useDateTimeDisplay();
   const authUser = useAppSelector(selectUser);
   const isFullAccess = usePermission(PERMISSIONS.USERS_MANAGE);
   const hasTeamAccess = usePermission(PERMISSIONS.USERS_TEAM);
@@ -420,7 +412,7 @@ export function TenantUsersPage() {
                   <TableCell>
                     <StatusBadge isActive={!!u.is_enabled} />
                   </TableCell>
-                  <TableCell className={styles.dateCell}>{formatDate(u.last_login_at)}</TableCell>
+                  <TableCell className={styles.dateCell}>{formatDateTime(u.last_login_at)}</TableCell>
                   <TableCell align="right">
                     <IconButton title="Edit" onClick={() => openEdit(u)} size="sm">
                       ✏️

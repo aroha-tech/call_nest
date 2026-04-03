@@ -16,6 +16,7 @@ import styles from '../../features/disposition/components/MasterCRUDPage.module.
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { FilterBar } from '../../components/admin/FilterBar';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
+import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
 import { Spinner } from '../../components/ui/Spinner';
 
@@ -92,6 +93,7 @@ function buildPreviewText(bodyText, paramValues) {
 const PAGE_SIZE = 20;
 
 export function WhatsAppMessagesPage() {
+  const { formatDateTime } = useDateTimeDisplay();
   const [appliedStatus, setAppliedStatus] = useState('all');
   const [appliedAccount, setAppliedAccount] = useState('__all__');
   const [appliedTemplate, setAppliedTemplate] = useState('all');
@@ -428,8 +430,8 @@ export function WhatsAppMessagesPage() {
                     <TableCell>
                       <Badge variant={STATUS_VARIANTS[row.status] || 'muted'}>{row.status}</Badge>
                     </TableCell>
-                    <TableCell>{row.sent_at ? new Date(row.sent_at).toLocaleString() : '—'}</TableCell>
-                    <TableCell>{row.created_at ? new Date(row.created_at).toLocaleString() : '—'}</TableCell>
+                    <TableCell>{row.sent_at ? formatDateTime(row.sent_at) : '—'}</TableCell>
+                    <TableCell>{row.created_at ? formatDateTime(row.created_at) : '—'}</TableCell>
                     <TableCell align="center">
                       <Button size="sm" variant="ghost" onClick={() => setSelectedMessage(row)}>Details</Button>
                     </TableCell>
@@ -487,10 +489,10 @@ export function WhatsAppMessagesPage() {
             <div style={{ marginTop: 8 }}>
               <strong>Timeline</strong>
               <ul style={{ margin: '8px 0 0', paddingLeft: 20, listStyle: 'disc' }}>
-                <li><strong>Created:</strong> {selectedMessage.created_at ? new Date(selectedMessage.created_at).toLocaleString() : '—'}</li>
-                <li><strong>Sent:</strong> {selectedMessage.sent_at ? new Date(selectedMessage.sent_at).toLocaleString() : '—'}</li>
-                <li><strong>Delivered:</strong> {selectedMessage.delivered_at ? new Date(selectedMessage.delivered_at).toLocaleString() : '—'}</li>
-                <li><strong>Read:</strong> {selectedMessage.read_at ? new Date(selectedMessage.read_at).toLocaleString() : '—'}</li>
+                <li><strong>Created:</strong> {selectedMessage.created_at ? formatDateTime(selectedMessage.created_at) : '—'}</li>
+                <li><strong>Sent:</strong> {selectedMessage.sent_at ? formatDateTime(selectedMessage.sent_at) : '—'}</li>
+                <li><strong>Delivered:</strong> {selectedMessage.delivered_at ? formatDateTime(selectedMessage.delivered_at) : '—'}</li>
+                <li><strong>Read:</strong> {selectedMessage.read_at ? formatDateTime(selectedMessage.read_at) : '—'}</li>
               </ul>
             </div>
           </div>

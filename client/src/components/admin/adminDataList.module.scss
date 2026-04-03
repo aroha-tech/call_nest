@@ -114,6 +114,8 @@
   max-height: var(--admin-table-body-h);
   flex: 0 0 var(--admin-table-body-h);
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   @include custom-scrollbar;
 
   /* Table wraps in a div — scroll on this parent, not inner wrapper */

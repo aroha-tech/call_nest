@@ -188,11 +188,14 @@ export async function registerAgent(req, res, next) {
  */
 export async function updateMe(req, res, next) {
   try {
-    const { name, currentPassword, newPassword } = req.body;
+    const { name, currentPassword, newPassword, datetimeDisplayMode, datetime_display_mode } =
+      req.body;
     const result = await authService.updateProfile(req.user.id, {
       name,
       currentPassword,
       newPassword,
+      datetimeDisplayMode,
+      datetime_display_mode,
     });
     res.json({
       access_token: result.accessToken,

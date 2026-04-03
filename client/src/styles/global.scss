@@ -47,6 +47,14 @@ a {
   }
 }
 
+:root[data-color-scheme='light'] a {
+  color: var(--color-primary-600);
+
+  &:hover {
+    color: var(--color-primary-700);
+  }
+}
+
 // Buttons reset
 button {
   font-family: inherit;

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
   account_locked_until TIMESTAMP NULL,
   password_changed_at TIMESTAMP NULL,
   last_login_at TIMESTAMP NULL,
+  datetime_display_mode ENUM('ist_fixed', 'browser_local') NOT NULL DEFAULT 'ist_fixed',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted_at TIMESTAMP NULL DEFAULT NULL,

@@ -88,6 +88,13 @@
   gap: $space-4;
 }
 
+.fieldHint {
+  margin: (-$space-2) 0 0;
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
 .changePwdTrigger {
   margin-top: $space-1;
 }

@@ -25,6 +25,7 @@ import { FilterBar } from '../components/admin/FilterBar';
 import { usersAPI, tenantsAPI } from '../services/adminAPI';
 import { useMutation } from '../hooks/useAsyncData';
 import { useTableLoadingState } from '../hooks/useTableLoadingState';
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import { TableDataRegion } from '../components/admin/TableDataRegion';
 import styles from './UsersPage.module.scss';
 
@@ -41,17 +42,8 @@ const ROLE_FILTER_OPTIONS = [
   ...ROLE_OPTIONS,
 ];
 
-function formatDate(iso) {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString(undefined, { dateStyle: 'short' }) + ' ' + d.toLocaleTimeString(undefined, { timeStyle: 'short' });
-  } catch {
-    return '—';
-  }
-}
-
 export function UsersPage() {
+  const { formatDateTime } = useDateTimeDisplay();
   const [searchParams] = useSearchParams();
   const tenantIdFromUrl = searchParams.get('tenantId') || '';
 
@@ -391,7 +383,7 @@ export function UsersPage() {
                       {isLocked(u) ? 'Locked' : '—'}
                     </span>
                   </TableCell>
-                  <TableCell className={styles.dateCell}>{formatDate(u.last_login_at)}</TableCell>
+                  <TableCell className={styles.dateCell}>{formatDateTime(u.last_login_at)}</TableCell>
                   <TableCell align="right">
                     <IconButton title="Edit" onClick={() => openEdit(u)} size="sm">✏️</IconButton>
                   </TableCell>

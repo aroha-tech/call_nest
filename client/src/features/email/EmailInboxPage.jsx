@@ -15,11 +15,13 @@ import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
+import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
 
 const PAGE_SIZE = 20;
 
 export function EmailInboxPage() {
+  const { formatDateTime } = useDateTimeDisplay();
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(PAGE_SIZE);
@@ -140,10 +142,10 @@ export function EmailInboxPage() {
               <TableBody>
                 {messages.map((row) => (
                   <TableRow key={row.id}>
-                    <TableCell style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.from_email || '—'}</TableCell>
-                    <TableCell style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.to_email || '—'}</TableCell>
-                    <TableCell style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.subject || '—'}</TableCell>
-                    <TableCell>{row.received_at ? new Date(row.received_at).toLocaleString() : (row.created_at ? new Date(row.created_at).toLocaleString() : '—')}</TableCell>
+                    <TableCell>{row.from_email || '—'}</TableCell>
+                    <TableCell>{row.to_email || '—'}</TableCell>
+                    <TableCell>{row.subject || '—'}</TableCell>
+                    <TableCell>{row.received_at ? formatDateTime(row.received_at) : (row.created_at ? formatDateTime(row.created_at) : '—')}</TableCell>
                     <TableCell>
                       <Button size="sm" variant="ghost" onClick={() => setSelectedMessage(row)}>Open</Button>
                     </TableCell>
@@ -183,7 +185,7 @@ export function EmailInboxPage() {
             <div><strong>From:</strong> {selectedMessage.from_email}</div>
             <div><strong>To:</strong> {selectedMessage.to_email}</div>
             <div><strong>Subject:</strong> {selectedMessage.subject}</div>
-            <div><strong>Date:</strong> {selectedMessage.received_at ? new Date(selectedMessage.received_at).toLocaleString() : selectedMessage.created_at ? new Date(selectedMessage.created_at).toLocaleString() : '—'}</div>
+            <div><strong>Date:</strong> {selectedMessage.received_at ? formatDateTime(selectedMessage.received_at) : selectedMessage.created_at ? formatDateTime(selectedMessage.created_at) : '—'}</div>
             <div>
               <strong>Body</strong>
               <div

@@ -5,8 +5,10 @@ import { setTokens } from '../features/auth/authSlice';
 import { userAndTenantFromToken } from '../features/auth/utils/jwtUtils';
 import { getUserDisplayName, getUserInitials } from '../features/auth/utils/userDisplay';
 import { updateProfile as updateProfileAPI } from '../features/auth/authAPI';
+import { DATETIME_DISPLAY_BROWSER, DATETIME_DISPLAY_IST } from '../utils/dateTimeDisplay';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Input } from '../components/ui/Input';
+import { Select } from '../components/ui/Select';
 import { PasswordField } from '../features/auth/components/PasswordField';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
@@ -48,13 +50,17 @@ export function ProfilePage() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [apiError, setApiError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [datetimeDisplayMode, setDatetimeDisplayMode] = useState(DATETIME_DISPLAY_IST);
 
   useEffect(() => {
     if (!user) return;
     setName(user.name ?? '');
+    setDatetimeDisplayMode(
+      user.datetimeDisplayMode === DATETIME_DISPLAY_BROWSER ? DATETIME_DISPLAY_BROWSER : DATETIME_DISPLAY_IST
+    );
     setFieldErrors({});
     setApiError(null);
-  }, [user?.id, user?.name]);
+  }, [user?.id, user?.name, user?.datetimeDisplayMode]);
 
   useEffect(() => {
     if (!user) return;
@@ -116,7 +122,10 @@ export function ProfilePage() {
 
     setSaving(true);
     try {
-      const payload = { name: name.trim() || null };
+      const payload = {
+        name: name.trim() || null,
+        datetimeDisplayMode,
+      };
       if (attemptingPasswordChange && newPassword.trim()) {
         payload.currentPassword = currentPassword;
         payload.newPassword = newPassword;
@@ -160,7 +169,7 @@ export function ProfilePage() {
     <div className={styles.page}>
       <PageHeader
         title="Profile"
-        description="Update your name. Use Change password when you want to set a new password. Email changes will be available later with verification."
+        description="Update your name, date/time display, and password. Email changes will be available later with verification."
       />
       <form className={styles.card} onSubmit={handleSubmit} noValidate>
         <div className={styles.hero}>
@@ -200,6 +209,27 @@ export function ProfilePage() {
             error={fieldErrors.name}
             placeholder="Your name"
           />
+
+          <Select
+            id="profile-datetime-mode"
+            label="Dates and times"
+            placeholder="Choose display"
+            value={datetimeDisplayMode}
+            onChange={(e) => setDatetimeDisplayMode(e.target.value)}
+            options={[
+              {
+                value: DATETIME_DISPLAY_IST,
+                label: 'India (IST) — DD/MM/YYYY, 12-hour with seconds',
+              },
+              {
+                value: DATETIME_DISPLAY_BROWSER,
+                label: 'This device — use my system timezone and formats',
+              },
+            ]}
+          />
+          <p className={styles.fieldHint}>
+            Applies to lists and details across the app. Default is India (IST).
+          </p>
 
           {!passwordFlowOpen && (
             <div className={styles.changePwdTrigger}>
