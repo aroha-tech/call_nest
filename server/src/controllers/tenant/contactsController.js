@@ -80,6 +80,22 @@ export async function list(req, res, next) {
 
     const { search = '', page = '1', limit = '20', type, status_id } = req.query;
     const touch_status = req.query.touch_status ? String(req.query.touch_status).trim().toLowerCase() : undefined;
+    const min_call_count =
+      req.query.min_call_count === undefined || req.query.min_call_count === null || String(req.query.min_call_count).trim() === ''
+        ? undefined
+        : Number(req.query.min_call_count);
+    const max_call_count =
+      req.query.max_call_count === undefined || req.query.max_call_count === null || String(req.query.max_call_count).trim() === ''
+        ? undefined
+        : Number(req.query.max_call_count);
+    const last_called_after =
+      req.query.last_called_after === undefined || req.query.last_called_after === null || String(req.query.last_called_after).trim() === ''
+        ? undefined
+        : String(req.query.last_called_after).trim();
+    const last_called_before =
+      req.query.last_called_before === undefined || req.query.last_called_before === null || String(req.query.last_called_before).trim() === ''
+        ? undefined
+        : String(req.query.last_called_before).trim();
 
     const filterManagerId = parseContactListFilterParam(req.query.filter_manager_id);
     const filterAssignedUserId = parseContactListFilterParam(req.query.filter_assigned_user_id);
@@ -94,6 +110,10 @@ export async function list(req, res, next) {
       type: type || undefined,
       statusId: status_id || undefined,
       touchStatus: touch_status || undefined,
+      minCallCount: Number.isFinite(min_call_count) ? min_call_count : undefined,
+      maxCallCount: Number.isFinite(max_call_count) ? max_call_count : undefined,
+      lastCalledAfter: last_called_after || undefined,
+      lastCalledBefore: last_called_before || undefined,
       filterManagerId,
       filterAssignedUserId,
       campaignIdFilter,

@@ -11,8 +11,9 @@ import { getMe as getMeAPI } from '../auth/authAPI';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
+import { Input } from '../../components/ui/Input';
 import { Table } from '../../components/ui/Table';
-import { ConfirmModal } from '../../components/ui/Modal';
+import { ConfirmModal, Modal, ModalFooter } from '../../components/ui/Modal';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { Pagination } from '../../components/ui/Pagination';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -40,6 +41,9 @@ import {
 } from './contactTableConfig';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import pageStyles from './ContactsPage.module.scss';
+import { dialerSessionsAPI } from '../../services/dialerSessionsAPI';
+import { dialingSetsAPI, callScriptsAPI } from '../../services/dispositionAPI';
+import { dialerPreferencesAPI } from '../../services/dialerPreferencesAPI';
 
 const FILTER_ALL = '__all__';
 
@@ -133,10 +137,11 @@ function BulkActionsMenu({
   );
 }
 
-export function ContactsPage({ type }) {
+export function ContactsPage({ type, mode = 'crm' }) {
   const navigate = useNavigate();
   const user = useAppSelector(selectUser);
   const role = user?.role ?? 'agent';
+  const isDialer = mode === 'dialer';
 
   const canRead = usePermission(type === 'lead' ? 'leads.read' : 'contacts.read');
   const canCreate = usePermission(type === 'lead' ? 'leads.create' : 'contacts.create');
@@ -266,6 +271,10 @@ export function ContactsPage({ type }) {
   const [tenantUsers, setTenantUsers] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [campaignFilter, setCampaignFilter] = useState(FILTER_ALL);
+  const [touchStatusFilter, setTouchStatusFilter] = useState(FILTER_ALL);
+  const [minCallCountFilter, setMinCallCountFilter] = useState('');
+  const [maxCallCountFilter, setMaxCallCountFilter] = useState('');
+  const [lastCalledPreset, setLastCalledPreset] = useState(FILTER_ALL);
   const [draftManagerFilter, setDraftManagerFilter] = useState(FILTER_ALL);
   const [draftAgentFilter, setDraftAgentFilter] = useState(FILTER_ALL);
   const [appliedManagerFilter, setAppliedManagerFilter] = useState(FILTER_ALL);
@@ -356,6 +365,27 @@ export function ContactsPage({ type }) {
   const filterParamsForApi = useMemo(() => {
     const mid = role === 'manager' ? FILTER_ALL : appliedManagerFilter;
     const aid = appliedAgentFilter;
+    const dialerParams = {};
+    if (isDialer && type === 'lead') {
+      if (touchStatusFilter && touchStatusFilter !== FILTER_ALL) {
+        dialerParams.touch_status = touchStatusFilter;
+      }
+      if (minCallCountFilter !== '' && Number.isFinite(Number(minCallCountFilter))) {
+        dialerParams.min_call_count = Number(minCallCountFilter);
+      }
+      if (maxCallCountFilter !== '' && Number.isFinite(Number(maxCallCountFilter))) {
+        dialerParams.max_call_count = Number(maxCallCountFilter);
+      }
+      if (lastCalledPreset && lastCalledPreset !== FILTER_ALL) {
+        const days = Number(lastCalledPreset);
+        if (Number.isFinite(days) && days > 0) {
+          const d = new Date();
+          d.setDate(d.getDate() - days);
+          dialerParams.last_called_after = d.toISOString();
+        }
+      }
+    }
+
     return {
       filter_manager_id:
         !mid || mid === FILTER_ALL ? undefined : mid === 'unassigned' ? 'unassigned' : Number(mid),
@@ -367,8 +397,21 @@ export function ContactsPage({ type }) {
           : campaignFilter === 'none'
             ? 'none'
             : campaignFilter,
+      ...dialerParams,
     };
-  }, [role, appliedManagerFilter, appliedAgentFilter, showCampaign, campaignFilter]);
+  }, [
+    role,
+    appliedManagerFilter,
+    appliedAgentFilter,
+    showCampaign,
+    campaignFilter,
+    isDialer,
+    type,
+    touchStatusFilter,
+    minCallCountFilter,
+    maxCallCountFilter,
+    lastCalledPreset,
+  ]);
 
   const campaignFilterOptions = useMemo(() => {
     const rows = [...campaigns].sort((a, b) =>
@@ -565,7 +608,7 @@ export function ContactsPage({ type }) {
 
   const canBulkAssign = canUpdate && role !== 'agent';
   const canBulkDelete = canDelete;
-  const showRowCheckboxes = canBulkAssign || canBulkDelete;
+  const showRowCheckboxes = isDialer || canBulkAssign || canBulkDelete;
 
   const managerFilterOptions = useMemo(() => {
     const managers = tenantUsers
@@ -624,6 +667,9 @@ export function ContactsPage({ type }) {
     setAppliedAgentFilter(FILTER_ALL);
     setCampaignFilter(FILTER_ALL);
     setTouchStatusFilter(FILTER_ALL);
+    setMinCallCountFilter('');
+    setMaxCallCountFilter('');
+    setLastCalledPreset(FILTER_ALL);
     setPage(1);
     clearSelection();
     setLeadSortBy(null);
@@ -636,6 +682,121 @@ export function ContactsPage({ type }) {
     setPage(1);
     clearSelection();
   };
+
+  // Dialer: start session modal
+  const [startModalOpen, setStartModalOpen] = useState(false);
+  const [dialingSets, setDialingSets] = useState([]);
+  const [callScripts, setCallScripts] = useState([]);
+  const [dialerDefaults, setDialerDefaults] = useState(null);
+  const [startDialingSetId, setStartDialingSetId] = useState('');
+  const [startCallScriptId, setStartCallScriptId] = useState('');
+  const [startError, setStartError] = useState('');
+  const [startBusy, setStartBusy] = useState(false);
+
+  useEffect(() => {
+    if (!isDialer) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [dsRes, csRes, prefRes] = await Promise.all([
+          dialingSetsAPI.getAll(true),
+          callScriptsAPI.getAll({ includeInactive: false, page: 1, limit: 200 }),
+          dialerPreferencesAPI.get(),
+        ]);
+        if (cancelled) return;
+        setDialingSets(dsRes?.data?.data ?? []);
+        setCallScripts(csRes?.data?.data ?? []);
+        setDialerDefaults(prefRes?.data?.data ?? null);
+      } catch {
+        if (!cancelled) {
+          setDialingSets([]);
+          setCallScripts([]);
+          setDialerDefaults(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isDialer]);
+
+  const dialingSetOptions = useMemo(() => {
+    const rows = (dialingSets || []).filter((d) => (d?.is_deleted ?? 0) === 0);
+    return [
+      { value: '', label: '— Select dialing set —' },
+      ...rows.map((d) => ({ value: String(d.id), label: d.name || d.id })),
+    ];
+  }, [dialingSets]);
+
+  const callScriptOptions = useMemo(() => {
+    const rows = callScripts || [];
+    return [
+      { value: '', label: '— Select script —' },
+      ...rows.map((s) => ({ value: String(s.id), label: s.script_name || `#${s.id}` })),
+    ];
+  }, [callScripts]);
+
+  const openStartModal = useCallback(
+    (idsToUse) => {
+      if (!isDialer) return;
+      setStartError('');
+      if (Array.isArray(idsToUse) && idsToUse.length > 0) {
+        setSelectedIds(new Set(idsToUse));
+      }
+
+      const dsDefault =
+        dialerDefaults?.default_dialing_set_id ||
+        dialingSets.find((d) => d.is_default === 1)?.id ||
+        dialingSets[0]?.id ||
+        '';
+      const csDefault =
+        dialerDefaults?.default_call_script_id ||
+        callScripts.find((s) => s.is_default === 1)?.id ||
+        callScripts[0]?.id ||
+        '';
+
+      setStartDialingSetId(dsDefault ? String(dsDefault) : '');
+      setStartCallScriptId(csDefault ? String(csDefault) : '');
+      setStartModalOpen(true);
+    },
+    [isDialer, dialerDefaults, dialingSets, callScripts]
+  );
+
+  const confirmStartDialer = useCallback(async () => {
+    setStartError('');
+    const ids = [...selectedIds];
+    if (ids.length === 0) {
+      setStartError('Select at least 1 lead.');
+      return;
+    }
+    if (!startDialingSetId) {
+      setStartError('Dialing set is required.');
+      return;
+    }
+    if (!startCallScriptId) {
+      setStartError('Call script is required.');
+      return;
+    }
+    setStartBusy(true);
+    try {
+      const res = await dialerSessionsAPI.create({
+        contact_ids: ids,
+        provider: 'dummy',
+        dialing_set_id: startDialingSetId,
+        call_script_id: Number(startCallScriptId),
+      });
+      const s = res?.data?.data ?? null;
+      setStartModalOpen(false);
+      clearSelection();
+      if (s?.id) {
+        navigate(`/dialer/session/${s.id}`);
+      }
+    } catch (e) {
+      setStartError(e?.response?.data?.error || e?.message || 'Failed to start dialer session');
+    } finally {
+      setStartBusy(false);
+    }
+  }, [selectedIds, startDialingSetId, startCallScriptId, navigate, clearSelection]);
 
   const handleDraftManagerChange = (e) => {
     const v = e.target.value;
@@ -748,10 +909,21 @@ export function ContactsPage({ type }) {
   return (
     <div className={listStyles.page}>
       <PageHeader
-        title={tableTitle}
-        description={role === 'agent' ? 'View and create your assigned leads/contacts' : 'Manage leads/contacts'}
+        title={isDialer ? 'Dialer' : tableTitle}
+        description={
+          isDialer
+            ? 'Select leads and start a dialer session.'
+            : role === 'agent'
+              ? 'View and create your assigned leads/contacts'
+              : 'Manage leads/contacts'
+        }
         actions={
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {isDialer ? (
+              <Button variant="secondary" onClick={() => navigate('/calls/history')}>
+                Call history
+              </Button>
+            ) : null}
             {canRead && (
               <Button
                 variant="secondary"
@@ -780,7 +952,7 @@ export function ContactsPage({ type }) {
                 Import
               </Button>
             )}
-            {canCreate ? (
+            {canCreate && !isDialer ? (
               <Button onClick={() => navigate(type === 'lead' ? '/leads/new' : '/contacts/new')}>
                 + Add {type === 'lead' ? 'Lead' : 'Contact'}
               </Button>
@@ -796,9 +968,18 @@ export function ContactsPage({ type }) {
         </Alert>
       ) : null}
 
-      {showOwnershipFilters ? (
+      {canRead && (showOwnershipFilters || showCampaign || isDialer) ? (
         <FilterBar onApply={applyFilters} onReset={resetFilters}>
-          {role === 'admin' ? (
+          {showCampaign ? (
+            <Select
+              label="Campaign"
+              value={campaignFilter}
+              onChange={onCampaignFilterChange}
+              options={campaignFilterOptions}
+              className={pageStyles.filterSelect}
+            />
+          ) : null}
+          {showOwnershipFilters && role === 'admin' ? (
             <Select
               label="Owning manager"
               value={draftManagerFilter}
@@ -807,13 +988,57 @@ export function ContactsPage({ type }) {
               className={pageStyles.filterSelect}
             />
           ) : null}
-          <Select
-            label="Assigned agent"
-            value={draftAgentFilter}
-            onChange={(e) => setDraftAgentFilter(e.target.value)}
-            options={agentFilterOptionsDraft}
-            className={pageStyles.filterSelect}
-          />
+          {showOwnershipFilters ? (
+            <Select
+              label="Assigned agent"
+              value={draftAgentFilter}
+              onChange={(e) => setDraftAgentFilter(e.target.value)}
+              options={agentFilterOptionsDraft}
+              className={pageStyles.filterSelect}
+            />
+          ) : null}
+          {isDialer && type === 'lead' ? (
+            <>
+              <Select
+                label="Call status"
+                value={touchStatusFilter}
+                onChange={(e) => setTouchStatusFilter(e.target.value)}
+                options={[
+                  { value: FILTER_ALL, label: 'All' },
+                  { value: 'untouched', label: 'Never called' },
+                  { value: 'touched', label: 'Called' },
+                ]}
+                className={pageStyles.filterSelect}
+              />
+              <Select
+                label="Last called"
+                value={lastCalledPreset}
+                onChange={(e) => setLastCalledPreset(e.target.value)}
+                options={[
+                  { value: FILTER_ALL, label: 'Any time' },
+                  { value: '1', label: 'Last 1 day' },
+                  { value: '7', label: 'Last 7 days' },
+                  { value: '30', label: 'Last 30 days' },
+                  { value: '90', label: 'Last 90 days' },
+                ]}
+                className={pageStyles.filterSelect}
+              />
+              <Input
+                label="Min calls"
+                value={minCallCountFilter}
+                onChange={(e) => setMinCallCountFilter(e.target.value)}
+                placeholder="e.g. 0"
+                className={pageStyles.filterSelect}
+              />
+              <Input
+                label="Max calls"
+                value={maxCallCountFilter}
+                onChange={(e) => setMaxCallCountFilter(e.target.value)}
+                placeholder="e.g. 5"
+                className={pageStyles.filterSelect}
+              />
+            </>
+          ) : null}
         </FilterBar>
       ) : null}
 
@@ -834,14 +1059,20 @@ export function ContactsPage({ type }) {
                     <Button size="sm" variant="secondary" onClick={clearSelection}>
                       Clear
                     </Button>
-                    <BulkActionsMenu
-                      disabled={assignMutation.loading || bulkDeleteMutation.loading}
-                      canBulkAssign={canBulkAssign}
-                      canBulkDelete={canBulkDelete}
-                      onAssign={() => setAssignOpen(true)}
-                      onUnassign={openUnassignConfirm}
-                      onBulkDelete={() => setBulkDeleteConfirmOpen(true)}
-                    />
+                    {isDialer && type === 'lead' ? (
+                      <Button size="sm" onClick={() => openStartModal()}>
+                        Call selected
+                      </Button>
+                    ) : (
+                      <BulkActionsMenu
+                        disabled={assignMutation.loading || bulkDeleteMutation.loading}
+                        canBulkAssign={canBulkAssign}
+                        canBulkDelete={canBulkDelete}
+                        onAssign={() => setAssignOpen(true)}
+                        onUnassign={openUnassignConfirm}
+                        onBulkDelete={() => setBulkDeleteConfirmOpen(true)}
+                      />
+                    )}
                   </>
                 ) : (
                   <span className={listStyles.bulkToolbarHint}>
@@ -907,6 +1138,7 @@ export function ContactsPage({ type }) {
                 visibleColumnIds={leadVisibleColumnIds}
                 columnFilters={leadColumnFilters}
                 canBulkAssign={showRowCheckboxes}
+                showSelection={showRowCheckboxes}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
                 onToggleSelectAllOnPage={toggleSelectAllOnPage}
@@ -920,6 +1152,8 @@ export function ContactsPage({ type }) {
                 canDelete={canDelete}
                 onEdit={(c) => navigate(`/leads/${c.id}`)}
                 onDelete={setDeleteItem}
+                showDialerCall={isDialer}
+                onDialerCall={(c) => openStartModal([c.id])}
               />
             ) : (
               <LeadDataTable
@@ -928,6 +1162,7 @@ export function ContactsPage({ type }) {
                 visibleColumnIds={contactVisibleColumnIds}
                 columnFilters={contactColumnFilters}
                 canBulkAssign={showRowCheckboxes}
+                showSelection={showRowCheckboxes}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
                 onToggleSelectAllOnPage={toggleSelectAllOnPage}
@@ -977,6 +1212,42 @@ export function ContactsPage({ type }) {
         variant="primary"
         loading={assignMutation.loading}
       />
+
+      {isDialer ? (
+        <Modal
+          isOpen={startModalOpen}
+          onClose={() => (!startBusy ? setStartModalOpen(false) : null)}
+          title={`Start dialing (${selectedIds.size} selected)`}
+          size="md"
+          closeOnEscape
+          footer={
+            <ModalFooter>
+              <Button variant="secondary" onClick={() => setStartModalOpen(false)} disabled={startBusy}>
+                Cancel
+              </Button>
+              <Button onClick={confirmStartDialer} disabled={startBusy}>
+                {startBusy ? 'Starting…' : 'Continue'}
+              </Button>
+            </ModalFooter>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {startError ? <Alert variant="error">{startError}</Alert> : null}
+            <Select
+              label="Dialing set"
+              value={startDialingSetId}
+              onChange={(e) => setStartDialingSetId(e.target.value)}
+              options={dialingSetOptions}
+            />
+            <Select
+              label="Call script"
+              value={startCallScriptId}
+              onChange={(e) => setStartCallScriptId(e.target.value)}
+              options={callScriptOptions}
+            />
+          </div>
+        </Modal>
+      ) : null}
 
       <ConfirmModal
         isOpen={!!deleteItem}

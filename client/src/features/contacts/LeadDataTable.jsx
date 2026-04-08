@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { IconButton } from '../../components/ui/IconButton';
 import { EditIcon, TrashIcon, RowActionGroup } from '../../components/ui/ActionIcons';
+import { Button } from '../../components/ui/Button';
 
 import styles from './LeadDataTable.module.scss';
 import { parseCustomFieldColumnId } from './customFieldColumnIds';
@@ -167,6 +168,7 @@ export function LeadDataTable({
   visibleColumnIds,
   columnFilters,
   canBulkAssign,
+  showSelection,
   selectedIds,
   onToggleSelect,
   onToggleSelectAllOnPage,
@@ -180,7 +182,10 @@ export function LeadDataTable({
   onEdit,
   onDelete,
   tableScrollContainerRef,
+  showDialerCall = false,
+  onDialerCall,
 }) {
+  const selectionEnabled = showSelection ?? canBulkAssign;
   const visibleDefs = useMemo(() => {
     const map = new Map(applicableColumns.map((c) => [c.id, c]));
     return visibleColumnIds.map((id) => map.get(id)).filter(Boolean);
@@ -286,7 +291,7 @@ export function LeadDataTable({
     >
       <TableHead>
         <TableRow>
-          {canBulkAssign ? (
+          {selectionEnabled ? (
             <TableHeaderCell width="44px" align="center" className={styles.stickyFirst}>
               <input
                 type="checkbox"
@@ -294,6 +299,11 @@ export function LeadDataTable({
                 checked={contacts.length > 0 && contacts.every((c) => selectedIds.has(c.id))}
                 onChange={onToggleSelectAllOnPage}
               />
+            </TableHeaderCell>
+          ) : null}
+          {showDialerCall ? (
+            <TableHeaderCell width="96px" align="center">
+              Call
             </TableHeaderCell>
           ) : null}
           {visibleDefs.map((col) => (
@@ -348,7 +358,7 @@ export function LeadDataTable({
       <TableBody>
         {contacts.map((c) => (
           <TableRow key={c.id}>
-            {canBulkAssign ? (
+            {selectionEnabled ? (
               <TableCell align="center" className={styles.stickyFirst}>
                 <input
                   type="checkbox"
@@ -356,6 +366,18 @@ export function LeadDataTable({
                   onChange={() => onToggleSelect(c.id)}
                   aria-label={`Select ${c.display_name || c.id}`}
                 />
+              </TableCell>
+            ) : null}
+            {showDialerCall ? (
+              <TableCell align="center">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => onDialerCall?.(c)}
+                  disabled={!onDialerCall}
+                >
+                  Call
+                </Button>
               </TableCell>
             ) : null}
             {visibleDefs.map((col) => (

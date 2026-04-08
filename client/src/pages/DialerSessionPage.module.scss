@@ -1,0 +1,234 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.loadingCenter {
+  display: flex;
+  justify-content: center;
+  padding: 18px;
+}
+
+.topBar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-end;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.stats {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.statLabel {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.statValue {
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 320px 1fr 320px;
+  gap: 12px;
+  align-items: start;
+}
+
+.left,
+.center,
+.right {
+  min-width: 0;
+}
+
+.center {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.cardTitle {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-weight: 800;
+}
+
+.cardTitleRow {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.cardSubtle {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.contactName {
+  padding: 12px;
+  font-weight: 900;
+  font-size: 18px;
+}
+
+.contactMeta {
+  padding: 0 12px 12px 12px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.metaLabel {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.metaValue {
+  margin-top: 3px;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.scriptBody {
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  /* When script is plain text (converted to <br/>), keep the spacing readable */
+  white-space: normal;
+}
+
+.queueTableWrap {
+  overflow: auto;
+  max-height: 44vh;
+}
+
+.queueTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.queueTable th,
+.queueTable td {
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+  vertical-align: top;
+}
+
+.queueName {
+  font-weight: 700;
+}
+
+.queueSub {
+  opacity: 0.75;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.queueRowActive {
+  background: rgba(59, 130, 246, 0.10);
+}
+
+.statePill {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--color-border-subtle);
+  text-transform: capitalize;
+}
+
+.state_queued {
+  background: rgba(148, 163, 184, 0.10);
+}
+.state_calling {
+  background: rgba(59, 130, 246, 0.12);
+}
+.state_called {
+  background: rgba(34, 197, 94, 0.10);
+}
+.state_failed {
+  background: rgba(239, 68, 68, 0.10);
+}
+.state_skipped {
+  background: rgba(245, 158, 11, 0.10);
+}
+
+.dispoList {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dispoEmpty {
+  opacity: 0.8;
+  font-size: 13px;
+}
+
+.dispoBtn {
+  text-align: left;
+  width: 100%;
+  border-radius: 12px;
+  padding: 10px 10px;
+  border: 1px solid var(--color-border-subtle);
+  background: rgba(59, 130, 246, 0.06);
+  cursor: pointer;
+}
+
+.dispoBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dispoBtnName {
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.dispoBtnHint {
+  margin-top: 3px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .queueTableWrap {
+    max-height: 36vh;
+  }
+}
+

@@ -620,6 +620,10 @@ export async function listContacts(
     limit = 20,
     type,
     statusId,
+    minCallCount,
+    maxCallCount,
+    lastCalledAfter,
+    lastCalledBefore,
     filterManagerId,
     filterAssignedUserId,
     campaignIdFilter,
@@ -654,6 +658,23 @@ export async function listContacts(
     whereClauses.push('(c.last_called_at IS NULL OR c.call_count_total = 0)');
   } else if (touchStatus === 'touched') {
     whereClauses.push('(c.last_called_at IS NOT NULL AND c.call_count_total > 0)');
+  }
+
+  if (Number.isFinite(minCallCount)) {
+    whereClauses.push('(c.call_count_total >= ?)');
+    params.push(Number(minCallCount));
+  }
+  if (Number.isFinite(maxCallCount)) {
+    whereClauses.push('(c.call_count_total <= ?)');
+    params.push(Number(maxCallCount));
+  }
+  if (lastCalledAfter) {
+    whereClauses.push('(c.last_called_at IS NOT NULL AND c.last_called_at >= ?)');
+    params.push(lastCalledAfter);
+  }
+  if (lastCalledBefore) {
+    whereClauses.push('(c.last_called_at IS NOT NULL AND c.last_called_at <= ?)');
+    params.push(lastCalledBefore);
   }
 
   if (campaignIdFilter === 'none') {
