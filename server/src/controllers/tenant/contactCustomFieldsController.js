@@ -34,7 +34,15 @@ export async function create(req, res, next) {
       });
     }
 
-    const allowedTypes = ['text', 'number', 'date', 'boolean', 'select'];
+    const allowedTypes = [
+      'text',
+      'number',
+      'date',
+      'boolean',
+      'select',
+      'multiselect',
+      'multiselect_dropdown',
+    ];
     if (!allowedTypes.includes(type)) {
       return res.status(400).json({ error: `type must be one of: ${allowedTypes.join(', ')}` });
     }
@@ -43,7 +51,8 @@ export async function create(req, res, next) {
       name,
       label,
       type,
-      options_json: type === 'select' ? options ?? [] : null,
+      options_json:
+        type === 'select' || type === 'multiselect' || type === 'multiselect_dropdown' ? options ?? [] : null,
       is_required: !!is_required,
     });
 

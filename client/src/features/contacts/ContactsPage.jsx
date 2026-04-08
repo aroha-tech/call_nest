@@ -2,17 +2,16 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { selectUser } from '../../features/auth/authSelectors';
-import { usePermission } from '../../hooks/usePermission';
+import { usePermission, useAnyPermission } from '../../hooks/usePermission';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import { contactsAPI } from '../../services/contactsAPI';
 import { campaignsAPI } from '../../services/campaignsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
+import { getMe as getMeAPI } from '../auth/authAPI';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
-import { IconButton } from '../../components/ui/IconButton';
-import { EditIcon, TrashIcon, RowActionGroup } from '../../components/ui/ActionIcons';
 import { Select } from '../../components/ui/Select';
-import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
+import { Table } from '../../components/ui/Table';
 import { ConfirmModal } from '../../components/ui/Modal';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { Pagination } from '../../components/ui/Pagination';
@@ -32,10 +31,107 @@ import {
   mergeApplicableLeadColumnsWithCustomFields,
   saveLeadVisibleColumnIds,
 } from './leadTableConfig';
+import {
+  getApplicableContactColumns,
+  getDefaultVisibleContactColumnIds,
+  loadContactVisibleColumnIds,
+  mergeApplicableContactColumnsWithCustomFields,
+  saveContactVisibleColumnIds,
+} from './contactTableConfig';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import pageStyles from './ContactsPage.module.scss';
 
 const FILTER_ALL = '__all__';
+
+function BulkActionsMenu({
+  disabled,
+  canBulkAssign,
+  canBulkDelete,
+  onAssign,
+  onUnassign,
+  onBulkDelete,
+}) {
+  const wrapRef = useRef(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => {
+      if (wrapRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const hasAny = canBulkAssign || canBulkDelete;
+  if (!hasAny) return null;
+
+  return (
+    <div className={pageStyles.bulkActionsWrap} ref={wrapRef}>
+      <button
+        type="button"
+        className={pageStyles.bulkActionsBtn}
+        disabled={disabled}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => !disabled && setOpen((o) => !o)}
+      >
+        Actions ▾
+      </button>
+      {open ? (
+        <div className={pageStyles.bulkActionsMenu} role="menu">
+          {canBulkAssign ? (
+            <>
+              <button
+                type="button"
+                role="menuitem"
+                className={pageStyles.bulkActionsItem}
+                onClick={() => {
+                  setOpen(false);
+                  onAssign();
+                }}
+              >
+                Assign…
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className={pageStyles.bulkActionsItem}
+                onClick={() => {
+                  setOpen(false);
+                  onUnassign();
+                }}
+              >
+                Unassign agent
+              </button>
+            </>
+          ) : null}
+          {canBulkDelete ? (
+            <button
+              type="button"
+              role="menuitem"
+              className={pageStyles.bulkActionsItemDanger}
+              onClick={() => {
+                setOpen(false);
+                onBulkDelete();
+              }}
+            >
+              Delete selected
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export function ContactsPage({ type }) {
   const navigate = useNavigate();
@@ -44,13 +140,53 @@ export function ContactsPage({ type }) {
 
   const canRead = usePermission(type === 'lead' ? 'leads.read' : 'contacts.read');
   const canCreate = usePermission(type === 'lead' ? 'leads.create' : 'contacts.create');
-  const canUpdate = usePermission(type === 'lead' ? 'leads.update' : 'contacts.update');
-  const canDelete = usePermission(type === 'lead' ? 'leads.delete' : 'contacts.delete');
+  /** API allows PUT with contacts.update OR leads.update; managers/agents often have only leads.update. */
+  const canUpdate = useAnyPermission(
+    type === 'lead' ? ['leads.update'] : ['contacts.update', 'leads.update']
+  );
+  const canDeleteRBAC = usePermission(type === 'lead' ? 'leads.delete' : 'contacts.delete');
+
+  const [agentDeleteFlags, setAgentDeleteFlags] = useState(null);
+  useEffect(() => {
+    if (!canRead) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (role !== 'agent' || canDeleteRBAC || !user?.id) {
+          if (!cancelled) setAgentDeleteFlags(null);
+          return;
+        }
+        const res = await getMeAPI();
+        const d = res?.data;
+        if (!cancelled && d) {
+          setAgentDeleteFlags({
+            agent_can_delete_leads: !!d.agent_can_delete_leads,
+            agent_can_delete_contacts: !!d.agent_can_delete_contacts,
+          });
+        } else if (!cancelled) {
+          setAgentDeleteFlags(null);
+        }
+      } catch {
+        if (!cancelled) setAgentDeleteFlags(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canRead, role, canDeleteRBAC, user?.id]);
+
+  const canDelete = useMemo(() => {
+    if (canDeleteRBAC) return true;
+    if (role !== 'agent' || !agentDeleteFlags) return false;
+    if (type === 'lead') return agentDeleteFlags.agent_can_delete_leads;
+    return agentDeleteFlags.agent_can_delete_contacts;
+  }, [canDeleteRBAC, role, agentDeleteFlags, type]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [deleteItem, setDeleteItem] = useState(null);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [assignOpen, setAssignOpen] = useState(false);
   const [unassignConfirmOpen, setUnassignConfirmOpen] = useState(false);
@@ -60,6 +196,7 @@ export function ContactsPage({ type }) {
   const showManagerAgentColumns = (role === 'admin' || role === 'manager') && canRead;
   /** Tenant-defined contact custom fields — columns in Customize + values from list API `custom_field_values`. */
   const [leadCustomFieldDefs, setLeadCustomFieldDefs] = useState([]);
+  const [contactCustomFieldDefs, setContactCustomFieldDefs] = useState([]);
   const leadApplicableColumns = useMemo(
     () =>
       type === 'lead'
@@ -73,12 +210,34 @@ export function ContactsPage({ type }) {
         : [],
     [type, showCampaign, showManagerAgentColumns, leadCustomFieldDefs]
   );
+  const contactApplicableColumns = useMemo(
+    () =>
+      type === 'contact'
+        ? mergeApplicableContactColumnsWithCustomFields(
+            getApplicableContactColumns({ showManagerAgent: showManagerAgentColumns }),
+            contactCustomFieldDefs
+          )
+        : [],
+    [type, showManagerAgentColumns, contactCustomFieldDefs]
+  );
   const [leadVisibleColumnIds, setLeadVisibleColumnIds] = useState(() =>
     type === 'lead'
       ? loadLeadVisibleColumnIds(
           mergeApplicableLeadColumnsWithCustomFields(
             getApplicableLeadColumns({
               showCampaign: type === 'lead' && canRead,
+              showManagerAgent: (role === 'admin' || role === 'manager') && canRead,
+            }),
+            []
+          )
+        )
+      : []
+  );
+  const [contactVisibleColumnIds, setContactVisibleColumnIds] = useState(() =>
+    type === 'contact'
+      ? loadContactVisibleColumnIds(
+          mergeApplicableContactColumnsWithCustomFields(
+            getApplicableContactColumns({
               showManagerAgent: (role === 'admin' || role === 'manager') && canRead,
             }),
             []
@@ -94,6 +253,13 @@ export function ContactsPage({ type }) {
   const [leadTableHasHorizontalOverflow, setLeadTableHasHorizontalOverflow] = useState(false);
   const [leadSortBy, setLeadSortBy] = useState(null);
   const [leadSortDir, setLeadSortDir] = useState('desc');
+  const [contactCustomizeOpen, setContactCustomizeOpen] = useState(false);
+  const [contactColumnPanelCol, setContactColumnPanelCol] = useState(null);
+  const [contactColumnFilters, setContactColumnFilters] = useState([]);
+  const contactTableScrollRef = useRef(null);
+  const [contactTableHasHorizontalOverflow, setContactTableHasHorizontalOverflow] = useState(false);
+  const [contactSortBy, setContactSortBy] = useState(null);
+  const [contactSortDir, setContactSortDir] = useState('desc');
 
   const showOwnershipFilters = canRead && (role === 'admin' || role === 'manager');
 
@@ -125,7 +291,12 @@ export function ContactsPage({ type }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await campaignsAPI.list({ page: 1, limit: 500, show_paused: true });
+        const res = await campaignsAPI.list({
+          page: 1,
+          limit: 500,
+          show_paused: true,
+          type: 'static',
+        });
         const list = res?.data?.data ?? res?.data ?? [];
         if (!cancelled) setCampaigns(Array.isArray(list) ? list : []);
       } catch {
@@ -154,11 +325,33 @@ export function ContactsPage({ type }) {
     };
   }, [type, canRead]);
 
+  useEffect(() => {
+    if (type !== 'contact' || !canRead) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await contactsAPI.getCustomFields();
+        const list = res?.data?.data ?? res?.data ?? [];
+        if (!cancelled) setContactCustomFieldDefs(Array.isArray(list) ? list : []);
+      } catch {
+        if (!cancelled) setContactCustomFieldDefs([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [type, canRead]);
+
   /** Re-read localStorage when applicable set grows (e.g. custom fields loaded) so `cf:*` prefs apply. */
   useEffect(() => {
     if (type !== 'lead') return;
     setLeadVisibleColumnIds(loadLeadVisibleColumnIds(leadApplicableColumns));
   }, [type, leadApplicableColumns]);
+
+  useEffect(() => {
+    if (type !== 'contact') return;
+    setContactVisibleColumnIds(loadContactVisibleColumnIds(contactApplicableColumns));
+  }, [type, contactApplicableColumns]);
 
   const filterParamsForApi = useMemo(() => {
     const mid = role === 'manager' ? FILTER_ALL : appliedManagerFilter;
@@ -204,8 +397,26 @@ export function ContactsPage({ type }) {
           ? { sort_by: leadSortBy, sort_dir: leadSortDir }
           : {}),
         ...(type === 'lead' && leadColumnFilters.length > 0 ? { column_filters: leadColumnFilters } : {}),
+        ...(type === 'contact' && contactSortBy
+          ? { sort_by: contactSortBy, sort_dir: contactSortDir }
+          : {}),
+        ...(type === 'contact' && contactColumnFilters.length > 0
+          ? { column_filters: contactColumnFilters }
+          : {}),
       }),
-    [searchQuery, page, limit, type, filterParamsForApi, leadSortBy, leadSortDir, leadColumnFilters]
+    [
+      searchQuery,
+      page,
+      limit,
+      type,
+      filterParamsForApi,
+      leadSortBy,
+      leadSortDir,
+      leadColumnFilters,
+      contactSortBy,
+      contactSortDir,
+      contactColumnFilters,
+    ]
   );
 
   const {
@@ -248,6 +459,34 @@ export function ContactsPage({ type }) {
     [refetch]
   );
 
+  const handleContactCustomFieldCreated = useCallback(
+    (created) => {
+      const fid = created?.field_id ?? created?.id;
+      if (fid == null) return;
+      const colId = leadCustomFieldColumnId(fid);
+      setContactCustomFieldDefs((prev) => {
+        if (prev.some((f) => Number(f.field_id ?? f.id) === Number(fid))) return prev;
+        return [
+          ...prev,
+          {
+            field_id: fid,
+            name: created.name,
+            label: created.label,
+            type: created.type,
+          },
+        ];
+      });
+      setContactVisibleColumnIds((prev) => {
+        if (prev.includes(colId)) return prev;
+        const next = [...prev, colId];
+        saveContactVisibleColumnIds(next);
+        return next;
+      });
+      refetch();
+    },
+    [refetch]
+  );
+
   useEffect(() => {
     if (type !== 'lead') return;
     const el = leadTableScrollRef.current;
@@ -266,6 +505,25 @@ export function ContactsPage({ type }) {
       window.removeEventListener('resize', measure);
     };
   }, [type, contacts.length, leadVisibleColumnIds, loadingContacts]);
+
+  useEffect(() => {
+    if (type !== 'contact') return;
+    const el = contactTableScrollRef.current;
+    if (!el) return;
+    const measure = () => {
+      setContactTableHasHorizontalOverflow(el.scrollWidth > el.clientWidth + 1);
+    };
+    measure();
+    const t = window.requestAnimationFrame(() => measure());
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      window.cancelAnimationFrame(t);
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [type, contacts.length, contactVisibleColumnIds, loadingContacts]);
 
   const { hasCompletedInitialFetch } = useTableLoadingState(loadingContacts);
 
@@ -295,11 +553,19 @@ export function ContactsPage({ type }) {
   const createMutation = useMutation((payload) => contactsAPI.create(payload));
   const updateMutation = useMutation((id, payload) => contactsAPI.update(id, payload));
   const deleteMutation = useMutation((id) => contactsAPI.remove(id, { deleted_source: 'manual' }));
+  const bulkDeleteMutation = useMutation((ids) => contactsAPI.removeBulk(ids, { deleted_source: 'manual' }));
   const assignMutation = useMutation((body) => contactsAPI.assign(body));
 
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
+  /** Same component instance can be reused when switching /leads ↔ /contacts; lead IDs must not carry over. */
+  useEffect(() => {
+    clearSelection();
+  }, [type, clearSelection]);
+
   const canBulkAssign = canUpdate && role !== 'agent';
+  const canBulkDelete = canDelete;
+  const showRowCheckboxes = canBulkAssign || canBulkDelete;
 
   const managerFilterOptions = useMemo(() => {
     const managers = tenantUsers
@@ -357,6 +623,7 @@ export function ContactsPage({ type }) {
     setAppliedManagerFilter(FILTER_ALL);
     setAppliedAgentFilter(FILTER_ALL);
     setCampaignFilter(FILTER_ALL);
+    setTouchStatusFilter(FILTER_ALL);
     setPage(1);
     clearSelection();
     setLeadSortBy(null);
@@ -415,6 +682,26 @@ export function ContactsPage({ type }) {
         setLeadSortDir(sort);
       }
       setLeadColumnFilters((prev) => {
+        const rest = prev.filter((r) => r.field !== col.id);
+        if (!filter || !filter.op) return rest;
+        return [...rest, { field: col.id, op: filter.op, value: filter.value || '' }];
+      });
+      setPage(1);
+      clearSelection();
+    },
+    [clearSelection]
+  );
+
+  const applyContactColumnPanel = useCallback(
+    (col, { sort, filter }) => {
+      if (sort === 'default') {
+        setContactSortBy(null);
+        setContactSortDir('desc');
+      } else {
+        setContactSortBy(col.sortKey);
+        setContactSortDir(sort);
+      }
+      setContactColumnFilters((prev) => {
         const rest = prev.filter((r) => r.field !== col.id);
         if (!filter || !filter.op) return rest;
         return [...rest, { field: col.id, op: filter.op, value: filter.value || '' }];
@@ -539,7 +826,7 @@ export function ContactsPage({ type }) {
           }
         >
           <div className={listStyles.tableCardToolbarLeft}>
-            {canBulkAssign && contacts.length > 0 ? (
+            {showRowCheckboxes && contacts.length > 0 ? (
               <div className={listStyles.bulkToolbarSlot}>
                 {selectedIds.size > 0 ? (
                   <>
@@ -547,15 +834,25 @@ export function ContactsPage({ type }) {
                     <Button size="sm" variant="secondary" onClick={clearSelection}>
                       Clear
                     </Button>
-                    <Button size="sm" onClick={() => setAssignOpen(true)}>
-                      Assign…
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={openUnassignConfirm}>
-                      Unassign agent
-                    </Button>
+                    <BulkActionsMenu
+                      disabled={assignMutation.loading || bulkDeleteMutation.loading}
+                      canBulkAssign={canBulkAssign}
+                      canBulkDelete={canBulkDelete}
+                      onAssign={() => setAssignOpen(true)}
+                      onUnassign={openUnassignConfirm}
+                      onBulkDelete={() => setBulkDeleteConfirmOpen(true)}
+                    />
                   </>
                 ) : (
-                  <span className={listStyles.bulkToolbarHint}>Select rows for bulk assign</span>
+                  <span className={listStyles.bulkToolbarHint}>
+                    {canBulkAssign && canBulkDelete
+                      ? 'Select rows for bulk assign or delete'
+                      : canBulkAssign
+                        ? 'Select rows for bulk assign'
+                        : canBulkDelete
+                          ? 'Select rows to delete'
+                          : ''}
+                  </span>
                 )}
               </div>
             ) : null}
@@ -601,7 +898,7 @@ export function ContactsPage({ type }) {
                   ? `${listStyles.tableCardBody} ${listStyles.tableCardBodyLead}`
                   : listStyles.tableCardBody
               }
-              ref={type === 'lead' ? leadTableScrollRef : undefined}
+              ref={type === 'lead' ? leadTableScrollRef : type === 'contact' ? contactTableScrollRef : undefined}
             >
             {type === 'lead' ? (
               <LeadDataTable
@@ -609,7 +906,7 @@ export function ContactsPage({ type }) {
                 applicableColumns={leadApplicableColumns}
                 visibleColumnIds={leadVisibleColumnIds}
                 columnFilters={leadColumnFilters}
-                canBulkAssign={canBulkAssign}
+                canBulkAssign={showRowCheckboxes}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
                 onToggleSelectAllOnPage={toggleSelectAllOnPage}
@@ -625,89 +922,26 @@ export function ContactsPage({ type }) {
                 onDelete={setDeleteItem}
               />
             ) : (
-            <Table variant="adminList">
-              <TableHead>
-                <TableRow>
-                  {canBulkAssign ? (
-                    <TableHeaderCell width="44px" align="center">
-                      <input
-                        type="checkbox"
-                        aria-label="Select all on page"
-                        checked={
-                          contacts.length > 0 && contacts.every((c) => selectedIds.has(c.id))
-                        }
-                        onChange={toggleSelectAllOnPage}
-                      />
-                    </TableHeaderCell>
-                  ) : null}
-                  <TableHeaderCell>Display Name</TableHeaderCell>
-                  <TableHeaderCell>Primary Phone</TableHeaderCell>
-                  <TableHeaderCell>Email</TableHeaderCell>
-                  <TableHeaderCell>Tag</TableHeaderCell>
-                  {showCampaign ? <TableHeaderCell>Campaign</TableHeaderCell> : null}
-                  <TableHeaderCell>Type</TableHeaderCell>
-                  {(role === 'admin' || role === 'manager') && canRead ? (
-                    <>
-                      <TableHeaderCell>Manager</TableHeaderCell>
-                      <TableHeaderCell>Agent</TableHeaderCell>
-                    </>
-                  ) : null}
-                  <TableHeaderCell width="160px" align="center">
-                    Actions
-                  </TableHeaderCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {contacts.map((c) => (
-                  <TableRow key={c.id}>
-                    {canBulkAssign ? (
-                      <TableCell align="center">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(c.id)}
-                          onChange={() => toggleSelect(c.id)}
-                          aria-label={`Select ${c.display_name || c.id}`}
-                        />
-                      </TableCell>
-                    ) : null}
-                    <TableCell>{c.display_name || c.first_name || c.email || '—'}</TableCell>
-                    <TableCell>{c.primary_phone || '—'}</TableCell>
-                    <TableCell>{c.email || '—'}</TableCell>
-                    <TableCell>{c.tag_names || '—'}</TableCell>
-                    {showCampaign ? <TableCell>{c.campaign_name || '—'}</TableCell> : null}
-                    <TableCell>{c.type}</TableCell>
-                    {(role === 'admin' || role === 'manager') && canRead ? (
-                      <>
-                        <TableCell>
-                          {c.manager_name || (c.manager_id != null ? `#${c.manager_id}` : '—')}
-                        </TableCell>
-                        <TableCell>
-                          {c.assigned_user_name || (c.assigned_user_id != null ? `#${c.assigned_user_id}` : '—')}
-                        </TableCell>
-                      </>
-                    ) : null}
-                    <TableCell align="center">
-                      <RowActionGroup>
-                        {canUpdate && (
-                          <IconButton
-                            size="sm"
-                            title="Edit"
-                            onClick={() => navigate(`/contacts/${c.id}`)}
-                          >
-                            <EditIcon />
-                          </IconButton>
-                        )}
-                        {canDelete && (
-                          <IconButton size="sm" variant="danger" title="Delete" onClick={() => setDeleteItem(c)}>
-                            <TrashIcon />
-                          </IconButton>
-                        )}
-                      </RowActionGroup>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+              <LeadDataTable
+                contacts={contacts}
+                applicableColumns={contactApplicableColumns}
+                visibleColumnIds={contactVisibleColumnIds}
+                columnFilters={contactColumnFilters}
+                canBulkAssign={showRowCheckboxes}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onToggleSelectAllOnPage={toggleSelectAllOnPage}
+                sortBy={contactSortBy}
+                sortDir={contactSortDir}
+                onColumnHeaderClick={(col) => setContactColumnPanelCol(col)}
+                onOpenCustomizeColumns={() => setContactCustomizeOpen(true)}
+                useCompactRowActions={contactTableHasHorizontalOverflow}
+                tableScrollContainerRef={contactTableScrollRef}
+                canUpdate={canUpdate}
+                canDelete={canDelete}
+                onEdit={(c) => navigate(`/contacts/${c.id}`)}
+                onDelete={setDeleteItem}
+              />
             )}
             </div>
           )}
@@ -763,6 +997,29 @@ export function ContactsPage({ type }) {
         loading={deleteMutation.loading}
       />
 
+      <ConfirmModal
+        isOpen={bulkDeleteConfirmOpen}
+        onClose={() => {
+          if (!bulkDeleteMutation.loading) setBulkDeleteConfirmOpen(false);
+        }}
+        onConfirm={async () => {
+          if (selectedIds.size === 0) return;
+          const n = selectedIds.size;
+          const result = await bulkDeleteMutation.mutate([...selectedIds]);
+          if (result?.success) {
+            setBulkDeleteConfirmOpen(false);
+            clearSelection();
+            if (n >= contacts.length && page > 1) setPage(page - 1);
+            refetch();
+          }
+        }}
+        title={`Delete ${selectedIds.size} ${type === 'lead' ? 'leads' : 'contacts'}?`}
+        message={`Remove ${selectedIds.size} selected record(s) from this list? They will be soft-deleted for your workspace.`}
+        confirmText="Delete all"
+        variant="danger"
+        loading={bulkDeleteMutation.loading}
+      />
+
       <AssignContactsBulkModal
         isOpen={assignOpen}
         onClose={() => setAssignOpen(false)}
@@ -784,6 +1041,23 @@ export function ContactsPage({ type }) {
           onSave={setLeadVisibleColumnIds}
           canAddCustomField={canUpdate}
           onCustomFieldCreated={handleLeadCustomFieldCreated}
+          title="Customize columns"
+          persistVisibleIds={saveLeadVisibleColumnIds}
+        />
+      ) : null}
+
+      {type === 'contact' ? (
+        <LeadColumnCustomizeModal
+          isOpen={contactCustomizeOpen}
+          onClose={() => setContactCustomizeOpen(false)}
+          applicableColumns={contactApplicableColumns}
+          visibleColumnIds={contactVisibleColumnIds}
+          onSave={setContactVisibleColumnIds}
+          canAddCustomField={canUpdate}
+          onCustomFieldCreated={handleContactCustomFieldCreated}
+          title="Customize columns"
+          getDefaults={getDefaultVisibleContactColumnIds}
+          persistVisibleIds={saveContactVisibleColumnIds}
         />
       ) : null}
 
@@ -797,6 +1071,20 @@ export function ContactsPage({ type }) {
           filterRule={leadColumnFilters.find((r) => r.field === leadColumnPanelCol?.id)}
           onApply={(payload) => {
             if (leadColumnPanelCol) applyLeadColumnPanel(leadColumnPanelCol, payload);
+          }}
+        />
+      ) : null}
+
+      {type === 'contact' ? (
+        <LeadColumnSortFilterModal
+          isOpen={!!contactColumnPanelCol}
+          onClose={() => setContactColumnPanelCol(null)}
+          column={contactColumnPanelCol}
+          sortBy={contactSortBy}
+          sortDir={contactSortDir}
+          filterRule={contactColumnFilters.find((r) => r.field === contactColumnPanelCol?.id)}
+          onApply={(payload) => {
+            if (contactColumnPanelCol) applyContactColumnPanel(contactColumnPanelCol, payload);
           }}
         />
       ) : null}

@@ -103,9 +103,9 @@ function TenantFlow() {
 
       <div className={styles.row}>
         <Node
-          title="Activities"
-          hint="Calls, tasks & follow-ups"
-          to="/activities"
+          title="Dialer"
+          hint="Call queue & sessions"
+          to="/dialer"
           canAccess={p.activities}
         />
       </div>

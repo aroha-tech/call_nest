@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as contactsController from '../../controllers/tenant/contactsController.js';
-import { tenantAuthMiddleware, requirePermission } from '../../middleware/auth.js';
+import { tenantAuthMiddleware, requirePermission, requireContactDeleteAccess } from '../../middleware/auth.js';
 import { uploadCsvImportSingle } from '../../middleware/uploadCsvImport.js';
 
 const router = Router();
@@ -52,6 +52,7 @@ router.post(
   requirePermission(['contacts.create', 'leads.create']),
   contactsController.create
 );
+router.post('/bulk-delete', requireContactDeleteAccess(), contactsController.bulkRemove);
 router.put(
   '/:id',
   requirePermission(['contacts.update', 'leads.update']),
@@ -59,7 +60,7 @@ router.put(
 );
 router.delete(
   '/:id',
-  requirePermission(['contacts.delete', 'leads.delete']),
+  requireContactDeleteAccess(),
   contactsController.remove
 );
 router.post(

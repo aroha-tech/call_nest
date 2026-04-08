@@ -13,6 +13,7 @@ router.post('/refresh', authController.refresh);
 
 // Authenticated: update own profile (name, password); works for tenant users and platform admins
 router.patch('/me', authMiddleware, verifyTokenVersion, authController.updateMe);
+router.get('/me', authMiddleware, verifyTokenVersion, authController.getMe);
 
 // Public: Get industries for registration dropdown
 router.get('/industries', async (req, res, next) => {

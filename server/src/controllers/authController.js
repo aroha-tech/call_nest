@@ -207,6 +207,50 @@ export async function updateMe(req, res, next) {
 }
 
 /**
+ * GET /api/auth/me
+ * Returns signed-in user's current server-side flags (including per-agent delete flags).
+ */
+export async function getMe(req, res, next) {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Platform admins may not have tenant_id; return token-derived info only.
+    if (req.user.isPlatformAdmin) {
+      return res.json({
+        data: {
+          id: req.user.id,
+          email: req.user.email,
+          tenant_id: null,
+          role: req.user.role,
+          is_platform_admin: true,
+        },
+      });
+    }
+
+    const tenantId = req.user.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant context required' });
+    }
+
+    const [row] = await query(
+      `SELECT id, tenant_id, email, name, role, is_enabled,
+              agent_can_delete_leads, agent_can_delete_contacts
+       FROM users
+       WHERE id = ? AND tenant_id = ? AND is_deleted = 0 AND is_platform_admin = 0
+       LIMIT 1`,
+      [req.user.id, tenantId]
+    );
+
+    if (!row) return res.status(404).json({ error: 'User not found' });
+    res.json({ data: row });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
  * Refresh access token
  * POST /api/auth/refresh
  * Body: { refreshToken }

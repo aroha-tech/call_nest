@@ -84,13 +84,16 @@ export async function update(req, res, next) {
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant context required' });
     }
-    const { name, role, is_enabled, password, manager_id } = req.body;
+    const { name, role, is_enabled, password, manager_id, agent_can_delete_leads, agent_can_delete_contacts } =
+      req.body;
     const user = await tenantUsersService.update(req.params.id, tenantId, req.user, {
       name,
       role,
       is_enabled,
       password: password || undefined,
       manager_id: manager_id !== undefined ? manager_id : undefined,
+      agent_can_delete_leads: agent_can_delete_leads !== undefined ? agent_can_delete_leads : undefined,
+      agent_can_delete_contacts: agent_can_delete_contacts !== undefined ? agent_can_delete_contacts : undefined,
     });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });

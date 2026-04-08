@@ -53,7 +53,9 @@ export function AssignContactsBulkModal({
     try {
       const [uRes, cRes] = await Promise.all([
         tenantUsersAPI.getAll({ page: 1, limit: 500, includeDisabled: false }),
-        campaignsAPI.list({ page: 1, limit: 500, show_paused: true }).catch(() => ({ data: { data: [] } })),
+        campaignsAPI
+          .list({ page: 1, limit: 500, show_paused: true, type: 'static' })
+          .catch(() => ({ data: { data: [] } })),
       ]);
       setUsers(uRes?.data?.data ?? []);
       setCampaigns(cRes?.data?.data ?? []);
@@ -160,7 +162,9 @@ export function AssignContactsBulkModal({
   };
 
   const campaignOptions = useMemo(() => {
-    return (campaigns || []).map((c) => ({ value: String(c.id), label: c.name || `#${c.id}` }));
+    return (campaigns || [])
+      .filter((c) => c.type === 'static')
+      .map((c) => ({ value: String(c.id), label: c.name || `#${c.id}` }));
   }, [campaigns]);
 
   const handleSubmit = async () => {

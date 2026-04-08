@@ -22,6 +22,22 @@ export function pickFirstByAliasKeys(normalizedRow, aliasKeys) {
   return null;
 }
 
+/**
+ * Same as pickFirstByAliasKeys but skips columns the user set to `-- unmapped --` ({ target: 'ignore' }).
+ * `headerMapping` keys are normalized column names (same as row keys).
+ */
+export function pickFirstByAliasKeysRespectingIgnore(normalizedRow, aliasKeys, headerMapping) {
+  if (!aliasKeys?.length) return null;
+  for (const key of aliasKeys) {
+    const nk = normalizeImportHeader(key);
+    const v = normalizedRow[nk];
+    if (v === undefined || v === null || !String(v).trim()) continue;
+    if (headerMapping && headerMapping[nk]?.target === 'ignore') continue;
+    return v;
+  }
+  return null;
+}
+
 export function splitFullNameToFirstLast(raw) {
   const s = String(raw || '').trim();
   if (!s) return { first_name: null, last_name: null };
@@ -455,21 +471,130 @@ registerSuggestions('date_of_birth', DATE_OF_BIRTH_KEYS);
 registerSuggestions('tax_id', TAX_ID_KEYS);
 
 /**
+ * Legacy import keys that map to auto-created custom fields (see contactsService PROVIDER_COLUMNS_AUTO_CF).
+ * These are NOT core `contacts` columns — UI lists tenant custom fields instead; suggestions resolve to
+ * `custom:id` when a field with this name exists, else ignore (user creates via "new custom field").
+ */
+export const LEGACY_PROVIDER_IMPORT_KEYS = new Set([
+  'property',
+  'budget',
+  'services',
+  'remark',
+  'remark_status',
+  'assign_date',
+  'lead_date',
+  'lead_timestamp',
+  'assign_status',
+]);
+
+/**
+ * Core `contacts` / lead columns the importer can map to (single source for API + UI).
+ * Must match handling in contactsService `resolveCsvRowToImportPayload`.
+ */
+export const IMPORT_CORE_FIELD_OPTIONS = [
+  { key: 'first_name', label: 'First name' },
+  { key: 'last_name', label: 'Last name' },
+  { key: 'full_name', label: 'Full name (split to first / last)' },
+  { key: 'display_name', label: 'Display name' },
+  { key: 'email', label: 'Email' },
+  { key: 'primary_phone', label: 'Primary phone' },
+  { key: 'source', label: 'Lead source' },
+  { key: 'status', label: 'Lead status' },
+  { key: 'city', label: 'City' },
+  { key: 'state', label: 'State' },
+  { key: 'country', label: 'Country' },
+  { key: 'address', label: 'Address (street)' },
+  { key: 'address_line_2', label: 'Address line 2' },
+  { key: 'pin_code', label: 'Pin code' },
+  { key: 'company', label: 'Company' },
+  { key: 'job_title', label: 'Job title' },
+  { key: 'website', label: 'Website' },
+  { key: 'industry', label: 'Industry' },
+  { key: 'date_of_birth', label: 'Date of birth' },
+  { key: 'tax_id', label: 'Tax ID (GST / PAN / etc.)' },
+];
+
+export const IMPORT_CORE_TARGET_KEYS = new Set(IMPORT_CORE_FIELD_OPTIONS.map((o) => o.key));
+
+/**
  * @param {string} normalizedCol - already normalizeImportHeader(columnName)
  * @param {{ id: number, name: string, label: string }[]} customFields
- * Built-in targets (name, city, email, default contact columns, etc.) win over tenant custom fields
- * with the same name/label so imports map to `contacts` columns first.
+ * 1) Core contact columns win when the file header matches known aliases (city, email, …).
+ * 2) Otherwise match tenant custom fields by name/label.
+ * 3) Legacy provider keys (property, budget, …) resolve to an existing custom field by canonical name, else ignore.
  */
 export function suggestImportColumnTarget(normalizedCol, customFields = []) {
-  const direct = PREVIEW_SUGGEST_MAP.get(normalizedCol);
-  if (direct) return direct;
+  const fromAlias = PREVIEW_SUGGEST_MAP.get(normalizedCol);
 
-  const cf =
+  if (fromAlias && IMPORT_CORE_TARGET_KEYS.has(fromAlias)) {
+    return fromAlias;
+  }
+
+  const cfByHeader =
     customFields.find((f) => normalizeImportHeader(f.name) === normalizedCol) ||
     customFields.find((f) => normalizeImportHeader(f.label) === normalizedCol);
-  if (cf) return `custom:${cf.id}`;
+  if (cfByHeader) return `custom:${cfByHeader.id}`;
+
+  if (fromAlias && LEGACY_PROVIDER_IMPORT_KEYS.has(fromAlias)) {
+    const cfByLegacyName = customFields.find((f) => normalizeImportHeader(f.name) === fromAlias);
+    if (cfByLegacyName) return `custom:${cfByLegacyName.id}`;
+    return 'ignore';
+  }
 
   return 'ignore';
+}
+
+/**
+ * Best-effort type for a new tenant custom field from normalized header + sample cells.
+ * Used by import preview so the UI can default "Value type" near the right choice.
+ * @param {string} normalizedCol
+ * @param {string[]} samples
+ * @returns {'text'|'number'|'date'|'boolean'|'select'|'multiselect'|'multiselect_dropdown'}
+ */
+export function suggestNewCustomFieldType(normalizedCol, samples = []) {
+  const h = String(normalizedCol || '').toLowerCase();
+
+  if (
+    /(^|_)(date|dob|birth|birthday|anniversary|created|updated|timestamp|time)(_|$)/.test(h) ||
+    /\bdate_of\b/.test(h)
+  ) {
+    return 'date';
+  }
+  if (
+    /\b(amount|price|salary|revenue|budget|cost|fee|qty|quantity|count|score|percent|rating|weight|distance|age)\b/.test(
+      h
+    ) ||
+    /_(amt|amount|price|qty|count|num|number)$/.test(h)
+  ) {
+    return 'number';
+  }
+  if (/\b(is_|has_|active|enabled|verified|subscribe)\b/.test(h) || /^is_/.test(h)) {
+    return 'boolean';
+  }
+
+  const vals = (samples || []).map((s) => String(s ?? '').trim()).filter((s) => s.length > 0);
+  if (vals.length === 0) return 'text';
+
+  const boolRe = /^(yes|no|y|n|true|false|0|1)$/i;
+  if (vals.every((s) => boolRe.test(s))) return 'boolean';
+
+  const stripNum = (s) => s.replace(/[,\s₹$€£]/g, '');
+  let numLike = 0;
+  for (const s of vals.slice(0, 20)) {
+    const t = stripNum(s);
+    if (t !== '' && !Number.isNaN(Number(t)) && /^-?\d/.test(t)) numLike++;
+  }
+  if (numLike >= Math.ceil(vals.length * 0.85) && vals.length >= 2) return 'number';
+
+  const dateLike = (s) => {
+    if (/^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}/.test(s)) return true;
+    const d = Date.parse(s);
+    return !Number.isNaN(d) && s.length >= 6;
+  };
+  const dCount = vals.filter(dateLike).length;
+  if (dCount >= Math.ceil(vals.length * 0.7) && vals.length >= 2) return 'date';
+
+  return 'text';
 }
 
 /**

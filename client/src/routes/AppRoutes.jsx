@@ -48,6 +48,8 @@ import { CampaignsPage } from '../features/campaigns/CampaignsPage';
 import { CampaignOpenPage } from '../features/campaigns/CampaignOpenPage';
 import { DealsPage } from '../pages/DealsPage';
 import { useEmailModuleEnabled } from '../hooks/useEmailModuleEnabled';
+import { ActivitiesPage } from '../pages/ActivitiesPage';
+import { DialerPage } from '../pages/DialerPage';
 
 /**
  * Renders children only when email module is enabled for the tenant; otherwise redirects to dashboard.
@@ -479,11 +481,21 @@ function TenantRoutes() {
         }
       />
       <Route
-        path="/activities"
+        path="/dialer"
         element={
           <ProtectedRoute permission={PERMISSIONS.DIAL_EXECUTE}>
             <AppShellLayout>
-              <PlaceholderPage title="Activities" />
+              <DialerPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/calls/history"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.DIAL_EXECUTE}>
+            <AppShellLayout>
+              <ActivitiesPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

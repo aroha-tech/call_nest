@@ -9,6 +9,8 @@ const FIELD_TYPE_OPTIONS = [
   { value: 'date', label: 'Date' },
   { value: 'boolean', label: 'Yes / No' },
   { value: 'select', label: 'Select (dropdown)' },
+  { value: 'multiselect', label: 'Multi-select (checkboxes)' },
+  { value: 'multiselect_dropdown', label: 'Multi-select (dropdown)' },
 ];
 
 export function ContactCustomFieldsPage() {
@@ -67,7 +69,8 @@ export function ContactCustomFieldsPage() {
       key: 'options_json',
       label: 'Options',
       render: (val, item) => {
-        if (item.type !== 'select') return '—';
+        if (item.type !== 'select' && item.type !== 'multiselect' && item.type !== 'multiselect_dropdown')
+          return '—';
         try {
           const arr =
             typeof val === 'string'
@@ -110,9 +113,9 @@ export function ContactCustomFieldsPage() {
     },
     {
       name: 'options',
-      label: 'Options (for Select)',
+      label: 'Options (Select / Multi-select)',
       placeholder: 'Comma-separated values, e.g. Hot,Warm,Cold',
-      hint: 'Only used when type = Select',
+      hint: 'Used when type is Select, Multi-select (checkboxes), or Multi-select (dropdown)',
     },
     {
       name: 'is_required',

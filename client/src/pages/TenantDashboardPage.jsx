@@ -61,7 +61,7 @@ function buildShortcuts(canPerm, canAnyPerm, role) {
     items.push({ to: '/campaigns', label: 'Campaigns', desc: 'Segments & outreach', icon: '📣' });
   }
   if (canPerm(PERMISSIONS.DIAL_EXECUTE)) {
-    items.push({ to: '/activities', label: 'Activities', desc: 'Calls & tasks', icon: '☎️' });
+    items.push({ to: '/dialer', label: 'Dialer', desc: 'Call queue & sessions', icon: '☎️' });
   }
   if (canPerm(PERMISSIONS.DISPOSITIONS_MANAGE)) {
     items.push({ to: '/workflow/dispositions', label: 'Dispositions', desc: 'Dialer workflow', icon: '📞' });

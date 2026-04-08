@@ -67,3 +67,11 @@ export async function updateProfile(payload) {
   const { data } = await axiosInstance.patch(`${AUTH_BASE}/me`, payload);
   return data;
 }
+
+/**
+ * Get signed-in user's server-side flags (including per-agent delete flags).
+ */
+export async function getMe() {
+  const { data } = await axiosInstance.get(`${AUTH_BASE}/me`);
+  return data;
+}

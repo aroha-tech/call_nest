@@ -1,0 +1,300 @@
+.grid {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.sidebar,
+.main {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.sidebarHead,
+.mainHead {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sidebarTitle,
+.mainTitle {
+  font-weight: 700;
+}
+
+.sidebarMeta,
+.mainMeta {
+  opacity: 0.8;
+  font-size: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sidebarControls {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sideRow {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.checkboxRow {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.sidebarList {
+  max-height: 64vh;
+  overflow: auto;
+}
+
+.sidebarFooter {
+  padding: 10px 14px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.loadingRow {
+  padding: 14px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.empty,
+.emptyMain {
+  padding: 16px 14px;
+  opacity: 0.85;
+}
+
+.emptyTitle {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.emptyHint {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.listTableWrap,
+.sessionTableWrap {
+  overflow: auto;
+}
+
+.listTable,
+.sessionTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.listTable th,
+.listTable td,
+.sessionTable th,
+.sessionTable td {
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+  vertical-align: top;
+}
+
+.rowSelected {
+  background: rgba(59, 130, 246, 0.10);
+}
+
+.leadName {
+  font-weight: 600;
+}
+
+.leadSub {
+  opacity: 0.75;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.mainActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.mainBody {
+  padding: 12px 14px;
+}
+
+.dialerTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 0 12px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  margin-bottom: 12px;
+}
+
+.dialerContact {
+  min-width: 0;
+}
+
+.dialerLabel {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.dialerName {
+  font-weight: 800;
+  font-size: 18px;
+  margin-top: 4px;
+  word-break: break-word;
+}
+
+.dialerSub {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.dialerMid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.scriptBox,
+.dispoBox {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.scriptHead {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.scriptTitle {
+  font-weight: 700;
+}
+
+.scriptBody {
+  margin: 0;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.dispoTitle {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-weight: 700;
+}
+
+.dispoGrid {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.dispoEmpty {
+  opacity: 0.8;
+  font-size: 13px;
+}
+
+.dispoBtn {
+  text-align: left;
+  width: 100%;
+  border-radius: 12px;
+  padding: 10px 10px;
+  border: 1px solid var(--color-border-subtle);
+  background: rgba(59, 130, 246, 0.06);
+  cursor: pointer;
+}
+
+.dispoBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dispoBtnName {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.dispoBtnHint {
+  margin-top: 3px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.startModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.loadingCenter {
+  display: flex;
+  justify-content: center;
+  padding: 18px;
+}
+
+.statePill {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--color-border-subtle);
+  text-transform: capitalize;
+}
+
+.state_queued {
+  background: rgba(148, 163, 184, 0.10);
+}
+.state_calling {
+  background: rgba(59, 130, 246, 0.12);
+}
+.state_called {
+  background: rgba(34, 197, 94, 0.10);
+}
+.state_failed {
+  background: rgba(239, 68, 68, 0.10);
+}
+.state_skipped {
+  background: rgba(245, 158, 11, 0.10);
+}
+
+@media (max-width: 1020px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .sidebarList {
+    max-height: 40vh;
+  }
+  .dialerMid {
+    grid-template-columns: 1fr;
+  }
+}
+

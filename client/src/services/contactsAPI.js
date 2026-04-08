@@ -58,6 +58,9 @@ export const contactsAPI = {
   remove: (id, payload = null) =>
     axiosInstance.delete(`${BASE}/${id}`, payload ? { data: payload } : undefined),
 
+  removeBulk: (ids, payload = {}) =>
+    axiosInstance.post(`${BASE}/bulk-delete`, { ids, ...payload }),
+
   assign: (payload) => axiosInstance.post(`${BASE}/assign`, payload),
 
   getCustomFields: () => axiosInstance.get(`${BASE}/custom-fields`),

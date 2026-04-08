@@ -1,0 +1,36 @@
+@use '../../styles/variables' as *;
+
+.card {
+  margin-bottom: $space-5;
+}
+
+.title {
+  margin: 0 0 $space-2;
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+}
+
+.desc {
+  margin: 0 0 $space-4;
+  font-size: $font-size-xs;
+  line-height: $line-height-relaxed;
+  color: var(--color-text-secondary);
+  max-width: 40rem;
+}
+
+.muted {
+  margin: 0;
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+}
+
+.actions {
+  margin-top: $space-2;
+}

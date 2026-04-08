@@ -5,6 +5,7 @@ import { getRoleByTenantAndName } from '../rbacService.js';
 import { syncContactsManagerForAgent } from './contactsService.js';
 
 const USER_SELECT = `u.id, u.tenant_id, u.email, u.name, u.role, u.role_id, u.manager_id,
+            u.agent_can_delete_leads, u.agent_can_delete_contacts,
             u.is_enabled, u.created_at, u.last_login_at,
             mgr.name AS manager_name, mgr.email AS manager_email`;
 
@@ -177,7 +178,8 @@ export async function update(id, tenantId, actingUser, payload) {
   const existing = await findById(id, tenantId, actingUser);
   if (!existing) return null;
 
-  const { name, role, is_enabled, password, manager_id } = payload;
+  const { name, role, is_enabled, password, manager_id, agent_can_delete_leads, agent_can_delete_contacts } =
+    payload;
 
   if (actingUser?.role === 'manager') {
     if (manager_id !== undefined) {
@@ -255,6 +257,24 @@ export async function update(id, tenantId, actingUser, payload) {
     const passwordHash = await bcrypt.hash(String(password).trim(), 10);
     updates.push('password_hash = ?, password_changed_at = NOW(), token_version = COALESCE(token_version, 1) + 1');
     params.push(passwordHash);
+  }
+
+  const effectiveRole = role ?? existing.role;
+  if (agent_can_delete_leads !== undefined) {
+    if (effectiveRole !== 'agent') {
+      updates.push('agent_can_delete_leads = 0');
+    } else {
+      updates.push('agent_can_delete_leads = ?');
+      params.push(agent_can_delete_leads ? 1 : 0);
+    }
+  }
+  if (agent_can_delete_contacts !== undefined) {
+    if (effectiveRole !== 'agent') {
+      updates.push('agent_can_delete_contacts = 0');
+    } else {
+      updates.push('agent_can_delete_contacts = ?');
+      params.push(agent_can_delete_contacts ? 1 : 0);
+    }
   }
 
   if (updates.length === 0) return existing;

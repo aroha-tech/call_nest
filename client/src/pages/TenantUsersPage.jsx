@@ -76,6 +76,8 @@ export function TenantUsersPage() {
     is_enabled: true,
     new_password: '',
     manager_id: '',
+    agent_can_delete_leads: false,
+    agent_can_delete_contacts: false,
   });
   const [actionMessage, setActionMessage] = useState(null);
   const [formErrors, setFormErrors] = useState({});
@@ -192,6 +194,8 @@ export function TenantUsersPage() {
       is_enabled: true,
       new_password: '',
       manager_id: '',
+      agent_can_delete_leads: false,
+      agent_can_delete_contacts: false,
     });
     setFormErrors({});
     setModalOpen(true);
@@ -207,6 +211,8 @@ export function TenantUsersPage() {
       is_enabled: !!row.is_enabled,
       new_password: '',
       manager_id: row.manager_id != null ? String(row.manager_id) : '',
+      agent_can_delete_leads: !!row.agent_can_delete_leads,
+      agent_can_delete_contacts: !!row.agent_can_delete_contacts,
     });
     setFormErrors({});
     setModalOpen(true);
@@ -239,6 +245,10 @@ export function TenantUsersPage() {
       const effectiveRole = form.role || editing.role;
       if (effectiveRole === 'agent' && isFullAccess) {
         payload.manager_id = form.manager_id ? Number(form.manager_id) : null;
+      }
+      if (effectiveRole === 'agent') {
+        payload.agent_can_delete_leads = !!form.agent_can_delete_leads;
+        payload.agent_can_delete_contacts = !!form.agent_can_delete_contacts;
       }
       const result = await updateMutation.mutate(editing.id, payload);
       if (result.success) {
@@ -415,9 +425,15 @@ export function TenantUsersPage() {
                   </TableCell>
                   <TableCell className={styles.dateCell}>{formatDateTime(u.last_login_at)}</TableCell>
                   <TableCell align="right">
-                    <IconButton title="Edit" onClick={() => openEdit(u)} size="sm">
-                      <EditIcon />
-                    </IconButton>
+                    {isFullAccess && authUser?.role === 'admin' && Number(u.id) === Number(authUser?.id) ? (
+                      <IconButton title="Edit your profile from Profile page" size="sm" disabled>
+                        <EditIcon />
+                      </IconButton>
+                    ) : (
+                      <IconButton title="Edit" onClick={() => openEdit(u)} size="sm">
+                        <EditIcon />
+                      </IconButton>
+                    )}
                   </TableCell>
                 </TableRow>
             ))}
@@ -531,6 +547,25 @@ export function TenantUsersPage() {
           {editing && (
             <div className={styles.formSection}>
               <h3 className={styles.formSectionTitle}>Account</h3>
+              {(form.role === 'agent' || editing.role === 'agent') ? (
+                <>
+                  <h3 className={styles.formSectionTitle}>Agent delete permissions</h3>
+                  <Checkbox
+                    label="Allow this agent to delete leads"
+                    checked={!!form.agent_can_delete_leads}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, agent_can_delete_leads: e.target.checked }))
+                    }
+                  />
+                  <Checkbox
+                    label="Allow this agent to delete contacts"
+                    checked={!!form.agent_can_delete_contacts}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, agent_can_delete_contacts: e.target.checked }))
+                    }
+                  />
+                </>
+              ) : null}
               <Input
                 label="New password (leave blank to keep current)"
                 type="password"

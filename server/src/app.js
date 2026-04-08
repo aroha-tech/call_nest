@@ -35,6 +35,7 @@ import contactCustomFieldsRoutes from './routes/tenant/contactCustomFields.js';
 import integrationsRoutes from './routes/tenant/integrations.js';
 import tenantUsersRoutes from './routes/tenant/users.js';
 import tenantCompanyRoutes from './routes/tenant/company.js';
+import contactDeletePolicyRoutes from './routes/tenant/contactDeletePolicy.js';
 import dialerPreferencesRoutes from './routes/tenant/dialerPreferences.js';
 import tenantDashboardRoutes from './routes/tenant/dashboard.js';
 import campaignsRoutes from './routes/tenant/campaigns.js';
@@ -45,6 +46,8 @@ import whatsappWebhookRoutes from './routes/whatsappWebhook.js';
 import emailModuleRoutes from './routes/tenant/email.js';
 import templateVariablesRoutes from './routes/templateVariables.js';
 import integrationsWebhookRoutes from './routes/integrationsWebhook.js';
+import callsRoutes from './routes/tenant/calls.js';
+import dialerSessionsRoutes from './routes/tenant/dialerSessions.js';
 
 const app = express();
 
@@ -137,6 +140,7 @@ app.use('/api/tenant/whatsapp-templates', whatsappTemplatesRoutes);
 app.use('/api/tenant/call-scripts', callScriptsRoutes);
 app.use('/api/tenant/users', tenantUsersRoutes);
 app.use('/api/tenant/company', tenantCompanyRoutes);
+app.use('/api/tenant/contact-delete-policy', contactDeletePolicyRoutes);
 app.use('/api/tenant/dialer-preferences', dialerPreferencesRoutes);
 app.use('/api/tenant/dashboard', tenantDashboardRoutes);
 app.use('/api/tenant/campaigns', campaignsRoutes);
@@ -148,6 +152,8 @@ app.use('/api/tenant/contacts', contactsRoutes);
 app.use('/api/tenant/contact-tags', contactTagsRoutes);
 app.use('/api/tenant/contact-custom-fields', contactCustomFieldsRoutes);
 app.use('/api/tenant/integrations', integrationsRoutes);
+app.use('/api/tenant/calls', callsRoutes);
+app.use('/api/tenant/dialer-sessions', dialerSessionsRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);

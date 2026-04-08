@@ -5,7 +5,7 @@ import { IconButton } from '../../components/ui/IconButton';
 import { EditIcon, TrashIcon, RowActionGroup } from '../../components/ui/ActionIcons';
 
 import styles from './LeadDataTable.module.scss';
-import { parseLeadCustomFieldColumnId } from './leadTableConfig';
+import { parseCustomFieldColumnId } from './customFieldColumnIds';
 
 const ACTION_MENU_MIN_W = 160;
 
@@ -211,7 +211,7 @@ export function LeadDataTable({
   };
 
   const renderCell = (col, c) => {
-    const cfId = parseLeadCustomFieldColumnId(col.id);
+    const cfId = parseCustomFieldColumnId(col.id);
     if (cfId != null) {
       const map = c.custom_field_values || {};
       const raw = map[String(cfId)];
@@ -269,6 +269,10 @@ export function LeadDataTable({
         return formatDateOnly(c.date_of_birth);
       case 'created_at':
         return formatCreated(c.created_at);
+      case 'call_count_total':
+        return c.call_count_total == null ? '0' : String(c.call_count_total);
+      case 'last_called_at':
+        return formatCreated(c.last_called_at);
       default:
         return '—';
     }

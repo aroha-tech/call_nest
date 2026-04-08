@@ -209,7 +209,12 @@ async function mapSystemRolePermissions(tenantId) {
     manager: [
       'dashboard.view',
       'contacts.read',
-      'leads.read', 'leads.create', 'leads.update',
+      'contacts.update',
+      'contacts.delete',
+      'leads.read',
+      'leads.create',
+      'leads.update',
+      'leads.delete',
       'dial.monitor',
       'reports.view',
       'users.team',
@@ -224,6 +229,7 @@ async function mapSystemRolePermissions(tenantId) {
     agent: [
       'dashboard.view',
       'contacts.read',
+      'contacts.update',
       'leads.read', 'leads.create', 'leads.update',
       'dial.execute',
       'workflow.view',

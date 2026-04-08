@@ -14,26 +14,12 @@ const LEGACY_LEAD_TABLE_COLUMNS_STORAGE_KEY_V2 = 'callnest.leadList.visibleColum
  * }} LeadColumnDef
  */
 
+import { customFieldColumnId, parseCustomFieldColumnId } from './customFieldColumnIds';
+
+/** Back-compat exports (used by LeadDataTable / ContactsPage). */
 export const LEAD_CUSTOM_FIELD_COL_PREFIX = 'cf:';
-
-/**
- * @param {number|string} fieldId
- * @returns {string}
- */
-export function leadCustomFieldColumnId(fieldId) {
-  return `${LEAD_CUSTOM_FIELD_COL_PREFIX}${fieldId}`;
-}
-
-/**
- * @param {string} columnId
- * @returns {number | null}
- */
-export function parseLeadCustomFieldColumnId(columnId) {
-  if (!columnId || typeof columnId !== 'string') return null;
-  if (!columnId.startsWith(LEAD_CUSTOM_FIELD_COL_PREFIX)) return null;
-  const n = Number(columnId.slice(LEAD_CUSTOM_FIELD_COL_PREFIX.length));
-  return Number.isFinite(n) ? n : null;
-}
+export const leadCustomFieldColumnId = customFieldColumnId;
+export const parseLeadCustomFieldColumnId = parseCustomFieldColumnId;
 
 /**
  * @param {Array<{ field_id?: number, id?: number, name?: string, label?: string }>} customFields from GET /contacts/custom-fields
@@ -44,7 +30,7 @@ export function buildLeadCustomFieldColumnDefs(customFields) {
   return customFields.map((f) => {
     const id = f.field_id ?? f.id;
     return {
-      id: leadCustomFieldColumnId(id),
+      id: customFieldColumnId(id),
       label: f.label || f.name || `Field ${id}`,
       category: 'custom',
       customFieldType: f.type,
@@ -70,6 +56,8 @@ const ALL_LEAD_COLUMNS = [
   { id: 'type', label: 'Type', sortKey: 'type', category: 'default' },
   { id: 'manager_name', label: 'Manager', sortKey: 'manager_name', requireManagerAgent: true, category: 'default' },
   { id: 'assigned_user_name', label: 'Agent', sortKey: 'assigned_user_name', requireManagerAgent: true, category: 'default' },
+  { id: 'call_count_total', label: 'Call count', sortKey: null, category: 'extra' },
+  { id: 'last_called_at', label: 'Last called', sortKey: null, category: 'extra' },
   { id: 'source', label: 'Source', sortKey: 'source', category: 'extra' },
   { id: 'city', label: 'City', sortKey: 'city', category: 'extra' },
   { id: 'company', label: 'Company', sortKey: 'company', category: 'extra' },

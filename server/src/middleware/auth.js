@@ -210,6 +210,51 @@ export function requirePermission(permissionCodes) {
  * Platform admins bypass permission checks
  * @param {string[]} permissionCodes - Array of permission codes (all must match)
  */
+/**
+ * Delete contact/lead: RBAC delete permission, or agent when tenant allows agent delete for that type.
+ */
+export function requireContactDeleteAccess() {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      if (req.user.isPlatformAdmin) {
+        return next();
+      }
+      const perms = req.user.permissions || [];
+      if (perms.includes('contacts.delete') || perms.includes('leads.delete')) {
+        return next();
+      }
+      if (req.user.role !== 'agent') {
+        return res.status(403).json({ error: 'Permission denied' });
+      }
+      // Agents can only delete record types they can edit, and only when the workspace policy allows it.
+      // Type-specific enforcement happens in the service layer (based on the record's `type`).
+      if (!perms.includes('contacts.update') && !perms.includes('leads.update')) {
+        return res.status(403).json({ error: 'Permission denied' });
+      }
+      const tenantId = req.tenant?.id;
+      if (!tenantId) {
+        return res.status(400).json({ error: 'Tenant context required' });
+      }
+      const [row] = await query(
+        `SELECT agent_can_delete_leads, agent_can_delete_contacts
+         FROM users
+         WHERE id = ? AND tenant_id = ? AND is_deleted = 0 AND is_platform_admin = 0
+         LIMIT 1`,
+        [req.user.id, tenantId]
+      );
+      if (row && (row.agent_can_delete_leads || row.agent_can_delete_contacts)) {
+        return next();
+      }
+      return res.status(403).json({ error: 'Permission denied' });
+    } catch (err) {
+      return next(err);
+    }
+  };
+}
+
 export function requireAllPermissions(permissionCodes) {
   return (req, res, next) => {
     if (!req.user) {

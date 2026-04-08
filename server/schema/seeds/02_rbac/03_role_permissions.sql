@@ -43,6 +43,7 @@ WHERE r.name = 'admin'
 -- MANAGER ROLE: Monitoring and reporting
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
+
 FROM roles r
 CROSS JOIN permissions p
 WHERE r.name = 'manager'
@@ -50,9 +51,12 @@ WHERE r.name = 'manager'
   AND p.code IN (
     'dashboard.view',
     'contacts.read',
+    'contacts.update',
+    'contacts.delete',
     'leads.read',
     'leads.create',
     'leads.update',
+    'leads.delete',
     'dial.monitor',
     'reports.view',
     'users.team',
@@ -75,6 +79,7 @@ WHERE r.name = 'agent'
   AND p.code IN (
     'dashboard.view',
     'contacts.read',
+    'contacts.update',
     'leads.read',
     'leads.create',
     'leads.update',

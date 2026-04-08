@@ -16,6 +16,8 @@ const FIELD_TYPE_OPTIONS = [
   { value: 'date', label: 'Date' },
   { value: 'boolean', label: 'Yes / No' },
   { value: 'select', label: 'Select (dropdown)' },
+  { value: 'multiselect', label: 'Multi-select (checkboxes)' },
+  { value: 'multiselect_dropdown', label: 'Multi-select (dropdown)' },
 ];
 
 function parseSelectOptionsFromCommaString(raw) {
@@ -41,6 +43,9 @@ export function LeadColumnCustomizeModal({
   onSave,
   canAddCustomField = false,
   onCustomFieldCreated,
+  title = 'Customize columns',
+  getDefaults,
+  persistVisibleIds,
 }) {
   const [visibleOrdered, setVisibleOrdered] = useState([]);
   const [search, setSearch] = useState('');
@@ -101,7 +106,10 @@ export function LeadColumnCustomizeModal({
     if (!String(addLabel).trim()) errors.label = 'Label is required';
     if (!addType) errors.type = 'Type is required';
     const optionList = parseSelectOptionsFromCommaString(addOptions);
-    if (addType === 'select' && optionList.length === 0) {
+    if (
+      (addType === 'select' || addType === 'multiselect' || addType === 'multiselect_dropdown') &&
+      optionList.length === 0
+    ) {
       errors.options = 'Add at least one option (comma-separated)';
     }
     if (Object.keys(errors).length > 0) {
@@ -116,7 +124,9 @@ export function LeadColumnCustomizeModal({
         label: String(addLabel).trim(),
         type: addType,
         is_required: addRequired,
-        ...(addType === 'select' ? { options: optionList } : {}),
+        ...(addType === 'select' || addType === 'multiselect' || addType === 'multiselect_dropdown'
+          ? { options: optionList }
+          : {}),
       });
       const created = res?.data?.data;
       if (created && onCustomFieldCreated) {
@@ -200,7 +210,8 @@ export function LeadColumnCustomizeModal({
   }, []);
 
   const handleDefault = () => {
-    setVisibleOrdered(getDefaultVisibleLeadColumnIds(applicableColumns));
+    const fn = getDefaults || getDefaultVisibleLeadColumnIds;
+    setVisibleOrdered(fn(applicableColumns));
   };
 
   const handleSave = () => {
@@ -209,7 +220,8 @@ export function LeadColumnCustomizeModal({
       : applicableColumns.some((c) => c.id === 'display_name')
         ? ['display_name', ...visibleOrdered.filter((id) => id !== 'display_name')]
         : visibleOrdered;
-    saveLeadVisibleColumnIds(ensured);
+    const persist = persistVisibleIds || saveLeadVisibleColumnIds;
+    persist(ensured);
     onSave(ensured);
     onClose();
   };
@@ -222,7 +234,7 @@ export function LeadColumnCustomizeModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Customize columns"
+      title={title}
       size="lg"
       closeOnEscape
       footer={
@@ -400,14 +412,14 @@ export function LeadColumnCustomizeModal({
           options={FIELD_TYPE_OPTIONS}
           error={addErrors.type}
         />
-        {addType === 'select' ? (
+        {addType === 'select' || addType === 'multiselect' || addType === 'multiselect_dropdown' ? (
           <Input
             label="Options (comma-separated)"
             placeholder="e.g. Hot, Warm, Cold"
             value={addOptions}
             onChange={(e) => setAddOptions(e.target.value)}
             error={addErrors.options}
-            hint="Only used when type is Select"
+            hint="Used for single select and both multi-select types"
           />
         ) : null}
         <Checkbox

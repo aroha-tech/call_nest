@@ -79,6 +79,7 @@ export async function list(req, res, next) {
     }
 
     const { search = '', page = '1', limit = '20', type, status_id } = req.query;
+    const touch_status = req.query.touch_status ? String(req.query.touch_status).trim().toLowerCase() : undefined;
 
     const filterManagerId = parseContactListFilterParam(req.query.filter_manager_id);
     const filterAssignedUserId = parseContactListFilterParam(req.query.filter_assigned_user_id);
@@ -92,6 +93,7 @@ export async function list(req, res, next) {
       limit: parseInt(limit, 10),
       type: type || undefined,
       statusId: status_id || undefined,
+      touchStatus: touch_status || undefined,
       filterManagerId,
       filterAssignedUserId,
       campaignIdFilter,
@@ -230,6 +232,25 @@ export async function listContactCustomFields(req, res, next) {
     const contactId = req.params.id;
     const fields = await contactCustomFieldsService.listContactCustomFieldValues(tenantId, contactId, req.user);
     res.json({ data: fields });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkRemove(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
+
+    const ids = req.body?.ids;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids must be a non-empty array' });
+    }
+
+    const result = await contactsService.softDeleteContactsBulk(ids, tenantId, req.user, {
+      deleted_source: req.body?.deleted_source || 'manual',
+    });
+    res.json({ ok: true, data: result });
   } catch (err) {
     next(err);
   }

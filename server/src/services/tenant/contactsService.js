@@ -28,9 +28,13 @@ import {
   DATE_OF_BIRTH_KEYS,
   TAX_ID_KEYS,
   suggestImportColumnTarget,
+  suggestNewCustomFieldType,
+  IMPORT_CORE_FIELD_OPTIONS,
+  pickFirstByAliasKeysRespectingIgnore,
   splitFullNameToFirstLast,
 } from '../../utils/leadImportCsvHelpers.js';
 import * as contactTagsService from './contactTagsService.js';
+import * as contactAssignmentHistoryService from './contactAssignmentHistoryService.js';
 
 function assertUniquePhoneLabels(phones) {
   if (!Array.isArray(phones)) return;
@@ -62,6 +66,52 @@ function trimStr(v) {
   if (v === null || v === undefined) return null;
   const t = String(v).trim();
   return t === '' ? null : t;
+}
+
+/** Normalize CSV cell for contact_custom_field_values.value_text by field type. */
+function normalizeImportedCustomFieldValue(raw, fieldType) {
+  if (raw === null || raw === undefined) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  if (fieldType === 'date') {
+    const iso = normalizeDateOfBirthForDb(s);
+    if (iso) return iso;
+    const dmy = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+    if (dmy) {
+      const dd = parseInt(dmy[1], 10);
+      const mm = parseInt(dmy[2], 10);
+      let yyyy = parseInt(dmy[3], 10);
+      if (yyyy < 100) yyyy += yyyy >= 70 ? 1900 : 2000;
+      if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${yyyy}-${pad(mm)}-${pad(dd)}`;
+      }
+    }
+    return s;
+  }
+  if (fieldType === 'boolean') {
+    const lower = s.toLowerCase();
+    if (['1', 'true', 'yes', 'y', 'on'].includes(lower)) return '1';
+    if (['0', 'false', 'no', 'n', 'off'].includes(lower)) return '0';
+    return s;
+  }
+  if (fieldType === 'number') {
+    const n = Number(s.replace(/,/g, ''));
+    return Number.isFinite(n) ? String(n) : s;
+  }
+  if (fieldType === 'multiselect' || fieldType === 'multiselect_dropdown') {
+    try {
+      const parsed = JSON.parse(s);
+      if (Array.isArray(parsed)) {
+        return JSON.stringify(parsed.map((x) => String(x).trim()).filter(Boolean));
+      }
+    } catch {
+      // fall through
+    }
+    const parts = s.split(/[,;|]/).map((x) => x.trim()).filter(Boolean);
+    return JSON.stringify(parts);
+  }
+  return s;
 }
 
 export function buildOwnershipWhere(user) {
@@ -576,6 +626,7 @@ export async function listContacts(
     sortBy,
     sortDir,
     columnFilters,
+    touchStatus,
   } = {}
 ) {
   const pageNum = parseInt(page, 10) || 1;
@@ -596,6 +647,13 @@ export async function listContacts(
   if (statusId) {
     whereClauses.push('c.status_id = ?');
     params.push(statusId);
+  }
+
+  // touchStatus: 'untouched' | 'touched'
+  if (touchStatus === 'untouched') {
+    whereClauses.push('(c.last_called_at IS NULL OR c.call_count_total = 0)');
+  } else if (touchStatus === 'touched') {
+    whereClauses.push('(c.last_called_at IS NOT NULL AND c.call_count_total > 0)');
   }
 
   if (campaignIdFilter === 'none') {
@@ -675,6 +733,9 @@ export async function listContacts(
         c.created_source,
         c.created_by,
         c.updated_by,
+        c.first_called_at,
+        c.last_called_at,
+        c.call_count_total,
         c.created_at
      ${CONTACT_LIST_JOIN_FROM}
      ${finalWhere}
@@ -754,6 +815,9 @@ export async function getContactById(id, tenantId, user) {
         c.created_source,
         c.created_by,
         c.updated_by,
+        c.first_called_at,
+        c.last_called_at,
+        c.call_count_total,
         c.created_at
      FROM contacts c
      LEFT JOIN contact_phones p
@@ -1200,6 +1264,38 @@ export async function updateContact(id, tenantId, user, payload) {
     );
   }
 
+  // Record assignment history if ownership fields were changed by this update call.
+  // (assignment bulk uses assignContacts which should also record history)
+  const nextManager =
+    payload.manager_id !== undefined ? (payload.manager_id || null) : existing.manager_id ?? null;
+  const nextAssigned =
+    payload.assigned_user_id !== undefined
+      ? (payload.assigned_user_id || null)
+      : existing.assigned_user_id ?? null;
+  const nextCampaign =
+    payload.campaign_id !== undefined ? (payload.campaign_id || null) : existing.campaign_id ?? null;
+
+  const changed =
+    (payload.manager_id !== undefined && Number(nextManager || 0) !== Number(existing.manager_id || 0)) ||
+    (payload.assigned_user_id !== undefined &&
+      Number(nextAssigned || 0) !== Number(existing.assigned_user_id || 0)) ||
+    (payload.campaign_id !== undefined && Number(nextCampaign || 0) !== Number(existing.campaign_id || 0));
+
+  if (changed) {
+    await contactAssignmentHistoryService.recordChange(tenantId, {
+      contact_id: Number(id),
+      changed_by_user_id: user?.id ?? null,
+      change_source: 'manual',
+      change_reason: 'update_contact',
+      from_manager_id: existing.manager_id ?? null,
+      to_manager_id: nextManager,
+      from_assigned_user_id: existing.assigned_user_id ?? null,
+      to_assigned_user_id: nextAssigned,
+      from_campaign_id: existing.campaign_id ?? null,
+      to_campaign_id: nextCampaign,
+    });
+  }
+
   // Update phones if provided (replace strategy)
   if (Array.isArray(phones)) {
     await query(
@@ -1266,10 +1362,55 @@ export async function updateContact(id, tenantId, user, payload) {
   return getContactById(id, tenantId, user);
 }
 
-export async function softDeleteContact(id, tenantId, user, { deleted_source = 'manual' } = {}) {
-  // Ensure user can access the contact (ownership enforced by getContactById)
+async function fetchAgentDeleteFlagsForUser(tenantId, userId) {
+  const [row] = await query(
+    `SELECT agent_can_delete_leads, agent_can_delete_contacts
+     FROM users
+     WHERE id = ? AND tenant_id = ? AND is_deleted = 0 AND is_platform_admin = 0
+     LIMIT 1`,
+    [userId, tenantId]
+  );
+  return {
+    agent_can_delete_leads: !!row?.agent_can_delete_leads,
+    agent_can_delete_contacts: !!row?.agent_can_delete_contacts,
+  };
+}
+
+function canUserDeleteContactRecord(user, existing, flags) {
+  const perms = user.permissions || [];
+  if (existing.type === 'lead' && perms.includes('leads.delete')) return true;
+  if (existing.type === 'contact' && perms.includes('contacts.delete')) return true;
+  if (user.role !== 'agent') return false;
+  if (existing.type === 'lead') {
+    if (!perms.includes('leads.update')) return false;
+    return !!flags.agent_can_delete_leads;
+  }
+  if (existing.type === 'contact') {
+    if (!perms.includes('contacts.update')) return false;
+    return !!flags.agent_can_delete_contacts;
+  }
+  return false;
+}
+
+export async function softDeleteContact(
+  id,
+  tenantId,
+  user,
+  { deleted_source = 'manual', agentDeleteFlags: agentDeleteFlagsOpt = null } = {}
+) {
   const existing = await getContactById(id, tenantId, user);
   if (!existing) return null;
+
+  const flags =
+    agentDeleteFlagsOpt ??
+    (user?.role === 'agent'
+      ? await fetchAgentDeleteFlagsForUser(tenantId, user.id)
+      : { agent_can_delete_leads: false, agent_can_delete_contacts: false });
+  if (!canUserDeleteContactRecord(user, existing, flags)) {
+    const err = new Error('You do not have permission to delete this record');
+    err.status = 403;
+    throw err;
+  }
 
   await query(
     `UPDATE contacts
@@ -1281,8 +1422,37 @@ export async function softDeleteContact(id, tenantId, user, { deleted_source = '
     [user.id, deleted_source || 'manual', user.id, id, tenantId]
   );
 
-  // After delete it won't show in getContactById (deleted_at IS NULL), so return minimal
   return { id: Number(id), deleted_at: new Date().toISOString() };
+}
+
+const BULK_DELETE_MAX = 100;
+
+export async function softDeleteContactsBulk(ids, tenantId, user, { deleted_source = 'manual' } = {}) {
+  const raw = Array.isArray(ids) ? ids : [];
+  const unique = [...new Set(raw.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))].slice(
+    0,
+    BULK_DELETE_MAX
+  );
+
+  const deleted = [];
+  const skipped = [];
+  const flags =
+    user?.role === 'agent'
+      ? await fetchAgentDeleteFlagsForUser(tenantId, user.id)
+      : { agent_can_delete_leads: false, agent_can_delete_contacts: false };
+
+  for (const id of unique) {
+    try {
+      const r = await softDeleteContact(id, tenantId, user, { deleted_source, agentDeleteFlags: flags });
+      if (r) deleted.push(r.id);
+      else skipped.push({ id, reason: 'not_found_or_no_access' });
+    } catch (e) {
+      if (e.status === 403) skipped.push({ id, reason: 'forbidden' });
+      else throw e;
+    }
+  }
+
+  return { deleted, skipped, deletedCount: deleted.length };
 }
 
 export async function assignContacts(tenantId, user, payload) {
@@ -1484,6 +1654,31 @@ export async function assignContacts(tenantId, user, payload) {
     [tenantId, ...ids]
   );
 
+  // Record assignment history for each affected row (append-only).
+  // Use the "before" snapshot we loaded and the requested target values (normalizedMid/Aid/campaign_id).
+  const byIdBefore = new Map(contacts.map((c) => [Number(c.id), c]));
+  for (const c of updated) {
+    const before = byIdBefore.get(Number(c.id));
+    if (!before) continue;
+    const changed =
+      Number(before.manager_id || 0) !== Number(c.manager_id || 0) ||
+      Number(before.assigned_user_id || 0) !== Number(c.assigned_user_id || 0) ||
+      (cidProvided && Number((before.campaign_id ?? 0) || 0) !== Number((c.campaign_id ?? 0) || 0));
+    if (!changed) continue;
+    await contactAssignmentHistoryService.recordChange(tenantId, {
+      contact_id: Number(c.id),
+      changed_by_user_id: user?.id ?? null,
+      change_source: 'manual',
+      change_reason: 'assign_contacts',
+      from_manager_id: before.manager_id ?? null,
+      to_manager_id: c.manager_id ?? null,
+      from_assigned_user_id: before.assigned_user_id ?? null,
+      to_assigned_user_id: c.assigned_user_id ?? null,
+      from_campaign_id: before.campaign_id ?? null,
+      to_campaign_id: c.campaign_id ?? null,
+    });
+  }
+
   return { updatedCount: affectedRows, data: updated };
 }
 
@@ -1548,13 +1743,61 @@ async function resolveContactStatusIdByName(tenantId, statusNameOrCode) {
   return rows?.[0]?.id ?? null;
 }
 
-async function ensureCustomFieldDefinition(tenantId, { name, label, type }) {
+const CUSTOM_FIELD_TYPES = new Set([
+  'text',
+  'number',
+  'date',
+  'boolean',
+  'select',
+  'multiselect',
+  'multiselect_dropdown',
+]);
+
+/** How to interpret cell values: `auto` uses the DB field type (or provider default when creating). */
+function effectiveImportValueType(cfg, fallbackType) {
+  const iv = cfg?.importValueType;
+  if (iv && iv !== 'auto') {
+    if (iv === 'checkbox') return 'boolean';
+    if (CUSTOM_FIELD_TYPES.has(iv)) return iv;
+  }
+  return fallbackType || 'text';
+}
+
+function effectiveCustomFieldImportType(cfg, fieldDef) {
+  return effectiveImportValueType(cfg, fieldDef?.type || 'text');
+}
+
+function normalizeNewCustomFieldType(raw) {
+  if (raw === 'checkbox') return 'boolean';
+  return CUSTOM_FIELD_TYPES.has(raw) ? raw : 'text';
+}
+
+function coerceCustomFieldOptionsJson(raw) {
+  if (raw == null) return null;
+  if (Array.isArray(raw) && raw.length > 0) return raw.map((x) => String(x).trim()).filter(Boolean);
+  if (typeof raw === 'string') {
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return null;
+}
+
+async function ensureCustomFieldDefinition(tenantId, { name, label, type, options_json } = {}) {
   const safeName = normalizeHeader(name);
   const safeLabel = String(label || safeName).trim() || safeName;
   if (!safeName) return null;
 
+  const fieldType = CUSTOM_FIELD_TYPES.has(type) ? type : 'text';
+  const optsArr =
+    fieldType === 'select' || fieldType === 'multiselect' || fieldType === 'multiselect_dropdown'
+      ? coerceCustomFieldOptionsJson(options_json)
+      : null;
+  const optsStr = optsArr && optsArr.length ? JSON.stringify(optsArr) : null;
+
   const existing = await query(
-    `SELECT id, name, label
+    `SELECT id, name, label, type
      FROM contact_custom_fields
      WHERE tenant_id = ? AND name = ?
      LIMIT 1`,
@@ -1564,15 +1807,15 @@ async function ensureCustomFieldDefinition(tenantId, { name, label, type }) {
 
   try {
     const result = await query(
-      `INSERT INTO contact_custom_fields (tenant_id, name, label, type, is_required, is_active)
-       VALUES (?, ?, ?, ?, 0, 1)`,
-      [tenantId, safeName, safeLabel, type]
+      `INSERT INTO contact_custom_fields (tenant_id, name, label, type, options_json, is_required, is_active)
+       VALUES (?, ?, ?, ?, ?, 0, 1)`,
+      [tenantId, safeName, safeLabel, fieldType, optsStr]
     );
-    return { id: result.insertId, name: safeName, label: safeLabel };
+    return { id: result.insertId, name: safeName, label: safeLabel, type: fieldType };
   } catch (e) {
     // If another request created it concurrently, fetch again
     const again = await query(
-      `SELECT id, name, label
+      `SELECT id, name, label, type
        FROM contact_custom_fields
        WHERE tenant_id = ? AND name = ?
        LIMIT 1`,
@@ -1607,8 +1850,8 @@ const PROVIDER_COLUMNS_AUTO_CF = [
   { key: 'services', label: 'Services', type: 'text' },
   { key: 'remark', label: 'Remark', type: 'text' },
   { key: 'remark_status', label: 'Remark Status', type: 'text' },
-  { key: 'assign_date', label: 'Assign Date', type: 'text' },
-  { key: 'lead_date', label: 'Lead Date', type: 'text' },
+  { key: 'assign_date', label: 'Assign Date', type: 'date' },
+  { key: 'lead_date', label: 'Lead Date', type: 'date' },
   { key: 'lead_timestamp', label: 'Time Stamp', type: 'text' },
   { key: 'assign_status', label: 'Assign', type: 'text' },
 ];
@@ -1637,7 +1880,7 @@ const PROVIDER_ALIAS_BY_KEY = {
   assign_status: ASSIGN_STATUS_KEYS,
 };
 
-function applyCoreDefaultsFromNormalized(normalized, mappedCore = {}) {
+function applyCoreDefaultsFromNormalized(normalized, mappedCore = {}, headerMapping = null) {
   const out = {};
   for (const key of CONTACT_DEFAULT_EXTRA_KEYS) {
     let val = mappedCore[key];
@@ -1645,8 +1888,22 @@ function applyCoreDefaultsFromNormalized(normalized, mappedCore = {}) {
       out[key] = key === 'date_of_birth' ? normalizeDateOfBirthForDb(val) : trimStr(val);
       continue;
     }
-    let picked = pickFirstByAliasKeys(normalized, PROVIDER_ALIAS_BY_KEY[key] || []);
-    if (picked === undefined || picked === null) picked = normalized[key];
+    let picked = pickFirstByAliasKeysRespectingIgnore(
+      normalized,
+      PROVIDER_ALIAS_BY_KEY[key] || [],
+      headerMapping
+    );
+    if (picked === undefined || picked === null) {
+      const direct = normalized[key];
+      if (
+        direct !== undefined &&
+        direct !== null &&
+        String(direct).trim() &&
+        !(headerMapping && headerMapping[key]?.target === 'ignore')
+      ) {
+        picked = direct;
+      }
+    }
     if (picked === undefined || picked === null || !String(picked).trim()) continue;
     out[key] = key === 'date_of_birth' ? normalizeDateOfBirthForDb(picked) : trimStr(picked);
   }
@@ -1661,11 +1918,55 @@ function pickDefinedCoreFieldsFromResolved(resolved) {
   return o;
 }
 
+/** Labels for core `contacts` extras — same order as IMPORT_CORE_FIELD_OPTIONS subset. */
+const CORE_EXTRA_FIELD_META = IMPORT_CORE_FIELD_OPTIONS.filter((o) => CONTACT_DEFAULT_EXTRA_KEY_SET.has(o.key));
+
+/**
+ * When a file column is explicitly mapped in `headerMapping`, do not also attach its value to a tenant
+ * custom field just because the header text matches a custom field name (e.g. "City" → core city vs CF "city").
+ */
+function isHeaderMappingOwningColumn(headerMapping, columnKey) {
+  return (
+    headerMapping &&
+    typeof headerMapping === 'object' &&
+    Object.prototype.hasOwnProperty.call(headerMapping, columnKey)
+  );
+}
+
+/** Skip legacy provider auto-fill when this logical field is already mapped via the grid. */
+function isProviderLogicalFieldMappedInHeaderMapping(headerMapping, defKey, customFieldDefsById) {
+  if (!headerMapping || typeof headerMapping !== 'object') return false;
+  const nk = normalizeHeader(defKey);
+  for (const cfg of Object.values(headerMapping)) {
+    if (!cfg?.target || cfg.target === 'ignore') continue;
+    if (cfg.target === defKey) return true;
+    if (cfg.target === 'custom' && cfg.customFieldId && customFieldDefsById) {
+      const f = customFieldDefsById.get(Number(cfg.customFieldId));
+      if (f && normalizeHeader(f.name) === nk) return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Same rules as CSV import row processing (may create missing provider-style custom fields).
  * @returns {{ error: string } | { error: null, first_name, last_name, display_name, email, finalSource, resolvedStatusId, providerStatusName, campaign_id, manager_id, assigned_user_id, phones, custom_fields_deduped, primaryPhone }}
  */
-async function resolveCsvRowToImportPayload(tenantId, { normalized, headerMapping, byHeader, defaultCountryCode }) {
+async function resolveCsvRowToImportPayload(
+  tenantId,
+  { normalized, headerMapping, byHeader, defaultCountryCode, customFieldDefsById = null }
+) {
+  // Drop ignored columns once so no later path (aliases, provider auto-CF, tenant CF by header, core defaults)
+  // can re-use their values — fixes "-- unmapped --" still filling City / Custom fields via parallel aliases.
+  const row = { ...normalized };
+  if (headerMapping && typeof headerMapping === 'object') {
+    for (const nk of Object.keys(headerMapping)) {
+      if (headerMapping[nk]?.target === 'ignore') {
+        delete row[nk];
+      }
+    }
+  }
+
   let first_name = null;
   let last_name = null;
   let email = null;
@@ -1679,7 +1980,7 @@ async function resolveCsvRowToImportPayload(tenantId, { normalized, headerMappin
 
   if (headerMapping) {
     for (const [nk, cfg] of Object.entries(headerMapping)) {
-      const val = normalized[nk];
+      const val = row[nk];
       if (val === undefined) continue;
       const target = cfg?.target;
       if (!target || target === 'ignore') continue;
@@ -1709,14 +2010,51 @@ async function resolveCsvRowToImportPayload(tenantId, { normalized, headerMappin
         if (!field?.id) continue;
         byHeader.set(def.key, field);
         byHeader.set(normalizeHeader(def.label), field);
-        custom_fields.push({ field_id: field.id, value_text: val === null ? null : String(val) });
+        const effType = effectiveImportValueType(cfg, field.type);
+        const pv = normalizeImportedCustomFieldValue(val, effType);
+        custom_fields.push({ field_id: field.id, value_text: pv !== null ? pv : String(val) });
       } else if (target === 'custom' && cfg.customFieldId) {
-        custom_fields.push({ field_id: cfg.customFieldId, value_text: val === null ? null : String(val) });
+        const fieldDef = customFieldDefsById?.get(Number(cfg.customFieldId)) || null;
+        const effType = effectiveCustomFieldImportType(cfg, fieldDef);
+        const pv = normalizeImportedCustomFieldValue(val, effType);
+        custom_fields.push({
+          field_id: cfg.customFieldId,
+          value_text: pv !== null ? pv : val === null ? null : String(val),
+        });
+      } else if (target === 'new_custom') {
+        if (val === null || !String(val).trim()) continue;
+        const ft = normalizeNewCustomFieldType(cfg.fieldType);
+        const label = String(cfg.fieldLabel || nk).trim() || nk;
+        const importNameRaw = `import_${nk}`;
+        const importName = importNameRaw.length > 100 ? importNameRaw.slice(0, 100) : importNameRaw;
+        let opts = null;
+        if (ft === 'select' || ft === 'multiselect' || ft === 'multiselect_dropdown') {
+          opts = coerceCustomFieldOptionsJson(cfg.options_json ?? cfg.selectOptions);
+        }
+        const field = await ensureCustomFieldDefinition(tenantId, {
+          name: importName,
+          label,
+          type: ft,
+          options_json: opts,
+        });
+        if (!field?.id) continue;
+        byHeader.set(normalizeHeader(field.name || importName), field);
+        byHeader.set(normalizeHeader(label), field);
+        const value_text = normalizeImportedCustomFieldValue(val, ft);
+        custom_fields.push({ field_id: field.id, value_text });
+        if (customFieldDefsById && field?.id) {
+          customFieldDefsById.set(Number(field.id), {
+            id: field.id,
+            name: field.name,
+            label: field.label,
+            type: ft,
+          });
+        }
       }
     }
   }
 
-  const extracted = extractNamesAndEmailFromNormalizedRow(normalized);
+  const extracted = extractNamesAndEmailFromNormalizedRow(row);
   if (!first_name) first_name = extracted.first_name;
   if (!last_name) last_name = extracted.last_name;
   if (!email) email = extracted.email;
@@ -1729,7 +2067,7 @@ async function resolveCsvRowToImportPayload(tenantId, { normalized, headerMappin
     display_name = composed || email || extracted.full_name_raw || null;
   }
 
-  const normalizedForPhones = { ...normalized };
+  const normalizedForPhones = { ...row };
   if (mappedPrimaryPhone != null && String(mappedPrimaryPhone).trim()) {
     normalizedForPhones.primary_phone = mappedPrimaryPhone;
   }
@@ -1743,32 +2081,59 @@ async function resolveCsvRowToImportPayload(tenantId, { normalized, headerMappin
     return { error: 'Either first_name or email is required' };
   }
 
-  const source = normalized.source || null;
-  const providerSource = pickFirstByAliasKeys(normalized, SOURCE_KEYS);
-  const finalSource = mappedSource || providerSource || source;
+  const directSource =
+    row.source !== undefined && row.source !== null && String(row.source).trim()
+      ? headerMapping?.source?.target === 'ignore'
+        ? null
+        : row.source
+      : null;
+  const providerSource = pickFirstByAliasKeysRespectingIgnore(row, SOURCE_KEYS, headerMapping);
+  const finalSource = mappedSource || providerSource || directSource;
 
-  const status_id = normalized.status_id || undefined;
+  const status_id = row.status_id || undefined;
   const providerStatusName =
-    mappedStatusName || pickFirstByAliasKeys(normalized, STATUS_KEYS) || null;
+    mappedStatusName || pickFirstByAliasKeysRespectingIgnore(row, STATUS_KEYS, headerMapping) || null;
   const resolvedStatusId =
     status_id || (providerStatusName ? await resolveContactStatusIdByName(tenantId, providerStatusName) : null);
-  const campaign_id = normalized.campaign_id ? Number(normalized.campaign_id) : undefined;
-  const manager_id = normalized.manager_id ? Number(normalized.manager_id) : undefined;
-  const assigned_user_id = normalized.assigned_user_id ? Number(normalized.assigned_user_id) : undefined;
+  const campaign_id = row.campaign_id ? Number(row.campaign_id) : undefined;
+  const manager_id = row.manager_id ? Number(row.manager_id) : undefined;
+  const assigned_user_id = row.assigned_user_id ? Number(row.assigned_user_id) : undefined;
 
-  for (const [k, v] of Object.entries(normalized)) {
+  for (const [k, v] of Object.entries(row)) {
+    if (isHeaderMappingOwningColumn(headerMapping, k)) {
+      continue;
+    }
     let header = k;
     if (header.startsWith('cf:')) header = header.slice(3);
     const field = byHeader.get(normalizeHeader(header));
     if (!field) continue;
     if (v === undefined) continue;
-    const value_text = v === null ? null : String(v);
+    const effType = field?.type || 'text';
+    const value_text =
+      v === null ? null : normalizeImportedCustomFieldValue(v, effType) ?? String(v);
     custom_fields.push({ field_id: field.id, value_text });
   }
 
   for (const def of PROVIDER_COLUMNS_AUTO_CF) {
-    const val =
-      pickFirstByAliasKeys(normalized, PROVIDER_ALIAS_BY_KEY[def.key] || []) ?? normalized[def.key];
+    if (isProviderLogicalFieldMappedInHeaderMapping(headerMapping, def.key, customFieldDefsById)) {
+      continue;
+    }
+    let val = pickFirstByAliasKeysRespectingIgnore(
+      row,
+      PROVIDER_ALIAS_BY_KEY[def.key] || [],
+      headerMapping
+    );
+    if (val === undefined || val === null || !String(val).trim()) {
+      const dv = row[def.key];
+      if (
+        dv !== undefined &&
+        dv !== null &&
+        String(dv).trim() &&
+        !(headerMapping && headerMapping[def.key]?.target === 'ignore')
+      ) {
+        val = dv;
+      }
+    }
     if (val === undefined || val === null || !String(val).trim()) continue;
     const existingField = byHeader.get(def.key);
     const field =
@@ -1778,11 +2143,12 @@ async function resolveCsvRowToImportPayload(tenantId, { normalized, headerMappin
     byHeader.set(def.key, field);
     byHeader.set(normalizeHeader(def.label), field);
 
-    const value_text = val === null ? null : String(val);
+    const pv = normalizeImportedCustomFieldValue(val, def.type);
+    const value_text = pv !== null ? pv : val === null ? null : String(val);
     custom_fields.push({ field_id: field.id, value_text });
   }
 
-  const coreDefaults = applyCoreDefaultsFromNormalized(normalized, mappedCore);
+  const coreDefaults = applyCoreDefaultsFromNormalized(row, mappedCore, headerMapping);
 
   const cfByField = new Map();
   for (const c of custom_fields) {
@@ -2058,19 +2424,20 @@ export async function importContactsCsv(
   const { records, headerRowIndex } = parseImportBufferToRecords(buffer, { originalFilename });
 
   const allFields = await query(
-    `SELECT id, name, label
+    `SELECT id, name, label, type
      FROM contact_custom_fields
      WHERE tenant_id = ?`,
     [tenantId]
   );
 
   const byHeader = new Map();
+  const customFieldDefsById = new Map(allFields.map((f) => [f.id, f]));
   for (const f of allFields) {
     byHeader.set(normalizeHeader(f.name), f);
     byHeader.set(normalizeHeader(f.label), f);
   }
 
-  // mapping: { [normalizedHeader]: { target: 'ignore' | 'first_name' | 'last_name' | 'full_name' | 'display_name' | 'email' | 'primary_phone' | 'source' | 'status' | 'custom', customFieldId?: number } }
+  // mapping: { [nk]: { target, customFieldId?, importValueType? } | { target:'new_custom', fieldType, fieldLabel?, selectOptions? } }
   const headerMapping = mapping && typeof mapping === 'object' ? mapping : null;
 
   let created = 0;
@@ -2101,6 +2468,7 @@ export async function importContactsCsv(
         headerMapping,
         byHeader,
         defaultCountryCode,
+        customFieldDefsById,
       });
 
       if (resolved.error) {
@@ -2218,13 +2586,14 @@ export async function previewResolvedContactsImportCsv(
   }
 
   const allFields = await query(
-    `SELECT id, name, label
+    `SELECT id, name, label, type
      FROM contact_custom_fields
      WHERE tenant_id = ?`,
     [tenantId]
   );
 
   const byHeader = new Map();
+  const customFieldDefsById = new Map(allFields.map((f) => [f.id, f]));
   for (const f of allFields) {
     byHeader.set(normalizeHeader(f.name), f);
     byHeader.set(normalizeHeader(f.label), f);
@@ -2250,10 +2619,12 @@ export async function previewResolvedContactsImportCsv(
       headerMapping,
       byHeader,
       defaultCountryCode,
+      customFieldDefsById,
     });
 
     if (resolved.error) {
       sampleRows.push({
+        sample_row: i + 1,
         row: rowIndex,
         error: resolved.error,
         duplicate_action: null,
@@ -2277,12 +2648,26 @@ export async function previewResolvedContactsImportCsv(
       }
     }
 
-    const custom_fields_preview = (resolved.custom_fields_deduped || []).map((c) => ({
-      label: fieldLabelById.get(c.field_id) || `Field ${c.field_id}`,
-      value: c.value_text,
-    }));
+    const custom_fields_preview = (resolved.custom_fields_deduped || []).map((c) => {
+      let display = c.value_text;
+      if (display != null && String(display).trim().startsWith('[')) {
+        try {
+          const parsed = JSON.parse(display);
+          if (Array.isArray(parsed)) display = parsed.join(', ');
+        } catch {
+          // keep raw
+        }
+      }
+      return {
+        label: fieldLabelById.get(c.field_id) || `Field ${c.field_id}`,
+        value: display,
+      };
+    });
+
+    const coreExtras = pickDefinedCoreFieldsFromResolved(resolved);
 
     sampleRows.push({
+      sample_row: i + 1,
       row: rowIndex,
       duplicate_action,
       display_name: resolved.display_name,
@@ -2292,6 +2677,7 @@ export async function previewResolvedContactsImportCsv(
       primary_phone: resolved.primaryPhone,
       source: resolved.finalSource,
       status: resolved.providerStatusName,
+      ...coreExtras,
       custom_fields_preview,
     });
   }
@@ -2300,6 +2686,7 @@ export async function previewResolvedContactsImportCsv(
     totalRows: records.length,
     mode,
     sampleRows,
+    standardExtraFieldColumns: CORE_EXTRA_FIELD_META,
   };
 }
 
@@ -2307,7 +2694,13 @@ export async function previewContactsImportCsv(tenantId, { buffer, originalFilen
   const { records } = parseImportBufferToRecords(buffer, { originalFilename });
 
   if (!records || records.length === 0) {
-    return { columns: [], totalRows: 0, customFields: [] };
+    return {
+      columns: [],
+      totalRows: 0,
+      customFields: [],
+      coreFields: IMPORT_CORE_FIELD_OPTIONS,
+      standardExtraFieldColumns: CORE_EXTRA_FIELD_META,
+    };
   }
 
   const firstRows = records.slice(0, 5);
@@ -2338,6 +2731,7 @@ export async function previewContactsImportCsv(tenantId, { buffer, originalFilen
       normalized,
       samples,
       suggested,
+      suggestedFieldType: suggestNewCustomFieldType(normalized, samples),
     };
   });
 
@@ -2345,6 +2739,8 @@ export async function previewContactsImportCsv(tenantId, { buffer, originalFilen
     totalRows: records.length,
     columns,
     customFields,
+    coreFields: IMPORT_CORE_FIELD_OPTIONS,
+    standardExtraFieldColumns: CORE_EXTRA_FIELD_META,
   };
 }
 

@@ -6,6 +6,8 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { Checkbox } from '../../components/ui/Checkbox';
+import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown';
 import { Alert } from '../../components/ui/Alert';
 import { Spinner } from '../../components/ui/Spinner';
 import { contactsAPI } from '../../services/contactsAPI';
@@ -28,17 +30,39 @@ const DEFAULT_COUNTRY_CODE = '+91';
 
 function normalizeOptions(options_json) {
   if (!options_json) return [];
-  if (Array.isArray(options_json)) return options_json;
+  if (Array.isArray(options_json)) return options_json.map((x) => String(x));
   if (typeof options_json === 'string') {
+    const trimmed = options_json.trim();
+    if (!trimmed) return [];
     try {
-      const parsed = JSON.parse(options_json);
-      if (Array.isArray(parsed)) return parsed;
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.map((x) => String(x));
     } catch {
-      // ignore
+      // Plain comma / semicolon list (some exports or legacy rows)
     }
+    return trimmed
+      .split(/[,;|]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
-  if (typeof options_json === 'object' && Array.isArray(options_json.values)) return options_json.values;
+  if (typeof options_json === 'object' && Array.isArray(options_json.values)) {
+    return options_json.values.map((x) => String(x));
+  }
   return [];
+}
+
+function parseMultiselectStored(raw) {
+  if (raw == null || raw === '') return [];
+  try {
+    const p = JSON.parse(raw);
+    if (Array.isArray(p)) return p.map((x) => String(x));
+  } catch {
+    // ignore
+  }
+  return String(raw)
+    .split(/[,;|]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function uniqueLabelError(phones) {
@@ -170,7 +194,9 @@ export function ContactFormPage({ defaultType }) {
           ? await tenantUsersAPI.getAll({ page: 1, limit: 500, includeDisabled: false })
           : { data: { data: [] } };
         const cRes = loadCampaigns
-          ? await campaignsAPI.list({ page: 1, limit: 500, show_paused: true }).catch(() => ({ data: { data: [] } }))
+          ? await campaignsAPI
+              .list({ page: 1, limit: 500, show_paused: true, type: 'static' })
+              .catch(() => ({ data: { data: [] } }))
           : { data: { data: [] } };
         if (cancelled) return;
         setTenantUsers(uRes?.data?.data ?? []);
@@ -983,6 +1009,66 @@ export function ContactFormPage({ defaultType }) {
                     options={options.map((opt) => ({ value: String(opt), label: String(opt) }))}
                     placeholder="Select..."
                   />
+                );
+              }
+
+              if (f.type === 'multiselect') {
+                const selected = new Set(parseMultiselectStored(value).map(String));
+                const setMultiselect = (nextSet) => {
+                  const ordered = options.map(String).filter((o) => nextSet.has(o));
+                  const nextMap = { ...(formData.customValuesMap || {}) };
+                  nextMap[f.field_id] = ordered.length ? JSON.stringify(ordered) : '';
+                  setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
+                };
+                return (
+                  <div key={f.field_id} className={styles.customFieldFull}>
+                    <div className={styles.customMultiselectLabel}>{f.label}</div>
+                    {options.length === 0 ? (
+                      <p className={styles.customMultiselectEmpty}>
+                        No options configured. Add comma-separated options under Settings → Custom fields.
+                      </p>
+                    ) : (
+                      <div className={styles.customMultiselectGroup} role="group" aria-label={f.label}>
+                        {options.map((opt, optIdx) => {
+                          const optStr = String(opt);
+                          const id = `cf-ms-${f.field_id}-${optIdx}`;
+                          return (
+                            <Checkbox
+                              key={id}
+                              id={id}
+                              label={optStr}
+                              checked={selected.has(optStr)}
+                              onChange={(e) => {
+                                const next = new Set(selected);
+                                if (e.target.checked) next.add(optStr);
+                                else next.delete(optStr);
+                                setMultiselect(next);
+                              }}
+                              className={styles.customMultiselectCheck}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              if (f.type === 'multiselect_dropdown') {
+                return (
+                  <div key={f.field_id} className={styles.customFieldFull}>
+                    <MultiSelectDropdown
+                      label={f.label}
+                      options={options}
+                      value={value}
+                      placeholder="Select…"
+                      onChange={(next) => {
+                        const nextMap = { ...(formData.customValuesMap || {}) };
+                        nextMap[f.field_id] = next;
+                        setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
+                      }}
+                    />
+                  </div>
                 );
               }
 
