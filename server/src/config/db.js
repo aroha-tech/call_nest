@@ -103,4 +103,16 @@ export async function query(sql, params = []) {
   throw lastErr;
 }
 
+/**
+ * Run work with one pooled connection (e.g. GET_LOCK / RELEASE_LOCK on the same session).
+ */
+export async function withConnection(fn) {
+  const conn = await pool.getConnection();
+  try {
+    return await fn(conn);
+  } finally {
+    conn.release();
+  }
+}
+
 export { pool };

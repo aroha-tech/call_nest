@@ -34,6 +34,28 @@ export async function next(req, res, nextFn) {
   }
 }
 
+export async function pause(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
+    const data = await dialerSessionsService.pauseSession(tenantId, req.user, req.params.id);
+    res.json({ ok: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function resume(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
+    const data = await dialerSessionsService.resumeSession(tenantId, req.user, req.params.id);
+    res.json({ ok: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function cancel(req, res, next) {
   try {
     const tenantId = req.tenant?.id;

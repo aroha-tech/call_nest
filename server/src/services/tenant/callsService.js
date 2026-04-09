@@ -266,6 +266,23 @@ export async function setAttemptDisposition(tenantId, user, attemptId, { disposi
     `SELECT id, contact_id, disposition_id, notes FROM contact_call_attempts WHERE tenant_id = ? AND id = ? LIMIT 1`,
     [tenantId, id]
   );
+
+  // Only advance the dialer queue when a real disposition was chosen. A PUT with
+  // disposition_id null (e.g. Activities "Save" with empty select, or bad client)
+  // must NOT mark the row "called" or the first lead disappears while you are still on them.
+  const dispIdNum =
+    disposition_id !== undefined && disposition_id !== null && disposition_id !== ''
+      ? Number(disposition_id)
+      : NaN;
+  if (Number.isFinite(dispIdNum) && dispIdNum > 0) {
+    await query(
+      `UPDATE dialer_session_items
+       SET state = 'called', called_at = NOW()
+       WHERE tenant_id = ? AND last_attempt_id = ? AND state = 'calling'`,
+      [tenantId, id]
+    );
+  }
+
   return row || null;
 }
 

@@ -10,6 +10,8 @@ router.use(tenantAuthMiddleware);
 router.post('/', requirePermission(['dial.execute']), dialerSessionsController.create);
 router.get('/:id', requirePermission(['dial.execute', 'dial.monitor']), dialerSessionsController.getById);
 router.post('/:id/next', requirePermission(['dial.execute']), dialerSessionsController.next);
+router.post('/:id/pause', requirePermission(['dial.execute']), dialerSessionsController.pause);
+router.post('/:id/resume', requirePermission(['dial.execute']), dialerSessionsController.resume);
 router.post('/:id/cancel', requirePermission(['dial.execute']), dialerSessionsController.cancel);
 
 export default router;

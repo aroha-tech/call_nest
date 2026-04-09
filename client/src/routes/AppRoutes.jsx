@@ -51,6 +51,8 @@ import { useEmailModuleEnabled } from '../hooks/useEmailModuleEnabled';
 import { ActivitiesPage } from '../pages/ActivitiesPage';
 import { DialerPage } from '../pages/DialerPage';
 import { DialerSessionPage } from '../pages/DialerSessionPage';
+import { DialerSessionSetupPage } from '../pages/DialerSessionSetupPage';
+import { StandalonePageLayout } from '../layouts/StandalonePageLayout';
 
 /**
  * Renders children only when email module is enabled for the tenant; otherwise redirects to dashboard.
@@ -492,12 +494,22 @@ function TenantRoutes() {
         }
       />
       <Route
+        path="/dialer/session/setup"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.DIAL_EXECUTE}>
+            <StandalonePageLayout>
+              <DialerSessionSetupPage />
+            </StandalonePageLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/dialer/session/:id"
         element={
           <ProtectedRoute permission={PERMISSIONS.DIAL_EXECUTE}>
-            <AppShellLayout>
+            <StandalonePageLayout>
               <DialerSessionPage />
-            </AppShellLayout>
+            </StandalonePageLayout>
           </ProtectedRoute>
         }
       />

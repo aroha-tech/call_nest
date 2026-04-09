@@ -6,7 +6,7 @@ const TABLE = 'dialing_set_dispositions';
 
 export async function findAll(tenantId, dialingSetId) {
   const sql = `
-    SELECT dsd.*, d.name as disposition_name, d.code as disposition_code
+    SELECT dsd.*, d.name as disposition_name, d.code as disposition_code, d.next_action
     FROM ${TABLE} dsd
     LEFT JOIN dispositions d ON dsd.disposition_id = d.id
     WHERE dsd.tenant_id = ? AND dsd.dialing_set_id = ?

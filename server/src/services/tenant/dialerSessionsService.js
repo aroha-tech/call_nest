@@ -1,4 +1,4 @@
-import { query } from '../../config/db.js';
+import { query, withConnection } from '../../config/db.js';
 import { startCallForContact } from './callsService.js';
 
 function normalizeIds(arr, max = 200) {
@@ -23,8 +23,8 @@ export async function createSession(
 
   const result = await query(
     `INSERT INTO dialer_sessions (
-       tenant_id, created_by_user_id, provider, status, started_at, dialing_set_id, call_script_id
-     ) VALUES (?, ?, ?, 'active', NOW(), ?, ?)`,
+       tenant_id, created_by_user_id, provider, status, started_at, ended_at, paused_at, paused_seconds, dialing_set_id, call_script_id
+     ) VALUES (?, ?, ?, 'ready', NULL, NULL, NULL, 0, ?, ?)`,
     [tenantId, user.id, String(provider || 'dummy'), dialingSetId, callScriptId]
   );
   const sessionId = result.insertId;
@@ -47,7 +47,7 @@ export async function getSession(tenantId, user, sessionId) {
   if (!sid) return null;
 
   const [sess] = await query(
-    `SELECT id, tenant_id, created_by_user_id, provider, status, started_at, ended_at, dialing_set_id, call_script_id, created_at
+    `SELECT id, tenant_id, created_by_user_id, provider, status, started_at, ended_at, paused_at, paused_seconds, dialing_set_id, call_script_id, created_at
      FROM dialer_sessions
      WHERE tenant_id = ? AND id = ?
      LIMIT 1`,
@@ -73,10 +73,14 @@ export async function getSession(tenantId, user, sessionId) {
         dsi.called_at,
         c.display_name,
         c.primary_phone_id,
-        p.phone AS primary_phone
+        p.phone AS primary_phone,
+        cca.is_connected AS attempt_is_connected,
+        cca.status AS attempt_status,
+        cca.disposition_id AS attempt_disposition_id
      FROM dialer_session_items dsi
      LEFT JOIN contacts c ON c.id = dsi.contact_id AND c.tenant_id = dsi.tenant_id
      LEFT JOIN contact_phones p ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id
+     LEFT JOIN contact_call_attempts cca ON cca.id = dsi.last_attempt_id AND cca.tenant_id = dsi.tenant_id
      WHERE dsi.tenant_id = ? AND dsi.session_id = ?
      ORDER BY dsi.order_index ASC, dsi.id ASC`,
     [tenantId, sid]
@@ -137,14 +141,58 @@ export async function callNextInSession(tenantId, user, sessionId) {
     throw err;
   }
 
+  // Serialize all "next dial" work per session (double-clicks, StrictMode, parallel tabs).
+  const lockName = `cn_dn_${tenantId}_${sid}`.slice(0, 64);
+  return withConnection(async (conn) => {
+    const [lr] = await conn.query('SELECT GET_LOCK(?, 25) AS g', [lockName]);
+    const got = Number(lr?.[0]?.g);
+    if (got !== 1) {
+      const err = new Error('Another dial action is in progress for this session. Please wait.');
+      err.status = 409;
+      throw err;
+    }
+    try {
+      return await runCallNextAfterLock(tenantId, user, sid);
+    } finally {
+      await conn.query('SELECT RELEASE_LOCK(?) AS r', [lockName]);
+    }
+  });
+}
+
+async function runCallNextAfterLock(tenantId, user, sid) {
   const session = await getSession(tenantId, user, sid);
   if (!session) {
     const err = new Error('Session not found');
     err.status = 404;
     throw err;
   }
-  if (session.status !== 'active') {
+  if (session.status === 'paused') {
+    const err = new Error('Session is paused');
+    err.status = 400;
+    throw err;
+  }
+  if (session.status !== 'active' && session.status !== 'ready') {
     const err = new Error('Session is not active');
+    err.status = 400;
+    throw err;
+  }
+  if (session.status === 'ready') {
+    await query(
+      `UPDATE dialer_sessions
+       SET status = 'active', started_at = COALESCE(started_at, NOW())
+       WHERE tenant_id = ? AND id = ? AND status = 'ready'`,
+      [tenantId, sid]
+    );
+  }
+
+  const [activeCalling] = await query(
+    `SELECT id FROM dialer_session_items
+     WHERE tenant_id = ? AND session_id = ? AND state = 'calling'
+     LIMIT 1`,
+    [tenantId, sid]
+  );
+  if (activeCalling) {
+    const err = new Error('Finish the current call (set a disposition) before dialing the next lead.');
     err.status = 400;
     throw err;
   }
@@ -153,7 +201,7 @@ export async function callNextInSession(tenantId, user, sessionId) {
   if (!next) {
     await query(
       `UPDATE dialer_sessions SET status = 'completed', ended_at = NOW()
-       WHERE tenant_id = ? AND id = ? AND status = 'active'`,
+       WHERE tenant_id = ? AND id = ? AND status IN ('active','ready')`,
       [tenantId, sid]
     );
     return { done: true, attempt: null, session: await getSession(tenantId, user, sid) };
@@ -161,7 +209,7 @@ export async function callNextInSession(tenantId, user, sessionId) {
 
   await query(
     `UPDATE dialer_session_items
-     SET state = 'calling'
+     SET state = 'calling', called_at = NULL
      WHERE tenant_id = ? AND id = ? AND state = 'queued'`,
     [tenantId, next.id]
   );
@@ -174,7 +222,7 @@ export async function callNextInSession(tenantId, user, sessionId) {
     });
     await query(
       `UPDATE dialer_session_items
-       SET state = 'called', last_attempt_id = ?, last_error = NULL, called_at = NOW()
+       SET state = 'calling', last_attempt_id = ?, last_error = NULL, called_at = NULL
        WHERE tenant_id = ? AND id = ?`,
       [attempt.id, tenantId, next.id]
     );
@@ -201,6 +249,48 @@ export async function cancelSession(tenantId, user, sessionId) {
   await query(
     `UPDATE dialer_sessions SET status = 'cancelled', ended_at = NOW()
      WHERE tenant_id = ? AND id = ?`,
+    [tenantId, sid]
+  );
+  return getSession(tenantId, user, sid);
+}
+
+export async function pauseSession(tenantId, user, sessionId) {
+  const sid = Number(sessionId);
+  const session = await getSession(tenantId, user, sid);
+  if (!session) {
+    const err = new Error('Session not found');
+    err.status = 404;
+    throw err;
+  }
+  if (session.status === 'completed' || session.status === 'cancelled') return session;
+  if (session.status === 'paused') return session;
+
+  await query(
+    `UPDATE dialer_sessions
+     SET status = 'paused', paused_at = NOW()
+     WHERE tenant_id = ? AND id = ? AND status IN ('ready','active')`,
+    [tenantId, sid]
+  );
+  return getSession(tenantId, user, sid);
+}
+
+export async function resumeSession(tenantId, user, sessionId) {
+  const sid = Number(sessionId);
+  const session = await getSession(tenantId, user, sid);
+  if (!session) {
+    const err = new Error('Session not found');
+    err.status = 404;
+    throw err;
+  }
+  if (session.status !== 'paused') return session;
+
+  await query(
+    `UPDATE dialer_sessions
+     SET
+       status = 'active',
+       paused_seconds = paused_seconds + GREATEST(0, TIMESTAMPDIFF(SECOND, paused_at, NOW())),
+       paused_at = NULL
+     WHERE tenant_id = ? AND id = ? AND status = 'paused'`,
     [tenantId, sid]
   );
   return getSession(tenantId, user, sid);

@@ -10,6 +10,10 @@ export const dialerSessionsAPI = {
 
   next: (id) => axiosInstance.post(`${BASE}/${id}/next`),
 
+  pause: (id) => axiosInstance.post(`${BASE}/${id}/pause`),
+
+  resume: (id) => axiosInstance.post(`${BASE}/${id}/resume`),
+
   cancel: (id) => axiosInstance.post(`${BASE}/${id}/cancel`),
 };
 

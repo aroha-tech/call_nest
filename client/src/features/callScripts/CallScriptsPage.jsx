@@ -12,7 +12,6 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
 import { StatusBadge } from '../../components/ui/Badge';
 import { Pagination, PaginationPageSize } from '../../components/ui/Pagination';
-import { VariableSelector } from '../../components/VariableSelector';
 import { callScriptsAPI } from '../../services/dispositionAPI';
 import { useMutation } from '../../hooks/useAsyncData';
 import { useTemplateVariableAutocomplete } from '../../hooks/useTemplateVariables';
@@ -194,11 +193,6 @@ export function CallScriptsPage() {
     setFormError(null);
     setShowModal(true);
   };
-
-  const handleInsertVariable = useCallback((text) => {
-    editorRef.current?.insertAtCursor(text);
-    editorRef.current?.focus();
-  }, []);
 
   const handleAutocompleteSelect = (key) => {
     if (!autocompleteContext) return;
@@ -461,11 +455,6 @@ export function CallScriptsPage() {
                 <Button type="button" variant="secondary" size="sm" onClick={() => setShowPreviewModal(true)}>
                   Show Preview
                 </Button>
-              </div>
-            </div>
-            <div className={styles.varCol}>
-              <div className={styles.varColInner}>
-                <VariableSelector onInsert={handleInsertVariable} className={styles.varSelectorFill} />
               </div>
             </div>
           </div>

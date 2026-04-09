@@ -13,7 +13,7 @@ import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
 import { Input } from '../../components/ui/Input';
 import { Table } from '../../components/ui/Table';
-import { ConfirmModal, Modal, ModalFooter } from '../../components/ui/Modal';
+import { ConfirmModal } from '../../components/ui/Modal';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { Pagination } from '../../components/ui/Pagination';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -41,7 +41,6 @@ import {
 } from './contactTableConfig';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import pageStyles from './ContactsPage.module.scss';
-import { dialerSessionsAPI } from '../../services/dialerSessionsAPI';
 import { dialingSetsAPI, callScriptsAPI } from '../../services/dispositionAPI';
 import { dialerPreferencesAPI } from '../../services/dialerPreferencesAPI';
 
@@ -683,15 +682,10 @@ export function ContactsPage({ type, mode = 'crm' }) {
     clearSelection();
   };
 
-  // Dialer: start session modal
-  const [startModalOpen, setStartModalOpen] = useState(false);
+  // Dialer: defaults for standalone setup page
   const [dialingSets, setDialingSets] = useState([]);
   const [callScripts, setCallScripts] = useState([]);
   const [dialerDefaults, setDialerDefaults] = useState(null);
-  const [startDialingSetId, setStartDialingSetId] = useState('');
-  const [startCallScriptId, setStartCallScriptId] = useState('');
-  const [startError, setStartError] = useState('');
-  const [startBusy, setStartBusy] = useState(false);
 
   useEffect(() => {
     if (!isDialer) return;
@@ -720,29 +714,11 @@ export function ContactsPage({ type, mode = 'crm' }) {
     };
   }, [isDialer]);
 
-  const dialingSetOptions = useMemo(() => {
-    const rows = (dialingSets || []).filter((d) => (d?.is_deleted ?? 0) === 0);
-    return [
-      { value: '', label: '— Select dialing set —' },
-      ...rows.map((d) => ({ value: String(d.id), label: d.name || d.id })),
-    ];
-  }, [dialingSets]);
-
-  const callScriptOptions = useMemo(() => {
-    const rows = callScripts || [];
-    return [
-      { value: '', label: '— Select script —' },
-      ...rows.map((s) => ({ value: String(s.id), label: s.script_name || `#${s.id}` })),
-    ];
-  }, [callScripts]);
-
   const openStartModal = useCallback(
     (idsToUse) => {
       if (!isDialer) return;
-      setStartError('');
-      if (Array.isArray(idsToUse) && idsToUse.length > 0) {
-        setSelectedIds(new Set(idsToUse));
-      }
+      const ids = Array.isArray(idsToUse) && idsToUse.length > 0 ? idsToUse : [...selectedIds];
+      if (!ids.length) return;
 
       const dsDefault =
         dialerDefaults?.default_dialing_set_id ||
@@ -755,48 +731,17 @@ export function ContactsPage({ type, mode = 'crm' }) {
         callScripts[0]?.id ||
         '';
 
-      setStartDialingSetId(dsDefault ? String(dsDefault) : '');
-      setStartCallScriptId(csDefault ? String(csDefault) : '');
-      setStartModalOpen(true);
-    },
-    [isDialer, dialerDefaults, dialingSets, callScripts]
-  );
-
-  const confirmStartDialer = useCallback(async () => {
-    setStartError('');
-    const ids = [...selectedIds];
-    if (ids.length === 0) {
-      setStartError('Select at least 1 lead.');
-      return;
-    }
-    if (!startDialingSetId) {
-      setStartError('Dialing set is required.');
-      return;
-    }
-    if (!startCallScriptId) {
-      setStartError('Call script is required.');
-      return;
-    }
-    setStartBusy(true);
-    try {
-      const res = await dialerSessionsAPI.create({
-        contact_ids: ids,
-        provider: 'dummy',
-        dialing_set_id: startDialingSetId,
-        call_script_id: Number(startCallScriptId),
-      });
-      const s = res?.data?.data ?? null;
-      setStartModalOpen(false);
       clearSelection();
-      if (s?.id) {
-        navigate(`/dialer/session/${s.id}`);
-      }
-    } catch (e) {
-      setStartError(e?.response?.data?.error || e?.message || 'Failed to start dialer session');
-    } finally {
-      setStartBusy(false);
-    }
-  }, [selectedIds, startDialingSetId, startCallScriptId, navigate, clearSelection]);
+      navigate('/dialer/session/setup', {
+        state: {
+          contactIds: ids,
+          dialingSetId: dsDefault ? String(dsDefault) : '',
+          callScriptId: csDefault ? String(csDefault) : '',
+        },
+      });
+    },
+    [isDialer, dialerDefaults, dialingSets, callScripts, selectedIds, navigate, clearSelection]
+  );
 
   const handleDraftManagerChange = (e) => {
     const v = e.target.value;
@@ -1213,41 +1158,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
         loading={assignMutation.loading}
       />
 
-      {isDialer ? (
-        <Modal
-          isOpen={startModalOpen}
-          onClose={() => (!startBusy ? setStartModalOpen(false) : null)}
-          title={`Start dialing (${selectedIds.size} selected)`}
-          size="md"
-          closeOnEscape
-          footer={
-            <ModalFooter>
-              <Button variant="secondary" onClick={() => setStartModalOpen(false)} disabled={startBusy}>
-                Cancel
-              </Button>
-              <Button onClick={confirmStartDialer} disabled={startBusy}>
-                {startBusy ? 'Starting…' : 'Continue'}
-              </Button>
-            </ModalFooter>
-          }
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {startError ? <Alert variant="error">{startError}</Alert> : null}
-            <Select
-              label="Dialing set"
-              value={startDialingSetId}
-              onChange={(e) => setStartDialingSetId(e.target.value)}
-              options={dialingSetOptions}
-            />
-            <Select
-              label="Call script"
-              value={startCallScriptId}
-              onChange={(e) => setStartCallScriptId(e.target.value)}
-              options={callScriptOptions}
-            />
-          </div>
-        </Modal>
-      ) : null}
+      {/* Dialer start modal removed (setup is now a standalone page). */}
 
       <ConfirmModal
         isOpen={!!deleteItem}
