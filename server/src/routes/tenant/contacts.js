@@ -53,6 +53,11 @@ router.post(
   contactsController.create
 );
 router.post('/bulk-delete', requireContactDeleteAccess(), contactsController.bulkRemove);
+router.post(
+  '/:id/phones',
+  requirePermission(['contacts.update', 'leads.update']),
+  contactsController.appendPhone
+);
 router.put(
   '/:id',
   requirePermission(['contacts.update', 'leads.update']),

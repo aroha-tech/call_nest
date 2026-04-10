@@ -1,7 +1,7 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .headerActions {
@@ -16,51 +16,417 @@
   padding: 18px;
 }
 
-.dialerConsole {
-  background: linear-gradient(180deg, rgba(59, 130, 246, 0.12), rgba(0, 0, 0, 0) 70%), var(--color-bg-surface);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 14px;
-  padding: 14px;
+/* Dedicated dark cockpit — reads as a pro dial session, not a generic form page */
+.dialerShell {
+  --dialer-fg: #f1f5f9;
+  --dialer-muted: #94a3b8;
+  --dialer-edge: rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  overflow: hidden;
+  color: var(--dialer-fg);
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(99, 102, 241, 0.2), transparent 50%),
+    radial-gradient(80% 60% at 100% 0%, rgba(34, 197, 94, 0.12), transparent 45%),
+    linear-gradient(180deg, #0f172a 0%, #0b1120 48%, #070b14 100%);
+  border: 1px solid var(--dialer-edge);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5) inset,
+    0 28px 80px rgba(0, 0, 0, 0.45);
 }
 
-.consoleMain {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 14px;
-  align-items: start;
+.dialerChromeBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--dialer-edge);
+  background: rgba(0, 0, 0, 0.25);
 }
 
-.consoleLeft {
+.dialerChromeLeft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
   min-width: 0;
 }
 
-.consoleTitleRow {
+.dialerChromeBadge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #a5b4fc;
+}
+
+.dialerChromeSession {
+  font-size: 15px;
+  font-weight: 950;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.dialerChromeRight {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  max-width: min(420px, 100%);
+}
+
+.dialerChromeScriptLabel {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dialer-muted);
+  flex-shrink: 0;
+}
+
+.dialerChromeScriptName {
+  font-size: 13px;
+  font-weight: 750;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dialerShell .statusPill {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--dialer-fg);
+  box-shadow: none;
+}
+
+.dialerShell .status_active {
+  background: rgba(34, 197, 94, 0.22);
+  border-color: rgba(74, 222, 128, 0.45);
+  color: #ecfdf5;
+}
+
+.dialerShell .status_ready {
+  background: rgba(148, 163, 184, 0.15);
+}
+
+.dialerShell .status_paused {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fffbeb;
+}
+
+.dialerShell .status_completed {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.dialerShell .status_cancelled {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.metricsStrip {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0;
+  overflow-x: auto;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--dialer-edge);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.metricCell {
+  flex: 1 0 auto;
+  min-width: 86px;
+  padding: 6px 14px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.metricCell:last-child {
+  border-right: none;
+}
+
+.metricLabel {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dialer-muted);
+}
+
+.metricValue {
+  margin-top: 4px;
+  font-size: 15px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.shellProgress {
+  padding: 12px 18px 10px;
+  border-bottom: 1px solid var(--dialer-edge);
+}
+
+.shellProgressText {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #cbd5e1;
+  margin-bottom: 8px;
+}
+
+.shellProgressPct {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--dialer-muted);
+  white-space: nowrap;
+}
+
+.shellProgressBar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.shellProgressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6366f1, #22d3ee 50%, #22c55e);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.35);
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.activeCallStrip {
+  border-bottom: 1px solid var(--dialer-edge);
+}
+
+.activeCallStripMain {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 16px 20px;
+  align-items: center;
+  padding: 16px 18px;
+}
+
+@media (max-width: 900px) {
+  .activeCallStripMain {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .activeCallStripRight {
+    justify-self: center;
+  }
+
+  .activeCallStripLeft {
+    justify-content: center;
+  }
+}
+
+.activeCallStripLive {
+  background: linear-gradient(90deg, rgba(22, 163, 74, 0.35) 0%, rgba(15, 23, 42, 0.5) 55%, rgba(15, 23, 42, 0.85) 100%);
+  box-shadow: inset 0 1px 0 rgba(74, 222, 128, 0.2);
+}
+
+.activeCallStripQueue {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.22) 0%, rgba(15, 23, 42, 0.55) 100%);
+}
+
+.activeCallStripIdle {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.activeCallStripLeft {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 }
 
-.sessionTitle {
+.activeCallLeadBadge {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 11px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+}
+
+.activeCallLiveDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.5);
+  animation: nowPulse 1.8s ease-out infinite;
+}
+
+@keyframes nowPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(74, 222, 128, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+  }
+}
+
+.activeCallName {
+  font-size: 1.25rem;
   font-weight: 950;
-  font-size: 16px;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  color: #fff;
 }
 
-.sessionId {
-  opacity: 0.85;
+.activeCallSub {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dialer-muted);
+  line-height: 1.35;
 }
 
-.statusPill {
+.activeCallStripRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+  max-width: min(100%, 520px);
+}
+
+@media (max-width: 900px) {
+  .activeCallStripRight {
+    align-items: center;
+  }
+}
+
+.activeCallPhoneRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #a5b4fc;
+}
+
+.activeCallPhone {
+  font-size: 1.35rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: #f8fafc;
+}
+
+.dialToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 14px 18px 16px;
+  border-bottom: 1px solid var(--dialer-edge);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.dialToolbarControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dialToolbarControls :global(button) {
+  min-height: 42px;
+}
+
+.endSessionIconBtn {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
+  justify-content: center;
+  width: 44px;
+  min-height: 42px;
+  flex-shrink: 0;
+  padding: 0;
+  margin-left: 2px;
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  border-radius: 10px;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(180deg, #f87171 0%, #dc2626 55%, #b91c1c 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.22) inset,
+    0 6px 18px rgba(220, 38, 38, 0.45);
+  transition: filter 0.15s ease, transform 0.12s ease;
+}
+
+.endSessionIconBtn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.endSessionIconBtn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.endSessionIconBtn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.endSessionIconBtn:focus-visible {
+  outline: 2px solid #fca5a5;
+  outline-offset: 2px;
+}
+
+.preflightShellHint {
+  margin: 0;
+  padding: 10px 18px 14px;
   font-size: 12px;
+  line-height: 1.45;
+  color: var(--dialer-muted);
+  border-bottom: 1px solid var(--dialer-edge);
+}
+
+.iconBtnInner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.iconBtnText {
   font-weight: 800;
-  border: 1px solid var(--color-border-subtle);
+}
+
+/* Status pill — default (also used outside shell) */
+.statusPill {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  border: 1px solid var(--color-border-subtle, rgba(148, 163, 184, 0.35));
   text-transform: capitalize;
-  background: rgba(148, 163, 184, 0.10);
+  background: color-mix(in srgb, var(--color-bg-subtle, #f1f5f9) 88%, transparent);
+  color: var(--color-text-primary, inherit);
+  box-shadow: 0 2px 10px color-mix(in srgb, #000000 8%, transparent);
 }
 
 .status_active {
@@ -68,7 +434,7 @@
 }
 
 .status_ready {
-  background: rgba(148, 163, 184, 0.10);
+  background: rgba(148, 163, 184, 0.1);
 }
 
 .status_paused {
@@ -83,151 +449,153 @@
   background: rgba(239, 68, 68, 0.12);
 }
 
-.progressRow {
-  margin-top: 10px;
-}
-
-.progressText {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.progressPrimary {
-  font-weight: 800;
-  font-size: 13px;
-  min-width: 0;
-}
-
-.progressSecondary {
-  font-size: 12px;
-  opacity: 0.85;
-  white-space: nowrap;
-}
-
-.progressSubtle {
-  opacity: 0.8;
-  font-weight: 700;
-}
-
-.progressBar {
-  height: 10px;
-  border-radius: 999px;
-  border: 1px solid var(--color-border-subtle);
-  background: rgba(255, 255, 255, 0.06);
-  overflow: hidden;
-}
-
-.progressFill {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, var(--color-primary-500), rgba(34, 197, 94, 0.9));
-  border-radius: 999px;
-}
-
-.consoleStats {
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.kpi {
-  border: 1px solid var(--color-border-subtle);
-  background: rgba(0, 0, 0, 0.14);
-  border-radius: 12px;
-  padding: 10px 10px;
-  min-width: 0;
-}
-
-.kpiLabel {
-  font-size: 11px;
-  opacity: 0.75;
-}
-
-.kpiValue {
-  margin-top: 4px;
-  font-size: 13px;
-  font-weight: 850;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.consoleRight {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.controlStack {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.controlRow {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.primaryAction {
-  display: flex;
-}
-
-.preflightPrimaryHint {
+.dialerShell .grid {
   margin: 0;
-  font-size: 12px;
-  line-height: 1.45;
-  opacity: 0.88;
-  max-width: 280px;
+  padding: 16px 16px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.12);
 }
 
-.iconBtnInner {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+/* Workspace cards sit on dark shell — use explicit light text so theme vars don’t wash out */
+.dialerShell .grid .card {
+  background: rgba(30, 41, 59, 0.92);
+  border-color: rgba(148, 163, 184, 0.22);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.4);
 }
 
-.iconBtnText {
-  font-weight: 800;
+.dialerShell .grid .cardTitle,
+.dialerShell .grid .queueTitle,
+.dialerShell .grid .dispoTitle {
+  color: #e2e8f0;
+  opacity: 1;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent);
 }
 
-.nowDialing {
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
-  padding: 10px 10px;
-  background: rgba(59, 130, 246, 0.06);
+.dialerShell .grid .queueHint,
+.dialerShell .grid .dispoSub {
+  color: #94a3b8;
+  opacity: 1;
 }
 
-.nowLabel {
-  font-size: 11px;
-  opacity: 0.75;
+.dialerShell .grid .cardTitleRow {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
 }
 
-.nowValue {
-  margin-top: 4px;
-  font-size: 14px;
-  font-weight: 900;
-  word-break: break-word;
+.dialerShell .grid .scriptEyebrow {
+  color: #94a3b8;
+  opacity: 1;
 }
 
-.nowSub {
-  margin-top: 6px;
-  font-size: 12px;
-  opacity: 0.85;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
+.dialerShell .grid .scriptTitle {
+  color: #f8fafc;
 }
 
-.dot {
-  opacity: 0.6;
+.dialerShell .grid .setBadge {
+  color: #eef2ff;
+  background: rgba(99, 102, 241, 0.35);
+  border-color: rgba(165, 180, 252, 0.45);
+}
+
+.dialerShell .grid .setBadgeMuted {
+  color: #94a3b8;
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dialerShell .grid .contactName {
+  color: #f8fafc;
+}
+
+.dialerShell .grid .contactPosition {
+  color: #94a3b8;
+  opacity: 1;
+}
+
+.dialerShell .grid .metaLabel {
+  color: #94a3b8;
+}
+
+.dialerShell .grid .metaValue {
+  color: #f1f5f9;
+}
+
+.dialerShell .grid .metaPlaceholder {
+  color: #64748b !important;
+}
+
+.dialerShell .grid .contactRow {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.dialerShell .grid .contactSourceHint {
+  color: #e2e8f0;
+  background: rgba(99, 102, 241, 0.22);
+  border-color: rgba(165, 180, 252, 0.35);
+}
+
+.dialerShell .grid .queueHeader {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
+}
+
+.dialerShell .grid .queueTable thead th {
+  background: rgba(15, 23, 42, 0.97);
+  color: #94a3b8;
+  opacity: 1;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.dialerShell .grid .queueTable tbody td {
+  color: #e2e8f0;
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.dialerShell .grid .queueName {
+  color: #f8fafc;
+}
+
+.dialerShell .grid .queueSub {
+  color: #94a3b8;
+  opacity: 1;
+}
+
+.dialerShell .grid .queueRowActive {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.28), rgba(99, 102, 241, 0.08)) !important;
+}
+
+.dialerShell .grid .dispoHeader {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
+}
+
+.dialerShell .grid .dispoBtn {
+  background: linear-gradient(165deg, rgba(99, 102, 241, 0.2) 0%, rgba(15, 23, 42, 0.5) 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dialerShell .grid .dispoBtnName {
+  color: #f1f5f9;
+}
+
+.dialerShell .grid .dispoBtnHint {
+  color: #94a3b8;
+}
+
+.dialerShell .grid .devWarn {
+  color: #fde68a;
+  border-color: rgba(251, 191, 36, 0.45);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.dialerShell .grid .devWarnHint,
+.dialerShell .grid .devWarnTitle {
+  color: inherit;
+}
+
+.dialerShell .grid .dispoEmpty {
+  color: #cbd5e1;
 }
 
 .preflightCard {
@@ -428,8 +796,8 @@
 
 .grid {
   display: grid;
-  grid-template-columns: 320px 1fr 320px;
-  gap: 12px;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr) minmax(280px, 340px);
+  gap: 16px;
   align-items: start;
 }
 
@@ -442,29 +810,98 @@
 .center {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .card {
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.04) 0%, rgba(0, 0, 0, 0.12) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
   overflow: hidden;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.22);
+}
+
+.cardContact {
+  border-color: rgba(129, 140, 248, 0.15);
+}
+
+.cardScript {
+  border-color: rgba(56, 189, 248, 0.12);
+}
+
+.cardQueue {
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.cardDispo {
+  border-color: rgba(34, 197, 94, 0.12);
 }
 
 .cardTitle {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-border-subtle);
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 11px;
   font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.72;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
 }
 
 .cardTitleRow {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-border-subtle);
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   display: flex;
   justify-content: space-between;
-  gap: 10px;
-  align-items: baseline;
+  align-items: flex-start;
+  gap: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent);
+}
+
+.scriptTitleBlock {
+  min-width: 0;
+}
+
+.scriptEyebrow {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  margin-bottom: 4px;
+}
+
+.scriptTitle {
+  font-size: 1.05rem;
+  font-weight: 950;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.setBadge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 6px 11px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(165, 180, 252, 0.35);
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.setBadgeMuted {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 6px 11px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.45;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .cardSubtle {
@@ -472,44 +909,177 @@
   opacity: 0.75;
 }
 
+.contactHero {
+  display: flex;
+  gap: 14px;
+  padding: 16px 16px 12px;
+  align-items: flex-start;
+}
+
+.contactAvatar {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 950;
+  letter-spacing: -0.02em;
+  background: linear-gradient(145deg, rgba(99, 102, 241, 0.45), rgba(79, 70, 229, 0.25));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.contactHeroMain {
+  min-width: 0;
+  flex: 1;
+}
+
 .contactName {
-  padding: 12px;
-  font-weight: 900;
-  font-size: 18px;
+  font-weight: 950;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--color-text-primary, inherit);
+}
+
+.contactSourceHint {
+  margin: 0 16px 12px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+  background: color-mix(in srgb, var(--color-primary-500, #6366f1) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary-500, #6366f1) 22%, transparent);
+  border-radius: 10px;
+}
+
+.contactHeroMeta {
+  margin-top: 6px;
+}
+
+.contactPosition {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
 }
 
 .contactMeta {
-  padding: 0 12px 12px 12px;
+  margin: 0;
+  padding: 0 0 4px;
+}
+
+.contactRow {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
+  grid-template-columns: 92px 1fr;
+  gap: 10px 14px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--color-border-subtle, rgba(15, 23, 42, 0.08));
+  align-items: baseline;
 }
 
 .metaLabel {
-  font-size: 11px;
-  opacity: 0.7;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary, #64748b);
+  opacity: 0.95;
+  margin: 0;
 }
 
 .metaValue {
-  margin-top: 3px;
+  margin: 0;
   font-size: 13px;
+  font-weight: 650;
+  line-height: 1.45;
   word-break: break-word;
+  color: var(--color-text-primary, #0f172a);
+}
+
+.metaPlaceholder {
+  color: var(--color-text-secondary, #64748b) !important;
+  font-style: italic;
+  font-weight: 600;
+}
+
+/* Light “paper” panel so rich-text (e.g. Quill) dark inline colors stay readable in any app theme */
+.scriptReadingSurface {
+  margin: 0 18px 22px;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #0f172a;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 1px 3px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
 }
 
 .scriptBody {
-  padding: 12px;
-  font-size: 13px;
-  line-height: 1.5;
-  /* When script is plain text (converted to <br/>), keep the spacing readable */
+  padding: 20px 22px 22px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: #0f172a;
   white-space: normal;
+  background: transparent;
+}
+
+/* Editors often emit dark grey inline styles — force readable body copy inside the paper panel */
+.scriptReadingSurface :global(p),
+.scriptReadingSurface :global(li),
+.scriptReadingSurface :global(span),
+.scriptReadingSurface :global(strong),
+.scriptReadingSurface :global(em),
+.scriptReadingSurface :global(u),
+.scriptReadingSurface :global(blockquote) {
+  color: #0f172a !important;
+}
+
+.scriptReadingSurface :global(h1),
+.scriptReadingSurface :global(h2),
+.scriptReadingSurface :global(h3),
+.scriptReadingSurface :global(h4) {
+  color: #020617 !important;
+}
+
+.scriptReadingSurface :global(a) {
+  color: #2563eb !important;
+}
+
+.scriptReadingSurface :global(ul),
+.scriptReadingSurface :global(ol) {
+  margin: 0.5em 0;
+  padding-left: 1.35rem;
+}
+
+.scriptReadingSurface :global(div[class*='ql-']) {
+  color: #0f172a !important;
+}
+
+.scriptReadingSurface .scriptBody :global(div) {
+  color: #0f172a !important;
+}
+
+.scriptEmpty {
+  padding: 28px 22px;
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 600;
+  color: #475569;
+  text-align: center;
 }
 
 .devWarn {
-  margin: 10px 12px 0 12px;
+  margin: 14px 18px 0 18px;
   border: 1px solid rgba(245, 158, 11, 0.35);
   background: rgba(245, 158, 11, 0.08);
   border-radius: 12px;
-  padding: 10px 10px;
+  padding: 12px 12px;
 }
 
 .devWarnTitle {
@@ -538,6 +1108,31 @@
   opacity: 0.85;
 }
 
+.queueHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
+}
+
+.queueTitle {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.queueHint {
+  font-size: 12px;
+  font-weight: 750;
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+
 .queueTableWrap {
   overflow: auto;
   max-height: 44vh;
@@ -549,34 +1144,87 @@
   font-size: 13px;
 }
 
-.queueTable th,
-.queueTable td {
-  padding: 10px 8px;
+.queueTable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  background: color-mix(in srgb, var(--color-bg-elevated, var(--color-bg-surface)) 94%, transparent);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 14px;
+  white-space: nowrap;
+}
+
+.queueTable tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
+}
+
+.queueTable tbody tr {
+  transition: background 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .queueTable tbody tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.thOrder,
+.thAttempt {
+  text-align: center !important;
+}
+
+.thState,
+.thTime {
+  text-align: left;
+}
+
+.queueTable tbody td:first-child {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  opacity: 0.75;
+}
+
+.queueTable tbody td:nth-child(5) {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  opacity: 0.85;
 }
 
 .queueName {
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .queueSub {
-  opacity: 0.75;
+  opacity: 0.62;
   font-size: 12px;
-  margin-top: 2px;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
 }
 
 .queueRowActive {
-  background: rgba(59, 130, 246, 0.10);
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.18), rgba(99, 102, 241, 0.04)) !important;
+  box-shadow: inset 3px 0 0 var(--color-primary-500, #6366f1);
 }
 
 .statePill {
   display: inline-flex;
-  padding: 2px 8px;
+  padding: 4px 10px;
   border-radius: 999px;
-  font-size: 12px;
-  border: 1px solid var(--color-border-subtle);
+  font-size: 11px;
+  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   text-transform: capitalize;
 }
 
@@ -596,51 +1244,339 @@
   background: rgba(245, 158, 11, 0.10);
 }
 
+.dispoHeader {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
+}
+
+.dispoTitle {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.dispoSub {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.62;
+  font-weight: 500;
+}
+
 .dispoList {
-  padding: 12px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .dispoEmpty {
-  opacity: 0.8;
+  opacity: 0.75;
   font-size: 13px;
+  line-height: 1.5;
+  padding: 8px 4px;
 }
 
 .dispoBtn {
   text-align: left;
   width: 100%;
-  border-radius: 12px;
-  padding: 10px 10px;
-  border: 1px solid var(--color-border-subtle);
-  background: rgba(59, 130, 246, 0.06);
+  border-radius: 14px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(165deg, rgba(99, 102, 241, 0.14) 0%, rgba(0, 0, 0, 0.12) 100%);
   cursor: pointer;
+  color: inherit;
+  font: inherit;
+  transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.dispoBtnBody {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px 14px 16px;
+  width: 100%;
+}
+
+.dispoBtnText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dispoBtnChevron {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  opacity: 0.45;
+  transform: rotate(-45deg);
+  margin-right: 4px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dispoBtn:hover:not(:disabled):not([aria-disabled='true']) {
+    transform: translateY(-2px);
+    border-color: rgba(165, 180, 252, 0.45);
+    box-shadow:
+      0 12px 32px rgba(99, 102, 241, 0.2),
+      0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  }
 }
 
 .dispoBtn:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.dispoBtn[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .dispoBtnName {
-  font-weight: 800;
-  font-size: 13px;
+  font-weight: 850;
+  font-size: 14px;
+  letter-spacing: -0.01em;
 }
 
 .dispoBtnHint {
-  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
+
+.activeCallNumbersPanel {
+  width: 100%;
+  text-align: right;
+}
+
+.activeCallNumbersTitle {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dialer-muted, #94a3b8);
+  margin-bottom: 6px;
+}
+
+.activeCallNumbersRow {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.activeCallAddPhoneWrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.activeCallAddPhoneBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px dashed rgba(129, 140, 248, 0.45);
+  background: rgba(99, 102, 241, 0.12);
+  color: #c7d2fe;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+
+  &:hover:not(:disabled) {
+    border-color: rgba(165, 180, 252, 0.65);
+    background: rgba(99, 102, 241, 0.22);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.activeCallAddPhonePop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  min-width: 240px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(99, 102, 241, 0.12) inset;
+}
+
+.activeCallAddPhoneSelect {
+  margin-bottom: 10px;
+}
+
+.activeCallAddPhoneInput {
+  margin-bottom: 12px;
+}
+
+.activeCallAddPhoneActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.activeCallPhoneListHoriz {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.activeCallPhoneListHorizItem {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.activeCallPhoneChip {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.22);
+  color: #e2e8f0;
   font-size: 12px;
+}
+
+.activeCallPhoneChipMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+.activeCallPhoneChipKind {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--dialer-muted, #94a3b8);
+}
+
+.activeCallPhoneChipBtn {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.activeCallPhoneChipBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.activeCallPhoneChip svg {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
   opacity: 0.8;
+  color: #a5b4fc;
+}
+
+.activeCallPhoneChipOn {
+  border-color: rgba(129, 140, 248, 0.6);
+  background: rgba(99, 102, 241, 0.2);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.12);
+}
+
+.activeCallPhoneChipNum {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: #f8fafc;
+  word-break: break-all;
+}
+
+.phoneBlock {
+  display: block;
+}
+
+.phoneDisplayList {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 14px 22px;
+  align-items: flex-start;
+}
+
+.phoneDisplayItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.phoneDisplayType {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.dialerShell .phoneDisplayType {
+  color: #94a3b8;
+}
+
+.phoneDisplayValue {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--color-text-primary, #0f172a);
+  word-break: break-all;
+}
+
+.dialerShell .phoneDisplayValue {
+  color: #f1f5f9;
 }
 
 @media (max-width: 1100px) {
-  .consoleMain {
-    grid-template-columns: 1fr;
-  }
-  .consoleStats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .summaryHero {
     grid-template-columns: 1fr;
   }

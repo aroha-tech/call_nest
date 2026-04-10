@@ -6,12 +6,32 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { Spinner } from '../components/ui/Spinner';
+import { Select } from '../components/ui/Select';
+import { Input } from '../components/ui/Input';
 import { callsAPI } from '../services/callsAPI';
 import { dialerSessionsAPI } from '../services/dialerSessionsAPI';
 import { contactsAPI } from '../services/contactsAPI';
 import { templateVariablesAPI } from '../services/templateVariablesAPI';
 import { extractTemplateKeys, renderScriptHtml } from '../utils/callScriptHtml';
+import { useToast } from '../context/ToastContext';
 import styles from './DialerSessionPage.module.scss';
+
+/** Display-only: maps `contact_phones.label` ENUM (and primary) to a short title. */
+function formatPhoneLabel(raw) {
+  const s = String(raw || '').trim().toLowerCase();
+  if (!s || s === 'primary') return 'Primary';
+  const map = {
+    mobile: 'Mobile',
+    work: 'Work',
+    home: 'Home',
+    whatsapp: 'WhatsApp',
+    other: 'Other',
+  };
+  return map[s] || (s ? s.charAt(0).toUpperCase() + s.slice(1) : '—');
+}
+
+/** Matches `contact_phones.label` ENUM — one row per type per contact. */
+const CONTACT_PHONE_LABEL_ENUM = ['mobile', 'home', 'work', 'whatsapp', 'other'];
 
 function safeDateTime(v) {
   if (!v) return '—';
@@ -68,6 +88,23 @@ function Icon({ name }) {
       </svg>
     );
   }
+  if (name === 'phone') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path
+          {...stroke}
+          d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"
+        />
+      </svg>
+    );
+  }
+  if (name === 'plus') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path {...stroke} d="M12 5v14M5 12h14" />
+      </svg>
+    );
+  }
   return null;
 }
 
@@ -81,11 +118,24 @@ function resolveCurrentItem(items = []) {
   return items.find((i) => i.state === 'calling') || items.find((i) => i.state === 'queued') || null;
 }
 
+function coerceAttemptId(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Dispositions are UUID strings (CHAR(36)); never use Number() — Number(uuid) is NaN. */
+function coerceDispositionId(v) {
+  const s = String(v ?? '').trim();
+  if (!s || s.length > 36) return null;
+  return s;
+}
+
 function resolveLastAttemptId(items = []) {
-  const active = items.find((i) => i.state === 'calling' && i.last_attempt_id);
-  if (active?.last_attempt_id) return active.last_attempt_id;
-  const last = [...items].reverse().find((i) => i.last_attempt_id);
-  return last?.last_attempt_id || null;
+  const active = items.find((i) => i.state === 'calling' && coerceAttemptId(i.last_attempt_id));
+  const activeId = coerceAttemptId(active?.last_attempt_id);
+  if (activeId) return activeId;
+  const last = [...items].reverse().find((i) => coerceAttemptId(i.last_attempt_id));
+  return coerceAttemptId(last?.last_attempt_id);
 }
 
 export function DialerSessionPage() {
@@ -100,9 +150,14 @@ export function DialerSessionPage() {
   const [session, setSession] = useState(null);
   const [contact, setContact] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [addPhoneOpen, setAddPhoneOpen] = useState(false);
+  const [addPhoneLabel, setAddPhoneLabel] = useState('');
+  const [addPhoneValue, setAddPhoneValue] = useState('');
   /** Bumps when POST /next applies session — stale in-flight GET /session must not overwrite. */
   const loadEpochRef = useRef(0);
   const callNextInFlightRef = useRef(false);
+  /** If session payload ever lacks last_attempt_id on a calling row, still allow dispo until refetch. */
+  const pendingAttemptFromNextRef = useRef(null);
   const [templateSample, setTemplateSample] = useState(null);
   const [activeTemplateKeys, setActiveTemplateKeys] = useState(null);
   const [tick, setTick] = useState(0);
@@ -141,7 +196,19 @@ export function DialerSessionPage() {
     [session?.items]
   );
   const currentItem = useMemo(() => resolveCurrentItem(items), [items]);
-  const lastAttemptId = useMemo(() => resolveLastAttemptId(items), [items]);
+  const lastAttemptId = useMemo(() => {
+    const fromItems = resolveLastAttemptId(items);
+    if (fromItems) {
+      pendingAttemptFromNextRef.current = null;
+      return fromItems;
+    }
+    const hasCalling = items.some((i) => i.state === 'calling');
+    if (!hasCalling) {
+      pendingAttemptFromNextRef.current = null;
+      return null;
+    }
+    return pendingAttemptFromNextRef.current || null;
+  }, [items]);
   const queuedCount = useMemo(() => items.filter((i) => i.state === 'queued').length, [items]);
   const calledCount = useMemo(() => items.filter((i) => i.state === 'called').length, [items]);
   const failedCount = useMemo(() => items.filter((i) => i.state === 'failed').length, [items]);
@@ -158,9 +225,135 @@ export function DialerSessionPage() {
 
   const currentContactNumber = useMemo(() => {
     if (!currentItem) return 0;
+    const oi = Number(currentItem.order_index);
+    if (Number.isFinite(oi) && oi >= 0) return oi + 1;
     const idx = items.findIndex((it) => it.id === currentItem.id);
     return idx >= 0 ? idx + 1 : 0;
   }, [items, currentItem]);
+
+  const activeDialPhone = useMemo(() => {
+    if (!currentItem) return '';
+    if (currentItem.state === 'calling') {
+      return (
+        currentItem.attempt_phone ||
+        currentItem.selected_phone ||
+        currentItem.primary_phone ||
+        ''
+      );
+    }
+    return currentItem.selected_phone || currentItem.primary_phone || '';
+  }, [currentItem]);
+
+  const phonesList = useMemo(() => {
+    if (Array.isArray(contact?.phones) && contact.phones.length > 0) {
+      return [...contact.phones].sort((a, b) => {
+        const pa = Number(a.is_primary) === 1 ? 1 : 0;
+        const pb = Number(b.is_primary) === 1 ? 1 : 0;
+        if (pb !== pa) return pb - pa;
+        return Number(a.id) - Number(b.id);
+      });
+    }
+    if (currentItem?.primary_phone) {
+      return [
+        {
+          id: 'synthetic-primary',
+          phone: currentItem.primary_phone,
+          label: 'primary',
+          is_primary: 1,
+        },
+      ];
+    }
+    return [];
+  }, [contact?.phones, currentItem?.primary_phone]);
+
+  const usedPhoneLabels = useMemo(() => {
+    const phones = contact?.phones;
+    if (!Array.isArray(phones)) return new Set();
+    const s = new Set();
+    for (const p of phones) {
+      const k = String(p.label || '').trim().toLowerCase();
+      if (k) s.add(k);
+    }
+    return s;
+  }, [contact?.phones]);
+
+  const missingPhoneLabels = useMemo(
+    () => CONTACT_PHONE_LABEL_ENUM.filter((l) => !usedPhoneLabels.has(l)),
+    [usedPhoneLabels]
+  );
+
+  const canAddPhoneNumber = Boolean(currentItem?.contact_id) && missingPhoneLabels.length > 0;
+
+  /** Merge full contact (API) with queue row so name/phone always show even if getById fails. */
+  const leadContact = useMemo(() => {
+    const row = currentItem;
+    const c = contact;
+    if (!row && !c) return null;
+    const displayName =
+      c?.display_name ||
+      row?.display_name ||
+      c?.first_name ||
+      c?.email ||
+      (row?.contact_id ? `Contact #${row.contact_id}` : '') ||
+      '';
+    const firstName =
+      c?.first_name ||
+      (displayName ? String(displayName).trim().split(/\s+/)[0] : '') ||
+      undefined;
+    return {
+      ...(c || {}),
+      display_name: displayName,
+      first_name: firstName,
+      last_name: c?.last_name,
+      primary_phone: activeDialPhone || c?.primary_phone || row?.primary_phone || '',
+      email: c?.email,
+      company: c?.company,
+      job_title: c?.job_title,
+      city: c?.city,
+      notes: c?.notes,
+      id: c?.id ?? row?.contact_id,
+    };
+  }, [contact, currentItem, activeDialPhone]);
+
+  const contactInitial = useMemo(() => {
+    const raw = leadContact?.display_name || leadContact?.email || '';
+    const c = String(raw).trim().charAt(0);
+    return c ? c.toUpperCase() : '?';
+  }, [leadContact]);
+
+  const contactDetailPending = Boolean(!contact && currentItem?.contact_id);
+
+  const leadSubtitle = useMemo(() => {
+    const parts = [leadContact?.company, leadContact?.job_title].filter(Boolean);
+    return parts.length ? parts.join(' · ') : '';
+  }, [leadContact]);
+
+  const sessionEnded = session?.status === 'completed' || session?.status === 'cancelled';
+
+  const sessionDisplayNo = useMemo(() => {
+    const n = Number(session?.user_session_no);
+    if (Number.isFinite(n) && n >= 1) return n;
+    return null;
+  }, [session?.user_session_no]);
+
+  const { showToast } = useToast();
+
+  /** Live dial workspace: no inline alert bar — surface messages as fixed toasts (ToastContext). */
+  useEffect(() => {
+    if (!error || !session || sessionEnded) return;
+    const m = String(error).toLowerCase();
+    const variant = m.includes('paused') || m.includes('not active') ? 'warning' : 'error';
+    showToast(error, variant);
+    setError('');
+  }, [error, session, sessionEnded, showToast]);
+
+  const errorAlertVariant = useMemo(() => {
+    const m = String(error || '').toLowerCase();
+    if (m.includes('paused') || m.includes('not active')) return 'warning';
+    return 'error';
+  }, [error]);
+
+  const showErrorOutside = Boolean(error && (!session || sessionEnded));
 
   useEffect(() => {
     if (!uiTimer?.startedAtMs) return;
@@ -201,6 +394,16 @@ export function DialerSessionPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    setAddPhoneOpen(false);
+    setAddPhoneValue('');
+  }, [currentItem?.contact_id]);
+
+  useEffect(() => {
+    if (!addPhoneOpen || missingPhoneLabels.length === 0) return;
+    setAddPhoneLabel((prev) => (missingPhoneLabels.includes(prev) ? prev : missingPhoneLabels[0]));
+  }, [addPhoneOpen, missingPhoneLabels]);
 
   useEffect(() => {
     let cancelled = false;
@@ -286,6 +489,8 @@ export function DialerSessionPage() {
       }
       if (nextSession) {
         loadEpochRef.current += 1;
+        const aid = coerceAttemptId(payload?.attempt?.id);
+        if (aid) pendingAttemptFromNextRef.current = aid;
         setSession(nextSession);
       } else {
         await load();
@@ -313,8 +518,6 @@ export function DialerSessionPage() {
       setBusy(false);
     }
   }
-
-  const sessionEnded = session?.status === 'completed' || session?.status === 'cancelled';
 
   async function pauseSession() {
     if (!id) return;
@@ -355,17 +558,126 @@ export function DialerSessionPage() {
     }
   }
 
-  async function setDisposition(dispositionId, nextAction) {
-    if (!lastAttemptId) return;
-    const dispNum = Number(dispositionId);
-    if (!Number.isFinite(dispNum) || dispNum <= 0) return;
+  async function submitAddPhone() {
+    const cid = currentItem?.contact_id;
+    if (!cid || !addPhoneLabel) return;
+    const raw = String(addPhoneValue || '').trim();
+    if (!raw) {
+      setError('Enter a phone number');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
-      await callsAPI.setDisposition(lastAttemptId, { disposition_id: dispNum });
+      const res = await contactsAPI.appendPhone(cid, { phone: raw, label: addPhoneLabel });
+      const updated = res?.data?.data ?? null;
+      if (updated) setContact(updated);
+      const newPhone = updated?.phones?.find(
+        (p) => String(p.label || '').trim().toLowerCase() === String(addPhoneLabel).toLowerCase()
+      );
+      if (
+        id &&
+        currentItem?.id &&
+        currentItem.state === 'queued' &&
+        newPhone?.id != null &&
+        Number(newPhone.id) > 0
+      ) {
+        const sres = await dialerSessionsAPI.updateItem(id, currentItem.id, {
+          contact_phone_id: Number(newPhone.id),
+        });
+        const s = sres?.data?.data;
+        if (s) {
+          loadEpochRef.current += 1;
+          setSession(s);
+        }
+      }
+      setAddPhoneOpen(false);
+      setAddPhoneValue('');
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || 'Failed to add number');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function applyTargetPhoneOnItem(contactPhoneId) {
+    if (!id || !currentItem?.id) return;
+    if (currentItem.state !== 'queued') return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await dialerSessionsAPI.updateItem(id, currentItem.id, {
+        contact_phone_id: contactPhoneId,
+      });
+      const s = res?.data?.data;
+      if (s) {
+        loadEpochRef.current += 1;
+        setSession(s);
+      } else {
+        await load();
+      }
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || 'Failed to update target number');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function isDialerPhoneRowSelected(p) {
+    const t = currentItem?.contact_phone_id;
+    if (t != null && Number(t) > 0) return Number(p.id) === Number(t);
+    if (p.id === 'synthetic-primary') return true;
+    if (Number(p.is_primary) === 1) return true;
+    const anyPri = phonesList.some((x) => Number(x.is_primary) === 1);
+    if (!anyPri && phonesList[0] && phonesList[0].id === p.id) return true;
+    return false;
+  }
+
+  function isPhoneHighlightedForDialer(p) {
+    if (!currentItem) return false;
+    if (currentItem.state === 'calling') {
+      const aid = currentItem.attempt_contact_phone_id;
+      if (aid != null && String(aid) !== '' && Number(aid) > 0) {
+        if (p.id === 'synthetic-primary') return false;
+        return Number(p.id) === Number(aid);
+      }
+      const norm = (s) => String(s || '').replace(/\s/g, '');
+      return norm(p.phone) === norm(activeDialPhone);
+    }
+    return isDialerPhoneRowSelected(p);
+  }
+
+  async function setDisposition(dispositionId, nextAction) {
+    const callingRow = items.find((i) => i.state === 'calling');
+    const attemptId = coerceAttemptId(callingRow?.last_attempt_id) || lastAttemptId;
+    if (!attemptId) {
+      setError('No active call attempt for this lead. Use Call next or refresh the page.');
+      return;
+    }
+    const dispId = coerceDispositionId(dispositionId);
+    if (!dispId) {
+      setError('Invalid disposition.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const res = await callsAPI.setDisposition(attemptId, { disposition_id: dispId });
+      const body = res?.data ?? {};
+      const na = String(nextAction || '').toLowerCase();
+
+      if (body.session && Array.isArray(body.session.items)) {
+        loadEpochRef.current += 1;
+        pendingAttemptFromNextRef.current = coerceAttemptId(body.dialer?.attempt?.id);
+        setSession(body.session);
+        return;
+      }
+
       await load();
-      if (String(nextAction || '').toLowerCase().includes('next')) {
-        await callNext();
+      if (!na.includes('next_number')) {
+        if (na.includes('next_contact') || (na.includes('next') && !na.includes('next_number'))) {
+          await callNext();
+        }
       }
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || 'Failed to set disposition');
@@ -376,22 +688,26 @@ export function DialerSessionPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader
-        title="Dialer session"
-        description={id ? `Session #${id}` : 'Session'}
-        actions={
-          <div className={styles.headerActions}>
-            <Button variant="secondary" onClick={() => navigate('/dialer')}>
-              Back to leads
-            </Button>
-            <Button variant="secondary" onClick={() => navigate('/calls/history')}>
-              Call history
-            </Button>
-          </div>
-        }
-      />
+      {!session || sessionEnded ? (
+        <PageHeader
+          title="Dialer session"
+          description={
+            sessionDisplayNo != null ? `Dial session #${sessionDisplayNo}` : 'Dial session'
+          }
+          actions={
+            <div className={styles.headerActions}>
+              <Button variant="secondary" onClick={() => navigate('/dialer')}>
+                Back to leads
+              </Button>
+              <Button variant="secondary" onClick={() => navigate('/calls/history')}>
+                Call history
+              </Button>
+            </div>
+          }
+        />
+      ) : null}
 
-      {error ? <Alert variant="error">{error}</Alert> : null}
+      {showErrorOutside ? <Alert variant={errorAlertVariant}>{error}</Alert> : null}
 
       {loading && !session ? (
         <div className={styles.loadingCenter}>
@@ -407,7 +723,8 @@ export function DialerSessionPage() {
                 <div className={styles.summaryHeroText}>
                   <div className={styles.summaryEyebrow}>Dialer session</div>
                   <h2 className={styles.summaryHeadline}>
-                    Session #{id} · <span className={styles.summaryStatus}>{session.status}</span>
+                    {sessionDisplayNo != null ? `Dial session #${sessionDisplayNo}` : 'Dial session'} ·{' '}
+                    <span className={styles.summaryStatus}>{session.status}</span>
                   </h2>
                   <p className={styles.summarySub}>
                     Here is how this run finished. You can return to leads when you are ready.
@@ -459,7 +776,7 @@ export function DialerSessionPage() {
                   <div className={styles.preflightList}>
                     <div>
                       <span className={styles.preflightKey}>Dialing set</span>
-                      <span className={styles.preflightVal}>{session?.dialing_set_id ? `#${session.dialing_set_id}` : '—'}</span>
+                      <span className={styles.preflightVal}>{session?.dialing_set_id ? 'Selected' : '—'}</span>
                     </div>
                     <div>
                       <span className={styles.preflightKey}>Call script</span>
@@ -511,208 +828,459 @@ export function DialerSessionPage() {
           ) : null}
 
           {sessionEnded ? null : (
-          <div className={styles.dialerConsole}>
-            <div className={styles.consoleMain}>
-              <div className={styles.consoleLeft}>
-                <div className={styles.consoleTitleRow}>
-                  <div className={styles.sessionTitle}>
-                    Session <span className={styles.sessionId}>#{id}</span>
-                  </div>
-                  <span className={`${styles.statusPill} ${styles[`status_${session.status}`] || ''}`.trim()}>{session.status || '—'}</span>
-                </div>
+          <div className={styles.dialerShell}>
+            <header className={styles.dialerChromeBar}>
+              <div className={styles.dialerChromeLeft}>
+                <span className={styles.dialerChromeBadge}>Dial workspace</span>
+                <span className={styles.dialerChromeSession}>
+                  {sessionDisplayNo != null ? `Dial session #${sessionDisplayNo}` : 'Dial session'}
+                </span>
+                <span className={`${styles.statusPill} ${styles[`status_${session.status}`] || ''}`.trim()}>
+                  {session.status || '—'}
+                </span>
+              </div>
+              <div className={styles.dialerChromeRight}>
+                <span className={styles.dialerChromeScriptLabel}>Script</span>
+                <span className={styles.dialerChromeScriptName} title={session?.script?.script_name || ''}>
+                  {session?.script?.script_name || '—'}
+                </span>
+              </div>
+            </header>
 
-                <div className={styles.progressRow}>
-                  <div className={styles.progressText}>
-                    <div className={styles.progressPrimary}>
-                      {totalCount > 0 ? (
-                        <>
-                          {completedCount} completed
-                          {callingCount ? <span className={styles.progressSubtle}> · {callingCount} in call</span> : null}
-                          {queuedCount ? <span className={styles.progressSubtle}> · {queuedCount} queued</span> : null}
-                        </>
-                      ) : (
-                        'No contacts in this session'
-                      )}
-                    </div>
-                    <div className={styles.progressSecondary}>
-                      {totalCount > 0 ? (
-                        <>
-                          {progressCount} / {totalCount} ({progressPct}%)
-                        </>
-                      ) : (
-                        '—'
-                      )}
-                    </div>
-                  </div>
-                  <div className={styles.progressBar} role="progressbar" aria-valuenow={progressPct} aria-valuemin={0} aria-valuemax={100}>
-                    <div className={styles.progressFill} style={{ width: `${progressPct}%` }} />
-                  </div>
-                </div>
-
-                <div className={styles.consoleStats}>
-                  <div className={styles.kpi}>
-                    <div className={styles.kpiLabel}>Started</div>
-                    <div className={styles.kpiValue}>{uiTimer?.startedAtMs ? 'Dialing started' : 'Not started'}</div>
-                  </div>
-                  <div className={styles.kpi}>
-                    <div className={styles.kpiLabel}>Duration</div>
-                    <div className={styles.kpiValue}>{formatTimerHms(durationMs)}</div>
-                  </div>
-                  <div className={styles.kpi}>
-                    <div className={styles.kpiLabel}>Called</div>
-                    <div className={styles.kpiValue}>{calledCount}</div>
-                  </div>
-                  <div className={styles.kpi}>
-                    <div className={styles.kpiLabel}>Failed</div>
-                    <div className={styles.kpiValue}>{failedCount}</div>
-                  </div>
-                  <div className={styles.kpi}>
-                    <div className={styles.kpiLabel}>Connected</div>
-                    <div className={styles.kpiValue}>{connectedCount}</div>
-                  </div>
-                  <div className={styles.kpi}>
-                    <div className={styles.kpiLabel}>Contacts</div>
-                    <div className={styles.kpiValue}>
-                      {totalCount > 0 ? (currentContactNumber ? `${currentContactNumber} / ${totalCount}` : `— / ${totalCount}`) : '—'}
-                    </div>
-                  </div>
+            <div className={styles.metricsStrip} role="group" aria-label="Session metrics">
+              <div className={styles.metricCell}>
+                <div className={styles.metricLabel}>Session time</div>
+                <div className={styles.metricValue}>{formatTimerHms(durationMs)}</div>
+              </div>
+              <div className={styles.metricCell}>
+                <div className={styles.metricLabel}>Lead #</div>
+                <div className={styles.metricValue}>
+                  {totalCount > 0 ? (currentContactNumber ? `${currentContactNumber} / ${totalCount}` : `— / ${totalCount}`) : '—'}
                 </div>
               </div>
+              <div className={styles.metricCell}>
+                <div className={styles.metricLabel}>Completed</div>
+                <div className={styles.metricValue}>{completedCount}</div>
+              </div>
+              <div className={styles.metricCell}>
+                <div className={styles.metricLabel}>In queue</div>
+                <div className={styles.metricValue}>{queuedCount}</div>
+              </div>
+              <div className={styles.metricCell}>
+                <div className={styles.metricLabel}>Dials</div>
+                <div className={styles.metricValue}>{calledCount}</div>
+              </div>
+              <div className={styles.metricCell}>
+                <div className={styles.metricLabel}>Connected</div>
+                <div className={styles.metricValue}>{connectedCount}</div>
+              </div>
+              <div className={styles.metricCell}>
+                <div className={styles.metricLabel}>Failed</div>
+                <div className={styles.metricValue}>{failedCount}</div>
+              </div>
+            </div>
 
-              <div className={styles.consoleRight}>
-                <div className={styles.controlRow}>
-                  <Button
-                    variant="secondary"
-                    onClick={session.status === 'paused' ? resumeSession : pauseSession}
-                    disabled={
-                      busy ||
-                      session.status === 'ready' ||
-                      session.status === 'completed' ||
-                      session.status === 'cancelled'
-                    }
-                    title={session.status === 'paused' ? 'Resume dialing' : 'Pause dialing'}
-                  >
-                    <span className={styles.iconBtnInner}>
-                      <Icon name={session.status === 'paused' ? 'play' : 'pause'} />
-                      <span className={styles.iconBtnText}>{session.status === 'paused' ? 'Resume' : 'Pause'}</span>
-                    </span>
-                  </Button>
-
-                  <Button
-                    variant="secondary"
-                    disabled
-                    title="Mute/unmute requires live call provider support (not available for dummy provider yet)"
-                  >
-                    <span className={styles.iconBtnInner}>
-                      <Icon name="micOff" />
-                      <span className={styles.iconBtnText}>Mute</span>
-                    </span>
-                  </Button>
-
-                  <Button
-                    variant="warning"
-                    onClick={cancelSession}
-                    disabled={busy || session.status === 'completed' || session.status === 'cancelled'}
-                    title="Ends the session (no more calls will be placed)"
-                  >
-                    <span className={styles.iconBtnInner}>
-                      <Icon name="stop" />
-                      <span className={styles.iconBtnText}>End</span>
-                    </span>
-                  </Button>
-                </div>
-
-                <div className={styles.primaryAction}>
-                  {view === 'preflight' ? (
-                    <p className={styles.preflightPrimaryHint}>
-                      Use <strong>Start session</strong> above to place the first call.
-                    </p>
+            <div className={styles.shellProgress}>
+              <div className={styles.shellProgressText}>
+                <span>
+                  {totalCount > 0 ? (
+                    <>
+                      {completedCount} done
+                      {callingCount ? ` · ${callingCount} live` : ''}
+                      {queuedCount ? ` · ${queuedCount} waiting` : ''}
+                    </>
                   ) : (
-                    <Button
-                      onClick={callNext}
-                      disabled={
-                        busy ||
-                        session.status === 'paused' ||
-                        session.status === 'completed' ||
-                        session.status === 'cancelled' ||
-                        callingCount > 0
-                      }
-                      title={
-                        callingCount > 0
-                          ? 'Set a disposition for the current call before dialing the next lead.'
-                          : undefined
-                      }
-                    >
-                      {busy ? 'Working…' : session.status === 'ready' ? 'Start dialing' : 'Call next'}
-                    </Button>
+                    'No contacts in this session'
                   )}
-                </div>
+                </span>
+                <span className={styles.shellProgressPct}>
+                  {totalCount > 0 ? `${progressCount} / ${totalCount} · ${progressPct}%` : '—'}
+                </span>
+              </div>
+              <div
+                className={styles.shellProgressBar}
+                role="progressbar"
+                aria-valuenow={progressPct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div className={styles.shellProgressFill} style={{ width: `${progressPct}%` }} />
+              </div>
+            </div>
 
-                <div className={styles.nowDialing}>
-                  <div className={styles.nowLabel}>Now dialing</div>
-                  <div className={styles.nowValue}>
-                    {contact?.display_name ||
-                      contact?.first_name ||
-                      contact?.email ||
-                      (currentItem ? currentItem.display_name || `Contact #${currentItem.contact_id}` : '—')}
+            <div
+              className={`${styles.activeCallStrip} ${
+                currentItem?.state === 'calling'
+                  ? styles.activeCallStripLive
+                  : currentItem?.state === 'queued'
+                    ? styles.activeCallStripQueue
+                    : styles.activeCallStripIdle
+              }`}
+            >
+              <div className={styles.activeCallStripMain}>
+                <div className={styles.activeCallStripLeft}>
+                  <span className={styles.activeCallLeadBadge}>
+                    {currentContactNumber ? `Lead ${currentContactNumber}` : 'Lead'}
+                  </span>
+                  {currentItem?.state === 'calling' ? (
+                    <span className={styles.activeCallLiveDot} aria-hidden="true" />
+                  ) : null}
+                </div>
+                <div className={styles.activeCallStripCenter}>
+                  <div className={styles.activeCallName}>
+                    {leadContact?.display_name || (totalCount === 0 ? 'No leads in session' : 'Select a lead from the queue')}
                   </div>
-                  <div className={styles.nowSub}>
-                    {contact?.primary_phone || currentItem?.primary_phone ? (
-                      <span>{contact?.primary_phone || currentItem?.primary_phone}</span>
+                  {leadSubtitle ? <div className={styles.activeCallSub}>{leadSubtitle}</div> : null}
+                </div>
+                <div className={styles.activeCallStripRight}>
+                  <div className={styles.activeCallNumbersPanel}>
+                    <div className={styles.activeCallNumbersTitle}>Numbers</div>
+                    {phonesList.length === 0 ? (
+                      <div className={styles.activeCallNumbersRow}>
+                        <div className={styles.activeCallPhoneRow}>
+                          <Icon name="phone" />
+                          <span className={styles.activeCallPhone}>
+                            {activeDialPhone || leadContact?.primary_phone || '—'}
+                          </span>
+                        </div>
+                        {canAddPhoneNumber ? (
+                          <div className={styles.activeCallAddPhoneWrap}>
+                            <button
+                              type="button"
+                              className={styles.activeCallAddPhoneBtn}
+                              disabled={busy}
+                              title="Add a number (pick a free type: mobile, work, …)"
+                              aria-expanded={addPhoneOpen}
+                              aria-label="Add phone number"
+                              onClick={() => setAddPhoneOpen((o) => !o)}
+                            >
+                              <Icon name="plus" />
+                            </button>
+                            {addPhoneOpen ? (
+                              <div className={styles.activeCallAddPhonePop}>
+                                <Select
+                                  className={styles.activeCallAddPhoneSelect}
+                                  label="Type"
+                                  placeholder="Type"
+                                  value={addPhoneLabel}
+                                  onChange={(e) => setAddPhoneLabel(e.target.value)}
+                                  options={missingPhoneLabels.map((l) => ({
+                                    value: l,
+                                    label: formatPhoneLabel(l),
+                                  }))}
+                                  disabled={busy}
+                                />
+                                <Input
+                                  className={styles.activeCallAddPhoneInput}
+                                  label="Number"
+                                  value={addPhoneValue}
+                                  onChange={(e) => setAddPhoneValue(e.target.value)}
+                                  placeholder="+1…"
+                                  disabled={busy}
+                                  autoComplete="tel"
+                                />
+                                <div className={styles.activeCallAddPhoneActions}>
+                                  <Button size="sm" variant="primary" disabled={busy} onClick={submitAddPhone}>
+                                    Save
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    disabled={busy}
+                                    onClick={() => {
+                                      setAddPhoneOpen(false);
+                                      setAddPhoneValue('');
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
                     ) : (
-                      <span>—</span>
+                      <div className={styles.activeCallNumbersRow}>
+                        <ul className={styles.activeCallPhoneListHoriz}>
+                          {phonesList.map((p, idx) => {
+                            const sid = String(p.id ?? `${idx}-${p.phone}`);
+                            const hi = isPhoneHighlightedForDialer(p);
+                            const chipClass = `${styles.activeCallPhoneChip} ${hi ? styles.activeCallPhoneChipOn : ''}`;
+                            const chipBody = (
+                              <>
+                                <Icon name="phone" />
+                                <span className={styles.activeCallPhoneChipMeta}>
+                                  <span className={styles.activeCallPhoneChipKind}>
+                                    {formatPhoneLabel(p.label)}
+                                  </span>
+                                  <span className={styles.activeCallPhoneChipNum}>{p.phone || '—'}</span>
+                                </span>
+                              </>
+                            );
+                            const pickQueued = currentItem?.state === 'queued';
+                            return (
+                              <li key={sid} className={styles.activeCallPhoneListHorizItem}>
+                                {pickQueued ? (
+                                  <button
+                                    type="button"
+                                    className={`${chipClass} ${styles.activeCallPhoneChipBtn}`}
+                                    disabled={busy}
+                                    title="Use this number on Call next"
+                                    onClick={() =>
+                                      applyTargetPhoneOnItem(
+                                        p.id === 'synthetic-primary' ? null : Number(p.id) || null
+                                      )
+                                    }
+                                  >
+                                    {chipBody}
+                                  </button>
+                                ) : (
+                                  <span className={chipClass}>{chipBody}</span>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        {canAddPhoneNumber ? (
+                          <div className={styles.activeCallAddPhoneWrap}>
+                            <button
+                              type="button"
+                              className={styles.activeCallAddPhoneBtn}
+                              disabled={busy}
+                              title="Add a number (pick a free type: mobile, work, …)"
+                              aria-expanded={addPhoneOpen}
+                              aria-label="Add phone number"
+                              onClick={() => setAddPhoneOpen((o) => !o)}
+                            >
+                              <Icon name="plus" />
+                            </button>
+                            {addPhoneOpen ? (
+                              <div className={styles.activeCallAddPhonePop}>
+                                <Select
+                                  className={styles.activeCallAddPhoneSelect}
+                                  label="Type"
+                                  placeholder="Type"
+                                  value={addPhoneLabel}
+                                  onChange={(e) => setAddPhoneLabel(e.target.value)}
+                                  options={missingPhoneLabels.map((l) => ({
+                                    value: l,
+                                    label: formatPhoneLabel(l),
+                                  }))}
+                                  disabled={busy}
+                                />
+                                <Input
+                                  className={styles.activeCallAddPhoneInput}
+                                  label="Number"
+                                  value={addPhoneValue}
+                                  onChange={(e) => setAddPhoneValue(e.target.value)}
+                                  placeholder="+1…"
+                                  disabled={busy}
+                                  autoComplete="tel"
+                                />
+                                <div className={styles.activeCallAddPhoneActions}>
+                                  <Button size="sm" variant="primary" disabled={busy} onClick={submitAddPhone}>
+                                    Save
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    disabled={busy}
+                                    onClick={() => {
+                                      setAddPhoneOpen(false);
+                                      setAddPhoneValue('');
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
                     )}
-                    <span className={styles.dot}>·</span>
-                    <span>{currentItem?.state ? `State: ${currentItem.state}` : 'State: —'}</span>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-          )}
 
-          {sessionEnded || view === 'preflight' ? null : (
-          <div className={styles.grid}>
+            <div className={styles.dialToolbar}>
+              <div className={styles.dialToolbarControls}>
+                <Button
+                  variant="primary"
+                  onClick={callNext}
+                  disabled={
+                    busy ||
+                    session.status === 'paused' ||
+                    session.status === 'completed' ||
+                    session.status === 'cancelled' ||
+                    callingCount > 0 ||
+                    queuedCount === 0
+                  }
+                  title={
+                    callingCount > 0
+                      ? 'Set a disposition on the current call before dialing the next lead.'
+                      : queuedCount === 0
+                        ? 'No leads left in the queue.'
+                        : undefined
+                  }
+                >
+                  {busy ? 'Working…' : 'Call next'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={session.status === 'paused' ? resumeSession : pauseSession}
+                  disabled={
+                    busy ||
+                    session.status === 'ready' ||
+                    session.status === 'completed' ||
+                    session.status === 'cancelled'
+                  }
+                  title={session.status === 'paused' ? 'Resume dialing' : 'Pause dialing'}
+                >
+                  <span className={styles.iconBtnInner}>
+                    <Icon name={session.status === 'paused' ? 'play' : 'pause'} />
+                    <span className={styles.iconBtnText}>{session.status === 'paused' ? 'Resume' : 'Pause'}</span>
+                  </span>
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled
+                  title="Mute/unmute requires live call provider support (not available for dummy provider yet)"
+                >
+                  <span className={styles.iconBtnInner}>
+                    <Icon name="micOff" />
+                    <span className={styles.iconBtnText}>Mute</span>
+                  </span>
+                </Button>
+                <button
+                  type="button"
+                  className={styles.endSessionIconBtn}
+                  onClick={cancelSession}
+                  disabled={busy || session.status === 'completed' || session.status === 'cancelled'}
+                  title="End session — no more calls will be placed"
+                  aria-label="End session"
+                >
+                  <Icon name="stop" />
+                </button>
+              </div>
+            </div>
+
+            {view === 'preflight' ? (
+              <p className={styles.preflightShellHint}>
+                Use <strong>Start session</strong> in the checklist above for the first call, or <strong>Skip</strong> to open
+                the workspace. Next steps use your disposition buttons (e.g. next contact).
+              </p>
+            ) : null}
+
+            {view === 'active' ? (
+            <div className={styles.grid}>
             <aside className={styles.left}>
-              <div className={styles.card}>
+              <div className={`${styles.card} ${styles.cardContact}`}>
                 <div className={styles.cardTitle}>Current contact</div>
-                <div className={styles.contactName}>
-                  {contact?.display_name || contact?.first_name || contact?.email || (currentItem ? `#${currentItem.contact_id}` : '—')}
-                </div>
-                <div className={styles.contactMeta}>
-                  <div>
-                    <span className={styles.metaLabel}>Phone</span>
-                    <div className={styles.metaValue}>{contact?.primary_phone || currentItem?.primary_phone || '—'}</div>
+                <div className={styles.contactHero}>
+                  <div className={styles.contactAvatar} aria-hidden="true">
+                    {contactInitial}
                   </div>
-                  <div>
-                    <span className={styles.metaLabel}>Email</span>
-                    <div className={styles.metaValue}>{contact?.email || '—'}</div>
-                  </div>
-                  <div>
-                    <span className={styles.metaLabel}>Company</span>
-                    <div className={styles.metaValue}>{contact?.company || '—'}</div>
-                  </div>
-                  <div>
-                    <span className={styles.metaLabel}>Job title</span>
-                    <div className={styles.metaValue}>{contact?.job_title || '—'}</div>
-                  </div>
-                  <div>
-                    <span className={styles.metaLabel}>City</span>
-                    <div className={styles.metaValue}>{contact?.city || '—'}</div>
-                  </div>
-                  <div>
-                    <span className={styles.metaLabel}>Notes</span>
-                    <div className={styles.metaValue}>{contact?.notes || '—'}</div>
+                  <div className={styles.contactHeroMain}>
+                    <div className={styles.contactName}>{leadContact?.display_name || '—'}</div>
+                    <div className={styles.contactHeroMeta}>
+                      {totalCount > 0 && currentContactNumber ? (
+                        <span className={styles.contactPosition}>
+                          Lead {currentContactNumber} of {totalCount}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
+                {contactDetailPending ? (
+                  <p className={styles.contactSourceHint}>
+                    Name and phone come from the dial queue. Other fields appear when the contact record loads.
+                  </p>
+                ) : null}
+                <dl className={styles.contactMeta}>
+                  <div className={styles.contactRow}>
+                    <dt className={styles.metaLabel}>Phone numbers</dt>
+                    <dd className={`${styles.metaValue} ${styles.phoneBlock}`}>
+                      {phonesList.length === 0 ? (
+                        <span>—</span>
+                      ) : (
+                        <div className={styles.phoneDisplayList}>
+                          {phonesList.map((p, idx) => {
+                            const sid = String(p.id ?? `${idx}-${p.phone}`);
+                            return (
+                              <div key={sid} className={styles.phoneDisplayItem}>
+                                <span className={styles.phoneDisplayType}>{formatPhoneLabel(p.label)}</span>
+                                <span className={styles.phoneDisplayValue}>{p.phone || '—'}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </dd>
+                  </div>
+                  <div className={styles.contactRow}>
+                    <dt className={styles.metaLabel}>Email</dt>
+                    <dd
+                      className={`${styles.metaValue} ${
+                        contactDetailPending && !leadContact?.email ? styles.metaPlaceholder : ''
+                      }`}
+                    >
+                      {leadContact?.email || '—'}
+                    </dd>
+                  </div>
+                  <div className={styles.contactRow}>
+                    <dt className={styles.metaLabel}>Company</dt>
+                    <dd
+                      className={`${styles.metaValue} ${
+                        contactDetailPending && !leadContact?.company ? styles.metaPlaceholder : ''
+                      }`}
+                    >
+                      {leadContact?.company || '—'}
+                    </dd>
+                  </div>
+                  <div className={styles.contactRow}>
+                    <dt className={styles.metaLabel}>Job title</dt>
+                    <dd
+                      className={`${styles.metaValue} ${
+                        contactDetailPending && !leadContact?.job_title ? styles.metaPlaceholder : ''
+                      }`}
+                    >
+                      {leadContact?.job_title || '—'}
+                    </dd>
+                  </div>
+                  <div className={styles.contactRow}>
+                    <dt className={styles.metaLabel}>City</dt>
+                    <dd
+                      className={`${styles.metaValue} ${
+                        contactDetailPending && !leadContact?.city ? styles.metaPlaceholder : ''
+                      }`}
+                    >
+                      {leadContact?.city || '—'}
+                    </dd>
+                  </div>
+                  <div className={styles.contactRow}>
+                    <dt className={styles.metaLabel}>Notes</dt>
+                    <dd
+                      className={`${styles.metaValue} ${
+                        contactDetailPending && !leadContact?.notes ? styles.metaPlaceholder : ''
+                      }`}
+                    >
+                      {leadContact?.notes || '—'}
+                    </dd>
+                  </div>
+                </dl>
               </div>
             </aside>
 
             <main className={styles.center}>
-              <div className={styles.card}>
+              <div className={`${styles.card} ${styles.cardScript}`}>
                 <div className={styles.cardTitleRow}>
-                  <div className={styles.cardTitle}>{session?.script?.script_name || 'Script'}</div>
-                  <div className={styles.cardSubtle}>Dialing: {session?.dialing_set_id ? `#${session.dialing_set_id}` : '—'}</div>
+                  <div className={styles.scriptTitleBlock}>
+                    <div className={styles.scriptEyebrow}>Call script</div>
+                    <div className={styles.scriptTitle}>{session?.script?.script_name || 'Script'}</div>
+                  </div>
                 </div>
                 {import.meta?.env?.DEV && missingTemplateKeys.length > 0 ? (
                   <div className={styles.devWarn} role="status">
@@ -729,31 +1297,50 @@ export function DialerSessionPage() {
                     </div>
                   </div>
                 ) : null}
-                <div
-                  className={styles.scriptBody}
-                  dangerouslySetInnerHTML={{
-                    __html: renderScriptHtml(
-                      session?.script?.script_body,
-                      contact || currentItem,
-                      user,
-                      tenant,
-                      templateSample
-                    ),
-                  }}
-                />
+                <div className={styles.scriptReadingSurface}>
+                  {String(session?.script?.script_body || '').trim() ? (
+                    <div
+                      className={styles.scriptBody}
+                      dangerouslySetInnerHTML={{
+                        __html: renderScriptHtml(
+                          session?.script?.script_body,
+                          leadContact,
+                          user,
+                          tenant,
+                          templateSample
+                        ),
+                      }}
+                    />
+                  ) : (
+                    <div className={styles.scriptEmpty}>
+                      No script text is set for this session. Ask an admin to attach a call script to the dialing set.
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className={styles.card}>
-                <div className={styles.cardTitle}>Queue</div>
+              <div className={`${styles.card} ${styles.cardQueue}`}>
+                <div className={styles.queueHeader}>
+                  <div className={styles.queueTitle}>Call queue</div>
+                  <div className={styles.queueHint}>{items.length} leads</div>
+                </div>
                 <div className={styles.queueTableWrap}>
                   <table className={styles.queueTable}>
                     <thead>
                       <tr>
-                        <th style={{ width: 60 }}>Order</th>
+                        <th className={styles.thOrder} style={{ width: 56 }}>
+                          #
+                        </th>
                         <th>Lead</th>
-                        <th style={{ width: 120 }}>State</th>
-                        <th style={{ width: 140 }}>Called at</th>
-                        <th style={{ width: 120 }}>Attempt</th>
+                        <th className={styles.thState} style={{ width: 112 }}>
+                          State
+                        </th>
+                        <th className={styles.thTime} style={{ width: 132 }}>
+                          Called at
+                        </th>
+                        <th className={styles.thAttempt} style={{ width: 100 }}>
+                          Attempt
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -763,7 +1350,10 @@ export function DialerSessionPage() {
                           <td>
                             <div className={styles.queueName}>{it.display_name || `#${it.contact_id}`}</div>
                             <div className={styles.queueSub}>
-                              #{it.contact_id} · {it.primary_phone || '—'}
+                              #{it.contact_id} ·{' '}
+                              {it.state === 'calling'
+                                ? it.attempt_phone || it.selected_phone || it.primary_phone || '—'
+                                : it.selected_phone || it.primary_phone || '—'}
                             </div>
                           </td>
                           <td>
@@ -782,8 +1372,11 @@ export function DialerSessionPage() {
             </main>
 
             <aside className={styles.right}>
-              <div className={styles.card}>
-                <div className={styles.cardTitle}>Disposition set</div>
+              <div className={`${styles.card} ${styles.cardDispo}`}>
+                <div className={styles.dispoHeader}>
+                  <div className={styles.dispoTitle}>Outcomes</div>
+                  <p className={styles.dispoSub}>After the call, pick a disposition to log and continue.</p>
+                </div>
                 <div className={styles.dispoList}>
                   {(session?.dispositions || []).length === 0 ? (
                     <div className={styles.dispoEmpty}>No dispositions configured for this dialing set.</div>
@@ -793,12 +1386,20 @@ export function DialerSessionPage() {
                         key={d.id}
                         type="button"
                         className={styles.dispoBtn}
-                        disabled={busy || !lastAttemptId}
+                        disabled={busy}
+                        aria-disabled={!lastAttemptId}
                         title={!lastAttemptId ? 'Call at least one lead first' : d.next_action || ''}
                         onClick={() => setDisposition(d.id, d.next_action)}
                       >
-                        <div className={styles.dispoBtnName}>{d.name}</div>
-                        {d.next_action ? <div className={styles.dispoBtnHint}>{d.next_action}</div> : null}
+                        <span className={styles.dispoBtnBody}>
+                          <span className={styles.dispoBtnText}>
+                            <span className={styles.dispoBtnName}>{d.name}</span>
+                            {d.next_action ? (
+                              <span className={styles.dispoBtnHint}>{d.next_action}</span>
+                            ) : null}
+                          </span>
+                          <span className={styles.dispoBtnChevron} aria-hidden="true" />
+                        </span>
                       </button>
                     ))
                   )}
@@ -806,9 +1407,12 @@ export function DialerSessionPage() {
               </div>
             </aside>
           </div>
+            ) : null}
+          </div>
           )}
         </>
       ) : null}
+
     </div>
   );
 }

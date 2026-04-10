@@ -1,4 +1,5 @@
 import * as callsService from '../../services/tenant/callsService.js';
+import * as dialerSessionsService from '../../services/tenant/dialerSessionsService.js';
 
 export async function start(req, res, next) {
   try {
@@ -42,14 +43,22 @@ export async function setDisposition(req, res, next) {
   try {
     const tenantId = req.tenant?.id;
     if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
-    const data = await callsService.setAttemptDisposition(
+    const { attempt, next_action } = await callsService.setAttemptDisposition(
       tenantId,
       req.user,
       req.params.id,
       req.body || {}
     );
-    if (!data) return res.status(404).json({ error: 'Call attempt not found' });
-    res.json({ ok: true, data });
+    if (!attempt) return res.status(404).json({ error: 'Call attempt not found' });
+
+    let session = null;
+    let dialer = null;
+    if (String(next_action || '').toLowerCase() === 'next_number') {
+      dialer = await dialerSessionsService.handleNextNumberDisposition(tenantId, req.user, req.params.id);
+      session = dialer?.session ?? null;
+    }
+
+    res.json({ ok: true, data: attempt, next_action, session, dialer });
   } catch (err) {
     next(err);
   }

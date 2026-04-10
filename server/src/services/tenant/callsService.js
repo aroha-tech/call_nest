@@ -1,9 +1,7 @@
 import { query } from '../../config/db.js';
 import { getTelephonyProvider } from './telephony/telephonyProviderRegistry.js';
 
-async function fetchContactAndPhoneForCall(tenantId, user, contactId) {
-  // Ownership restriction: match same logic as contactsService buildOwnershipWhere but inline for call module.
-  // Admin: any in tenant; Manager: manager_id = me; Agent: assigned_user_id = me.
+async function fetchContactBaseForCall(tenantId, user, contactId) {
   const where = ['c.tenant_id = ?', 'c.deleted_at IS NULL', 'c.id = ?'];
   const params = [tenantId, contactId];
   if (user.role === 'agent') {
@@ -20,7 +18,34 @@ async function fetchContactAndPhoneForCall(tenantId, user, contactId) {
         c.type,
         c.manager_id,
         c.assigned_user_id,
-        c.primary_phone_id,
+        c.primary_phone_id
+     FROM contacts c
+     WHERE ${where.join(' AND ')}
+     LIMIT 1`,
+    params
+  );
+  return row || null;
+}
+
+async function fetchContactAndPhoneForCall(tenantId, user, contactId, requestedPhoneId = null) {
+  const base = await fetchContactBaseForCall(tenantId, user, contactId);
+  if (!base) return null;
+
+  const reqPid = requestedPhoneId ? Number(requestedPhoneId) : null;
+  if (reqPid && Number.isFinite(reqPid) && reqPid > 0) {
+    const [p] = await query(
+      `SELECT id AS phone_id, phone AS phone_e164
+       FROM contact_phones
+       WHERE tenant_id = ? AND contact_id = ? AND id = ?
+       LIMIT 1`,
+      [tenantId, contactId, reqPid]
+    );
+    if (!p?.phone_e164) return null;
+    return { ...base, phone_id: p.phone_id, phone_e164: p.phone_e164 };
+  }
+
+  const [row] = await query(
+    `SELECT
         p.id AS phone_id,
         p.phone AS phone_e164
      FROM contacts c
@@ -28,12 +53,12 @@ async function fetchContactAndPhoneForCall(tenantId, user, contactId) {
        ON p.tenant_id = c.tenant_id
       AND p.contact_id = c.id
       AND (p.id = c.primary_phone_id OR p.is_primary = 1)
-     WHERE ${where.join(' AND ')}
+     WHERE c.tenant_id = ? AND c.deleted_at IS NULL AND c.id = ?
      ORDER BY (p.id = c.primary_phone_id) DESC, p.is_primary DESC, p.id ASC
      LIMIT 1`,
-    params
+    [tenantId, contactId]
   );
-  return row || null;
+  return { ...base, phone_id: row?.phone_id ?? null, phone_e164: row?.phone_e164 ?? null };
 }
 
 async function bumpContactCounters(tenantId, contactId, phoneId) {
@@ -72,14 +97,16 @@ export async function startCallForContact(
     throw err;
   }
 
-  const row = await fetchContactAndPhoneForCall(tenantId, user, cid);
+  const row = await fetchContactAndPhoneForCall(tenantId, user, cid, contact_phone_id);
   if (!row) {
-    const err = new Error('Contact not found');
+    const err = new Error(
+      contact_phone_id ? 'Contact not found or phone does not belong to this contact' : 'Contact not found'
+    );
     err.status = 404;
     throw err;
   }
 
-  const chosenPhoneId = contact_phone_id ? Number(contact_phone_id) : row.phone_id ? Number(row.phone_id) : null;
+  const chosenPhoneId = row.phone_id ? Number(row.phone_id) : null;
   const to = row.phone_e164;
   if (!to) {
     const err = new Error('No phone number found for this contact');
@@ -244,45 +271,69 @@ export async function setAttemptDisposition(tenantId, user, attemptId, { disposi
     throw err;
   }
 
-  // Only update attempts within scope (agents: their own; managers: their team; admin: any tenant)
+  // Only update attempts within scope (agents: their own; managers: their team; admin: any tenant).
+  // Managers who dial often have contacts with NULL or stale manager_id; startCallForContact always sets created_by to the dialing user.
   const where = ['tenant_id = ?', 'id = ?'];
   const params = [tenantId, id];
   if (user.role === 'agent') {
-    where.push('agent_user_id = ?');
-    params.push(user.id);
+    where.push('(agent_user_id = ? OR created_by = ?)');
+    params.push(user.id, user.id);
   } else if (user.role === 'manager') {
-    where.push('manager_id = ?');
-    params.push(user.id);
+    where.push('(manager_id = ? OR created_by = ?)');
+    params.push(user.id, user.id);
   }
 
-  await query(
+  const dispNormalized =
+    disposition_id !== undefined && disposition_id !== null ? String(disposition_id).trim() : '';
+  if (dispNormalized.length > 36) {
+    const err = new Error('Invalid disposition id');
+    err.status = 400;
+    throw err;
+  }
+  const dispForDb = dispNormalized.length > 0 ? dispNormalized : null;
+
+  const updateResult = await query(
     `UPDATE contact_call_attempts
      SET disposition_id = ?, notes = ?
      WHERE ${where.join(' AND ')}`,
-    [disposition_id || null, notes ? String(notes).slice(0, 2000) : null, ...params]
+    [dispForDb, notes ? String(notes).slice(0, 2000) : null, ...params]
   );
+
+  const affected = Number(updateResult?.affectedRows ?? 0);
+  if (affected === 0) {
+    const err = new Error('Call attempt not found or you do not have access to set its disposition');
+    err.status = 404;
+    throw err;
+  }
 
   const [row] = await query(
     `SELECT id, contact_id, disposition_id, notes FROM contact_call_attempts WHERE tenant_id = ? AND id = ? LIMIT 1`,
     [tenantId, id]
   );
 
-  // Only advance the dialer queue when a real disposition was chosen. A PUT with
-  // disposition_id null (e.g. Activities "Save" with empty select, or bad client)
-  // must NOT mark the row "called" or the first lead disappears while you are still on them.
-  const dispIdNum =
-    disposition_id !== undefined && disposition_id !== null && disposition_id !== ''
-      ? Number(disposition_id)
-      : NaN;
-  if (Number.isFinite(dispIdNum) && dispIdNum > 0) {
-    await query(
-      `UPDATE dialer_session_items
-       SET state = 'called', called_at = NOW()
-       WHERE tenant_id = ? AND last_attempt_id = ? AND state = 'calling'`,
-      [tenantId, id]
+  // Only advance the dialer queue when a real disposition was chosen. Tenant dispositions
+  // use UUID strings (CHAR(36)); do not use Number() here — Number(uuid) is NaN and would
+  // skip this update forever.
+  // `next_number` is handled in dialerSessionsService.handleNextNumberDisposition (called from
+  // the calls controller) so we can pick the next line or complete the lead and auto-dial.
+  let next_action = null;
+  if (dispForDb) {
+    const [dispo] = await query(
+      `SELECT next_action FROM dispositions WHERE tenant_id = ? AND id = ? AND is_deleted = 0 LIMIT 1`,
+      [tenantId, dispForDb]
     );
+    const na = String(dispo?.next_action || '').trim().toLowerCase();
+    next_action = na || null;
+    if (na !== 'next_number') {
+      await query(
+        `UPDATE dialer_session_items
+         SET state = 'called', called_at = NOW()
+         WHERE tenant_id = ? AND last_attempt_id = ? AND state = 'calling'`,
+        [tenantId, id]
+      );
+    }
   }
 
-  return row || null;
+  return { attempt: row || null, next_action };
 }
 

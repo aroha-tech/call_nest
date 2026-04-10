@@ -146,6 +146,23 @@ export async function getById(req, res, next) {
   }
 }
 
+export async function appendPhone(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant context required' });
+    }
+    const { phone, label } = req.body || {};
+    const contact = await contactsService.appendContactPhone(tenantId, req.user, req.params.id, {
+      phone,
+      label,
+    });
+    res.status(201).json({ data: contact });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function create(req, res, next) {
   try {
     const tenantId = req.tenant?.id;

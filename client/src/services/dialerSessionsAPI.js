@@ -8,6 +8,9 @@ export const dialerSessionsAPI = {
 
   getById: (id) => axiosInstance.get(`${BASE}/${id}`),
 
+  updateItem: (sessionId, itemId, body) =>
+    axiosInstance.patch(`${BASE}/${sessionId}/items/${itemId}`, body),
+
   next: (id) => axiosInstance.post(`${BASE}/${id}/next`),
 
   pause: (id) => axiosInstance.post(`${BASE}/${id}/pause`),

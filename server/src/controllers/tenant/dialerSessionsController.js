@@ -67,3 +67,20 @@ export async function cancel(req, res, next) {
   }
 }
 
+export async function patchItem(req, res, nextFn) {
+  try {
+    const tenantId = req.tenant?.id;
+    if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
+    const data = await dialerSessionsService.updateSessionItemTargetPhone(
+      tenantId,
+      req.user,
+      req.params.id,
+      req.params.itemId,
+      req.body || {}
+    );
+    res.json({ ok: true, data });
+  } catch (err) {
+    nextFn(err);
+  }
+}
+

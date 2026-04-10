@@ -867,6 +867,59 @@ export async function getContactById(id, tenantId, user) {
   };
 }
 
+export async function appendContactPhone(tenantId, user, contactId, { phone, label = 'mobile' } = {}) {
+  const cid = Number(contactId);
+  if (!cid) {
+    const err = new Error('Invalid contact id');
+    err.status = 400;
+    throw err;
+  }
+  const raw = String(phone || '').trim();
+  if (!raw) {
+    const err = new Error('phone is required');
+    err.status = 400;
+    throw err;
+  }
+  const existing = await getContactById(cid, tenantId, user);
+  if (!existing) {
+    const err = new Error('Contact not found');
+    err.status = 404;
+    throw err;
+  }
+  const e164 = toE164Phone(raw);
+  if (!e164) {
+    const err = new Error('Invalid phone number');
+    err.status = 400;
+    throw err;
+  }
+  const rawLabel = String(label || 'mobile').trim().toLowerCase();
+  const allowed = new Set(['mobile', 'home', 'work', 'whatsapp', 'other']);
+  const lbl = allowed.has(rawLabel) ? rawLabel : 'other';
+  const [dupLabel] = await query(
+    `SELECT id FROM contact_phones WHERE tenant_id = ? AND contact_id = ? AND label = ? LIMIT 1`,
+    [tenantId, cid, lbl]
+  );
+  if (dupLabel) {
+    const err = new Error(`This contact already has a ${lbl} number`);
+    err.status = 400;
+    throw err;
+  }
+  const ins = await query(
+    `INSERT INTO contact_phones (tenant_id, contact_id, phone, label, is_primary) VALUES (?, ?, ?, ?, 0)`,
+    [tenantId, cid, e164, lbl]
+  );
+  const newPhoneId = ins.insertId;
+  if (!existing.primary_phone_id) {
+    await query(`UPDATE contacts SET primary_phone_id = ?, updated_by = ? WHERE id = ? AND tenant_id = ?`, [
+      newPhoneId,
+      user.id,
+      cid,
+      tenantId,
+    ]);
+  }
+  return getContactById(cid, tenantId, user);
+}
+
 export async function createContact(tenantId, user, payload) {
   const {
     type = 'lead',

@@ -61,6 +61,8 @@ export const contactsAPI = {
 
   getById: (id) => axiosInstance.get(`${BASE}/${id}`),
 
+  appendPhone: (contactId, payload) => axiosInstance.post(`${BASE}/${contactId}/phones`, payload),
+
   create: (data) => axiosInstance.post(`${BASE}`, data),
 
   update: (id, data) => axiosInstance.put(`${BASE}/${id}`, data),
