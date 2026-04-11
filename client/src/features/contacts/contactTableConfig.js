@@ -19,6 +19,7 @@ const ALL_CONTACT_COLUMNS = [
   { id: 'primary_phone', label: 'Primary phone', sortKey: 'primary_phone', category: 'default' },
   { id: 'email', label: 'Email', sortKey: 'email', category: 'default' },
   { id: 'tag_names', label: 'Tag', sortKey: 'tag_names', category: 'default' },
+  { id: 'status_name', label: 'Status', sortKey: 'status_name', category: 'default' },
   { id: 'manager_name', label: 'Manager', sortKey: 'manager_name', requireManagerAgent: true, category: 'default' },
   { id: 'assigned_user_name', label: 'Agent', sortKey: 'assigned_user_name', requireManagerAgent: true, category: 'default' },
 
@@ -60,6 +61,7 @@ export function getDefaultVisibleContactColumnIds(applicable) {
     'primary_phone',
     'email',
     'tag_names',
+    'status_name',
     'manager_name',
     'assigned_user_name',
   ];
@@ -79,7 +81,13 @@ export function loadContactVisibleColumnIds(applicableColumns) {
     if (!raw) return defaults;
     const parsed = JSON.parse(raw);
     const vis = Array.isArray(parsed.visible) ? parsed.visible : [];
-    const cleaned = [...new Set(vis.filter((id) => applicableIds.includes(id)))];
+    let cleaned = [...new Set(vis.filter((id) => applicableIds.includes(id)))];
+    if (applicableIds.includes('status_name') && !cleaned.includes('status_name')) {
+      const tagIdx = cleaned.indexOf('tag_names');
+      if (tagIdx >= 0) cleaned.splice(tagIdx + 1, 0, 'status_name');
+      else cleaned = ['status_name', ...cleaned];
+      cleaned = [...new Set(cleaned)];
+    }
     return cleaned.length ? cleaned : defaults;
   } catch {
     return defaults;

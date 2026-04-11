@@ -79,11 +79,12 @@ function Icon({ name }) {
         <path {...stroke} d="M8 22h8" />
         <path {...stroke} d="M3 3l18 18" />
       </svg>
+
     );
   }
   if (name === 'stop') {
     return (
-      <svg {...common} aria-hidden="true">
+      <svg {...common} aria-hidden="true">  
         <path {...stroke} d="M7 7h10v10H7z" />
       </svg>
     );

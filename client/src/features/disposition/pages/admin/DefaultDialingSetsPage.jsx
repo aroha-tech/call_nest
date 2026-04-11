@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { PageHeader } from '../../../../components/ui/PageHeader';
 import { Button } from '../../../../components/ui/Button';
 import { Input } from '../../../../components/ui/Input';
@@ -57,6 +57,7 @@ export function DefaultDialingSetsPage() {
   const [selectedDispoId, setSelectedDispoId] = useState('');
   const [formErrors, setFormErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
+  const [draggingDispoId, setDraggingDispoId] = useState(null);
 
   const filteredData = useMemo(() => {
     if (!search) return defaultDialingSets;
@@ -156,10 +157,37 @@ export function DefaultDialingSetsPage() {
     refetchDispositions();
   };
 
-  const handleMoveDisposition = async (id, direction) => {
-    await moveDisposition.mutate(id, direction);
-    refetchDispositions();
-  };
+  const handleDispoDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const handleDispoDragStart = useCallback((e, id) => {
+    e.dataTransfer.setData('text/plain', String(id));
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggingDispoId(id);
+  }, []);
+
+  const handleDispoDragEnd = useCallback(() => {
+    setDraggingDispoId(null);
+  }, []);
+
+  const handleDispoDrop = useCallback(
+    async (e, targetId) => {
+      e.preventDefault();
+      setDraggingDispoId(null);
+      const draggedId = e.dataTransfer.getData('text/plain');
+      if (!draggedId || String(draggedId) === String(targetId)) return;
+      const list = setDispositions;
+      const from = list.findIndex((x) => String(x.id) === String(draggedId));
+      const to = list.findIndex((x) => String(x.id) === String(targetId));
+      if (from < 0 || to < 0) return;
+      const targetPosition = list[to].order_index;
+      await moveDisposition.mutate(draggedId, undefined, targetPosition);
+      refetchDispositions();
+    },
+    [setDispositions, moveDisposition, refetchDispositions]
+  );
 
   return (
     <div className={styles.page}>
@@ -234,19 +262,34 @@ export function DefaultDialingSetsPage() {
                   <Table>
                     <TableHead>
                       <TableRow>
-                        <TableHeaderCell width="60px">Order</TableHeaderCell>
+                        <TableHeaderCell width="52px">Reorder</TableHeaderCell>
                         <TableHeaderCell>Disposition</TableHeaderCell>
                         <TableHeaderCell width="100px">Code</TableHeaderCell>
                         <TableHeaderCell width="60px" align="center">Remove</TableHeaderCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {setDispositions.map((d, idx) => (
-                        <TableRow key={d.id}>
+                      {setDispositions.map((d) => (
+                        <TableRow
+                          key={d.id}
+                          className={draggingDispoId === d.id ? styles.rowDragging : undefined}
+                          onDragOver={handleDispoDragOver}
+                          onDrop={(e) => handleDispoDrop(e, d.id)}
+                        >
                           <TableCell>
-                            <div className={styles.actions}>
-                              <IconButton size="sm" onClick={() => handleMoveDisposition(d.id, 'up')} disabled={idx === 0}>↑</IconButton>
-                              <IconButton size="sm" onClick={() => handleMoveDisposition(d.id, 'down')} disabled={idx === setDispositions.length - 1}>↓</IconButton>
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              className={styles.dragHandle}
+                              draggable={!moveDisposition.loading}
+                              title="Drag to reorder"
+                              aria-label={`Drag to reorder ${d.disposition_name || 'disposition'}`}
+                              onDragStart={(e) => handleDispoDragStart(e, d.id)}
+                              onDragEnd={handleDispoDragEnd}
+                            >
+                              <span className={styles.dragGrip} aria-hidden>
+                                ⠿
+                              </span>
                             </div>
                           </TableCell>
                           <TableCell>{d.disposition_name}</TableCell>

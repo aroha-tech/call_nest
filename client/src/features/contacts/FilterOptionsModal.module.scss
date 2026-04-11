@@ -1,0 +1,150 @@
+@use '../../styles/variables' as *;
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
+  padding-bottom: $space-2;
+}
+
+.intro {
+  margin: 0;
+  text-align: center;
+  font-size: $font-size-sm;
+  line-height: 1.5;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.55));
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $space-4;
+}
+
+@media (max-width: 640px) {
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: $space-5 $space-4;
+  border-radius: $radius-lg;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface, rgba(255, 255, 255, 0.04));
+  gap: $space-3;
+  outline: none;
+  transition:
+    border-color $transition-fast,
+    box-shadow $transition-fast,
+    background $transition-fast;
+}
+
+.card:hover:not(.cardActive) {
+  border-color: var(--color-border);
+}
+
+.cardActive {
+  border-color: rgba(var(--color-primary-rgb, 99, 102, 241), 0.65);
+  box-shadow:
+    0 0 0 1px rgba(var(--color-primary-rgb, 99, 102, 241), 0.35),
+    0 4px 24px rgba(var(--color-primary-rgb, 99, 102, 241), 0.12);
+  background: var(--color-bg-surface, rgba(255, 255, 255, 0.05));
+}
+
+.iconCircle {
+  width: 48px;
+  height: 48px;
+  border-radius: $radius-full;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-elevated, rgba(0, 0, 0, 0.35));
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-primary);
+  transition:
+    border-color $transition-fast,
+    background $transition-fast,
+    color $transition-fast,
+    box-shadow $transition-fast;
+
+  svg {
+    display: block;
+  }
+}
+
+.iconCircleActive {
+  border-color: rgba(var(--color-primary-rgb, 99, 102, 241), 0.45);
+  background: rgba(var(--color-primary-rgb, 99, 102, 241), 0.1);
+  color: var(--color-primary-300, #a5b4fc);
+}
+
+.iconCircleFolder {
+  background: rgba(251, 191, 36, 0.08);
+  border-color: rgba(251, 191, 36, 0.25);
+  color: #d97706;
+}
+
+.iconCircleFolderActive {
+  background: rgba(251, 191, 36, 0.16);
+  border-color: rgba(251, 191, 36, 0.5);
+  color: #fbbf24;
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.2);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  transition: color $transition-fast;
+}
+
+.cardTitleActive {
+  color: var(--color-primary-400, #818cf8);
+}
+
+.cardDesc {
+  margin: 0;
+  font-size: $font-size-xs;
+  line-height: 1.5;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.5));
+  flex: 1;
+}
+
+.cardActionBtn {
+  width: 100%;
+  max-width: 220px;
+  margin-top: $space-1;
+  padding: 10px $space-4;
+  border: none;
+  border-radius: $radius-md;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, #7c3aed 0%, #6366f1 42%, #2563eb 100%);
+  box-shadow: 0 2px 14px rgba(99, 102, 241, 0.4);
+  transition:
+    filter $transition-fast,
+    box-shadow $transition-fast,
+    transform $transition-fast;
+
+  &:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.45);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary-400);
+    outline-offset: 2px;
+  }
+}

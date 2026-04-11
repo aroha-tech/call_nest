@@ -11,6 +11,8 @@ export function Select({
   error,
   disabled = false,
   className = '',
+  /** When true, empty value is a real choice (e.g. clear optional field), not a disabled placeholder row. */
+  allowEmpty = false,
   ...props
 }) {
   const selectId = id || `select-${Math.random().toString(36).slice(2, 9)}`;
@@ -30,7 +32,7 @@ export function Select({
         className={`${styles.select} ${error ? styles.hasError : ''}`}
         {...props}
       >
-        <option value="" disabled>
+        <option value="" disabled={!allowEmpty}>
           {placeholder}
         </option>
         {options.map((opt) => (

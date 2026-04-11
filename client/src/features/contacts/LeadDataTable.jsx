@@ -2,15 +2,16 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from 'react-dom';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { IconButton } from '../../components/ui/IconButton';
-import { EditIcon, TrashIcon, RowActionGroup } from '../../components/ui/ActionIcons';
+import { EditIcon, TrashIcon, ViewIcon, RowActionGroup } from '../../components/ui/ActionIcons';
 import { Button } from '../../components/ui/Button';
 
 import styles from './LeadDataTable.module.scss';
 import { parseCustomFieldColumnId } from './customFieldColumnIds';
+import { IconPhone } from './ListActionsMenuIcons';
 
 const ACTION_MENU_MIN_W = 160;
 
-function LeadRowActionsMenu({ useMenu, canUpdate, canDelete, onEdit, onDelete, scrollContainerRef }) {
+function LeadRowActionsMenu({ useMenu, onView, canUpdate, canDelete, onEdit, onDelete, scrollContainerRef }) {
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
   const wrapRef = useRef(null);
@@ -79,6 +80,11 @@ function LeadRowActionsMenu({ useMenu, canUpdate, canDelete, onEdit, onDelete, s
   if (!useMenu) {
     return (
       <RowActionGroup className={styles.actionsRowGroup}>
+        {onView && (
+          <IconButton size="sm" title="View" onClick={onView}>
+            <ViewIcon />
+          </IconButton>
+        )}
         {canUpdate && (
           <IconButton size="sm" title="Edit" onClick={onEdit}>
             <EditIcon />
@@ -102,6 +108,21 @@ function LeadRowActionsMenu({ useMenu, canUpdate, canDelete, onEdit, onDelete, s
             style={{ top: menuPos.top, left: menuPos.left }}
             role="menu"
           >
+            {onView ? (
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={styles.actionMenuItem}
+                  onClick={() => {
+                    onView();
+                    setOpen(false);
+                  }}
+                >
+                  View
+                </button>
+              </li>
+            ) : null}
             {canUpdate ? (
               <li role="none">
                 <button
@@ -177,6 +198,7 @@ export function LeadDataTable({
   onColumnHeaderClick,
   onOpenCustomizeColumns,
   useCompactRowActions,
+  onView,
   canUpdate,
   canDelete,
   onEdit,
@@ -238,6 +260,8 @@ export function LeadDataTable({
         return c.email || '—';
       case 'tag_names':
         return c.tag_names || '—';
+      case 'status_name':
+        return c.status_name || '—';
       case 'campaign_name':
         return c.campaign_name || '—';
       case 'type':
@@ -302,8 +326,11 @@ export function LeadDataTable({
             </TableHeaderCell>
           ) : null}
           {showDialerCall ? (
-            <TableHeaderCell width="96px" align="center">
-              Call
+            <TableHeaderCell width="72px" align="center" className={styles.callColumnTh}>
+              <span className={styles.callColHeader} title="Call" aria-hidden>
+                <IconPhone width={16} height={16} />
+              </span>
+              <span className={styles.callColHeaderSr}>Call</span>
             </TableHeaderCell>
           ) : null}
           {visibleDefs.map((col) => (
@@ -373,10 +400,12 @@ export function LeadDataTable({
                 <Button
                   size="sm"
                   variant="secondary"
+                  className={styles.dialCallBtn}
                   onClick={() => onDialerCall?.(c)}
                   disabled={!onDialerCall}
+                  aria-label={`Call ${c.display_name?.trim() || 'lead'}`}
                 >
-                  Call
+                  <IconPhone className={styles.dialCallIcon} width={18} height={18} aria-hidden />
                 </Button>
               </TableCell>
             ) : null}
@@ -386,6 +415,7 @@ export function LeadDataTable({
             <TableCell align="center" className={`${styles.stickyLast} ${styles.actionsTd}`}>
               <LeadRowActionsMenu
                 useMenu={useCompactRowActions}
+                onView={onView ? () => onView(c) : undefined}
                 canUpdate={canUpdate}
                 canDelete={canDelete}
                 onEdit={() => onEdit(c)}

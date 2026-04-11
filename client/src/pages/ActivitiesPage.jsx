@@ -11,6 +11,8 @@ import { Select } from '../components/ui/Select';
 import { Input } from '../components/ui/Input';
 import { callsAPI } from '../services/callsAPI';
 import { dispositionsAPI } from '../services/dispositionAPI';
+import { tenantUsersAPI } from '../services/tenantUsersAPI';
+import { savedListFiltersAPI } from '../services/savedListFiltersAPI';
 import listStyles from '../components/admin/adminDataList.module.scss';
 import styles from './ActivitiesPage.module.scss';
 
@@ -41,9 +43,34 @@ export function ActivitiesPage() {
   const [starting, setStarting] = useState(false);
 
   const [dispositions, setDispositions] = useState([]);
+  const [dispositionFilter, setDispositionFilter] = useState('');
+  const [agentFilter, setAgentFilter] = useState('');
+  const [startedAfter, setStartedAfter] = useState('');
+  const [startedBefore, setStartedBefore] = useState('');
+  const [tenantAgents, setTenantAgents] = useState([]);
+  const [savedFilters, setSavedFilters] = useState([]);
+  const [savedPick, setSavedPick] = useState('');
+
   const dispoOptions = useMemo(
     () => [{ value: '', label: '— No disposition —' }, ...dispositions.map((d) => ({ value: String(d.id), label: d.name || d.code || d.id }))],
     [dispositions]
+  );
+
+  const dispoFilterOptions = useMemo(
+    () => [{ value: '', label: 'All dispositions' }, ...dispositions.map((d) => ({ value: String(d.id), label: d.name || d.code || d.id }))],
+    [dispositions]
+  );
+
+  const agentFilterOptions = useMemo(() => {
+    const opts = tenantAgents
+      .map((u) => ({ value: String(u.id), label: u.name || u.email || `#${u.id}` }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    return [{ value: '', label: 'All agents' }, ...opts];
+  }, [tenantAgents]);
+
+  const savedFilterOptions = useMemo(
+    () => [{ value: '', label: 'Saved filters…' }, ...savedFilters.map((f) => ({ value: String(f.id), label: f.name }))],
+    [savedFilters]
   );
 
   async function load() {
@@ -51,7 +78,14 @@ export function ActivitiesPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await callsAPI.list({ page, limit });
+      const res = await callsAPI.list({
+        page,
+        limit,
+        disposition_id: dispositionFilter || undefined,
+        agent_user_id: agentFilter || undefined,
+        started_after: startedAfter || undefined,
+        started_before: startedBefore || undefined,
+      });
       setPayload(res?.data ?? null);
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || 'Failed to load activities');
@@ -64,7 +98,7 @@ export function ActivitiesPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, limit, canView]);
+  }, [page, limit, canView, dispositionFilter, agentFilter, startedAfter, startedBefore]);
 
   useEffect(() => {
     if (!canView) return;
@@ -73,6 +107,85 @@ export function ActivitiesPage() {
       .then((res) => setDispositions(res?.data?.data?.data ?? []))
       .catch(() => setDispositions([]));
   }, [canView]);
+
+  useEffect(() => {
+    if (!canView || !user) return;
+    if (user.role !== 'admin' && user.role !== 'manager') return;
+    let cancelled = false;
+    tenantUsersAPI
+      .getAll({ page: 1, limit: 500, includeDisabled: false })
+      .then((res) => {
+        const list = res?.data?.data ?? [];
+        if (!cancelled) setTenantAgents(list.filter((u) => u.role === 'agent'));
+      })
+      .catch(() => {
+        if (!cancelled) setTenantAgents([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canView, user]);
+
+  useEffect(() => {
+    if (!canView) return;
+    let cancelled = false;
+    savedListFiltersAPI
+      .list({ entity_type: 'call_history' })
+      .then((res) => {
+        if (!cancelled) setSavedFilters(res?.data?.data ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setSavedFilters([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canView]);
+
+  const applyCallHistorySnapshot = (snap) => {
+    if (!snap || snap.version !== 1) return;
+    setDispositionFilter(snap.dispositionFilter ?? '');
+    setAgentFilter(snap.agentFilter ?? '');
+    setStartedAfter(snap.startedAfter ?? '');
+    setStartedBefore(snap.startedBefore ?? '');
+    setPage(1);
+  };
+
+  const handleSavedCallFilterPick = (e) => {
+    const id = e.target.value;
+    setSavedPick(id);
+    if (!id) return;
+    const row = savedFilters.find((f) => String(f.id) === id);
+    let snap = row?.filter_json;
+    if (snap == null) return;
+    if (typeof snap === 'string') {
+      try {
+        snap = JSON.parse(snap);
+      } catch {
+        return;
+      }
+    }
+    applyCallHistorySnapshot(snap);
+  };
+
+  const saveCurrentCallFilter = async () => {
+    const name = window.prompt('Name for this filter');
+    if (!name || !String(name).trim()) return;
+    const filter_json = {
+      version: 1,
+      dispositionFilter,
+      agentFilter,
+      startedAfter,
+      startedBefore,
+    };
+    try {
+      await savedListFiltersAPI.create({ entity_type: 'call_history', name: String(name).trim(), filter_json });
+      const res = await savedListFiltersAPI.list({ entity_type: 'call_history' });
+      setSavedFilters(res?.data?.data ?? []);
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || 'Could not save filter');
+    }
+  };
 
   const rows = payload?.data ?? [];
   const pagination = payload?.pagination ?? { page, limit, total: 0, totalPages: 1 };
@@ -133,6 +246,60 @@ export function ActivitiesPage() {
       />
 
       {error ? <Alert variant="error">{error}</Alert> : null}
+
+      <div className={styles.filterCard}>
+        <div className={styles.filterRow}>
+          <Select
+            label="Disposition"
+            value={dispositionFilter}
+            onChange={(e) => {
+              setDispositionFilter(e.target.value);
+              setPage(1);
+            }}
+            options={dispoFilterOptions}
+          />
+          {(user?.role === 'admin' || user?.role === 'manager') && (
+            <Select
+              label="Agent"
+              value={agentFilter}
+              onChange={(e) => {
+                setAgentFilter(e.target.value);
+                setPage(1);
+              }}
+              options={agentFilterOptions}
+            />
+          )}
+          <Input
+            label="Started after"
+            type="datetime-local"
+            value={startedAfter}
+            onChange={(e) => {
+              setStartedAfter(e.target.value);
+              setPage(1);
+            }}
+          />
+          <Input
+            label="Started before"
+            type="datetime-local"
+            value={startedBefore}
+            onChange={(e) => {
+              setStartedBefore(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <div className={styles.filterRow}>
+          <Select
+            label="Saved filter"
+            value={savedPick}
+            onChange={handleSavedCallFilterPick}
+            options={savedFilterOptions}
+          />
+          <Button type="button" variant="secondary" onClick={saveCurrentCallFilter}>
+            Save current filter
+          </Button>
+        </div>
+      </div>
 
       <div className={listStyles.tableCard}>
         <div className={styles.cardBody}>

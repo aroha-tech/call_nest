@@ -36,15 +36,19 @@
 }
 
 .sm {
-  height: 30px;
-  padding: 0 $space-3;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 $space-4;
   font-size: $font-size-xs;
+  border-radius: $radius-md;
 }
 
 .md {
-  height: 34px;
-  padding: 0 $space-4;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 $space-5;
   font-size: $font-size-sm;
+  border-radius: $radius-md;
 }
 
 .lg {
@@ -53,60 +57,40 @@
   font-size: $font-size-base;
 }
 
-// Variants
+// Variants — flat, theme-token driven (light theme: crisp outline secondaries; no heavy 3D chrome)
 .primary {
-  background: linear-gradient(180deg, var(--color-primary-500) 0%, var(--color-primary-700) 100%);
-  color: white;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.14) inset,
-    0 1px 2px rgba(0, 0, 0, 0.22),
-    0 5px 16px rgba(var(--color-primary-rgb), 0.34);
+  background: var(--color-primary-600);
+  color: #fff;
+  box-shadow: $shadow-xs;
 
   &:hover:not(:disabled) {
-    background: linear-gradient(180deg, var(--color-primary-400) 0%, var(--color-primary-600) 100%);
-    box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.16) inset,
-      0 2px 4px rgba(0, 0, 0, 0.2),
-      0 8px 22px rgba(var(--color-primary-rgb), 0.4);
+    background: var(--color-primary-500);
+    box-shadow: $shadow-sm;
   }
 
   &:active:not(:disabled) {
-    background: linear-gradient(180deg, var(--color-primary-600) 0%, var(--color-primary-800) 100%);
-    box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.35) inset,
-      0 2px 8px rgba(var(--color-primary-rgb), 0.25);
+    background: var(--color-primary-700);
+    box-shadow: none;
     transform: translateY(0.5px);
   }
 }
 
 .secondary {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--color-bg-muted) 100%, #fff 6%) 0%,
-    color-mix(in srgb, var(--color-bg-muted) 72%, #000 28%) 100%
-  );
+  background: var(--color-bg-subtle);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border-strong);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.07) inset,
-    0 1px 2px rgba(0, 0, 0, 0.28),
-    0 3px 12px rgba(0, 0, 0, 0.18);
+  box-shadow: $shadow-xs;
 
   &:hover:not(:disabled) {
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--color-bg-muted) 100%, #fff 11%) 0%,
-      color-mix(in srgb, var(--color-bg-muted) 65%, #000 35%) 100%
-    );
-    border-color: rgba(255, 255, 255, 0.14);
-    box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.09) inset,
-      0 2px 4px rgba(0, 0, 0, 0.3),
-      0 5px 16px rgba(0, 0, 0, 0.22);
+    background: var(--color-bg-surface);
+    border-color: var(--color-border-strong);
+    box-shadow: $shadow-sm;
   }
 
   &:active:not(:disabled) {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35) inset;
+    background: var(--color-bg-muted);
+    border-color: var(--color-border-strong);
+    box-shadow: none;
     transform: translateY(0.5px);
   }
 }

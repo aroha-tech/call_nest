@@ -6,6 +6,15 @@
   gap: $space-1;
   position: relative;
   width: 100%;
+
+  :global(.cn-multiselect__control) {
+    border-radius: $radius-sm;
+    font-size: $font-size-sm;
+  }
+}
+
+.selectError :global(.cn-multiselect__control) {
+  border-color: var(--color-danger);
 }
 
 .label {
@@ -13,113 +22,6 @@
   font-weight: $font-weight-medium;
   color: var(--color-text-secondary);
   margin-bottom: 2px;
-}
-
-.trigger {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: $space-2;
-  width: 100%;
-  min-height: 34px;
-  padding: 0 $space-3;
-  font-size: $font-size-sm;
-  font-weight: $font-weight-medium;
-  color: var(--color-text-primary);
-  text-align: left;
-  background-color: var(--color-input-bg);
-  border: 1px solid var(--color-input-border);
-  border-radius: $radius-sm;
-  cursor: pointer;
-  transition: border-color $transition-fast, box-shadow $transition-fast;
-
-  &:hover:not(:disabled) {
-    border-color: var(--color-input-border-hover);
-  }
-
-  &:focus {
-    outline: none;
-    border-color: var(--color-input-border-focus);
-    box-shadow: 0 0 0 3px var(--color-focus-ring);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-}
-
-.triggerError {
-  border-color: var(--color-danger);
-
-  &:focus {
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.22);
-  }
-}
-
-.triggerText {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chevron {
-  flex-shrink: 0;
-  font-size: 10px;
-  color: var(--color-text-muted);
-  line-height: 1;
-}
-
-.panel {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 40;
-  max-height: 240px;
-  overflow-y: auto;
-  padding: $space-2;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-input-border);
-  border-radius: $radius-md;
-  box-shadow: $shadow-md;
-}
-
-.option {
-  display: flex;
-  align-items: flex-start;
-  gap: $space-2;
-  padding: $space-1 $space-1;
-  border-radius: $radius-sm;
-  cursor: pointer;
-  font-size: $font-size-sm;
-  color: var(--color-text-primary);
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.04);
-  }
-}
-
-.optionInput {
-  margin-top: 2px;
-  flex-shrink: 0;
-  width: 1rem;
-  height: 1rem;
-  cursor: pointer;
-  accent-color: var(--color-primary, #6366f1);
-}
-
-.optionLabel {
-  flex: 1;
-  line-height: $line-height-normal;
-  white-space: normal;
-}
-
-.empty {
-  font-size: $font-size-xs;
-  color: var(--color-text-muted);
 }
 
 .error {

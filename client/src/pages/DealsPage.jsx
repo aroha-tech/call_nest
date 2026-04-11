@@ -29,6 +29,7 @@ export function DealsPage() {
   const [deleteDeal, setDeleteDeal] = useState(null);
   const [deleteStage, setDeleteStage] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [draggingStageId, setDraggingStageId] = useState(null);
 
   const fetchDeals = useCallback(async () => {
     setLoading(true);
@@ -190,15 +191,36 @@ export function DealsPage() {
     }
   }
 
-  async function moveStage(dealId, stages, index, direction) {
-    const j = index + direction;
-    if (j < 0 || j >= stages.length) return;
-    const next = [...stages];
-    [next[index], next[j]] = [next[j], next[index]];
-    const ids = next.map((s) => s.id);
+  const handleStageDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const handleStageDragStart = useCallback((e, stageId) => {
+    e.dataTransfer.setData('text/plain', String(stageId));
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggingStageId(stageId);
+  }, []);
+
+  const handleStageDragEnd = useCallback(() => {
+    setDraggingStageId(null);
+  }, []);
+
+  async function handleStageDrop(e, dealId, stages, targetStageId) {
+    e.preventDefault();
+    setDraggingStageId(null);
+    const raw = e.dataTransfer.getData('text/plain');
+    if (!raw || String(raw) === String(targetStageId)) return;
+    const order = stages.map((s) => s.id);
+    const from = order.findIndex((id) => String(id) === String(raw));
+    const to = order.findIndex((id) => String(id) === String(targetStageId));
+    if (from < 0 || to < 0) return;
+    const next = [...order];
+    const [removed] = next.splice(from, 1);
+    next.splice(to, 0, removed);
     setSaving(true);
     try {
-      await dealsAPI.reorderStages(dealId, ids);
+      await dealsAPI.reorderStages(dealId, next);
       await fetchDeals();
       if (tab === 'board') await fetchBoard();
     } catch (err) {
@@ -285,7 +307,7 @@ export function DealsPage() {
                 <table className={styles.stageTable}>
                   <thead>
                     <tr>
-                      <th>Order</th>
+                      <th className={styles.stageOrderCol}>Reorder</th>
                       <th>Stage</th>
                       <th>Progress %</th>
                       <th>Terminal</th>
@@ -293,15 +315,28 @@ export function DealsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {d.stages.map((s, idx) => (
-                      <tr key={s.id}>
-                        <td>
-                          <Button type="button" size="xs" variant="ghost" disabled={saving} onClick={() => moveStage(d.id, d.stages, idx, -1)} title="Move up">
-                            ↑
-                          </Button>
-                          <Button type="button" size="xs" variant="ghost" disabled={saving} onClick={() => moveStage(d.id, d.stages, idx, 1)} title="Move down">
-                            ↓
-                          </Button>
+                    {d.stages.map((s) => (
+                      <tr
+                        key={s.id}
+                        className={String(draggingStageId) === String(s.id) ? styles.stageRowDragging : ''}
+                        onDragOver={handleStageDragOver}
+                        onDrop={(e) => handleStageDrop(e, d.id, d.stages, s.id)}
+                      >
+                        <td className={styles.stageOrderCol}>
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            className={styles.stageDragHandle}
+                            draggable={!saving}
+                            title="Drag to reorder stages"
+                            aria-label={`Drag to reorder ${s.name}`}
+                            onDragStart={(e) => handleStageDragStart(e, s.id)}
+                            onDragEnd={handleStageDragEnd}
+                          >
+                            <span className={styles.stageDragGrip} aria-hidden>
+                              ⠿
+                            </span>
+                          </div>
                         </td>
                         <td>{s.name}</td>
                         <td>{s.progression_percent}%</td>

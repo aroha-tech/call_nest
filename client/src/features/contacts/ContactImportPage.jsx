@@ -1,12 +1,17 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAppSelector } from '../../app/hooks';
+import { selectUser } from '../../features/auth/authSelectors';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Alert } from '../../components/ui/Alert';
 import { Spinner } from '../../components/ui/Spinner';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown';
 import { contactsAPI } from '../../services/contactsAPI';
+import { contactTagsAPI } from '../../services/contactTagsAPI';
+import { tenantUsersAPI } from '../../services/tenantUsersAPI';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import styles from './ContactImportPage.module.scss';
 
@@ -87,12 +92,20 @@ function duplicateBadge(dup) {
 
 export function ContactImportPage({ type }) {
   const navigate = useNavigate();
+  const user = useAppSelector(selectUser);
   const title = useMemo(() => (type === 'lead' ? 'Import Leads' : 'Import Contacts'), [type]);
   const historyPath = type === 'lead' ? '/leads/import/history' : '/contacts/import/history';
+
+  const canSetImportOwnership = user?.role === 'admin' || user?.role === 'manager';
 
   const [file, setFile] = useState(null);
   const [mode, setMode] = useState('skip'); // skip | update
   const [defaultCountryCode, setDefaultCountryCode] = useState('+91');
+  const [tagOptions, setTagOptions] = useState([]);
+  const [tenantUsers, setTenantUsers] = useState([]);
+  const [importTagsJson, setImportTagsJson] = useState('');
+  const [importManagerId, setImportManagerId] = useState('');
+  const [importAssignedUserId, setImportAssignedUserId] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -103,6 +116,70 @@ export function ContactImportPage({ type }) {
   const [reviewData, setReviewData] = useState(null);
   const [resolvingPreview, setResolvingPreview] = useState(false);
   const previewDebounceRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [tRes, uRes] = await Promise.all([
+          contactTagsAPI.list(),
+          tenantUsersAPI.getAll({ page: 1, limit: 500, includeDisabled: false }),
+        ]);
+        if (cancelled) return;
+        setTagOptions(
+          (tRes?.data?.data ?? []).map((t) => ({
+            value: String(t.id),
+            label: t.name,
+          }))
+        );
+        setTenantUsers(uRes?.data?.data ?? []);
+      } catch {
+        if (!cancelled) {
+          setTagOptions([]);
+          setTenantUsers([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const managerSelectOptions = useMemo(() => {
+    const base = [{ value: '', label: '— Not set (use normal rules) —' }];
+    let mgrs = tenantUsers.filter((u) => u.role === 'manager');
+    if (user?.role === 'manager' && user?.id) {
+      mgrs = mgrs.filter((u) => Number(u.id) === Number(user.id));
+    }
+    return [
+      ...base,
+      ...mgrs
+        .map((u) => ({
+          value: String(u.id),
+          label: u.name || u.email || `#${u.id}`,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    ];
+  }, [tenantUsers, user]);
+
+  const agentSelectOptions = useMemo(() => {
+    const base = [{ value: '', label: '— Not set (use normal rules) —' }];
+    let agents = tenantUsers.filter((u) => u.role === 'agent');
+    if (user?.role === 'manager' && user?.id) {
+      agents = agents.filter((u) => Number(u.manager_id) === Number(user.id));
+    } else if (importManagerId && user?.role === 'admin') {
+      agents = agents.filter((u) => Number(u.manager_id) === Number(importManagerId));
+    }
+    return [
+      ...base,
+      ...agents
+        .map((u) => ({
+          value: String(u.id),
+          label: u.name || u.email || `#${u.id}`,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    ];
+  }, [tenantUsers, user, importManagerId]);
 
   const hasPreview = !!preview && Array.isArray(preview.columns);
   const canPreview = !!file && !loading;
@@ -201,6 +278,7 @@ export function ContactImportPage({ type }) {
     try {
       const res = await contactsAPI.resolveImportPreview({
         file,
+        type,
         mode,
         default_country_code: defaultCountryCode || '+91',
         mapping,
@@ -214,7 +292,7 @@ export function ContactImportPage({ type }) {
     } finally {
       setResolvingPreview(false);
     }
-  }, [file, hasPreview, mode, defaultCountryCode, mapping]);
+  }, [file, hasPreview, type, mode, defaultCountryCode, mapping]);
 
   useEffect(() => {
     if (!file || !hasPreview) return undefined;
@@ -225,7 +303,7 @@ export function ContactImportPage({ type }) {
     return () => {
       if (previewDebounceRef.current) clearTimeout(previewDebounceRef.current);
     };
-  }, [file, hasPreview, mapping, mode, defaultCountryCode, fetchResolvedPreview]);
+  }, [file, hasPreview, mapping, mode, type, defaultCountryCode, fetchResolvedPreview]);
 
   const handlePreview = async () => {
     if (!file || loading) return;
@@ -371,12 +449,26 @@ export function ContactImportPage({ type }) {
     setError('');
     setResult(null);
     try {
+      let tag_ids = [];
+      try {
+        if (importTagsJson && String(importTagsJson).trim()) {
+          const parsed = JSON.parse(importTagsJson);
+          if (Array.isArray(parsed)) tag_ids = parsed.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0);
+        }
+      } catch {
+        tag_ids = [];
+      }
+
       const res = await contactsAPI.importCsv({
         file,
         type,
         mode,
         default_country_code: defaultCountryCode || '+91',
         mapping,
+        tag_ids: tag_ids.length > 0 ? tag_ids : undefined,
+        import_manager_id: canSetImportOwnership && importManagerId ? importManagerId : undefined,
+        import_assigned_user_id:
+          canSetImportOwnership && importAssignedUserId ? importAssignedUserId : undefined,
       });
       setResult(res?.data || null);
     } catch (e) {
@@ -483,13 +575,18 @@ export function ContactImportPage({ type }) {
                     }}
                     className={styles.fileInput}
                   />
-                  <div className={styles.footerNote} style={{ marginTop: 8 }}>
-                    Each row needs a <b>name</b> (full name, first+last, or display name) and <b>first name or email</b>.
-                    Phone columns like mobile / contact_number / whatsapp are detected automatically.
-                    <div style={{ marginTop: 6 }}>
-                      <b>Max file size:</b> {CSV_IMPORT_MAX_MB} MB · <b>Max rows per run:</b> 2000 (split larger files).
+                    <div className={styles.footerNote} style={{ marginTop: 8 }}>
+                      Each row needs a <b>name</b> (full name, first+last, or display name) and <b>first name or email</b>.
+                      Phone columns like mobile / contact_number / whatsapp are detected automatically.
+                      <div style={{ marginTop: 6 }}>
+                        <b>Duplicates:</b> same primary phone within this import type ({type}) — Skip mode leaves the
+                        existing row unchanged; Update mode refreshes it. Leads and contacts are separate: the same
+                        number can exist as both a lead and a contact without merging or changing type.
+                      </div>
+                      <div style={{ marginTop: 6 }}>
+                        <b>Max file size:</b> {CSV_IMPORT_MAX_MB} MB · <b>Max rows per run:</b> 2000 (split larger files).
+                      </div>
                     </div>
-                  </div>
                 </div>
 
                 <div className={styles.stepCard}>
@@ -521,6 +618,41 @@ export function ContactImportPage({ type }) {
                       }}
                       placeholder="+91"
                     />
+                  </div>
+
+                  <div className={styles.importBulkOptions}>
+                    <MultiSelectDropdown
+                      label="Tags (optional — add to every imported row)"
+                      options={tagOptions}
+                      value={importTagsJson}
+                      onChange={(v) => {
+                        setImportTagsJson(v);
+                      }}
+                      placeholder="Select tags…"
+                    />
+                    {canSetImportOwnership ? (
+                      <div className={styles.grid2}>
+                        <Select
+                          label="Default manager (optional)"
+                          value={importManagerId}
+                          onChange={(e) => {
+                            setImportManagerId(e.target.value);
+                            setImportAssignedUserId('');
+                          }}
+                          options={managerSelectOptions}
+                        />
+                        <Select
+                          label="Default assigned agent (optional)"
+                          value={importAssignedUserId}
+                          onChange={(e) => setImportAssignedUserId(e.target.value)}
+                          options={agentSelectOptions}
+                        />
+                      </div>
+                    ) : null}
+                    <div className={styles.importBulkHint}>
+                      Manager and agent columns in the file override these defaults. For rows that already exist,
+                      selected tags are added alongside existing tags (nothing is removed).
+                    </div>
                   </div>
 
                   <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
@@ -786,10 +918,12 @@ export function ContactImportPage({ type }) {
                     ) : null}
                   </div>
                   <div className={styles.footerNote} style={{ marginBottom: 10 }}>
-                    <b>New</b> = new contact. <b>Skip dup</b> / <b>Update dup</b> = someone with that phone already
-                    exists. Fix mapping errors before importing. Extra contact details (city, state, …) and your own
-                    extra fields show as separate columns when filled. <b>Sample</b> is the preview row number; errors use
-                    the real file row.
+                    <b>New</b> = new row for this import type. <b>Skip dup</b> / <b>Update dup</b> = that primary phone
+                    already exists as a <b>{type}</b>. If it exists only as the other type (lead vs contact), preview
+                    shows <b>New</b> — a second record is created. Fix mapping errors before importing. Extra contact
+                    details (city,
+                    state, …) and your own extra fields show as separate columns when filled. <b>Sample</b> is the
+                    preview row number; errors use the real file row.
                   </div>
                   <div className={styles.reviewScroll}>
                     <table className={`${styles.table} ${styles.previewTable}`}>

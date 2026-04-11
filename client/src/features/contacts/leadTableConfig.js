@@ -52,6 +52,7 @@ const ALL_LEAD_COLUMNS = [
   { id: 'primary_phone', label: 'Primary phone', sortKey: 'primary_phone', category: 'default' },
   { id: 'email', label: 'Email', sortKey: 'email', category: 'default' },
   { id: 'tag_names', label: 'Tag', sortKey: 'tag_names', category: 'default' },
+  { id: 'status_name', label: 'Status', sortKey: 'status_name', category: 'default' },
   { id: 'campaign_name', label: 'Campaign', sortKey: 'campaign_name', requireCampaign: true, category: 'default' },
   { id: 'type', label: 'Type', sortKey: 'type', category: 'default' },
   { id: 'manager_name', label: 'Manager', sortKey: 'manager_name', requireManagerAgent: true, category: 'default' },
@@ -130,6 +131,13 @@ export function loadLeadVisibleColumnIds(applicableColumns) {
     }
 
     cleaned = [...new Set(cleaned)];
+
+    if (applicableIds.includes('status_name') && !cleaned.includes('status_name')) {
+      const tagIdx = cleaned.indexOf('tag_names');
+      if (tagIdx >= 0) cleaned.splice(tagIdx + 1, 0, 'status_name');
+      else cleaned = ['status_name', ...cleaned];
+      cleaned = [...new Set(cleaned)];
+    }
 
     if (cleaned.length === 0) return defaults;
     return cleaned;

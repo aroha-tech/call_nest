@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useId, useMemo } from 'react';
+import Select from 'react-select';
 import styles from './MultiSelectDropdown.module.scss';
 
 function parseStoredMultiselect(raw) {
@@ -15,8 +16,98 @@ function parseStoredMultiselect(raw) {
     .filter(Boolean);
 }
 
+function normalizeOptions(options) {
+  if (!options?.length) {
+    return { selectOptions: [], values: [], labelFor: (v) => v };
+  }
+  const first = options[0];
+  if (typeof first === 'object' && first !== null && 'value' in first) {
+    const map = new Map(options.map((o) => [String(o.value), String(o.label ?? o.value)]));
+    const selectOptions = options.map((o) => ({
+      value: String(o.value),
+      label: String(o.label ?? o.value),
+    }));
+    return {
+      selectOptions,
+      values: selectOptions.map((o) => o.value),
+      labelFor: (v) => map.get(String(v)) ?? String(v),
+    };
+  }
+  const values = options.map((o) => String(o));
+  return {
+    selectOptions: values.map((v) => ({ value: v, label: v })),
+    values,
+    labelFor: (v) => String(v),
+  };
+}
+
+function getReactSelectStyles() {
+  return {
+    control: (base, state) => ({
+      ...base,
+      minHeight: 34,
+      backgroundColor: 'var(--color-input-bg, #1a1b26)',
+      borderColor: state.isFocused
+        ? 'var(--color-input-border-focus, #6366f1)'
+        : 'var(--color-input-border, rgba(255, 255, 255, 0.12))',
+      boxShadow: state.isFocused ? '0 0 0 3px var(--color-focus-ring, rgba(99, 102, 241, 0.25))' : 'none',
+      '&:hover': {
+        borderColor: 'var(--color-input-border-hover, rgba(255, 255, 255, 0.2))',
+      },
+    }),
+    menuPortal: (base) => ({ ...base, zIndex: 11000 }),
+    menu: (base) => ({
+      ...base,
+      backgroundColor: 'var(--color-bg-elevated, #252536)',
+      border: '1px solid var(--color-input-border, rgba(255, 255, 255, 0.12))',
+      zIndex: 11000,
+    }),
+    option: (base, state) => ({
+      ...base,
+      cursor: 'pointer',
+      backgroundColor: state.isSelected
+        ? 'rgba(99, 102, 241, 0.35)'
+        : state.isFocused
+          ? 'rgba(255, 255, 255, 0.06)'
+          : 'transparent',
+      color: 'var(--color-text-primary, #e2e8f0)',
+    }),
+    multiValue: (base) => ({
+      ...base,
+      backgroundColor: 'rgba(99, 102, 241, 0.22)',
+    }),
+    multiValueLabel: (base) => ({
+      ...base,
+      color: 'var(--color-text-primary, #e2e8f0)',
+      fontSize: '12px',
+    }),
+    multiValueRemove: (base) => ({
+      ...base,
+      color: 'var(--color-text-primary, #e2e8f0)',
+      '&:hover': { backgroundColor: 'rgba(239, 68, 68, 0.35)', color: '#fff' },
+    }),
+    placeholder: (base) => ({
+      ...base,
+      color: 'var(--color-text-muted, rgba(255, 255, 255, 0.45))',
+    }),
+    input: (base) => ({
+      ...base,
+      color: 'var(--color-text-primary, #e2e8f0)',
+    }),
+    singleValue: (base) => ({
+      ...base,
+      color: 'var(--color-text-primary, #e2e8f0)',
+    }),
+    indicatorsContainer: (base) => ({
+      ...base,
+      height: 32,
+    }),
+  };
+}
+
 /**
- * Multi-value field: one closed control opens a panel with checkboxes (same JSON array storage as multiselect).
+ * Multi-value dropdown (react-select). Value is JSON array string, same as before.
+ * `options` may be string[] or { value, label }[].
  */
 export function MultiSelectDropdown({
   label,
@@ -24,98 +115,62 @@ export function MultiSelectDropdown({
   value = '',
   onChange,
   disabled = false,
-  placeholder = 'Select…',
+  placeholder = 'Select...',
   error,
+  /** When false, hides the filter typing input (no narrow search box). */
+  searchable = true,
 }) {
   const id = useId();
-  const listId = `${id}-list`;
-  const rootRef = useRef(null);
-  const [open, setOpen] = useState(false);
-
-  const selected = new Set(parseStoredMultiselect(value).map(String));
-  const orderedSelected = options.map(String).filter((o) => selected.has(o));
-  const summaryText =
-    orderedSelected.length === 0 ? placeholder : orderedSelected.join(', ');
-
-  const commit = useCallback(
-    (nextSet) => {
-      const ordered = options.map(String).filter((o) => nextSet.has(o));
-      onChange(ordered.length ? JSON.stringify(ordered) : '');
-    },
-    [onChange, options]
+  const { selectOptions, values: optionValues, labelFor } = useMemo(
+    () => normalizeOptions(options),
+    [options]
   );
 
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e) => {
-      if (rootRef.current && !rootRef.current.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (e) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onDoc);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDoc);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+  const selectedSet = useMemo(() => new Set(parseStoredMultiselect(value).map(String)), [value]);
+
+  const selectedOptions = useMemo(
+    () => optionValues.filter((v) => selectedSet.has(v)).map((v) => ({ value: v, label: labelFor(v) })),
+    [optionValues, selectedSet, labelFor]
+  );
+
+  const handleChange = useCallback(
+    (selected) => {
+      const ordered = optionValues.filter((v) => (selected || []).some((s) => String(s.value) === v));
+      onChange(ordered.length ? JSON.stringify(ordered) : '');
+    },
+    [onChange, optionValues]
+  );
+
+  const rsStyles = useMemo(() => getReactSelectStyles(), []);
 
   return (
-    <div className={styles.wrapper} ref={rootRef}>
+    <div className={styles.wrapper}>
       {label ? (
         <span className={styles.label} id={`${id}-label`}>
           {label}
         </span>
       ) : null}
-      <button
-        type="button"
-        className={`${styles.trigger} ${error ? styles.triggerError : ''}`}
-        disabled={disabled}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        aria-controls={listId}
+      <Select
         aria-labelledby={label ? `${id}-label` : undefined}
-        onClick={() => !disabled && setOpen((o) => !o)}
-      >
-        <span className={styles.triggerText} title={summaryText}>
-          {summaryText}
-        </span>
-        <span className={styles.chevron} aria-hidden>
-          ▾
-        </span>
-      </button>
-      {open && options.length > 0 ? (
-        <div id={listId} className={styles.panel} role="listbox" aria-multiselectable="true">
-          {options.map((opt, idx) => {
-            const optStr = String(opt);
-            const checked = selected.has(optStr);
-            return (
-              <label key={`${optStr}-${idx}`} className={styles.option}>
-                <input
-                  type="checkbox"
-                  className={styles.optionInput}
-                  checked={checked}
-                  onChange={(e) => {
-                    const next = new Set(selected);
-                    if (e.target.checked) next.add(optStr);
-                    else next.delete(optStr);
-                    commit(next);
-                  }}
-                />
-                <span className={styles.optionLabel}>{optStr}</span>
-              </label>
-            );
-          })}
-        </div>
-      ) : null}
-      {open && options.length === 0 ? (
-        <div className={styles.panel} role="status">
-          <span className={styles.empty}>No options configured.</span>
-        </div>
-      ) : null}
+        aria-invalid={error ? true : undefined}
+        instanceId={id}
+        isMulti
+        isSearchable={searchable}
+        isDisabled={disabled}
+        isClearable
+        closeMenuOnSelect={false}
+        hideSelectedOptions={false}
+        options={selectOptions}
+        value={selectedOptions}
+        onChange={handleChange}
+        placeholder={placeholder}
+        noOptionsMessage={() => 'No options'}
+        styles={rsStyles}
+        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+        menuPosition="fixed"
+        classNamePrefix="cn-multiselect"
+        className={error ? styles.selectError : undefined}
+      />
       {error ? (
         <p className={styles.error} role="alert">
           {error}

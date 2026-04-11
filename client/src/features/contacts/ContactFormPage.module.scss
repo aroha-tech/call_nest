@@ -1,18 +1,144 @@
 @use '../../styles/variables' as *;
 
+// Full width inside AppShell `.content` (shell already applies horizontal padding) — avoids unused side margins on wide screens.
 .page {
-  padding: $space-6;
-  max-width: 960px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: $space-3 0 $space-4;
   display: flex;
   flex-direction: column;
-  gap: $space-4;
+  gap: $space-3;
+  box-sizing: border-box;
 }
 
 .form {
   display: flex;
   flex-direction: column;
   gap: $space-5;
+}
+
+.formCompact {
+  gap: $space-3;
+}
+
+.formLayout {
+  display: grid;
+  gap: $space-3;
+  align-items: start;
+
+  @media (min-width: 900px) {
+    grid-template-columns: 1fr 1fr;
+    gap: $space-4;
+  }
+
+  @media (min-width: 1440px) {
+    gap: $space-5;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  }
+}
+
+.formLayoutCol {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+  min-width: 0;
+}
+
+.fieldGridDense {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-2 $space-3;
+
+  @media (min-width: 1100px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.fullWidthFieldDense {
+  grid-column: 1 / -1;
+}
+
+.sectionCompact {
+  padding: $space-3 $space-4;
+}
+
+.sectionDescShort {
+  margin-bottom: $space-2;
+  font-size: $font-size-xs;
+  line-height: $line-height-normal;
+}
+
+.viewShell {
+  pointer-events: auto;
+}
+
+.recordMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-2 $space-3;
+}
+
+.convertTypeRow {
+  margin-top: $space-3;
+}
+
+.viewField {
+  min-width: 0;
+}
+
+.viewLabel {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  color: var(--color-text-secondary);
+  margin-bottom: 2px;
+}
+
+.viewValue {
+  font-size: $font-size-sm;
+  color: var(--color-text-primary);
+  line-height: $line-height-normal;
+  word-break: break-word;
+}
+
+.viewLink {
+  color: var(--color-primary, #6366f1);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.viewPhoneList {
+  margin: 0;
+  padding-left: $space-5;
+  font-size: $font-size-sm;
+  color: var(--color-text-primary);
+  line-height: $line-height-relaxed;
+}
+
+.viewPhoneItem {
+  margin-bottom: $space-1;
+}
+
+.phoneRowCompact {
+  padding: $space-2 $space-3;
+  gap: $space-2;
+}
+
+.customFieldsGridDense {
+  display: grid;
+  gap: $space-2 $space-3;
+  grid-template-columns: 1fr;
+
+  @media (min-width: 800px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (min-width: 1100px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .section {
@@ -174,9 +300,17 @@
 }
 
 .assignGrid {
-  display: flex;
-  flex-direction: column;
-  gap: $space-4;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: $space-3;
+
+  @media (min-width: 720px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (min-width: 1100px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .phoneList {
@@ -327,6 +461,33 @@
 
 .headerActions {
   display: flex;
+  align-items: center;
   gap: $space-2;
   flex-wrap: wrap;
+}
+
+.viewEditToggle {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: $radius-sm;
+  border: 1px solid var(--color-border-strong);
+  overflow: hidden;
+  background: var(--color-bg-muted, rgba(0, 0, 0, 0.2));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+}
+
+.viewEditToggleBtn {
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  min-height: 30px;
+
+  &:not(:last-child) {
+    border-right: 1px solid var(--color-border-strong) !important;
+  }
+
+  &:focus-visible {
+    position: relative;
+    z-index: 1;
+  }
 }

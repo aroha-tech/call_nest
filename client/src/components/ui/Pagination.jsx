@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from './Button';
 import styles from './Pagination.module.scss';
 
-export const LIMIT_OPTIONS = [10, 20, 50, 100];
+export const LIMIT_OPTIONS = [10, 20, 50, 100, 500];
 
 /** Rows-per-page control — use above the table with search */
 export function PaginationPageSize({ limit = 10, onLimitChange, className = '' }) {

@@ -234,3 +234,34 @@
 .fetchTable {
   margin-top: 0;
 }
+
+// Drag-and-drop reorder (dialing set dispositions)
+.dragHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  padding: $space-1 $space-2;
+  border-radius: $radius-sm;
+  color: var(--color-text-secondary);
+  line-height: 1;
+
+  &:hover {
+    background: var(--color-bg-muted);
+    color: var(--color-text-primary);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.dragGrip {
+  font-size: $font-size-md;
+  letter-spacing: -0.12em;
+  user-select: none;
+}
+
+.rowDragging {
+  opacity: 0.65;
+}

@@ -64,6 +64,7 @@ function filterPlaceholderForColumn(sortKey) {
     email: 'e.g. @gmail.com or partial address',
     primary_phone: 'Digits or partial number',
     tag_names: 'Tag name or part of it',
+    status_name: 'Status name (e.g. New, Contacted)',
     campaign_name: 'Campaign name',
     manager_name: 'Manager name',
     assigned_user_name: 'Agent name',

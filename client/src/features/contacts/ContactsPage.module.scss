@@ -14,10 +14,67 @@
   justify-content: flex-end;
 }
 
+/** Table card: bulk Actions (or dialer “Call selected”) left of search — group aligned right of table toolbar */
+.toolbarSearchAndBulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $space-3;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.toolbarResetBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
+}
+
+/** Minimum width so toolbar controls read as buttons (not tight text pills) beside Search */
+.toolbarControlBtn {
+  min-width: 7.25rem;
+  justify-content: center;
+}
+
+.toolbarResetIcon {
+  flex-shrink: 0;
+  display: block;
+}
+
+.toolbarBulkActionsGroup {
+  flex-shrink: 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $space-3;
+}
+
+.toolbarSavedFilterSelect {
+  min-width: 160px;
+  max-width: 220px;
+}
+
+.toolbarSearchField {
+  width: 100%;
+  flex: 1;
+  min-width: 200px;
+  max-width: 420px;
+}
+
 .bulkActionsWrap {
   position: relative;
   display: inline-flex;
   align-items: center;
+}
+
+.listActionsMenuHint {
+  padding: $space-2 12px $space-1;
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.45));
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .bulkActionsBtn {
@@ -41,38 +98,116 @@
     outline: 2px solid var(--color-input-border-focus);
     outline-offset: 2px;
   }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+
+    &:hover {
+      background: var(--color-bg-surface);
+      border-color: var(--color-border-subtle);
+    }
+  }
 }
 
 .bulkActionsMenu {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  min-width: 190px;
+  min-width: 220px;
   background: var(--color-bg-elevated, #111);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-subtle);
   border-radius: $radius-lg;
   box-shadow: $shadow-md;
   padding: $space-2;
   z-index: 20;
 }
 
-.bulkActionsItem {
+.actionsTriggerInner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.actionsTriggerChevron {
+  flex-shrink: 0;
+  opacity: 0.92;
+}
+
+.actionsMenuSection {
+  display: flex;
+  flex-direction: column;
+}
+
+.actionsMenuDivider {
+  height: 1px;
+  margin: $space-2 0;
+  background: var(--color-border-subtle);
+  border: none;
+  flex-shrink: 0;
+}
+
+.actionsMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
   text-align: left;
   border: none;
   background: transparent;
   color: var(--color-text-primary);
-  padding: $space-2 $space-3;
+  padding: 10px 12px;
   border-radius: $radius-md;
   font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
   cursor: pointer;
+  transition:
+    background $transition-fast,
+    color $transition-fast;
 
-  &:hover {
-    background: rgba(255, 255, 255, 0.06);
+  &:hover:not(:disabled) {
+    background: rgba(var(--color-primary-rgb, 99, 102, 241), 0.2);
+    color: var(--color-text-primary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-input-border-focus);
+    outline-offset: -2px;
   }
 }
 
-.bulkActionsItemDanger {
-  @extend .bulkActionsItem;
+.actionsMenuItemDanger {
   color: var(--color-danger, #ef4444);
+
+  &:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.16);
+    color: var(--color-danger, #f87171);
+  }
+}
+
+.actionsMenuItemDisabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+
+  &:hover {
+    background: transparent !important;
+  }
+}
+
+.actionsMenuIcon {
+  flex-shrink: 0;
+  width: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+
+  svg {
+    display: block;
+  }
+}
+
+.actionsMenuText {
+  flex: 1;
+  min-width: 0;
 }

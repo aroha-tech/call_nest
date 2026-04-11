@@ -80,6 +80,41 @@
   }
 }
 
+.stageOrderCol {
+  width: 52px;
+  vertical-align: middle;
+}
+
+.stageDragHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: var(--color-text-secondary, #64748b);
+  line-height: 1;
+
+  &:hover {
+    background: var(--color-bg-muted, #f1f5f9);
+    color: var(--color-text, #0f172a);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.stageDragGrip {
+  font-size: 1rem;
+  letter-spacing: -0.12em;
+  user-select: none;
+}
+
+.stageRowDragging {
+  opacity: 0.65;
+}
+
 .boardToolbar {
   display: flex;
   flex-wrap: wrap;

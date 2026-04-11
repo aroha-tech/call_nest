@@ -14,8 +14,26 @@ export const callsAPI = {
   startBulk: ({ contact_ids = [], provider = 'dummy' } = {}) =>
     axiosInstance.post(`${BASE}/start/bulk`, { contact_ids, provider }),
 
-  list: ({ page = 1, limit = 20, contact_id } = {}) =>
-    axiosInstance.get(`${BASE}`, { params: { page, limit, contact_id: contact_id || undefined } }),
+  list: ({
+    page = 1,
+    limit = 20,
+    contact_id,
+    disposition_id,
+    agent_user_id,
+    started_after,
+    started_before,
+  } = {}) =>
+    axiosInstance.get(`${BASE}`, {
+      params: {
+        page,
+        limit,
+        contact_id: contact_id || undefined,
+        disposition_id: disposition_id || undefined,
+        agent_user_id: agent_user_id || undefined,
+        started_after: started_after || undefined,
+        started_before: started_before || undefined,
+      },
+    }),
 
   setDisposition: (attemptId, { disposition_id, notes } = {}) =>
     axiosInstance.put(`${BASE}/${attemptId}/disposition`, { disposition_id: disposition_id ?? null, notes: notes ?? null }),

@@ -200,6 +200,19 @@
   gap: $space-4;
 }
 
+.importBulkOptions {
+  margin-top: $space-4;
+  display: grid;
+  gap: $space-3;
+  max-width: 100%;
+}
+
+.importBulkHint {
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
 .fileInput {
   display: block;
   width: 100%;

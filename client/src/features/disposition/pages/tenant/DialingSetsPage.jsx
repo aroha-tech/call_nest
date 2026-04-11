@@ -54,6 +54,7 @@ export function DialingSetsPage({ readOnly = false }) {
   const [selectedDispoId, setSelectedDispoId] = useState('');
   const [myDefaultSetId, setMyDefaultSetId] = useState(null);
   const [myDefaultSaving, setMyDefaultSaving] = useState(false);
+  const [draggingDispoId, setDraggingDispoId] = useState(null);
 
   const loadMyDefault = useCallback(async () => {
     try {
@@ -173,10 +174,37 @@ export function DialingSetsPage({ readOnly = false }) {
     refetchDispositions();
   };
 
-  const handleMoveDisposition = async (id, direction) => {
-    await moveDisposition.mutate(id, direction);
-    refetchDispositions();
-  };
+  const handleDispoDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const handleDispoDragStart = useCallback((e, id) => {
+    e.dataTransfer.setData('text/plain', String(id));
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggingDispoId(id);
+  }, []);
+
+  const handleDispoDragEnd = useCallback(() => {
+    setDraggingDispoId(null);
+  }, []);
+
+  const handleDispoDrop = useCallback(
+    async (e, targetId) => {
+      e.preventDefault();
+      setDraggingDispoId(null);
+      const draggedId = e.dataTransfer.getData('text/plain');
+      if (!draggedId || String(draggedId) === String(targetId)) return;
+      const list = setDispositions;
+      const from = list.findIndex((x) => String(x.id) === String(draggedId));
+      const to = list.findIndex((x) => String(x.id) === String(targetId));
+      if (from < 0 || to < 0) return;
+      const targetPosition = list[to].order_index;
+      await moveDisposition.mutate(draggedId, undefined, targetPosition);
+      refetchDispositions();
+    },
+    [setDispositions, moveDisposition, refetchDispositions]
+  );
 
   return (
     <div className={styles.page}>
@@ -283,20 +311,35 @@ export function DialingSetsPage({ readOnly = false }) {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      {!readOnly && <TableHeaderCell width="60px">Order</TableHeaderCell>}
+                      {!readOnly && <TableHeaderCell width="52px">Reorder</TableHeaderCell>}
                       <TableHeaderCell>Disposition</TableHeaderCell>
                       <TableHeaderCell width="100px">Code</TableHeaderCell>
                       {!readOnly && <TableHeaderCell width="60px" align="center">Remove</TableHeaderCell>}
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {setDispositions.map((d, idx) => (
-                      <TableRow key={d.id}>
+                    {setDispositions.map((d) => (
+                      <TableRow
+                        key={d.id}
+                        className={!readOnly && draggingDispoId === d.id ? styles.rowDragging : undefined}
+                        onDragOver={!readOnly ? handleDispoDragOver : undefined}
+                        onDrop={!readOnly ? (e) => handleDispoDrop(e, d.id) : undefined}
+                      >
                         {!readOnly && (
                           <TableCell>
-                            <div className={styles.actions}>
-                              <IconButton size="sm" onClick={() => handleMoveDisposition(d.id, 'up')} disabled={idx === 0}>↑</IconButton>
-                              <IconButton size="sm" onClick={() => handleMoveDisposition(d.id, 'down')} disabled={idx === setDispositions.length - 1}>↓</IconButton>
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              className={styles.dragHandle}
+                              draggable={!moveDisposition.loading}
+                              title="Drag to reorder"
+                              aria-label={`Drag to reorder ${d.disposition_name || 'disposition'}`}
+                              onDragStart={(e) => handleDispoDragStart(e, d.id)}
+                              onDragEnd={handleDispoDragEnd}
+                            >
+                              <span className={styles.dragGrip} aria-hidden>
+                                ⠿
+                              </span>
                             </div>
                           </TableCell>
                         )}

@@ -1,0 +1,65 @@
+@use '../../styles/variables' as *;
+
+.desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.55));
+}
+
+.tagChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2;
+  margin-top: $space-3;
+  min-height: 8px;
+}
+
+.tagChip {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1;
+  padding: 4px 8px;
+  border-radius: $radius-md;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-subtle);
+  font-size: 12px;
+}
+
+.tagChipLabel {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tagRemove {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.45));
+
+  &:hover {
+    color: var(--color-text-primary);
+  }
+}
+
+.tagAddSelect {
+  margin-top: $space-3;
+  width: 100%;
+  max-width: 360px;
+  height: 36px;
+  border-radius: $radius-md;
+  border: 1px solid var(--color-border);
+  padding: 0 $space-2;
+  font-size: $font-size-sm;
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+}
