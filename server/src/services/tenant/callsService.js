@@ -194,7 +194,19 @@ export async function startCallsBulk(tenantId, user, { contact_ids = [], provide
   return { startedCount: started.length, started, skippedCount: skipped.length, skipped };
 }
 
-export async function listCallAttempts(tenantId, user, { page = 1, limit = 20, contact_id } = {}) {
+export async function listCallAttempts(
+  tenantId,
+  user,
+  {
+    page = 1,
+    limit = 20,
+    contact_id,
+    disposition_id,
+    agent_user_id,
+    started_after,
+    started_before,
+  } = {}
+) {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
   const offset = (pageNum - 1) * limitNum;
@@ -206,6 +218,59 @@ export async function listCallAttempts(tenantId, user, { page = 1, limit = 20, c
   if (contact_id) {
     where.push('cca.contact_id = ?');
     params.push(Number(contact_id));
+  }
+
+  if (disposition_id !== undefined && disposition_id !== null && disposition_id !== '') {
+    const did = Number(disposition_id);
+    if (Number.isFinite(did) && did > 0) {
+      where.push('cca.disposition_id = ?');
+      params.push(did);
+    }
+  }
+
+  if (
+    (user.role === 'manager' || user.role === 'admin') &&
+    agent_user_id !== undefined &&
+    agent_user_id !== null &&
+    agent_user_id !== ''
+  ) {
+    const aid = Number(agent_user_id);
+    if (Number.isFinite(aid) && aid > 0) {
+      if (user.role === 'manager') {
+        const [ag] = await query(
+          `SELECT id FROM users
+           WHERE id = ? AND tenant_id = ? AND role = 'agent' AND is_deleted = 0 AND manager_id = ?
+           LIMIT 1`,
+          [aid, tenantId, user.id]
+        );
+        if (!ag) {
+          const err = new Error('Invalid agent filter');
+          err.status = 403;
+          throw err;
+        }
+      } else {
+        const [ag] = await query(
+          `SELECT id FROM users WHERE id = ? AND tenant_id = ? AND role = 'agent' AND is_deleted = 0 LIMIT 1`,
+          [aid, tenantId]
+        );
+        if (!ag) {
+          const err = new Error('Invalid agent filter');
+          err.status = 400;
+          throw err;
+        }
+      }
+      where.push('cca.agent_user_id = ?');
+      params.push(aid);
+    }
+  }
+
+  if (started_after) {
+    where.push('cca.started_at >= ?');
+    params.push(started_after);
+  }
+  if (started_before) {
+    where.push('cca.started_at <= ?');
+    params.push(started_before);
   }
 
   // Role scoping: agents only their attempts; managers only their team attempts.

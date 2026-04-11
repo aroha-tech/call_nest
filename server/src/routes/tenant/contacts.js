@@ -9,7 +9,13 @@ router.use(tenantAuthMiddleware);
 
 // Permissions: contacts.read / contacts.create
 router.get('/', requirePermission(['contacts.read', 'leads.read']), contactsController.list);
+router.get('/list-ids', requirePermission(['contacts.read', 'leads.read']), contactsController.listIds);
 router.get(
+  '/export/csv',
+  requirePermission(['contacts.read', 'leads.read']),
+  contactsController.exportCsv
+);
+router.post(
   '/export/csv',
   requirePermission(['contacts.read', 'leads.read']),
   contactsController.exportCsv
@@ -47,12 +53,32 @@ router.get(
   requirePermission(['contacts.read', 'leads.read']),
   contactsController.listCustomFields
 );
+router.get(
+  '/lead-pipeline-summary',
+  requirePermission(['leads.read']),
+  contactsController.leadPipelineSummary
+);
+router.get(
+  '/contact-dashboard-summary',
+  requirePermission(['contacts.read']),
+  contactsController.contactDashboardSummary
+);
 router.post(
   '/',
   requirePermission(['contacts.create', 'leads.create']),
   contactsController.create
 );
 router.post('/bulk-delete', requireContactDeleteAccess(), contactsController.bulkRemove);
+router.post(
+  '/bulk-add-tags',
+  requirePermission(['contacts.update', 'leads.update']),
+  contactsController.bulkAddTags
+);
+router.post(
+  '/bulk-remove-tags',
+  requirePermission(['contacts.update', 'leads.update']),
+  contactsController.bulkRemoveTags
+);
 router.post(
   '/:id/phones',
   requirePermission(['contacts.update', 'leads.update']),

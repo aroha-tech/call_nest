@@ -27,11 +27,22 @@ export async function list(req, res, next) {
   try {
     const tenantId = req.tenant?.id;
     if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
-    const { page = '1', limit = '20', contact_id } = req.query;
+    const { page = '1', limit = '20', contact_id, disposition_id, agent_user_id, started_after, started_before } =
+      req.query;
     const data = await callsService.listCallAttempts(tenantId, req.user, {
       page: parseInt(page, 10),
       limit: parseInt(limit, 10),
       contact_id: contact_id ? Number(contact_id) : undefined,
+      disposition_id: disposition_id !== undefined && disposition_id !== '' ? disposition_id : undefined,
+      agent_user_id: agent_user_id !== undefined && agent_user_id !== '' ? agent_user_id : undefined,
+      started_after:
+        started_after === undefined || started_after === null || String(started_after).trim() === ''
+          ? undefined
+          : String(started_after).trim(),
+      started_before:
+        started_before === undefined || started_before === null || String(started_before).trim() === ''
+          ? undefined
+          : String(started_before).trim(),
     });
     res.json(data);
   } catch (err) {

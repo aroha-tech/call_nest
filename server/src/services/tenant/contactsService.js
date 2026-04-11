@@ -1,4 +1,4 @@
-import { query } from '../../config/db.js';
+import { query, withConnection } from '../../config/db.js';
 import { parseImportBufferToRecords } from '../../utils/importSpreadsheetBuffer.js';
 import {
   buildPhonesFromCsvRow,
@@ -114,6 +114,12 @@ function normalizeImportedCustomFieldValue(raw, fieldType) {
   return s;
 }
 
+/** Coerce custom field ids from DB/JSON so Map lookups and inserts always match. */
+function normalizeContactImportCustomFieldId(id) {
+  const n = Number(id);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export function buildOwnershipWhere(user) {
   const clauses = ['c.tenant_id = ?', 'c.deleted_at IS NULL'];
   const params = [user.tenantId];
@@ -133,7 +139,13 @@ export function buildOwnershipWhere(user) {
  * Optional list/export filters. Values: undefined (omit), 'unassigned', or positive user id (number).
  * Agents ignore; managers only their team + valid agents; admins validated against tenant users.
  */
-async function applyContactListFilters(tenantId, user, whereClauses, params, { filterManagerId, filterAssignedUserId }) {
+async function applyContactListFilters(
+  tenantId,
+  user,
+  whereClauses,
+  params,
+  { filterManagerId, filterAssignedUserId, filterManagerIds, filterUnassignedManagers = false } = {}
+) {
   if (user.role === 'agent') {
     return;
   }
@@ -173,7 +185,35 @@ async function applyContactListFilters(tenantId, user, whereClauses, params, { f
   }
 
   if (user.role === 'admin') {
-    if (filterManagerId === 'unassigned') {
+    const multiIds = Array.isArray(filterManagerIds)
+      ? [...new Set(filterManagerIds.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))]
+      : [];
+    const useMulti = multiIds.length > 0 || filterUnassignedManagers;
+
+    if (useMulti) {
+      if (multiIds.length > 0) {
+        const ph = multiIds.map(() => '?').join(',');
+        const mgrRows = await query(
+          `SELECT id FROM users
+           WHERE tenant_id = ? AND role = 'manager' AND is_deleted = 0 AND id IN (${ph})`,
+          [tenantId, ...multiIds]
+        );
+        if (mgrRows.length !== multiIds.length) {
+          const err = new Error('Invalid manager filter (unknown manager id)');
+          err.status = 400;
+          throw err;
+        }
+        if (filterUnassignedManagers) {
+          whereClauses.push(`(c.manager_id IS NULL OR c.manager_id IN (${ph}))`);
+          params.push(...multiIds);
+        } else {
+          whereClauses.push(`c.manager_id IN (${ph})`);
+          params.push(...multiIds);
+        }
+      } else if (filterUnassignedManagers) {
+        whereClauses.push('c.manager_id IS NULL');
+      }
+    } else if (filterManagerId === 'unassigned') {
       whereClauses.push('c.manager_id IS NULL');
     } else if (filterManagerId !== undefined) {
       const [m] = await query(
@@ -235,6 +275,7 @@ const CONTACT_LIST_SORT_COLUMNS = {
   type: 'c.type',
   manager_name: 'mgr.name',
   assigned_user_name: 'ag.name',
+  status_name: 'csm.name',
   source: 'c.source',
   city: 'c.city',
   company: 'c.company',
@@ -285,7 +326,9 @@ const CONTACT_LIST_JOIN_FROM = `
      LEFT JOIN users mgr
        ON mgr.id = c.manager_id AND mgr.tenant_id = c.tenant_id AND mgr.is_deleted = 0
      LEFT JOIN users ag
-       ON ag.id = c.assigned_user_id AND ag.tenant_id = c.tenant_id AND ag.is_deleted = 0`;
+       ON ag.id = c.assigned_user_id AND ag.tenant_id = c.tenant_id AND ag.is_deleted = 0
+     LEFT JOIN contact_status_master csm
+       ON csm.id = c.status_id AND csm.is_deleted = 0`;
 
 const COLUMN_FILTER_FIELDS = new Set([
   'display_name',
@@ -296,6 +339,7 @@ const COLUMN_FILTER_FIELDS = new Set([
   'type',
   'manager_name',
   'assigned_user_name',
+  'status_name',
   'source',
   'city',
   'company',
@@ -477,6 +521,25 @@ function applyContactListColumnFilters(whereClauses, params, rules) {
           params.push(ends(value));
         }
         break;
+      case 'status_name':
+        if (op === 'empty') {
+          whereClauses.push(`(c.status_id IS NULL OR csm.name IS NULL OR TRIM(csm.name) = '')`);
+        } else if (op === 'not_empty') {
+          whereClauses.push(`(c.status_id IS NOT NULL AND csm.name IS NOT NULL AND TRIM(csm.name) != '')`);
+        } else if (op === 'contains') {
+          whereClauses.push(`(csm.name LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'not_contains') {
+          whereClauses.push(`(csm.name IS NULL OR csm.name NOT LIKE ?)`);
+          params.push(likeWord(value));
+        } else if (op === 'starts_with') {
+          whereClauses.push(`(csm.name LIKE ?)`);
+          params.push(starts(value));
+        } else if (op === 'ends_with') {
+          whereClauses.push(`(csm.name LIKE ?)`);
+          params.push(ends(value));
+        }
+        break;
       case 'type':
         if (op === 'empty') {
           whereClauses.push(`(c.type IS NULL OR TRIM(c.type) = '')`);
@@ -611,35 +674,101 @@ function applyContactListColumnFilters(whereClauses, params, rules) {
   }
 }
 
-export async function listContacts(
+const CONTACT_LIST_IDS_CAP = 10000;
+
+/** Multi-campaign filter: array of positive campaign ids and/or 'none' (no campaign). Overrides legacy campaignIdFilter when non-empty. */
+function applyCampaignIdsToWhere(whereClauses, params, { campaignIdFilter, campaignIdsFilter }) {
+  const idsRaw = Array.isArray(campaignIdsFilter) ? campaignIdsFilter : [];
+  if (idsRaw.length > 0) {
+    const hasNone = idsRaw.some((x) => x === 'none' || String(x).toLowerCase() === 'none');
+    const nums = [...new Set(idsRaw.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
+    if (hasNone && nums.length > 0) {
+      const ph = nums.map(() => '?').join(',');
+      whereClauses.push(`(c.campaign_id IS NULL OR c.campaign_id IN (${ph}))`);
+      params.push(...nums);
+    } else if (hasNone) {
+      whereClauses.push('c.campaign_id IS NULL');
+    } else if (nums.length > 0) {
+      const ph = nums.map(() => '?').join(',');
+      whereClauses.push(`c.campaign_id IN (${ph})`);
+      params.push(...nums);
+    }
+    return;
+  }
+  if (campaignIdFilter === 'none') {
+    whereClauses.push('c.campaign_id IS NULL');
+  } else if (campaignIdFilter !== undefined && campaignIdFilter !== null) {
+    whereClauses.push('c.campaign_id = ?');
+    params.push(Number(campaignIdFilter));
+  }
+}
+
+/** Contacts must have every listed tag (AND). */
+function applyFilterTagIdsToWhere(whereClauses, params, filterTagIds) {
+  if (!Array.isArray(filterTagIds) || filterTagIds.length === 0) return;
+  for (const tid of filterTagIds) {
+    const n = Number(tid);
+    if (!Number.isFinite(n) || n < 1) continue;
+    whereClauses.push(
+      `EXISTS (
+        SELECT 1 FROM contact_tag_assignments cta_ft
+        INNER JOIN contact_tags ct_ft ON ct_ft.id = cta_ft.tag_id AND ct_ft.tenant_id = cta_ft.tenant_id
+        WHERE cta_ft.contact_id = c.id AND cta_ft.tenant_id = c.tenant_id
+          AND ct_ft.deleted_at IS NULL AND cta_ft.tag_id = ?
+      )`
+    );
+    params.push(n);
+  }
+}
+
+/** Multi-status: positive contact_status_master ids and/or 'none' (no status). Overrides legacy statusId when non-empty. */
+function applyStatusIdsToWhere(whereClauses, params, { statusId, statusIdsFilter }) {
+  const idsRaw = Array.isArray(statusIdsFilter) ? statusIdsFilter : [];
+  if (idsRaw.length > 0) {
+    const hasNone = idsRaw.some((x) => x === 'none' || String(x).toLowerCase() === 'none');
+    const nums = [...new Set(idsRaw.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
+    if (hasNone && nums.length > 0) {
+      const ph = nums.map(() => '?').join(',');
+      whereClauses.push(`(c.status_id IS NULL OR c.status_id IN (${ph}))`);
+      params.push(...nums);
+    } else if (hasNone) {
+      whereClauses.push('c.status_id IS NULL');
+    } else if (nums.length > 0) {
+      const ph = nums.map(() => '?').join(',');
+      whereClauses.push(`c.status_id IN (${ph})`);
+      params.push(...nums);
+    }
+    return;
+  }
+  if (statusId !== undefined && statusId !== null && String(statusId).trim() !== '') {
+    whereClauses.push('c.status_id = ?');
+    params.push(Number(statusId));
+  }
+}
+
+async function prepareContactListFinalWhere(
   tenantId,
   user,
   {
     search = '',
-    page = 1,
-    limit = 20,
     type,
     statusId,
+    statusIdsFilter,
     minCallCount,
     maxCallCount,
     lastCalledAfter,
     lastCalledBefore,
     filterManagerId,
     filterAssignedUserId,
+    filterManagerIds,
+    filterUnassignedManagers,
     campaignIdFilter,
-    sortBy,
-    sortDir,
+    campaignIdsFilter,
+    filterTagIds,
     columnFilters,
     touchStatus,
-  } = {}
+  }
 ) {
-  const pageNum = parseInt(page, 10) || 1;
-  const limitNum = Math.min(parseInt(limit, 10) || 20, 100);
-  const offset = (pageNum - 1) * limitNum;
-  const limitInt = Math.floor(Number(limitNum)) || 20;
-  const offsetInt = Math.floor(Number(offset)) || 0;
-  const orderBySQL = resolveContactListOrderBy(sortBy, sortDir);
-
   const { whereSQL, params } = buildOwnershipWhere(user);
   const whereClauses = [whereSQL];
 
@@ -648,12 +777,8 @@ export async function listContacts(
     params.push(type);
   }
 
-  if (statusId) {
-    whereClauses.push('c.status_id = ?');
-    params.push(statusId);
-  }
+  applyStatusIdsToWhere(whereClauses, params, { statusId, statusIdsFilter });
 
-  // touchStatus: 'untouched' | 'touched'
   if (touchStatus === 'untouched') {
     whereClauses.push('(c.last_called_at IS NULL OR c.call_count_total = 0)');
   } else if (touchStatus === 'touched') {
@@ -677,12 +802,8 @@ export async function listContacts(
     params.push(lastCalledBefore);
   }
 
-  if (campaignIdFilter === 'none') {
-    whereClauses.push('c.campaign_id IS NULL');
-  } else if (campaignIdFilter !== undefined && campaignIdFilter !== null) {
-    whereClauses.push('c.campaign_id = ?');
-    params.push(Number(campaignIdFilter));
-  }
+  applyCampaignIdsToWhere(whereClauses, params, { campaignIdFilter, campaignIdsFilter });
+  applyFilterTagIdsToWhere(whereClauses, params, filterTagIds);
 
   if (search) {
     const q = `%${search}%`;
@@ -700,12 +821,70 @@ export async function listContacts(
   await applyContactListFilters(tenantId, user, whereClauses, params, {
     filterManagerId,
     filterAssignedUserId,
+    filterManagerIds,
+    filterUnassignedManagers,
   });
 
   const normalizedColumnFilters = normalizeContactListColumnFilters(columnFilters);
   applyContactListColumnFilters(whereClauses, params, normalizedColumnFilters);
 
   const finalWhere = `WHERE ${whereClauses.join(' AND ')}`;
+  return { finalWhere, params };
+}
+
+export async function listContacts(
+  tenantId,
+  user,
+  {
+    search = '',
+    page = 1,
+    limit = 20,
+    type,
+    statusId,
+    statusIdsFilter,
+    minCallCount,
+    maxCallCount,
+    lastCalledAfter,
+    lastCalledBefore,
+    filterManagerId,
+    filterAssignedUserId,
+    filterManagerIds,
+    filterUnassignedManagers,
+    campaignIdFilter,
+    campaignIdsFilter,
+    filterTagIds,
+    sortBy,
+    sortDir,
+    columnFilters,
+    touchStatus,
+  } = {}
+) {
+  const pageNum = parseInt(page, 10) || 1;
+  const limitNum = Math.min(parseInt(limit, 10) || 20, 500);
+  const offset = (pageNum - 1) * limitNum;
+  const limitInt = Math.floor(Number(limitNum)) || 20;
+  const offsetInt = Math.floor(Number(offset)) || 0;
+  const orderBySQL = resolveContactListOrderBy(sortBy, sortDir);
+
+  const { finalWhere, params } = await prepareContactListFinalWhere(tenantId, user, {
+    search,
+    type,
+    statusId,
+    statusIdsFilter,
+    minCallCount,
+    maxCallCount,
+    lastCalledAfter,
+    lastCalledBefore,
+    filterManagerId,
+    filterAssignedUserId,
+    filterManagerIds,
+    filterUnassignedManagers,
+    campaignIdFilter,
+    campaignIdsFilter,
+    filterTagIds,
+    columnFilters,
+    touchStatus,
+  });
 
   const [countRow] = await query(
     `SELECT COUNT(DISTINCT c.id) AS total
@@ -747,6 +926,7 @@ export async function listContacts(
         mgr.name AS manager_name,
         ag.name AS assigned_user_name,
         c.status_id,
+        csm.name AS status_name,
         c.campaign_id,
         cam.name AS campaign_name,
         c.primary_phone_id,
@@ -800,8 +980,110 @@ export async function listContacts(
   };
 }
 
+/** All matching contact ids for current list filters (same visibility as listContacts), capped for bulk selection. */
+export async function listContactIds(tenantId, user, options) {
+  const { finalWhere, params } = await prepareContactListFinalWhere(tenantId, user, options);
+  const [countRow] = await query(
+    `SELECT COUNT(DISTINCT c.id) AS total
+     ${CONTACT_LIST_JOIN_FROM}
+     ${finalWhere}`,
+    params
+  );
+  const total = countRow?.total ?? 0;
+  const cap = CONTACT_LIST_IDS_CAP;
+  const rows = await query(
+    `SELECT DISTINCT c.id
+     ${CONTACT_LIST_JOIN_FROM}
+     ${finalWhere}
+     ORDER BY c.id ASC
+     LIMIT ${cap + 1}`,
+    params
+  );
+  const truncated = rows.length > cap;
+  const ids = (truncated ? rows.slice(0, cap) : rows).map((r) => r.id);
+  return { ids, total, truncated, cap };
+}
+
+/**
+ * Lead counts for pipeline dashboard cards (same tenant + ownership visibility as default list, no extra filters).
+ * Buckets use contact_status_master.code: new, contacted, qualified, lost.
+ */
+export async function getLeadPipelineSummary(tenantId, user) {
+  const { whereSQL, params } = buildOwnershipWhere(user);
+  const baseWhere = `${whereSQL} AND c.type = 'lead'`;
+
+  const [totalRow] = await query(`SELECT COUNT(*) AS n FROM contacts c WHERE ${baseWhere}`, params);
+  const total = Number(totalRow?.n ?? 0);
+
+  const codeRows = await query(
+    `SELECT LOWER(TRIM(csm.code)) AS code, COUNT(*) AS n
+     FROM contacts c
+     INNER JOIN contact_status_master csm
+       ON csm.id = c.status_id AND csm.is_deleted = 0 AND COALESCE(csm.is_active, 1) = 1
+     WHERE ${baseWhere}
+     GROUP BY LOWER(TRIM(csm.code))`,
+    params
+  );
+
+  const byCode = Object.create(null);
+  for (const r of codeRows || []) {
+    const k = String(r.code || '').toLowerCase();
+    if (k) byCode[k] = Number(r.n ?? 0);
+  }
+
+  return {
+    total,
+    newLeads: byCode.new ?? 0,
+    contacted: byCode.contacted ?? 0,
+    qualified: byCode.qualified ?? 0,
+    lost: byCode.lost ?? 0,
+  };
+}
+
+/**
+ * Contact list dashboard cards (same tenant + ownership visibility as default list, no extra filters).
+ * - followUpsPending: contact records whose status code is qualified, nurturing, proposal_sent, or negotiation.
+ * - convertedContacts: contacts (type=contact) with status converted.
+ * - lostContacts: contacts with status lost.
+ */
+export async function getContactDashboardSummary(tenantId, user) {
+  const { whereSQL, params } = buildOwnershipWhere(user);
+  const baseContact = `${whereSQL} AND c.type = 'contact'`;
+
+  const [totalRow] = await query(`SELECT COUNT(*) AS n FROM contacts c WHERE ${baseContact}`, params);
+  const totalContacts = Number(totalRow?.n ?? 0);
+
+  const codeRows = await query(
+    `SELECT LOWER(TRIM(csm.code)) AS code, COUNT(*) AS n
+     FROM contacts c
+     INNER JOIN contact_status_master csm
+       ON csm.id = c.status_id AND csm.is_deleted = 0 AND COALESCE(csm.is_active, 1) = 1
+     WHERE ${baseContact}
+     GROUP BY LOWER(TRIM(csm.code))`,
+    params
+  );
+
+  const byCode = Object.create(null);
+  for (const r of codeRows || []) {
+    const k = String(r.code || '').toLowerCase();
+    if (k) byCode[k] = Number(r.n ?? 0);
+  }
+
+  const pendingCodes = ['qualified', 'nurturing', 'proposal_sent', 'negotiation'];
+  const followUpsPending = pendingCodes.reduce((sum, code) => sum + (byCode[code] ?? 0), 0);
+
+  return {
+    totalContacts,
+    contacted: byCode.contacted ?? 0,
+    followUpsPending,
+    convertedContacts: byCode.converted ?? 0,
+    lostContacts: byCode.lost ?? 0,
+  };
+}
+
 export async function getContactById(id, tenantId, user) {
   const { whereSQL, params } = buildOwnershipWhere(user);
+  
   const finalWhere = `${whereSQL} AND c.id = ?`;
   params.push(id);
 
@@ -839,7 +1121,8 @@ export async function getContactById(id, tenantId, user) {
         c.first_called_at,
         c.last_called_at,
         c.call_count_total,
-        c.created_at
+        c.created_at,
+        c.updated_at
      FROM contacts c
      LEFT JOIN contact_phones p
        ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id
@@ -865,6 +1148,26 @@ export async function getContactById(id, tenantId, user) {
     tags,
     tag_ids: tags.map((t) => t.id),
   };
+}
+
+/**
+ * Minimal contact row for update paths that already know the id is visible (e.g. CSV import duplicate rows).
+ * Avoids loading phones + tags like getContactById.
+ */
+async function fetchContactSnapshotForUpdate(id, tenantId, user) {
+  const cid = Number(id);
+  if (!Number.isFinite(cid) || cid <= 0) return null;
+  const { whereSQL, params } = buildOwnershipWhere(user);
+  const finalWhere = `${whereSQL} AND c.id = ?`;
+  params.push(cid);
+  const [row] = await query(
+    `SELECT c.id, c.tenant_id, c.type, c.manager_id, c.assigned_user_id, c.campaign_id
+     FROM contacts c
+     WHERE ${finalWhere}`,
+    params
+  );
+  if (!row || Number(row.tenant_id) !== Number(tenantId)) return null;
+  return row;
 }
 
 export async function appendContactPhone(tenantId, user, contactId, { phone, label = 'mobile' } = {}) {
@@ -920,9 +1223,19 @@ export async function appendContactPhone(tenantId, user, contactId, { phone, lab
   return getContactById(cid, tenantId, user);
 }
 
-export async function createContact(tenantId, user, payload) {
+/**
+ * Shared insert row resolution for createContact + CSV import bulk inserts.
+ * @returns {{ insertParams: any[], phones: any[], custom_fields: any[], tag_ids: any }}
+ */
+async function buildContactInsertRow(
+  tenantId,
+  user,
+  type,
+  payload,
+  statusCache = null,
+  preloadedAgentManagerId = undefined
+) {
   const {
-    type = 'lead',
     first_name,
     last_name,
     display_name,
@@ -950,25 +1263,24 @@ export async function createContact(tenantId, user, payload) {
     created_source,
   } = payload;
 
-  assertUniquePhoneLabels(phones);
-
-  // Determine ownership defaults for agent-created contacts
   let resolvedManagerId = manager_id || null;
   let resolvedAssignedUserId = assigned_user_id || null;
 
   if (user.role === 'agent') {
     resolvedAssignedUserId = user.id;
     if (!resolvedManagerId) {
-      const [userRow] = await query(
-        `SELECT manager_id FROM users WHERE id = ? AND tenant_id = ? AND is_deleted = 0 AND role = 'agent' LIMIT 1`,
-        [user.id, tenantId]
-      );
-      resolvedManagerId = userRow?.manager_id ?? null;
+      if (preloadedAgentManagerId !== undefined) {
+        resolvedManagerId = preloadedAgentManagerId;
+      } else {
+        const [userRow] = await query(
+          `SELECT manager_id FROM users WHERE id = ? AND tenant_id = ? AND is_deleted = 0 AND role = 'agent' LIMIT 1`,
+          [user.id, tenantId]
+        );
+        resolvedManagerId = userRow?.manager_id ?? null;
+      }
     }
   }
 
-  // Manager-created leads/contacts: default owning manager and assignee to self when not provided.
-  // (Optional assigned_user_id in payload assigns to a team agent instead.)
   if (user.role === 'manager') {
     if (!resolvedManagerId) {
       resolvedManagerId = user.id;
@@ -979,6 +1291,264 @@ export async function createContact(tenantId, user, payload) {
   }
 
   const dob = date_of_birth !== undefined && date_of_birth !== null ? normalizeDateOfBirthForDb(date_of_birth) : null;
+
+  let resolvedStatusId =
+    status_id !== undefined && status_id !== null && String(status_id).trim() !== '' ? status_id : null;
+  if (!resolvedStatusId) {
+    resolvedStatusId = await resolveContactStatusIdByName(tenantId, 'new', statusCache);
+  }
+
+  const insertParams = [
+    tenantId,
+    type,
+    first_name || null,
+    last_name || null,
+    display_name,
+    email || null,
+    source || null,
+    trimStr(city),
+    trimStr(state),
+    trimStr(country),
+    trimStr(address),
+    trimStr(address_line_2),
+    trimStr(pin_code),
+    trimStr(company),
+    trimStr(job_title),
+    trimStr(website),
+    trimStr(industry),
+    dob,
+    trimStr(tax_id),
+    resolvedManagerId,
+    resolvedAssignedUserId,
+    resolvedStatusId,
+    campaign_id || null,
+    created_source || 'manual',
+    user.id,
+  ];
+
+  return { insertParams, phones, custom_fields, tag_ids };
+}
+
+/** Max rows per multi-row INSERT during CSV import (tuned for packet size + round-trips). */
+const IMPORT_BULK_CREATE_CHUNK = 200;
+
+/** Coalesce tag merges on import-updates (avoid one DB round-trip per updated row). */
+const IMPORT_TAG_MERGE_CHUNK = 400;
+
+/**
+ * Bulk-insert buffered new contacts (one INSERT for `contacts`), then phones + CF + tags.
+ * Falls back to sequential createContact on failure.
+ */
+async function flushImportCreateBuffer(
+  tenantId,
+  user,
+  type,
+  buffer,
+  sessionPhoneMap,
+  statusCache,
+  validatedTagIds,
+  preloadedAgentManagerId = undefined
+) {
+  if (!buffer?.length) return;
+
+  const tryBulk = async () => {
+    const built = [];
+    for (const item of buffer) {
+      assertUniquePhoneLabels(item.payload.phones || []);
+      built.push(
+        await buildContactInsertRow(
+          tenantId,
+          user,
+          type,
+          item.payload,
+          statusCache,
+          preloadedAgentManagerId
+        )
+      );
+    }
+
+    const placeholders = built.map(() => `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).join(
+      ', '
+    );
+    const flatParams = built.flatMap((b) => b.insertParams);
+    const n = buffer.length;
+
+    let contactIds;
+    await withConnection(async (conn) => {
+      await conn.beginTransaction();
+      try {
+        const [insRes] = await conn.execute(
+          `INSERT INTO contacts (
+        tenant_id,
+        type,
+        first_name,
+        last_name,
+        display_name,
+        email,
+        source,
+        city,
+        state,
+        country,
+        address,
+        address_line_2,
+        pin_code,
+        company,
+        job_title,
+        website,
+        industry,
+        date_of_birth,
+        tax_id,
+        manager_id,
+        assigned_user_id,
+        status_id,
+        campaign_id,
+        created_source,
+        created_by
+      ) VALUES ${placeholders}`,
+          flatParams
+        );
+
+        const firstId = Number(insRes.insertId);
+        if (!Number.isFinite(firstId) || firstId <= 0) {
+          throw new Error('Bulk contact insert did not return insertId');
+        }
+
+        contactIds = [];
+        for (let i = 0; i < n; i++) {
+          contactIds.push(firstId + i);
+        }
+
+        const phoneRows = [];
+        for (let i = 0; i < n; i++) {
+          const contactId = contactIds[i];
+          const phones = built[i].phones || [];
+          for (const phone of phones) {
+            if (!phone?.phone) continue;
+            phoneRows.push({
+              contactId,
+              phone: phone.phone,
+              label: phone.label || 'mobile',
+              is_primary: !!phone.is_primary,
+            });
+          }
+        }
+        if (phoneRows.length > 0) {
+          const phPlaceholders = phoneRows.map(() => '(?, ?, ?, ?, ?)').join(',');
+          const phFlat = phoneRows.flatMap((r) => [
+            tenantId,
+            r.contactId,
+            r.phone,
+            r.label,
+            r.is_primary ? 1 : 0,
+          ]);
+          const [phInsRes] = await conn.execute(
+            `INSERT INTO contact_phones (tenant_id, contact_id, phone, label, is_primary) VALUES ${phPlaceholders}`,
+            phFlat
+          );
+          const firstPhId = Number(phInsRes.insertId);
+          if (!Number.isFinite(firstPhId) || firstPhId <= 0) {
+            throw new Error('Bulk phone insert did not return insertId');
+          }
+          const primaryIdByContact = new Map();
+          for (let k = 0; k < phoneRows.length; k++) {
+            const rowPhoneId = firstPhId + k;
+            const pr = phoneRows[k];
+            if (pr.is_primary && !primaryIdByContact.has(pr.contactId)) {
+              primaryIdByContact.set(pr.contactId, rowPhoneId);
+            }
+          }
+          if (primaryIdByContact.size > 0) {
+            const cids = [...primaryIdByContact.keys()];
+            const caseParts = cids.map(() => 'WHEN ? THEN ?').join(' ');
+            const caseParams = cids.flatMap((cid) => [cid, primaryIdByContact.get(cid)]);
+            const inPh = cids.map(() => '?').join(',');
+            await conn.execute(
+              `UPDATE contacts SET primary_phone_id = CASE id ${caseParts} END WHERE tenant_id = ? AND id IN (${inPh})`,
+              [...caseParams, tenantId, ...cids]
+            );
+          }
+        }
+
+        const allCfTuples = [];
+        for (let i = 0; i < n; i++) {
+          const contactId = contactIds[i];
+          const cfRows = Array.isArray(built[i].custom_fields)
+            ? built[i].custom_fields.filter((f) => f?.field_id)
+            : [];
+          for (const field of cfRows) {
+            allCfTuples.push([tenantId, contactId, field.field_id, field.value_text ?? null]);
+          }
+        }
+        if (allCfTuples.length > 0) {
+          const ph = allCfTuples.map(() => '(?, ?, ?, ?)').join(',');
+          const params = allCfTuples.flat();
+          await conn.execute(
+            `INSERT INTO contact_custom_field_values (
+           tenant_id,
+           contact_id,
+           field_id,
+           value_text
+         ) VALUES ${ph}
+         ON DUPLICATE KEY UPDATE value_text = VALUES(value_text)`,
+            params
+          );
+        }
+
+        await conn.commit();
+      } catch (e) {
+        await conn.rollback();
+        throw e;
+      }
+    });
+
+    // Import sets the same tag_ids on every row as `validatedTagIds`; merge once — do not per-row
+    // syncContactTagAssignments (that would DELETE+INSERT per contact then duplicate insertTagAssignmentsMerge).
+    if (validatedTagIds.length > 0) {
+      await contactTagsService.insertTagAssignmentsMerge(tenantId, user, contactIds, validatedTagIds);
+    }
+
+    for (let i = 0; i < n; i++) {
+      const primaryPhone = buffer[i].primaryPhone;
+      if (primaryPhone != null && primaryPhone !== '') {
+        sessionPhoneMap.set(primaryPhone, { id: contactIds[i], type });
+      }
+    }
+  };
+
+  try {
+    await tryBulk();
+  } catch (bulkErr) {
+    console.error('import bulk create fallback (sequential)', bulkErr?.message || bulkErr);
+    const fallbackIds = [];
+    for (const item of buffer) {
+      const createdContact = await createContact(tenantId, user, item.payload, { skipFetch: true });
+      if (createdContact?.id != null) fallbackIds.push(createdContact.id);
+      if (item.primaryPhone != null && item.primaryPhone !== '' && createdContact?.id != null) {
+        sessionPhoneMap.set(item.primaryPhone, { id: createdContact.id, type });
+      }
+    }
+    if (validatedTagIds.length > 0 && fallbackIds.length > 0) {
+      await contactTagsService.insertTagAssignmentsMerge(tenantId, user, fallbackIds, validatedTagIds);
+    }
+  }
+}
+
+export async function createContact(tenantId, user, payload, options = {}) {
+  const { skipFetch = false } = options;
+  const {
+    type = 'lead',
+    phones = [],
+  } = payload;
+
+  assertUniquePhoneLabels(phones);
+
+  const { insertParams, phones: ph, custom_fields: cf, tag_ids } = await buildContactInsertRow(
+    tenantId,
+    user,
+    type,
+    payload,
+    null
+  );
 
   const result = await query(
     `INSERT INTO contacts (
@@ -1008,41 +1578,15 @@ export async function createContact(tenantId, user, payload) {
         created_source,
         created_by
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      tenantId,
-      type,
-      first_name || null,
-      last_name || null,
-      display_name,
-      email || null,
-      source || null,
-      trimStr(city),
-      trimStr(state),
-      trimStr(country),
-      trimStr(address),
-      trimStr(address_line_2),
-      trimStr(pin_code),
-      trimStr(company),
-      trimStr(job_title),
-      trimStr(website),
-      trimStr(industry),
-      dob,
-      trimStr(tax_id),
-      resolvedManagerId,
-      resolvedAssignedUserId,
-      status_id || null,
-      campaign_id || null,
-      created_source || 'manual',
-      user.id,
-    ]
+    insertParams
   );
 
   const contactId = result.insertId;
 
   // Insert phones
   let primaryPhoneId = null;
-  if (Array.isArray(phones) && phones.length > 0) {
-    for (const phone of phones) {
+  if (Array.isArray(ph) && ph.length > 0) {
+    for (const phone of ph) {
       if (!phone?.phone) continue;
       const phoneResult = await query(
         `INSERT INTO contact_phones (
@@ -1073,25 +1617,29 @@ export async function createContact(tenantId, user, payload) {
     );
   }
 
-  // Insert custom fields
-  if (Array.isArray(custom_fields) && custom_fields.length > 0) {
-    for (const field of custom_fields) {
-      if (!field?.field_id) continue;
-      await query(
-        `INSERT INTO contact_custom_field_values (
-           tenant_id,
-           contact_id,
-           field_id,
-           value_text
-         ) VALUES (?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE value_text = VALUES(value_text)`,
-        [tenantId, contactId, field.field_id, field.value_text ?? null]
-      );
+  // Insert custom fields (batched for import performance)
+  const cfRows = Array.isArray(cf) ? cf.filter((f) => f?.field_id) : [];
+  if (cfRows.length > 0) {
+    const placeholders = cfRows.map(() => '(?, ?, ?, ?)').join(',');
+    const params = [];
+    for (const field of cfRows) {
+      params.push(tenantId, contactId, field.field_id, field.value_text ?? null);
     }
+    await query(
+      `INSERT INTO contact_custom_field_values (
+         tenant_id,
+         contact_id,
+         field_id,
+         value_text
+       ) VALUES ${placeholders}
+       ON DUPLICATE KEY UPDATE value_text = VALUES(value_text)`,
+      params
+    );
   }
 
   await contactTagsService.syncContactTagAssignments(tenantId, user, contactId, tag_ids);
 
+  if (skipFetch) return { id: contactId };
   return getContactById(contactId, tenantId, user);
 }
 
@@ -1194,8 +1742,36 @@ async function assertCanChangeContactOwnership(tenantId, user, payload, existing
   }
 }
 
-export async function updateContact(id, tenantId, user, payload) {
-  const existing = await getContactById(id, tenantId, user);
+/** Lead ↔ contact conversion: admins/managers, or users with both lead and contact update rights. */
+function assertCanConvertContactType(user, existing, nextType) {
+  const nt = String(nextType || '').toLowerCase();
+  const ot = String(existing?.type || '').toLowerCase();
+  if (nt !== 'lead' && nt !== 'contact') {
+    const err = new Error('Invalid type');
+    err.status = 400;
+    throw err;
+  }
+  if (ot === nt) return;
+  if (user.role === 'admin' || user.role === 'manager') return;
+  const perms = user.permissions || [];
+  if (perms.includes('leads.update') && perms.includes('contacts.update')) return;
+  const err = new Error('You do not have permission to change record type between lead and contact');
+  err.status = 403;
+  throw err;
+}
+
+export async function updateContact(id, tenantId, user, payload, options = {}) {
+  const { skipFetch = false, contactSnapshot = null } = options;
+  let existing;
+  if (
+    contactSnapshot &&
+    Number(contactSnapshot.id) === Number(id) &&
+    Number(contactSnapshot.tenant_id) === Number(tenantId)
+  ) {
+    existing = contactSnapshot;
+  } else {
+    existing = await getContactById(id, tenantId, user);
+  }
   if (!existing) {
     return null;
   }
@@ -1229,6 +1805,17 @@ export async function updateContact(id, tenantId, user, payload) {
   } = payload;
 
   await assertCanChangeContactOwnership(tenantId, user, payload, existing);
+
+  if (type !== undefined && String(type) !== String(existing.type)) {
+    assertCanConvertContactType(user, existing, type);
+  }
+
+  const convertingLeadToContact =
+    type !== undefined && String(existing.type) === 'lead' && String(type) === 'contact';
+  let convertedStatusId = null;
+  if (convertingLeadToContact) {
+    convertedStatusId = await resolveContactStatusIdByName(tenantId, 'converted', null);
+  }
 
   if (Array.isArray(phones)) {
     assertUniquePhoneLabels(phones);
@@ -1309,7 +1896,10 @@ export async function updateContact(id, tenantId, user, payload) {
     updates.push('tax_id = ?');
     params.push(trimStr(tax_id));
   }
-  if (status_id !== undefined) {
+  if (convertingLeadToContact && convertedStatusId) {
+    updates.push('status_id = ?');
+    params.push(convertedStatusId);
+  } else if (status_id !== undefined) {
     updates.push('status_id = ?');
     params.push(status_id || null);
   }
@@ -1412,19 +2002,24 @@ export async function updateContact(id, tenantId, user, payload) {
     }
   }
 
-  // Update custom fields if provided
+  // Update custom fields if provided (batched)
   if (Array.isArray(custom_fields)) {
-    for (const field of custom_fields) {
-      if (!field?.field_id) continue;
+    const cfRows = custom_fields.filter((f) => f?.field_id);
+    if (cfRows.length > 0) {
+      const placeholders = cfRows.map(() => '(?, ?, ?, ?)').join(',');
+      const params = [];
+      for (const field of cfRows) {
+        params.push(tenantId, id, field.field_id, field.value_text ?? null);
+      }
       await query(
         `INSERT INTO contact_custom_field_values (
            tenant_id,
            contact_id,
            field_id,
            value_text
-         ) VALUES (?, ?, ?, ?)
+         ) VALUES ${placeholders}
          ON DUPLICATE KEY UPDATE value_text = VALUES(value_text)`,
-        [tenantId, id, field.field_id, field.value_text ?? null]
+        params
       );
     }
   }
@@ -1433,6 +2028,7 @@ export async function updateContact(id, tenantId, user, payload) {
     await contactTagsService.syncContactTagAssignments(tenantId, user, id, tag_ids);
   }
 
+  if (skipFetch) return existing ? { id: Number(id) } : null;
   return getContactById(id, tenantId, user);
 }
 
@@ -1499,10 +2095,14 @@ export async function softDeleteContact(
   return { id: Number(id), deleted_at: new Date().toISOString() };
 }
 
-const BULK_DELETE_MAX = 100;
+/** Aligned with CONTACT_LIST_IDS_CAP — bulk select + delete must not silently cap at 100. */
+const BULK_DELETE_MAX = 10000;
+
+const BULK_DELETE_CHUNK = 500;
 
 export async function softDeleteContactsBulk(ids, tenantId, user, { deleted_source = 'manual' } = {}) {
   const raw = Array.isArray(ids) ? ids : [];
+
   const unique = [...new Set(raw.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))].slice(
     0,
     BULK_DELETE_MAX
@@ -1515,18 +2115,175 @@ export async function softDeleteContactsBulk(ids, tenantId, user, { deleted_sour
       ? await fetchAgentDeleteFlagsForUser(tenantId, user.id)
       : { agent_can_delete_leads: false, agent_can_delete_contacts: false };
 
-  for (const id of unique) {
-    try {
-      const r = await softDeleteContact(id, tenantId, user, { deleted_source, agentDeleteFlags: flags });
-      if (r) deleted.push(r.id);
-      else skipped.push({ id, reason: 'not_found_or_no_access' });
-    } catch (e) {
-      if (e.status === 403) skipped.push({ id, reason: 'forbidden' });
-      else throw e;
+  const { whereSQL, params: ownParams } = buildOwnershipWhere(user);
+
+  for (let i = 0; i < unique.length; i += BULK_DELETE_CHUNK) {
+    const chunk = unique.slice(i, i + BULK_DELETE_CHUNK);
+    const ph = chunk.map(() => '?').join(',');
+    const rows = await query(
+      `SELECT c.id, c.type
+       FROM contacts c
+       WHERE ${whereSQL} AND c.id IN (${ph})`,
+      [...ownParams, ...chunk]
+    );
+    const visibleById = new Map(rows.map((r) => [Number(r.id), String(r.type)]));
+
+    const toDelete = [];
+    for (const id of chunk) {
+      const ctype = visibleById.get(id);
+      if (ctype === undefined) {
+        skipped.push({ id, reason: 'not_found_or_no_access' });
+        continue;
+      }
+      if (!canUserDeleteContactRecord(user, { type: ctype }, flags)) {
+        skipped.push({ id, reason: 'forbidden' });
+        continue;
+      }
+      toDelete.push(id);
     }
+
+    if (toDelete.length === 0) continue;
+
+    const ph2 = toDelete.map(() => '?').join(',');
+    await query(
+      `UPDATE contacts
+       SET deleted_at = NOW(),
+           deleted_by = ?,
+           deleted_source = ?,
+           updated_by = ?
+       WHERE tenant_id = ? AND deleted_at IS NULL AND id IN (${ph2})`,
+      [user.id, deleted_source || 'manual', user.id, tenantId, ...toDelete]
+    );
+
+    deleted.push(...toDelete);
   }
 
   return { deleted, skipped, deletedCount: deleted.length };
+}
+
+const BULK_ADD_TAGS_MAX = 100;
+
+/**
+ * Merge tag_ids onto each visible contact (does not remove existing tags).
+ * One visibility query + one bulk INSERT IGNORE (same ownership rules as list/detail via buildOwnershipWhere).
+ */
+export async function bulkAddTagsToContacts(tenantId, user, { contact_ids, tag_ids } = {}) {
+  const rawContacts = Array.isArray(contact_ids) ? contact_ids : [];
+  const contactIds = [
+    ...new Set(rawContacts.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0)),
+  ].slice(0, BULK_ADD_TAGS_MAX);
+
+  const rawTags = Array.isArray(tag_ids) ? tag_ids : [];
+  const tidList = [
+    ...new Set(rawTags.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0)),
+  ];
+
+  if (contactIds.length === 0) {
+    const err = new Error('contact_ids must be a non-empty array');
+    err.status = 400;
+    throw err;
+  }
+  if (tidList.length === 0) {
+    const err = new Error('tag_ids must be a non-empty array');
+    err.status = 400;
+    throw err;
+  }
+
+  const tPlace = tidList.map(() => '?').join(',');
+  const tagRows = await query(
+    `SELECT id FROM contact_tags WHERE tenant_id = ? AND deleted_at IS NULL AND id IN (${tPlace})`,
+    [tenantId, ...tidList]
+  );
+  if (tagRows.length !== tidList.length) {
+    const err = new Error('Invalid tag_id in list');
+    err.status = 400;
+    throw err;
+  }
+
+  const { whereSQL, params: ownParams } = buildOwnershipWhere(user);
+  const cPlace = contactIds.map(() => '?').join(',');
+  const visibleRows = await query(
+    `SELECT c.id FROM contacts c WHERE ${whereSQL} AND c.id IN (${cPlace})`,
+    [...ownParams, ...contactIds]
+  );
+  const allowedSet = new Set(visibleRows.map((r) => Number(r.id)));
+
+  const updated = [];
+  const skipped = [];
+  for (const id of contactIds) {
+    if (allowedSet.has(id)) updated.push(id);
+    else skipped.push({ id, reason: 'not_found_or_no_access' });
+  }
+
+  if (updated.length > 0) {
+    await contactTagsService.insertTagAssignmentsMerge(tenantId, user, updated, tidList);
+  }
+
+  return { updated, skipped, updatedCount: updated.length };
+}
+
+/**
+ * Remove tag links from many visible contacts (only (contact_id, tag_id) pairs that exist are deleted).
+ */
+export async function bulkRemoveTagsFromContacts(tenantId, user, { contact_ids, tag_ids } = {}) {
+  const rawContacts = Array.isArray(contact_ids) ? contact_ids : [];
+  const contactIds = [
+    ...new Set(rawContacts.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0)),
+  ].slice(0, BULK_ADD_TAGS_MAX);
+
+  const rawTags = Array.isArray(tag_ids) ? tag_ids : [];
+  const tidList = [
+    ...new Set(rawTags.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0)),
+  ];
+
+  if (contactIds.length === 0) {
+    const err = new Error('contact_ids must be a non-empty array');
+    err.status = 400;
+    throw err;
+  }
+  if (tidList.length === 0) {
+    const err = new Error('tag_ids must be a non-empty array');
+    err.status = 400;
+    throw err;
+  }
+
+  const tPlace = tidList.map(() => '?').join(',');
+  const tagRows = await query(
+    `SELECT id FROM contact_tags WHERE tenant_id = ? AND deleted_at IS NULL AND id IN (${tPlace})`,
+    [tenantId, ...tidList]
+  );
+  if (tagRows.length !== tidList.length) {
+    const err = new Error('Invalid tag_id in list');
+    err.status = 400;
+    throw err;
+  }
+
+  const { whereSQL, params: ownParams } = buildOwnershipWhere(user);
+  const cPlace = contactIds.map(() => '?').join(',');
+  const visibleRows = await query(
+    `SELECT c.id FROM contacts c WHERE ${whereSQL} AND c.id IN (${cPlace})`,
+    [...ownParams, ...contactIds]
+  );
+  const allowedSet = new Set(visibleRows.map((r) => Number(r.id)));
+
+  const updated = [];
+  const skipped = [];
+  for (const id of contactIds) {
+    if (allowedSet.has(id)) updated.push(id);
+    else skipped.push({ id, reason: 'not_found_or_no_access' });
+  }
+
+  if (updated.length > 0) {
+    const cPh = updated.map(() => '?').join(',');
+    const tPh = tidList.map(() => '?').join(',');
+    await query(
+      `DELETE FROM contact_tag_assignments
+       WHERE tenant_id = ? AND contact_id IN (${cPh}) AND tag_id IN (${tPh})`,
+      [tenantId, ...updated, ...tidList]
+    );
+  }
+
+  return { updated, skipped, updatedCount: updated.length };
 }
 
 export async function assignContacts(tenantId, user, payload) {
@@ -1579,7 +2336,7 @@ export async function assignContacts(tenantId, user, payload) {
 
   const placeholders = ids.map(() => '?').join(', ');
   const contacts = await query(
-    `SELECT id, manager_id, assigned_user_id FROM contacts
+    `SELECT id, manager_id, assigned_user_id, campaign_id FROM contacts
      WHERE tenant_id = ? AND id IN (${placeholders}) AND deleted_at IS NULL`,
     [tenantId, ...ids]
   );
@@ -1728,9 +2485,9 @@ export async function assignContacts(tenantId, user, payload) {
     [tenantId, ...ids]
   );
 
-  // Record assignment history for each affected row (append-only).
-  // Use the "before" snapshot we loaded and the requested target values (normalizedMid/Aid/campaign_id).
+  // Record assignment history for changed rows in one INSERT (bulk assign / unassign).
   const byIdBefore = new Map(contacts.map((c) => [Number(c.id), c]));
+  const historyRows = [];
   for (const c of updated) {
     const before = byIdBefore.get(Number(c.id));
     if (!before) continue;
@@ -1739,7 +2496,7 @@ export async function assignContacts(tenantId, user, payload) {
       Number(before.assigned_user_id || 0) !== Number(c.assigned_user_id || 0) ||
       (cidProvided && Number((before.campaign_id ?? 0) || 0) !== Number((c.campaign_id ?? 0) || 0));
     if (!changed) continue;
-    await contactAssignmentHistoryService.recordChange(tenantId, {
+    historyRows.push({
       contact_id: Number(c.id),
       changed_by_user_id: user?.id ?? null,
       change_source: 'manual',
@@ -1751,6 +2508,9 @@ export async function assignContacts(tenantId, user, payload) {
       from_campaign_id: before.campaign_id ?? null,
       to_campaign_id: c.campaign_id ?? null,
     });
+  }
+  if (historyRows.length > 0) {
+    await contactAssignmentHistoryService.recordChangesBulk(tenantId, historyRows);
   }
 
   return { updatedCount: affectedRows, data: updated };
@@ -1800,10 +2560,23 @@ function toE164Phone(raw, defaultCountryCode = '+91') {
   return `+${ccDigits}${digits}`;
 }
 
-async function resolveContactStatusIdByName(tenantId, statusNameOrCode) {
+/** One query at import start — avoids thousands of per-row status lookups on large CSVs. */
+async function warmImportStatusCache(statusCache) {
+  if (!statusCache) return;
+  const rows = await query(
+    `SELECT id, code, name FROM contact_status_master WHERE is_deleted = 0`
+  );
+  for (const r of rows) {
+    if (r?.code) statusCache.set(String(r.code).toLowerCase(), r.id);
+    if (r?.name) statusCache.set(String(r.name).toLowerCase(), r.id);
+  }
+}
+
+async function resolveContactStatusIdByName(tenantId, statusNameOrCode, statusCache = null) {
   const s = String(statusNameOrCode || '').trim();
   if (!s) return null;
   const lowered = s.toLowerCase();
+  if (statusCache?.has(lowered)) return statusCache.get(lowered);
 
   // Exact code match first, then name match (case-insensitive)
   const rows = await query(
@@ -1814,7 +2587,9 @@ async function resolveContactStatusIdByName(tenantId, statusNameOrCode) {
      LIMIT 1`,
     [lowered, lowered]
   );
-  return rows?.[0]?.id ?? null;
+  const id = rows?.[0]?.id ?? null;
+  if (statusCache) statusCache.set(lowered, id);
+  return id;
 }
 
 const CUSTOM_FIELD_TYPES = new Set([
@@ -1858,10 +2633,16 @@ function coerceCustomFieldOptionsJson(raw) {
   return null;
 }
 
-async function ensureCustomFieldDefinition(tenantId, { name, label, type, options_json } = {}) {
+async function ensureCustomFieldDefinition(
+  tenantId,
+  { name, label, type, options_json } = {},
+  cfDefCache = null
+) {
   const safeName = normalizeHeader(name);
   const safeLabel = String(label || safeName).trim() || safeName;
   if (!safeName) return null;
+
+  if (cfDefCache?.has(safeName)) return cfDefCache.get(safeName);
 
   const fieldType = CUSTOM_FIELD_TYPES.has(type) ? type : 'text';
   const optsArr =
@@ -1877,7 +2658,11 @@ async function ensureCustomFieldDefinition(tenantId, { name, label, type, option
      LIMIT 1`,
     [tenantId, safeName]
   );
-  if (existing?.[0]?.id) return existing[0];
+  if (existing?.[0]?.id) {
+    const row = existing[0];
+    cfDefCache?.set(safeName, row);
+    return row;
+  }
 
   try {
     const result = await query(
@@ -1885,7 +2670,9 @@ async function ensureCustomFieldDefinition(tenantId, { name, label, type, option
        VALUES (?, ?, ?, ?, ?, 0, 1)`,
       [tenantId, safeName, safeLabel, fieldType, optsStr]
     );
-    return { id: result.insertId, name: safeName, label: safeLabel, type: fieldType };
+    const row = { id: result.insertId, name: safeName, label: safeLabel, type: fieldType };
+    cfDefCache?.set(safeName, row);
+    return row;
   } catch (e) {
     // If another request created it concurrently, fetch again
     const again = await query(
@@ -1895,7 +2682,9 @@ async function ensureCustomFieldDefinition(tenantId, { name, label, type, option
        LIMIT 1`,
       [tenantId, safeName]
     );
-    return again?.[0] ?? null;
+    const row = again?.[0] ?? null;
+    if (row) cfDefCache?.set(safeName, row);
+    return row;
   }
 }
 
@@ -2023,12 +2812,76 @@ function isProviderLogicalFieldMappedInHeaderMapping(headerMapping, defKey, cust
 }
 
 /**
+ * Sync-only: primary phone E.164 for duplicate prefetch (no DB). Matches phone resolution in
+ * {@link resolveCsvRowToImportPayload} without running custom-field / provider async work.
+ */
+function peekImportPrimaryPhoneE164(normalized, headerMapping, defaultCountryCode) {
+  const row = { ...normalized };
+  if (headerMapping && typeof headerMapping === 'object') {
+    for (const nk of Object.keys(headerMapping)) {
+      if (headerMapping[nk]?.target === 'ignore') {
+        delete row[nk];
+      }
+    }
+  }
+  let mappedPrimaryPhone = null;
+  if (headerMapping) {
+    for (const [nk, cfg] of Object.entries(headerMapping)) {
+      const val = row[nk];
+      if (val === undefined) continue;
+      const target = cfg?.target;
+      if (!target || target === 'ignore') continue;
+      if (target === 'primary_phone') mappedPrimaryPhone = val;
+    }
+  }
+  const normalizedForPhones = { ...row };
+  if (mappedPrimaryPhone != null && String(mappedPrimaryPhone).trim()) {
+    normalizedForPhones.primary_phone = mappedPrimaryPhone;
+  }
+  const phones = buildPhonesFromCsvRow(normalizedForPhones, defaultCountryCode, toE164Phone);
+  return phones.find((p) => p.is_primary)?.phone || null;
+}
+
+/** Load existing rows keyed by primary phone for import duplicate detection (same `recordType` only — leads and contacts are independent). */
+async function prefetchImportExistingByPhones(tenantId, phones, recordType) {
+  const rt = String(recordType || 'lead').toLowerCase() === 'contact' ? 'contact' : 'lead';
+  const unique = [...new Set((phones || []).filter(Boolean))];
+  const map = new Map();
+  if (unique.length === 0) return map;
+  const chunkSize = 450;
+  for (let i = 0; i < unique.length; i += chunkSize) {
+    const chunk = unique.slice(i, i + chunkSize);
+    const ph = chunk.map(() => '?').join(',');
+    const rows = await query(
+      `SELECT p.phone AS phone, c.id AS id, c.type AS type
+       FROM contact_phones p
+       INNER JOIN contacts c
+         ON c.id = p.contact_id AND c.tenant_id = p.tenant_id
+       WHERE p.tenant_id = ? AND c.type = ? AND p.phone IN (${ph}) AND c.deleted_at IS NULL`,
+      [tenantId, rt, ...chunk]
+    );
+    for (const r of rows) {
+      if (r?.phone) map.set(r.phone, { id: r.id, type: r.type });
+    }
+  }
+  return map;
+}
+
+/**
  * Same rules as CSV import row processing (may create missing provider-style custom fields).
  * @returns {{ error: string } | { error: null, first_name, last_name, display_name, email, finalSource, resolvedStatusId, providerStatusName, campaign_id, manager_id, assigned_user_id, phones, custom_fields_deduped, primaryPhone }}
  */
 async function resolveCsvRowToImportPayload(
   tenantId,
-  { normalized, headerMapping, byHeader, defaultCountryCode, customFieldDefsById = null }
+  {
+    normalized,
+    headerMapping,
+    byHeader,
+    defaultCountryCode,
+    customFieldDefsById = null,
+    statusCache = null,
+    cfDefCache = null,
+  }
 ) {
   // Drop ignored columns once so no later path (aliases, provider auto-CF, tenant CF by header, core defaults)
   // can re-use their values — fixes "-- unmapped --" still filling City / Custom fields via parallel aliases.
@@ -2080,21 +2933,31 @@ async function resolveCsvRowToImportPayload(
         const existingField = byHeader.get(def.key);
         const field =
           existingField ||
-          (await ensureCustomFieldDefinition(tenantId, { name: def.key, label: def.label, type: def.type }));
+          (await ensureCustomFieldDefinition(
+            tenantId,
+            { name: def.key, label: def.label, type: def.type },
+            cfDefCache
+          ));
         if (!field?.id) continue;
         byHeader.set(def.key, field);
         byHeader.set(normalizeHeader(def.label), field);
         const effType = effectiveImportValueType(cfg, field.type);
         const pv = normalizeImportedCustomFieldValue(val, effType);
-        custom_fields.push({ field_id: field.id, value_text: pv !== null ? pv : String(val) });
+        const fidAuto = normalizeContactImportCustomFieldId(field.id);
+        if (fidAuto) {
+          custom_fields.push({ field_id: fidAuto, value_text: pv !== null ? pv : String(val) });
+        }
       } else if (target === 'custom' && cfg.customFieldId) {
-        const fieldDef = customFieldDefsById?.get(Number(cfg.customFieldId)) || null;
+        const fid = normalizeContactImportCustomFieldId(cfg.customFieldId);
+        const fieldDef = fid ? customFieldDefsById?.get(fid) || null : null;
         const effType = effectiveCustomFieldImportType(cfg, fieldDef);
         const pv = normalizeImportedCustomFieldValue(val, effType);
-        custom_fields.push({
-          field_id: cfg.customFieldId,
-          value_text: pv !== null ? pv : val === null ? null : String(val),
-        });
+        if (fid) {
+          custom_fields.push({
+            field_id: fid,
+            value_text: pv !== null ? pv : val === null ? null : String(val),
+          });
+        }
       } else if (target === 'new_custom') {
         if (val === null || !String(val).trim()) continue;
         const ft = normalizeNewCustomFieldType(cfg.fieldType);
@@ -2105,20 +2968,28 @@ async function resolveCsvRowToImportPayload(
         if (ft === 'select' || ft === 'multiselect' || ft === 'multiselect_dropdown') {
           opts = coerceCustomFieldOptionsJson(cfg.options_json ?? cfg.selectOptions);
         }
-        const field = await ensureCustomFieldDefinition(tenantId, {
-          name: importName,
-          label,
-          type: ft,
-          options_json: opts,
-        });
-        if (!field?.id) continue;
+        const field = await ensureCustomFieldDefinition(
+          tenantId,
+          {
+            name: importName,
+            label,
+            type: ft,
+            options_json: opts,
+          },
+          cfDefCache
+        );
+        const fidNew = normalizeContactImportCustomFieldId(field?.id);
+        if (!fidNew) continue;
         byHeader.set(normalizeHeader(field.name || importName), field);
         byHeader.set(normalizeHeader(label), field);
-        const value_text = normalizeImportedCustomFieldValue(val, ft);
-        custom_fields.push({ field_id: field.id, value_text });
-        if (customFieldDefsById && field?.id) {
-          customFieldDefsById.set(Number(field.id), {
-            id: field.id,
+        const pv = normalizeImportedCustomFieldValue(val, ft);
+        custom_fields.push({
+          field_id: fidNew,
+          value_text: pv !== null ? pv : String(val),
+        });
+        if (customFieldDefsById) {
+          customFieldDefsById.set(fidNew, {
+            id: fidNew,
             name: field.name,
             label: field.label,
             type: ft,
@@ -2168,7 +3039,8 @@ async function resolveCsvRowToImportPayload(
   const providerStatusName =
     mappedStatusName || pickFirstByAliasKeysRespectingIgnore(row, STATUS_KEYS, headerMapping) || null;
   const resolvedStatusId =
-    status_id || (providerStatusName ? await resolveContactStatusIdByName(tenantId, providerStatusName) : null);
+    status_id ||
+    (providerStatusName ? await resolveContactStatusIdByName(tenantId, providerStatusName, statusCache) : null);
   const campaign_id = row.campaign_id ? Number(row.campaign_id) : undefined;
   const manager_id = row.manager_id ? Number(row.manager_id) : undefined;
   const assigned_user_id = row.assigned_user_id ? Number(row.assigned_user_id) : undefined;
@@ -2185,7 +3057,8 @@ async function resolveCsvRowToImportPayload(
     const effType = field?.type || 'text';
     const value_text =
       v === null ? null : normalizeImportedCustomFieldValue(v, effType) ?? String(v);
-    custom_fields.push({ field_id: field.id, value_text });
+    const fidUn = normalizeContactImportCustomFieldId(field.id);
+    if (fidUn) custom_fields.push({ field_id: fidUn, value_text });
   }
 
   for (const def of PROVIDER_COLUMNS_AUTO_CF) {
@@ -2212,21 +3085,28 @@ async function resolveCsvRowToImportPayload(
     const existingField = byHeader.get(def.key);
     const field =
       existingField ||
-      (await ensureCustomFieldDefinition(tenantId, { name: def.key, label: def.label, type: def.type }));
+      (await ensureCustomFieldDefinition(
+        tenantId,
+        { name: def.key, label: def.label, type: def.type },
+        cfDefCache
+      ));
     if (!field?.id) continue;
     byHeader.set(def.key, field);
     byHeader.set(normalizeHeader(def.label), field);
 
     const pv = normalizeImportedCustomFieldValue(val, def.type);
     const value_text = pv !== null ? pv : val === null ? null : String(val);
-    custom_fields.push({ field_id: field.id, value_text });
+    const fidPv = normalizeContactImportCustomFieldId(field.id);
+    if (fidPv) custom_fields.push({ field_id: fidPv, value_text });
   }
 
   const coreDefaults = applyCoreDefaultsFromNormalized(row, mappedCore, headerMapping);
 
   const cfByField = new Map();
   for (const c of custom_fields) {
-    if (c?.field_id) cfByField.set(c.field_id, c.value_text);
+    const fid = normalizeContactImportCustomFieldId(c?.field_id);
+    if (!fid) continue;
+    cfByField.set(fid, c.value_text);
   }
   const custom_fields_deduped = [...cfByField.entries()].map(([field_id, value_text]) => ({
     field_id,
@@ -2260,6 +3140,159 @@ function csvEscape(v) {
   return s;
 }
 
+/** Core column keys allowed in dynamic export (aligned with list column ids, tag_names = tags in CSV). */
+const EXPORT_CORE_KEY_WHITELIST = new Set([
+  'id',
+  'type',
+  'display_name',
+  'first_name',
+  'last_name',
+  'email',
+  'primary_phone',
+  'source',
+  'city',
+  'state',
+  'country',
+  'address',
+  'address_line_2',
+  'pin_code',
+  'company',
+  'job_title',
+  'website',
+  'industry',
+  'date_of_birth',
+  'tax_id',
+  'tag_names',
+  'campaign_id',
+  'campaign_name',
+  'status_id',
+  'status_name',
+  'manager_id',
+  'assigned_user_id',
+  'manager_name',
+  'assigned_user_name',
+  'call_count_total',
+  'last_called_at',
+  'created_source',
+  'created_by',
+  'updated_by',
+  'created_at',
+]);
+
+const EXPORT_HEADER_LABEL = {
+  id: 'id',
+  type: 'type',
+  display_name: 'display_name',
+  first_name: 'first_name',
+  last_name: 'last_name',
+  email: 'email',
+  primary_phone: 'primary_phone',
+  source: 'source',
+  city: 'city',
+  state: 'state',
+  country: 'country',
+  address: 'address',
+  address_line_2: 'address_line_2',
+  pin_code: 'pin_code',
+  company: 'company',
+  job_title: 'job_title',
+  website: 'website',
+  industry: 'industry',
+  date_of_birth: 'date_of_birth',
+  tax_id: 'tax_id',
+  tag_names: 'tags',
+  campaign_id: 'campaign_id',
+  campaign_name: 'campaign_name',
+  status_id: 'status_id',
+  status_name: 'status_name',
+  manager_id: 'manager_id',
+  assigned_user_id: 'assigned_user_id',
+  manager_name: 'manager_name',
+  assigned_user_name: 'assigned_user_name',
+  call_count_total: 'call_count_total',
+  last_called_at: 'last_called_at',
+  created_source: 'created_source',
+  created_by: 'created_by',
+  updated_by: 'updated_by',
+  created_at: 'created_at',
+};
+
+function formatExportCoreCell(key, c) {
+  if (key === 'date_of_birth') {
+    if (c.date_of_birth == null) return '';
+    return c.date_of_birth instanceof Date
+      ? c.date_of_birth.toISOString().slice(0, 10)
+      : String(c.date_of_birth).slice(0, 10);
+  }
+  if (key === 'created_at' || key === 'last_called_at') {
+    const v = c[key];
+    if (v == null) return '';
+    try {
+      return new Date(v).toISOString();
+    } catch {
+      return String(v);
+    }
+  }
+  if (key === 'tag_names') return c.tag_names ?? '';
+  const v = c[key];
+  return v == null ? '' : v;
+}
+
+/**
+ * @returns {{ keys: Array<{ kind: 'core' | 'cf', key: string, fieldId?: number }>, headers: string[] }}
+ */
+async function resolveDynamicExportColumns(tenantId, columnKeys) {
+  const keys = [];
+  const seen = new Set();
+  const cfIds = [];
+
+  for (const raw of columnKeys) {
+    const s = String(raw ?? '').trim();
+    if (!s || seen.has(s)) continue;
+    const m = /^cf:(\d+)$/i.exec(s);
+    if (m) {
+      const fieldId = Number(m[1]);
+      if (Number.isFinite(fieldId) && fieldId > 0) {
+        seen.add(s);
+        keys.push({ kind: 'cf', key: `cf:${fieldId}`, fieldId });
+        cfIds.push(fieldId);
+      }
+      continue;
+    }
+    if (EXPORT_CORE_KEY_WHITELIST.has(s)) {
+      seen.add(s);
+      keys.push({ kind: 'core', key: s });
+    }
+  }
+
+  let cfMeta = [];
+  if (cfIds.length > 0) {
+    const uniq = [...new Set(cfIds)];
+    const ph = uniq.map(() => '?').join(',');
+    cfMeta = await query(
+      `SELECT id, name, label FROM contact_custom_fields WHERE tenant_id = ? AND id IN (${ph})`,
+      [tenantId, ...uniq]
+    );
+  }
+  const cfById = new Map((cfMeta || []).map((r) => [r.id, r]));
+
+  const resolved = [];
+  const headers = [];
+  for (const k of keys) {
+    if (k.kind === 'core') {
+      resolved.push(k);
+      headers.push(EXPORT_HEADER_LABEL[k.key] || k.key);
+    } else {
+      const row = cfById.get(k.fieldId);
+      if (!row) continue;
+      resolved.push(k);
+      headers.push(`cf:${row.name}`);
+    }
+  }
+
+  return { keys: resolved, headers };
+}
+
 export async function exportContactsCsv(
   tenantId,
   user,
@@ -2267,54 +3300,29 @@ export async function exportContactsCsv(
     search = '',
     type,
     statusId,
+    statusIdsFilter,
     includeCustomFields = true,
     filterManagerId,
     filterAssignedUserId,
+    filterManagerIds,
+    filterUnassignedManagers,
     campaignIdFilter,
+    campaignIdsFilter,
+    filterTagIds,
+    minCallCount,
+    maxCallCount,
+    lastCalledAfter,
+    lastCalledBefore,
+    touchStatus,
+    columnFilters,
+    /** 'filtered' = apply list filters; 'selected' = only id list (+ type + ownership). */
+    exportScope = 'filtered',
+    selectedIds = [],
+    /** Ordered column keys: core ids + `cf:fieldId`. Null/empty = legacy full export. */
+    columnKeys = null,
   } = {}
 ) {
-  const { whereSQL, params } = buildOwnershipWhere(user);
-  const whereClauses = [whereSQL];
-
-  if (type) {
-    whereClauses.push('c.type = ?');
-    params.push(type);
-  }
-
-  if (statusId) {
-    whereClauses.push('c.status_id = ?');
-    params.push(statusId);
-  }
-
-  if (campaignIdFilter === 'none') {
-    whereClauses.push('c.campaign_id IS NULL');
-  } else if (campaignIdFilter !== undefined && campaignIdFilter !== null) {
-    whereClauses.push('c.campaign_id = ?');
-    params.push(Number(campaignIdFilter));
-  }
-
-  if (search) {
-    const q = `%${search}%`;
-    whereClauses.push(
-      `(c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ? OR c.display_name LIKE ?
-        OR c.city LIKE ? OR c.company LIKE ? OR EXISTS (
-        SELECT 1 FROM contact_tag_assignments cta_s
-        INNER JOIN contact_tags ct_s ON ct_s.id = cta_s.tag_id AND ct_s.tenant_id = cta_s.tenant_id
-        WHERE cta_s.contact_id = c.id AND cta_s.tenant_id = c.tenant_id AND ct_s.deleted_at IS NULL AND ct_s.name LIKE ?
-      ))`
-    );
-    params.push(q, q, q, q, q, q, q);
-  }
-
-  await applyContactListFilters(tenantId, user, whereClauses, params, {
-    filterManagerId,
-    filterAssignedUserId,
-  });
-
-  const finalWhere = `WHERE ${whereClauses.join(' AND ')}`;
-
-  const contacts = await query(
-    `SELECT 
+  const exportSelect = `
         c.id,
         c.type,
         c.display_name,
@@ -2335,6 +3343,8 @@ export async function exportContactsCsv(
         c.industry,
         c.date_of_birth,
         c.tax_id,
+        c.call_count_total,
+        c.last_called_at,
         (SELECT GROUP_CONCAT(DISTINCT ct.name ORDER BY ct.name SEPARATOR ', ')
          FROM contact_tag_assignments cta
          INNER JOIN contact_tags ct ON ct.id = cta.tag_id AND ct.tenant_id = cta.tenant_id
@@ -2343,25 +3353,118 @@ export async function exportContactsCsv(
         c.campaign_id,
         cam.name AS campaign_name,
         c.status_id,
+        csm.name AS status_name,
         c.manager_id,
         c.assigned_user_id,
+        mgr.name AS manager_name,
+        ag.name AS assigned_user_name,
         c.created_source,
         c.created_by,
         c.updated_by,
-        c.created_at
+        c.created_at`;
+
+  const exportJoins = `
      FROM contacts c
      LEFT JOIN contact_phones p
        ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id
      LEFT JOIN campaigns cam
        ON cam.id = c.campaign_id AND cam.tenant_id = c.tenant_id AND cam.deleted_at IS NULL
+     LEFT JOIN contact_status_master csm
+       ON csm.id = c.status_id AND csm.is_deleted = 0
+     LEFT JOIN users mgr
+       ON mgr.id = c.manager_id AND mgr.tenant_id = c.tenant_id AND mgr.is_deleted = 0
+     LEFT JOIN users ag
+       ON ag.id = c.assigned_user_id AND ag.tenant_id = c.tenant_id AND ag.is_deleted = 0`;
+
+  let finalWhere;
+  let queryParams;
+
+  if (exportScope === 'selected') {
+    const { whereSQL, params: ownParams } = buildOwnershipWhere(user);
+    const ids = [...new Set((Array.isArray(selectedIds) ? selectedIds : []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))].slice(
+      0,
+      10000
+    );
+    if (ids.length === 0) {
+      return '\uFEFF';
+    }
+    const clauses = [whereSQL];
+    const params = [...ownParams];
+    if (type) {
+      clauses.push('c.type = ?');
+      params.push(type);
+    }
+    clauses.push(`c.id IN (${ids.map(() => '?').join(',')})`);
+    params.push(...ids);
+    finalWhere = `WHERE ${clauses.join(' AND ')}`;
+    queryParams = params;
+  } else {
+    const prepared = await prepareContactListFinalWhere(tenantId, user, {
+      search,
+      type,
+      statusId,
+      statusIdsFilter,
+      minCallCount,
+      maxCallCount,
+      lastCalledAfter,
+      lastCalledBefore,
+      filterManagerId,
+      filterAssignedUserId,
+      filterManagerIds,
+      filterUnassignedManagers,
+      campaignIdFilter,
+      campaignIdsFilter,
+      filterTagIds,
+      columnFilters,
+      touchStatus,
+    });
+    finalWhere = prepared.finalWhere;
+    queryParams = prepared.params;
+  }
+
+  const contacts = await query(
+    `SELECT ${exportSelect}
+     ${exportJoins}
      ${finalWhere}
      ORDER BY c.created_at DESC`,
-    params
+    queryParams
   );
+
+  const useDynamic =
+    Array.isArray(columnKeys) &&
+    columnKeys.length > 0 &&
+    columnKeys.some((k) => String(k ?? '').trim());
 
   let customFields = [];
   let valuesByContact = new Map();
-  if (includeCustomFields) {
+  let dynamicResolved = null;
+
+  if (useDynamic) {
+    dynamicResolved = await resolveDynamicExportColumns(tenantId, columnKeys);
+    if (!dynamicResolved.keys.length) {
+      return '\uFEFF';
+    }
+    const needCf = dynamicResolved.keys.filter((k) => k.kind === 'cf');
+    customFields = needCf.map((k) => ({ id: k.fieldId, name: k.key, label: k.key }));
+
+    const ids = contacts.map((c) => c.id);
+    if (ids.length > 0 && needCf.length > 0) {
+      const fieldIds = [...new Set(needCf.map((k) => k.fieldId))];
+      const placeholders = ids.map(() => '?').join(',');
+      const rows = await query(
+        `SELECT contact_id, field_id, value_text
+         FROM contact_custom_field_values
+         WHERE tenant_id = ? AND contact_id IN (${placeholders}) AND field_id IN (${fieldIds.map(() => '?').join(',')})`,
+        [tenantId, ...ids, ...fieldIds]
+      );
+
+      for (const r of rows) {
+        const map = valuesByContact.get(r.contact_id) || new Map();
+        map.set(r.field_id, r.value_text);
+        valuesByContact.set(r.contact_id, map);
+      }
+    }
+  } else if (includeCustomFields) {
     customFields = await query(
       `SELECT id, name, label
        FROM contact_custom_fields
@@ -2386,6 +3489,23 @@ export async function exportContactsCsv(
         valuesByContact.set(r.contact_id, map);
       }
     }
+  }
+
+  const lines = [];
+
+  if (useDynamic && dynamicResolved?.keys?.length) {
+    const headers = dynamicResolved.headers;
+    lines.push(`\uFEFF${headers.map(csvEscape).join(',')}`);
+
+    for (const c of contacts) {
+      const cfMap = valuesByContact.get(c.id);
+      const cells = dynamicResolved.keys.map((def) => {
+        if (def.kind === 'core') return formatExportCoreCell(def.key, c);
+        return cfMap && def.fieldId != null ? cfMap.get(def.fieldId) ?? '' : '';
+      });
+      lines.push(cells.map(csvEscape).join(','));
+    }
+    return lines.join('\r\n');
   }
 
   const baseHeaders = [
@@ -2413,6 +3533,7 @@ export async function exportContactsCsv(
     'campaign_id',
     'campaign_name',
     'status_id',
+    'status_name',
     'manager_id',
     'assigned_user_id',
     'created_source',
@@ -2421,14 +3542,9 @@ export async function exportContactsCsv(
     'created_at',
   ];
 
-  const customHeaders = includeCustomFields
-    ? customFields.map((f) => `cf:${f.name}`)
-    : [];
+  const customHeaders = includeCustomFields ? customFields.map((f) => `cf:${f.name}`) : [];
 
   const headers = [...baseHeaders, ...customHeaders];
-  const lines = [];
-
-  // UTF-8 BOM helps Excel
   lines.push(`\uFEFF${headers.map(csvEscape).join(',')}`);
 
   for (const c of contacts) {
@@ -2463,6 +3579,7 @@ export async function exportContactsCsv(
       c.campaign_id,
       c.campaign_name,
       c.status_id,
+      c.status_name,
       c.manager_id,
       c.assigned_user_id,
       c.created_source,
@@ -2482,6 +3599,117 @@ export async function exportContactsCsv(
   return lines.join('\r\n');
 }
 
+async function validateImportTagIdsForTenant(tenantId, tagIds) {
+  const ids = [
+    ...new Set(
+      (tagIds || []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0)
+    ),
+  ];
+  if (ids.length === 0) return [];
+  const ph = ids.map(() => '?').join(',');
+  const rows = await query(
+    `SELECT id FROM contact_tags
+     WHERE tenant_id = ? AND deleted_at IS NULL AND id IN (${ph})`,
+    [tenantId, ...ids]
+  );
+  if (rows.length !== ids.length) {
+    const err = new Error('One or more tag_ids are invalid for this tenant');
+    err.status = 400;
+    throw err;
+  }
+  return ids;
+}
+
+async function normalizeImportOwnershipDefaults(
+  tenantId,
+  user,
+  importManagerIdRaw,
+  importAssignedUserIdRaw
+) {
+  let defaultManagerId;
+  let defaultAssignedUserId;
+
+  const hasMgr =
+    importManagerIdRaw !== undefined &&
+    importManagerIdRaw !== null &&
+    importManagerIdRaw !== '' &&
+    String(importManagerIdRaw).trim() !== '';
+  const hasAsg =
+    importAssignedUserIdRaw !== undefined &&
+    importAssignedUserIdRaw !== null &&
+    importAssignedUserIdRaw !== '' &&
+    String(importAssignedUserIdRaw).trim() !== '';
+
+  if (user.role === 'agent') {
+    return { defaultManagerId, defaultAssignedUserId };
+  }
+
+  if (user.role === 'admin') {
+    if (hasMgr) {
+      const mid = normalizeOptionalUserId(importManagerIdRaw);
+      if (mid != null) {
+        const [mgr] = await query(
+          `SELECT id FROM users
+           WHERE id = ? AND tenant_id = ? AND role = 'manager' AND is_deleted = 0
+           LIMIT 1`,
+          [mid, tenantId]
+        );
+        if (!mgr) {
+          const err = new Error('Invalid import_manager_id');
+          err.status = 400;
+          throw err;
+        }
+        defaultManagerId = mid;
+      }
+    }
+    if (hasAsg) {
+      const aid = normalizeOptionalUserId(importAssignedUserIdRaw);
+      if (aid != null) {
+        const agent = await fetchUserBrief(tenantId, aid);
+        if (!agent || agent.role !== 'agent') {
+          const err = new Error('import_assigned_user_id must be an agent');
+          err.status = 400;
+          throw err;
+        }
+        defaultAssignedUserId = aid;
+      }
+    }
+    return { defaultManagerId, defaultAssignedUserId };
+  }
+
+  if (user.role === 'manager') {
+    if (hasMgr) {
+      const mid = normalizeOptionalUserId(importManagerIdRaw);
+      if (mid != null && mid !== Number(user.id)) {
+        const err = new Error('import_manager_id can only be yourself');
+        err.status = 403;
+        throw err;
+      }
+      if (mid != null) defaultManagerId = mid;
+    }
+    if (hasAsg) {
+      const aid = normalizeOptionalUserId(importAssignedUserIdRaw);
+      if (aid != null) {
+        const agent = await fetchUserBrief(tenantId, aid);
+        if (!agent || agent.role !== 'agent') {
+          const err = new Error('import_assigned_user_id must be an agent');
+          err.status = 400;
+          throw err;
+        }
+        if (Number(agent.manager_id) !== Number(user.id)) {
+          const err = new Error('import_assigned_user_id must be an agent on your team');
+          err.status = 403;
+          throw err;
+        }
+        defaultAssignedUserId = aid;
+      }
+    }
+    return { defaultManagerId, defaultAssignedUserId };
+  }
+
+  return { defaultManagerId, defaultAssignedUserId };
+}
+
 export async function importContactsCsv(
   tenantId,
   user,
@@ -2493,9 +3721,20 @@ export async function importContactsCsv(
     defaultCountryCode = '+91',
     mapping,
     originalFilename = '',
+    tagIds: tagIdsOpt,
+    importManagerId: importManagerIdRaw,
+    importAssignedUserId: importAssignedUserIdRaw,
   } = {}
 ) {
   const { records, headerRowIndex } = parseImportBufferToRecords(buffer, { originalFilename });
+
+  const validatedTagIds = await validateImportTagIdsForTenant(tenantId, tagIdsOpt);
+  const { defaultManagerId, defaultAssignedUserId } = await normalizeImportOwnershipDefaults(
+    tenantId,
+    user,
+    importManagerIdRaw,
+    importAssignedUserIdRaw
+  );
 
   const allFields = await query(
     `SELECT id, name, label, type
@@ -2505,8 +3744,10 @@ export async function importContactsCsv(
   );
 
   const byHeader = new Map();
-  const customFieldDefsById = new Map(allFields.map((f) => [f.id, f]));
+  const customFieldDefsById = new Map();
   for (const f of allFields) {
+    const nid = normalizeContactImportCustomFieldId(f.id);
+    if (nid) customFieldDefsById.set(nid, f);
     byHeader.set(normalizeHeader(f.name), f);
     byHeader.set(normalizeHeader(f.label), f);
   }
@@ -2514,17 +3755,73 @@ export async function importContactsCsv(
   // mapping: { [nk]: { target, customFieldId?, importValueType? } | { target:'new_custom', fieldType, fieldLabel?, selectOptions? } }
   const headerMapping = mapping && typeof mapping === 'object' ? mapping : null;
 
-  let created = 0;
-  let updated = 0;
-  let skipped = 0;
-  const errors = [];
-
   // Hard guard to prevent accidental huge imports
   if (records.length > 2000) {
     const err = new Error('CSV import supports up to 2000 rows per upload');
     err.status = 400;
     throw err;
   }
+
+  const statusCache = new Map();
+  await warmImportStatusCache(statusCache);
+  const cfDefCache = new Map();
+
+  let preloadedAgentManagerId;
+  if (user.role === 'agent') {
+    const [ur] = await query(
+      `SELECT manager_id FROM users WHERE id = ? AND tenant_id = ? AND is_deleted = 0 AND role = 'agent' LIMIT 1`,
+      [user.id, tenantId]
+    );
+    preloadedAgentManagerId = ur?.manager_id ?? null;
+  }
+
+  const peekPhones = [];
+  for (let ri = 0; ri < records.length; ri++) {
+    const prow = records[ri] || {};
+    const normalizedPeek = {};
+    for (const [k, v] of Object.entries(prow)) {
+      normalizedPeek[normalizeHeader(k)] = v;
+    }
+    peekPhones.push(peekImportPrimaryPhoneE164(normalizedPeek, headerMapping, defaultCountryCode));
+  }
+  const prefetchMap = await prefetchImportExistingByPhones(tenantId, peekPhones, type);
+  const sessionPhoneMap = new Map(prefetchMap);
+
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+  const errors = [];
+
+  const pendingImportCreates = [];
+  const pendingPhoneKeys = new Set();
+  const pendingTagMergeIds = [];
+
+  const flushPendingTagMerges = async () => {
+    if (validatedTagIds.length === 0 || pendingTagMergeIds.length === 0) return;
+    while (pendingTagMergeIds.length > 0) {
+      const chunk = pendingTagMergeIds.splice(0, IMPORT_TAG_MERGE_CHUNK);
+      await contactTagsService.insertTagAssignmentsMerge(tenantId, user, chunk, validatedTagIds);
+    }
+  };
+
+  const flushPendingCreates = async () => {
+    if (pendingImportCreates.length === 0) return;
+    const batch = pendingImportCreates.splice(0, pendingImportCreates.length);
+    for (const b of batch) {
+      if (b.primaryPhone) pendingPhoneKeys.delete(b.primaryPhone);
+    }
+    await flushImportCreateBuffer(
+      tenantId,
+      user,
+      type,
+      batch,
+      sessionPhoneMap,
+      statusCache,
+      validatedTagIds,
+      preloadedAgentManagerId
+    );
+    created += batch.length;
+  };
 
   for (let i = 0; i < records.length; i++) {
     const rowIndex = headerRowIndex + i + 2; // 1-based sheet row (header + data offset)
@@ -2543,6 +3840,8 @@ export async function importContactsCsv(
         byHeader,
         defaultCountryCode,
         customFieldDefsById,
+        statusCache,
+        cfDefCache,
       });
 
       if (resolved.error) {
@@ -2564,28 +3863,32 @@ export async function importContactsCsv(
         primaryPhone,
       } = resolved;
 
+      if (primaryPhone && pendingPhoneKeys.has(primaryPhone)) {
+        await flushPendingCreates();
+      }
+
+      let effManagerId = manager_id;
+      let effAssignedUserId = assigned_user_id;
+      if (effManagerId === undefined && defaultManagerId !== undefined) effManagerId = defaultManagerId;
+      if (effAssignedUserId === undefined && defaultAssignedUserId !== undefined) {
+        effAssignedUserId = defaultAssignedUserId;
+      }
+
       const coreRowFields = pickDefinedCoreFieldsFromResolved(resolved);
 
       let existingId = null;
       if (primaryPhone) {
-        const rows = await query(
-          `SELECT c.id
-           FROM contact_phones p
-           JOIN contacts c
-             ON c.id = p.contact_id AND c.tenant_id = p.tenant_id
-           WHERE p.tenant_id = ? AND p.phone = ? AND c.deleted_at IS NULL
-           LIMIT 1`,
-          [tenantId, primaryPhone]
-        );
-        existingId = rows?.[0]?.id ?? null;
+        const ex = sessionPhoneMap.get(primaryPhone);
+        if (ex) existingId = ex.id;
       }
 
-      if (existingId && mode !== 'update') {
+      if (existingId && mode === 'skip') {
         skipped++;
         continue;
       }
 
-      if (existingId && mode === 'update') {
+      if (existingId) {
+        await flushPendingCreates();
         const payload = {
           type,
           first_name,
@@ -2596,18 +3899,28 @@ export async function importContactsCsv(
           ...coreRowFields,
           ...(resolvedStatusId ? { status_id: resolvedStatusId } : {}),
           ...(campaign_id !== undefined ? { campaign_id } : {}),
-          ...(manager_id !== undefined ? { manager_id } : {}),
-          ...(assigned_user_id !== undefined ? { assigned_user_id } : {}),
+          ...(effManagerId !== undefined ? { manager_id: effManagerId } : {}),
+          ...(effAssignedUserId !== undefined ? { assigned_user_id: effAssignedUserId } : {}),
           ...(phones.length > 0 ? { phones } : {}),
           ...(custom_fields_deduped.length > 0 ? { custom_fields: custom_fields_deduped } : {}),
         };
 
-        await updateContact(existingId, tenantId, user, payload);
+        const snapshot = await fetchContactSnapshotForUpdate(existingId, tenantId, user);
+        if (!snapshot) {
+          skipped++;
+          continue;
+        }
+        await updateContact(existingId, tenantId, user, payload, { skipFetch: true, contactSnapshot: snapshot });
+        if (primaryPhone) sessionPhoneMap.set(primaryPhone, { id: existingId, type });
+        if (validatedTagIds.length > 0) {
+          pendingTagMergeIds.push(existingId);
+          if (pendingTagMergeIds.length >= IMPORT_TAG_MERGE_CHUNK) await flushPendingTagMerges();
+        }
         updated++;
         continue;
       }
 
-      await createContact(tenantId, user, {
+      const createPayload = {
         type,
         first_name,
         last_name,
@@ -2617,21 +3930,32 @@ export async function importContactsCsv(
         ...coreRowFields,
         ...(resolvedStatusId ? { status_id: resolvedStatusId } : {}),
         ...(campaign_id !== undefined ? { campaign_id } : {}),
-        ...(manager_id !== undefined ? { manager_id } : {}),
-        ...(assigned_user_id !== undefined ? { assigned_user_id } : {}),
+        ...(effManagerId !== undefined ? { manager_id: effManagerId } : {}),
+        ...(effAssignedUserId !== undefined ? { assigned_user_id: effAssignedUserId } : {}),
         phones,
         custom_fields: custom_fields_deduped,
         created_source,
-      });
+        ...(validatedTagIds.length > 0 ? { tag_ids: validatedTagIds } : {}),
+      };
 
-      created++;
+      pendingImportCreates.push({ primaryPhone, payload: createPayload });
+      if (primaryPhone) pendingPhoneKeys.add(primaryPhone);
+
+      if (pendingImportCreates.length >= IMPORT_BULK_CREATE_CHUNK) {
+        await flushPendingCreates();
+      }
     } catch (e) {
+      await flushPendingCreates();
+      await flushPendingTagMerges();
       errors.push({
         row: rowIndex,
         error: e?.message || 'Import failed',
       });
     }
   }
+
+  await flushPendingCreates();
+  await flushPendingTagMerges();
 
   return {
     rowCount: records.length,
@@ -2645,7 +3969,15 @@ export async function importContactsCsv(
 
 export async function previewResolvedContactsImportCsv(
   tenantId,
-  { buffer, mapping, defaultCountryCode = '+91', mode = 'skip', limit = 12, originalFilename = '' } = {}
+  {
+    buffer,
+    mapping,
+    defaultCountryCode = '+91',
+    mode = 'skip',
+    limit = 12,
+    originalFilename = '',
+    type: importType = 'lead',
+  } = {}
 ) {
   const { records, headerRowIndex } = parseImportBufferToRecords(buffer, { originalFilename });
 
@@ -2667,18 +3999,37 @@ export async function previewResolvedContactsImportCsv(
   );
 
   const byHeader = new Map();
-  const customFieldDefsById = new Map(allFields.map((f) => [f.id, f]));
+  const customFieldDefsById = new Map();
   for (const f of allFields) {
+    const nid = normalizeContactImportCustomFieldId(f.id);
+    if (nid) customFieldDefsById.set(nid, f);
     byHeader.set(normalizeHeader(f.name), f);
     byHeader.set(normalizeHeader(f.label), f);
   }
 
   const headerMapping = mapping && typeof mapping === 'object' ? mapping : null;
 
-  const fieldLabelById = new Map(allFields.map((f) => [f.id, f.label || f.name]));
+  const fieldLabelById = new Map();
+  for (const f of allFields) {
+    const nid = normalizeContactImportCustomFieldId(f.id);
+    if (nid) fieldLabelById.set(nid, f.label || f.name);
+  }
 
   const sampleLimit = Math.min(Math.max(1, parseInt(limit, 10) || 12), 50);
   const sampleRows = [];
+
+  const statusCache = new Map();
+  const cfDefCache = new Map();
+  const previewPeekPhones = [];
+  for (let pi = 0; pi < records.length && pi < sampleLimit; pi++) {
+    const pr = records[pi] || {};
+    const npeek = {};
+    for (const [k, v] of Object.entries(pr)) {
+      npeek[normalizeHeader(k)] = v;
+    }
+    previewPeekPhones.push(peekImportPrimaryPhoneE164(npeek, headerMapping, defaultCountryCode));
+  }
+  const previewPrefetchMap = await prefetchImportExistingByPhones(tenantId, previewPeekPhones, importType);
 
   for (let i = 0; i < records.length && i < sampleLimit; i++) {
     const rowIndex = headerRowIndex + i + 2;
@@ -2694,6 +4045,8 @@ export async function previewResolvedContactsImportCsv(
       byHeader,
       defaultCountryCode,
       customFieldDefsById,
+      statusCache,
+      cfDefCache,
     });
 
     if (resolved.error) {
@@ -2708,17 +4061,9 @@ export async function previewResolvedContactsImportCsv(
 
     let duplicate_action = 'create';
     if (resolved.primaryPhone) {
-      const rows = await query(
-        `SELECT c.id
-         FROM contact_phones p
-         JOIN contacts c
-           ON c.id = p.contact_id AND c.tenant_id = p.tenant_id
-         WHERE p.tenant_id = ? AND p.phone = ? AND c.deleted_at IS NULL
-         LIMIT 1`,
-        [tenantId, resolved.primaryPhone]
-      );
-      if (rows?.[0]?.id) {
-        duplicate_action = mode === 'update' ? 'update' : 'skip';
+      const ex = previewPrefetchMap.get(resolved.primaryPhone);
+      if (ex?.id) {
+        duplicate_action = mode === 'skip' ? 'skip' : 'update';
       }
     }
 

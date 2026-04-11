@@ -2,7 +2,7 @@
 
 Use these under **Import Leads** / **Import Contacts** (max **2000 rows**, **5 MB** per upload).
 
-## All files (21 scenarios)
+## All files (22 scenarios)
 
 | # | File | Scenario |
 |---|------|----------|
@@ -27,6 +27,7 @@ Use these under **Import Leads** / **Import Contacts** (max **2000 rows**, **5 M
 | 19 | `19-minimal-name-mobile.csv` | Minimal: only **`name`** + **`mobile`** |
 | 20 | `20-b2b-saas.csv` | B2B SaaS: `client_name`, `company`, `job_title`, `region` |
 | 21 | `21-state-region-budget.csv` | `state`, `region`, `budget_range`, `property_interest` (auto CF aliases) |
+| 22 | `22-demo-1000-leads-with-custom-fields.csv` | **1000 rows** — `budget_lakhs`, `property_type`, `project_interest`, `lead_score`, `preferred_call_time`, `remarks`, `utm_campaign`, `possession_timeline_months` (map as **Add new custom field** or existing CFs). Regenerate: `node samples/csv-import/generate-1000-demo-leads.mjs` |
 
 ## Recommended test order
 
@@ -35,7 +36,7 @@ Use these under **Import Leads** / **Import Contacts** (max **2000 rows**, **5 M
 3. **Sources / UTM:** `01`, `17`  
 4. **Edge / errors:** `15` (expect failures), `16` (skip/update)  
 5. **Unicode:** `13`  
-6. **Custom `cf:`:** `12` (add fields `batch_code`, `notes` in CRM first, or map manually)  
+6. **Custom `cf:`:** `12` (add fields `batch_code`, `notes` in CRM first, or map manually) · **bulk + custom columns:** `22`  
 7. **Industries:** `06`–`09`, `20`, `21`
 
 ## Checklist

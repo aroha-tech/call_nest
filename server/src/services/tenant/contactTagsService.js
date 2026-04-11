@@ -175,3 +175,38 @@ export async function fetchTagsForContact(tenantId, contactId) {
     [tenantId, contactId]
   );
 }
+
+/**
+ * Add (contact_id, tag_id) pairs for many contacts. Existing pairs are left unchanged (INSERT IGNORE).
+ */
+export async function insertTagAssignmentsMerge(tenantId, user, contactIds, tagIds) {
+  const cids = Array.isArray(contactIds)
+    ? [...new Set(contactIds.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))]
+    : [];
+  const tids = Array.isArray(tagIds)
+    ? [...new Set(tagIds.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))]
+    : [];
+  if (cids.length === 0 || tids.length === 0) return;
+
+  const uid = user?.id;
+  if (uid == null || !Number.isFinite(Number(uid))) {
+    const err = new Error('Invalid user for tag assignment');
+    err.status = 400;
+    throw err;
+  }
+
+  const tuples = [];
+  const params = [];
+  for (const cid of cids) {
+    for (const tid of tids) {
+      tuples.push('(?, ?, ?, ?, ?)');
+      params.push(tenantId, cid, tid, uid, uid);
+    }
+  }
+
+  await query(
+    `INSERT IGNORE INTO contact_tag_assignments (tenant_id, contact_id, tag_id, created_by, updated_by)
+     VALUES ${tuples.join(',')}`,
+    params
+  );
+}

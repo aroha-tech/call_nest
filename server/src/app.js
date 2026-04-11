@@ -48,6 +48,7 @@ import templateVariablesRoutes from './routes/templateVariables.js';
 import integrationsWebhookRoutes from './routes/integrationsWebhook.js';
 import callsRoutes from './routes/tenant/calls.js';
 import dialerSessionsRoutes from './routes/tenant/dialerSessions.js';
+import savedListFiltersRoutes from './routes/tenant/savedListFilters.js';
 
 const app = express();
 
@@ -154,6 +155,7 @@ app.use('/api/tenant/contact-custom-fields', contactCustomFieldsRoutes);
 app.use('/api/tenant/integrations', integrationsRoutes);
 app.use('/api/tenant/calls', callsRoutes);
 app.use('/api/tenant/dialer-sessions', dialerSessionsRoutes);
+app.use('/api/tenant/saved-list-filters', savedListFiltersRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);
