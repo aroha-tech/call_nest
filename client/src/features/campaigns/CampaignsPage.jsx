@@ -6,7 +6,7 @@ import { useAnyPermission } from '../../hooks/usePermission';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import { campaignsAPI } from '../../services/campaignsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
-import { contactStatusesAPI } from '../../services/dispositionAPI';
+import { contactStatusesAPI, campaignTypesAPI, campaignStatusesAPI } from '../../services/dispositionAPI';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
@@ -105,6 +105,9 @@ function sanitizeRuleForApi(r) {
 
 const emptyForm = {
   name: '',
+  description: '',
+  campaign_type_master_id: '',
+  campaign_status_master_id: '',
   type: 'static',
   manager_id: '',
   status: 'active',
@@ -139,6 +142,8 @@ export function CampaignsPage() {
   const [statusOptions, setStatusOptions] = useState([]);
   const [tagList, setTagList] = useState([]);
   const [allCampaigns, setAllCampaigns] = useState([]);
+  const [campaignTypeRows, setCampaignTypeRows] = useState([]);
+  const [campaignStatusRows, setCampaignStatusRows] = useState([]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -221,13 +226,15 @@ export function CampaignsPage() {
       try {
         // Agents cannot list tenant users (requires users.manage / users.team); skip to avoid breaking the whole page.
         const needsUserDirectory = role !== 'agent';
-        const [uRes, stRes, tagRes, cRes] = await Promise.all([
+        const [uRes, stRes, tagRes, cRes, ctRes, csRes] = await Promise.all([
           needsUserDirectory
             ? tenantUsersAPI.getAll({ page: 1, limit: 500, includeDisabled: false })
             : Promise.resolve({ data: { data: [] } }),
           contactStatusesAPI.getOptions().catch(() => ({ data: { data: [] } })),
           contactTagsAPI.list().catch(() => ({ data: { data: [] } })),
           campaignsAPI.list({ page: 1, limit: 500, show_paused: true }).catch(() => ({ data: { data: [] } })),
+          campaignTypesAPI.getOptions().catch(() => ({ data: { data: [] } })),
+          campaignStatusesAPI.getOptions().catch(() => ({ data: { data: [] } })),
         ]);
         if (cancelled) return;
         const rows = uRes.data?.data ?? [];
@@ -242,6 +249,8 @@ export function CampaignsPage() {
         const tags = tagRes.data?.data ?? [];
         setTagList(tags);
         setAllCampaigns(cRes.data?.data ?? []);
+        setCampaignTypeRows(ctRes.data?.data ?? []);
+        setCampaignStatusRows(csRes.data?.data ?? []);
       } catch {
         if (!cancelled) {
           setTenantUsers([]);
@@ -249,6 +258,8 @@ export function CampaignsPage() {
           setStatusOptions([]);
           setTagList([]);
           setAllCampaigns([]);
+          setCampaignTypeRows([]);
+          setCampaignStatusRows([]);
         }
       }
     })();
@@ -284,6 +295,22 @@ export function CampaignsPage() {
   const tagOptions = useMemo(() => {
     return (tagList || []).map((t) => ({ value: String(t.id), label: t.name || `#${t.id}` }));
   }, [tagList]);
+
+  const campaignTypeSelectOptions = useMemo(
+    () => [
+      { value: '', label: '— None —' },
+      ...campaignTypeRows.map((r) => ({ value: String(r.id), label: r.name || r.code || r.id })),
+    ],
+    [campaignTypeRows]
+  );
+
+  const campaignStatusSelectOptions = useMemo(
+    () => [
+      { value: '', label: '— None —' },
+      ...campaignStatusRows.map((r) => ({ value: String(r.id), label: r.name || r.code || r.id })),
+    ],
+    [campaignStatusRows]
+  );
 
   const campaignManagerFilterOptions = useMemo(() => {
     if (role === 'admin') {
@@ -340,6 +367,9 @@ export function CampaignsPage() {
     setEditing(row);
     setForm({
       name: row.name || '',
+      description: row.description || '',
+      campaign_type_master_id: row.campaign_type_master_id != null ? String(row.campaign_type_master_id) : '',
+      campaign_status_master_id: row.campaign_status_master_id != null ? String(row.campaign_status_master_id) : '',
       type: row.type || 'static',
       manager_id: row.manager_id != null ? String(row.manager_id) : '',
       status: row.status || 'active',
@@ -437,6 +467,9 @@ export function CampaignsPage() {
 
     const body = {
       name: form.name.trim(),
+      description: form.description?.trim() ? form.description.trim() : null,
+      campaign_type_master_id: form.campaign_type_master_id || null,
+      campaign_status_master_id: form.campaign_status_master_id || null,
       manager_id: form.manager_id ? Number(form.manager_id) : null,
       status: form.status,
       filters_json: form.type === 'filter' ? buildFiltersPayload() : null,
@@ -516,7 +549,7 @@ export function CampaignsPage() {
             )
           ) : null}
           <Select
-            label="Type"
+            label="Audience"
             value={draftTypeFilter}
             onChange={(e) => setDraftTypeFilter(e.target.value)}
             options={TYPE_FILTER_OPTIONS}
@@ -614,9 +647,11 @@ export function CampaignsPage() {
                 <TableHead>
                   <TableRow>
                     <TableHeaderCell>Name</TableHeaderCell>
-                    <TableHeaderCell>Type</TableHeaderCell>
+                    <TableHeaderCell>Audience</TableHeaderCell>
+                    <TableHeaderCell>Campaign type</TableHeaderCell>
+                    <TableHeaderCell>CRM status</TableHeaderCell>
                     <TableHeaderCell>Manager</TableHeaderCell>
-                    <TableHeaderCell>Status</TableHeaderCell>
+                    <TableHeaderCell>Dialer</TableHeaderCell>
                     <TableHeaderCell>Rules / notes</TableHeaderCell>
                     <TableHeaderCell width="220px" align="center">
                       Actions
@@ -630,6 +665,8 @@ export function CampaignsPage() {
                       <TableRow key={c.id}>
                         <TableCell>{c.name}</TableCell>
                         <TableCell>{c.type}</TableCell>
+                        <TableCell>{c.campaign_type_name || '—'}</TableCell>
+                        <TableCell>{c.campaign_status_name || '—'}</TableCell>
                         <TableCell>
                           {c.manager_id
                             ? managerMap[c.manager_id] || (role === 'agent' ? `Manager #${c.manager_id}` : `#${c.manager_id}`)
@@ -740,7 +777,7 @@ export function CampaignsPage() {
             placeholder="Campaign name"
           />
           <Select
-            label="Type"
+            label="Audience"
             value={form.type}
             disabled={!!editing}
             onChange={(e) => {
@@ -758,9 +795,52 @@ export function CampaignsPage() {
           />
           {editing ? (
             <p style={{ margin: 0, fontSize: 12, opacity: 0.75 }}>
-              Type is fixed after creation. Create a new campaign if you need the other type.
+              Audience is fixed after creation. Create a new campaign if you need the other type.
             </p>
           ) : null}
+          <div>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: 6,
+                fontSize: 13,
+                fontWeight: 500,
+                color: 'var(--color-text-secondary)',
+              }}
+            >
+              Description (optional)
+            </label>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+              rows={4}
+              placeholder="Internal notes about this campaign…"
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: 8,
+                border: '1px solid var(--color-border)',
+                fontFamily: 'inherit',
+                fontSize: 14,
+                background: 'var(--color-input-bg)',
+                color: 'var(--color-text-primary)',
+                resize: 'vertical',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+          <Select
+            label="Campaign type"
+            value={form.campaign_type_master_id}
+            onChange={(e) => setForm((s) => ({ ...s, campaign_type_master_id: e.target.value }))}
+            options={campaignTypeSelectOptions}
+          />
+          <Select
+            label="CRM status"
+            value={form.campaign_status_master_id}
+            onChange={(e) => setForm((s) => ({ ...s, campaign_status_master_id: e.target.value }))}
+            options={campaignStatusSelectOptions}
+          />
           <Select
             label="Owning manager (optional)"
             value={form.manager_id}
@@ -775,7 +855,7 @@ export function CampaignsPage() {
             If you pick a manager, only that manager sees and uses this campaign. Leave &quot;All managers&quot; for everyone.
           </p>
           <Select
-            label="Status"
+            label="Dialer availability"
             value={form.status}
             onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}
             options={[

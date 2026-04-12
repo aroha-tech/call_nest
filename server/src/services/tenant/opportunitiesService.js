@@ -19,19 +19,105 @@ function trimStr(v) {
   return t === '' ? null : t;
 }
 
+const OPP_SELECT = `o.id, o.contact_id, o.deal_id, o.stage_id, o.title, o.amount, o.lead_id,
+            o.owner_id, o.closing_date, o.probability_percent, o.expected_revenue,
+            o.lead_source, o.deal_type, o.next_step, o.description, o.campaign_id,
+            o.created_at, o.updated_at,
+            d.name AS deal_name,
+            s.name AS stage_name, s.sort_order AS stage_sort_order,
+            s.progression_percent, s.is_closed_won, s.is_closed_lost,
+            COALESCE(o.probability_percent, s.progression_percent) AS effective_probability,
+            ou.name AS owner_name,
+            camp.name AS campaign_name`;
+
+const OPP_JOINS = `
+     INNER JOIN deals d ON d.id = o.deal_id AND d.tenant_id = o.tenant_id AND d.deleted_at IS NULL
+     INNER JOIN deal_stages s ON s.id = o.stage_id AND s.tenant_id = o.tenant_id AND s.deleted_at IS NULL
+     LEFT JOIN users ou ON ou.id = o.owner_id
+     LEFT JOIN campaigns camp ON camp.id = o.campaign_id AND camp.tenant_id = o.tenant_id AND camp.deleted_at IS NULL`;
+
+async function assertTenantUserId(tenantId, userId) {
+  if (userId == null) return null;
+  const id = Number(userId);
+  if (!Number.isFinite(id)) {
+    const err = new Error('Invalid owner_id');
+    err.status = 400;
+    throw err;
+  }
+  const [r] = await query(
+    `SELECT id FROM users WHERE id = ? AND tenant_id = ? AND is_deleted = 0 LIMIT 1`,
+    [id, tenantId]
+  );
+  if (!r) {
+    const err = new Error('owner_id must be a user in this organization');
+    err.status = 400;
+    throw err;
+  }
+  return id;
+}
+
+async function assertTenantCampaignId(tenantId, campaignId) {
+  if (campaignId == null || campaignId === '') return null;
+  const id = Number(campaignId);
+  if (!Number.isFinite(id)) {
+    const err = new Error('Invalid campaign_id');
+    err.status = 400;
+    throw err;
+  }
+  const [r] = await query(
+    `SELECT id FROM campaigns WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1`,
+    [id, tenantId]
+  );
+  if (!r) {
+    const err = new Error('campaign_id not found');
+    err.status = 400;
+    throw err;
+  }
+  return id;
+}
+
+function parseOptionalProbability(v) {
+  if (v === undefined || v === null || v === '') return undefined;
+  const n = Number(v);
+  if (Number.isNaN(n) || n < 0 || n > 100) {
+    const err = new Error('probability_percent must be between 0 and 100');
+    err.status = 400;
+    throw err;
+  }
+  return n;
+}
+
+function parseOptionalMoney(v) {
+  if (v === undefined || v === null || v === '') return undefined;
+  const n = Number(v);
+  if (Number.isNaN(n)) {
+    const err = new Error('expected_revenue must be a number');
+    err.status = 400;
+    throw err;
+  }
+  return n;
+}
+
+function parseOptionalDateStr(v) {
+  if (v === undefined || v === null || v === '') return undefined;
+  const t = String(v).trim();
+  if (!t) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+    const err = new Error('closing_date must be YYYY-MM-DD');
+    err.status = 400;
+    throw err;
+  }
+  return t;
+}
+
 export async function listOpportunitiesForContact(tenantId, user, contactId) {
   const contact = await getContactById(contactId, tenantId, user);
   if (!contact) return null;
 
   const rows = await query(
-    `SELECT o.id, o.contact_id, o.deal_id, o.stage_id, o.title, o.amount, o.lead_id,
-            o.created_at, o.updated_at,
-            d.name AS deal_name,
-            s.name AS stage_name, s.sort_order AS stage_sort_order,
-            s.progression_percent, s.is_closed_won, s.is_closed_lost
+    `SELECT ${OPP_SELECT}
      FROM opportunities o
-     INNER JOIN deals d ON d.id = o.deal_id AND d.tenant_id = o.tenant_id AND d.deleted_at IS NULL
-     INNER JOIN deal_stages s ON s.id = o.stage_id AND s.tenant_id = o.tenant_id AND s.deleted_at IS NULL
+     ${OPP_JOINS}
      WHERE o.tenant_id = ? AND o.contact_id = ? AND o.deleted_at IS NULL
      ORDER BY d.name ASC, o.id ASC`,
     [tenantId, contactId]
@@ -129,12 +215,63 @@ export async function createOpportunity(tenantId, user, payload) {
     throw err;
   }
 
+  let ownerId;
+  if (payload?.owner_id !== undefined && payload?.owner_id !== null && payload?.owner_id !== '') {
+    ownerId = await assertTenantUserId(tenantId, payload.owner_id);
+  } else {
+    ownerId = await assertTenantUserId(tenantId, user?.id);
+  }
+
+  const closingDate = parseOptionalDateStr(payload?.closing_date) ?? null;
+
+  let probabilityPercent = null;
+  if (payload?.probability_percent !== undefined && payload?.probability_percent !== null && payload?.probability_percent !== '') {
+    probabilityPercent = parseOptionalProbability(payload.probability_percent);
+  }
+
+  let expectedRevenue = null;
+  if (payload?.expected_revenue !== undefined && payload?.expected_revenue !== null && payload?.expected_revenue !== '') {
+    expectedRevenue = parseOptionalMoney(payload.expected_revenue);
+  }
+
+  const leadSource = trimStr(payload?.lead_source);
+  const dealType = trimStr(payload?.deal_type);
+  const nextStep = trimStr(payload?.next_step);
+  const description = trimStr(payload?.description);
+
+  let campaignId = null;
+  if (payload?.campaign_id !== undefined && payload?.campaign_id !== null && payload?.campaign_id !== '') {
+    campaignId = await assertTenantCampaignId(tenantId, payload.campaign_id);
+  }
+
   const uid = user?.id ?? null;
   const result = await query(
     `INSERT INTO opportunities (
-       tenant_id, contact_id, deal_id, stage_id, title, amount, lead_id, created_by, updated_by
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [tenantId, contactId, dealId, stageId, title, amount, leadId, uid, uid]
+       tenant_id, contact_id, deal_id, stage_id, title, amount, lead_id,
+       owner_id, closing_date, probability_percent, expected_revenue,
+       lead_source, deal_type, next_step, description, campaign_id,
+       created_by, updated_by
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      tenantId,
+      contactId,
+      dealId,
+      stageId,
+      title,
+      amount,
+      leadId,
+      ownerId,
+      closingDate,
+      probabilityPercent,
+      expectedRevenue,
+      leadSource,
+      dealType,
+      nextStep,
+      description,
+      campaignId,
+      uid,
+      uid,
+    ]
   );
 
   return getOpportunityById(tenantId, user, result.insertId);
@@ -144,15 +281,10 @@ export async function getOpportunityById(tenantId, user, opportunityId) {
   const { whereSQL, params } = buildOwnershipWhere(user);
   const ctWhere = whereSQL.replace(/\bc\./g, 'ct.');
   const [row] = await query(
-    `SELECT o.id, o.contact_id, o.deal_id, o.stage_id, o.title, o.amount, o.lead_id,
-            o.created_at, o.updated_at,
-            d.name AS deal_name,
-            s.name AS stage_name, s.sort_order AS stage_sort_order,
-            s.progression_percent, s.is_closed_won, s.is_closed_lost
+    `SELECT ${OPP_SELECT}
      FROM opportunities o
      INNER JOIN contacts ct ON ct.id = o.contact_id AND ct.tenant_id = o.tenant_id AND ct.deleted_at IS NULL
-     INNER JOIN deals d ON d.id = o.deal_id AND d.tenant_id = o.tenant_id AND d.deleted_at IS NULL
-     INNER JOIN deal_stages s ON s.id = o.stage_id AND s.tenant_id = o.tenant_id AND s.deleted_at IS NULL
+     ${OPP_JOINS}
      WHERE o.tenant_id = ? AND o.id = ? AND o.deleted_at IS NULL AND (${ctWhere})`,
     [tenantId, opportunityId, ...params]
   );
@@ -211,6 +343,78 @@ export async function updateOpportunity(tenantId, user, opportunityId, payload) 
     }
   }
 
+  if (payload.owner_id !== undefined) {
+    if (payload.owner_id === null || payload.owner_id === '') {
+      updates.push('owner_id = ?');
+      sqlParams.push(null);
+    } else {
+      const oid = await assertTenantUserId(tenantId, payload.owner_id);
+      updates.push('owner_id = ?');
+      sqlParams.push(oid);
+    }
+  }
+
+  if (payload.closing_date !== undefined) {
+    if (payload.closing_date === null || payload.closing_date === '') {
+      updates.push('closing_date = ?');
+      sqlParams.push(null);
+    } else {
+      const d = parseOptionalDateStr(payload.closing_date);
+      updates.push('closing_date = ?');
+      sqlParams.push(d ?? null);
+    }
+  }
+
+  if (payload.probability_percent !== undefined) {
+    if (payload.probability_percent === null || payload.probability_percent === '') {
+      updates.push('probability_percent = ?');
+      sqlParams.push(null);
+    } else {
+      const p = parseOptionalProbability(payload.probability_percent);
+      updates.push('probability_percent = ?');
+      sqlParams.push(p);
+    }
+  }
+
+  if (payload.expected_revenue !== undefined) {
+    if (payload.expected_revenue === null || payload.expected_revenue === '') {
+      updates.push('expected_revenue = ?');
+      sqlParams.push(null);
+    } else {
+      const er = parseOptionalMoney(payload.expected_revenue);
+      updates.push('expected_revenue = ?');
+      sqlParams.push(er);
+    }
+  }
+
+  if (payload.lead_source !== undefined) {
+    updates.push('lead_source = ?');
+    sqlParams.push(trimStr(payload.lead_source));
+  }
+  if (payload.deal_type !== undefined) {
+    updates.push('deal_type = ?');
+    sqlParams.push(trimStr(payload.deal_type));
+  }
+  if (payload.next_step !== undefined) {
+    updates.push('next_step = ?');
+    sqlParams.push(trimStr(payload.next_step));
+  }
+  if (payload.description !== undefined) {
+    updates.push('description = ?');
+    sqlParams.push(trimStr(payload.description));
+  }
+
+  if (payload.campaign_id !== undefined) {
+    if (payload.campaign_id === null || payload.campaign_id === '') {
+      updates.push('campaign_id = ?');
+      sqlParams.push(null);
+    } else {
+      const cid = await assertTenantCampaignId(tenantId, payload.campaign_id);
+      updates.push('campaign_id = ?');
+      sqlParams.push(cid);
+    }
+  }
+
   if (!updates.length) return existing;
 
   updates.push('updated_by = ?');
@@ -223,6 +427,48 @@ export async function updateOpportunity(tenantId, user, opportunityId, payload) 
   );
 
   return getOpportunityById(tenantId, user, opportunityId);
+}
+
+/**
+ * When a call disposition is applied: ensure the contact has an opportunity on `dealId`
+ * at `stageId` (create if missing, else update stage). Used from callsService; failures are non-fatal for the call.
+ */
+export async function applyOpportunityFromDisposition(tenantId, user, contactId, dealId, stageId) {
+  const cid = Number(contactId);
+  const did = Number(dealId);
+  const sid = Number(stageId);
+  if (!Number.isFinite(cid) || !Number.isFinite(did) || !Number.isFinite(sid)) {
+    return { applied: false, reason: 'invalid_ids' };
+  }
+
+  const contact = await getContactById(cid, tenantId, user);
+  if (!contact) return { applied: false, reason: 'no_contact' };
+
+  try {
+    assertCanEditOpportunity(user, contact);
+  } catch {
+    return { applied: false, reason: 'permission' };
+  }
+
+  const deal = await getDealById(tenantId, did);
+  if (!deal?.is_active) return { applied: false, reason: 'inactive_deal' };
+
+  const match = deal.stages?.find((s) => Number(s.id) === sid);
+  if (!match) return { applied: false, reason: 'bad_stage' };
+
+  const dupId = await findDuplicateActive(tenantId, cid, did);
+  if (dupId) {
+    await updateOpportunity(tenantId, user, dupId, { stage_id: sid });
+    return { applied: true, mode: 'updated', opportunity_id: dupId };
+  }
+
+  const row = await createOpportunity(tenantId, user, {
+    contact_id: cid,
+    deal_id: did,
+    stage_id: sid,
+    owner_id: user?.id,
+  });
+  return { applied: true, mode: 'created', opportunity_id: row?.id };
 }
 
 export async function softDeleteOpportunity(tenantId, user, opportunityId) {

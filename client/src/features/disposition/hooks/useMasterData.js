@@ -7,6 +7,8 @@ import {
   contactStatusesAPI,
   contactTemperaturesAPI,
   templateVariablesAdminAPI,
+  campaignTypesAPI,
+  campaignStatusesAPI,
 } from '../../../services/dispositionAPI';
 
 /**
@@ -59,6 +61,14 @@ export function useIndustriesOptions() {
  */
 export function useDispoTypesOptions() {
   return useOptionsData(dispoTypesAPI.getOptions);
+}
+
+export function useCampaignTypesOptions() {
+  return useOptionsData(campaignTypesAPI.getOptions);
+}
+
+export function useCampaignStatusesOptions() {
+  return useOptionsData(campaignStatusesAPI.getOptions);
 }
 
 /**
@@ -168,6 +178,70 @@ export function useDispoTypes({ search = '', includeInactive = false, page = 1, 
 
   return {
     dispoTypes: data,
+    pagination,
+    loading,
+    error,
+    refetch,
+    create: createMutation,
+    update: updateMutation,
+    toggleActive: toggleActiveMutation,
+    delete: deleteMutation,
+  };
+}
+
+export function useCampaignTypes({ search = '', includeInactive = false, page = 1, limit = 10 } = {}) {
+  const { data, pagination, loading, error, fetch } = usePaginatedData(
+    (params) => campaignTypesAPI.getAll(params),
+    []
+  );
+
+  useEffect(() => {
+    fetch({ search, includeInactive, page, limit });
+  }, [search, includeInactive, page, limit, fetch]);
+
+  const refetch = useCallback(() => {
+    fetch({ search, includeInactive, page, limit });
+  }, [fetch, search, includeInactive, page, limit]);
+
+  const createMutation = useMutation(campaignTypesAPI.create);
+  const updateMutation = useMutation((id, data) => campaignTypesAPI.update(id, data));
+  const toggleActiveMutation = useMutation(campaignTypesAPI.toggleActive);
+  const deleteMutation = useMutation(campaignTypesAPI.delete);
+
+  return {
+    campaignTypes: data,
+    pagination,
+    loading,
+    error,
+    refetch,
+    create: createMutation,
+    update: updateMutation,
+    toggleActive: toggleActiveMutation,
+    delete: deleteMutation,
+  };
+}
+
+export function useCampaignStatuses({ search = '', includeInactive = false, page = 1, limit = 10 } = {}) {
+  const { data, pagination, loading, error, fetch } = usePaginatedData(
+    (params) => campaignStatusesAPI.getAll(params),
+    []
+  );
+
+  useEffect(() => {
+    fetch({ search, includeInactive, page, limit });
+  }, [search, includeInactive, page, limit, fetch]);
+
+  const refetch = useCallback(() => {
+    fetch({ search, includeInactive, page, limit });
+  }, [fetch, search, includeInactive, page, limit]);
+
+  const createMutation = useMutation(campaignStatusesAPI.create);
+  const updateMutation = useMutation((id, data) => campaignStatusesAPI.update(id, data));
+  const toggleActiveMutation = useMutation(campaignStatusesAPI.toggleActive);
+  const deleteMutation = useMutation(campaignStatusesAPI.delete);
+
+  return {
+    campaignStatuses: data,
     pagination,
     loading,
     error,

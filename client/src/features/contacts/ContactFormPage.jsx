@@ -1574,7 +1574,11 @@ export function ContactFormPage({ defaultType }) {
       />
 
       {!isNew && contact ? (
-        <ContactOpportunitiesSection contactId={id} contactType={contact.type || type} />
+        <ContactOpportunitiesSection
+          contactId={id}
+          contactType={contact.type || type}
+          accountName={contact?.company || ''}
+        />
       ) : null}
     </div>
   );

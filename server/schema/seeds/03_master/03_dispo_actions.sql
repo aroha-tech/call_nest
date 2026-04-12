@@ -16,6 +16,7 @@ INSERT INTO dispo_actions_master (id, code, name, description) VALUES
 (UUID(), 'update_status', 'Update Status', 'Update the contact status'),
 (UUID(), 'mark_converted', 'Mark as Converted', 'Mark the lead as converted'),
 (UUID(), 'schedule_meeting', 'Schedule Meeting', 'Schedule a meeting or demo'),
-(UUID(), 'send_proposal', 'Send Proposal', 'Send a proposal or quote');
+(UUID(), 'send_proposal', 'Send Proposal', 'Send a proposal or quote'),
+(UUID(), 'apply_deal', 'Apply pipeline / deal', 'On the dialer, agent chooses pipeline and stage; creates or updates the opportunity');
 
 SELECT CONCAT('Inserted ', ROW_COUNT(), ' disposition actions') AS status;

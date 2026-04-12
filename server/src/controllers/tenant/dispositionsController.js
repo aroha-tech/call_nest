@@ -44,7 +44,7 @@ export async function create(req, res, next) {
       next_action,
       is_connected,
       actions,
-      is_active
+      is_active,
     } = req.body;
     
     if (!name || !code || !dispo_type_id) {
@@ -55,7 +55,17 @@ export async function create(req, res, next) {
     
     const disposition = await dispositionsService.create(
       tenantId,
-      { dispo_type_id, contact_status_id, contact_temperature_id, name, code, next_action, is_connected, actions, is_active },
+      {
+        dispo_type_id,
+        contact_status_id,
+        contact_temperature_id,
+        name,
+        code,
+        next_action,
+        is_connected,
+        actions,
+        is_active,
+      },
       req.user.id
     );
     
@@ -77,13 +87,23 @@ export async function update(req, res, next) {
       next_action,
       is_connected,
       actions,
-      is_active
+      is_active,
     } = req.body;
     
     const disposition = await dispositionsService.update(
       tenantId,
       req.params.id,
-      { dispo_type_id, contact_status_id, contact_temperature_id, name, code, next_action, is_connected, actions, is_active },
+      {
+        dispo_type_id,
+        contact_status_id,
+        contact_temperature_id,
+        name,
+        code,
+        next_action,
+        is_connected,
+        actions,
+        is_active,
+      },
       req.user.id
     );
     

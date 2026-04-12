@@ -1,5 +1,7 @@
 import { query } from '../../config/db.js';
 import { getTelephonyProvider } from './telephony/telephonyProviderRegistry.js';
+import * as opportunitiesService from './opportunitiesService.js';
+import { loadDispositionCallApplyMeta } from './dispositionApplyDealHelper.js';
 
 async function fetchContactBaseForCall(tenantId, user, contactId) {
   const where = ['c.tenant_id = ?', 'c.deleted_at IS NULL', 'c.id = ?'];
@@ -328,7 +330,12 @@ export async function listCallAttempts(
   };
 }
 
-export async function setAttemptDisposition(tenantId, user, attemptId, { disposition_id = null, notes = null } = {}) {
+export async function setAttemptDisposition(
+  tenantId,
+  user,
+  attemptId,
+  { disposition_id = null, notes = null, deal_id: bodyDealId, stage_id: bodyStageId } = {}
+) {
   const id = Number(attemptId);
   if (!id) {
     const err = new Error('Invalid attempt id');
@@ -357,6 +364,16 @@ export async function setAttemptDisposition(tenantId, user, attemptId, { disposi
   }
   const dispForDb = dispNormalized.length > 0 ? dispNormalized : null;
 
+  let applyMeta = null;
+  if (dispForDb) {
+    applyMeta = await loadDispositionCallApplyMeta(tenantId, dispForDb);
+    if (!applyMeta) {
+      const err = new Error('Disposition not found');
+      err.status = 400;
+      throw err;
+    }
+  }
+
   const updateResult = await query(
     `UPDATE contact_call_attempts
      SET disposition_id = ?, notes = ?
@@ -382,12 +399,8 @@ export async function setAttemptDisposition(tenantId, user, attemptId, { disposi
   // `next_number` is handled in dialerSessionsService.handleNextNumberDisposition (called from
   // the calls controller) so we can pick the next line or complete the lead and auto-dial.
   let next_action = null;
-  if (dispForDb) {
-    const [dispo] = await query(
-      `SELECT next_action FROM dispositions WHERE tenant_id = ? AND id = ? AND is_deleted = 0 LIMIT 1`,
-      [tenantId, dispForDb]
-    );
-    const na = String(dispo?.next_action || '').trim().toLowerCase();
+  if (dispForDb && applyMeta) {
+    const na = String(applyMeta.next_action || '').trim().toLowerCase();
     next_action = na || null;
     if (na !== 'next_number') {
       await query(
@@ -396,6 +409,46 @@ export async function setAttemptDisposition(tenantId, user, attemptId, { disposi
          WHERE tenant_id = ? AND last_attempt_id = ? AND state = 'calling'`,
         [tenantId, id]
       );
+    }
+
+    if (row?.contact_id) {
+      let oppDealId = null;
+      let oppStageId = null;
+      if (applyMeta.requires_deal_selection) {
+        const bd =
+          bodyDealId !== undefined && bodyDealId !== null && bodyDealId !== ''
+            ? Number(bodyDealId)
+            : null;
+        const bs =
+          bodyStageId !== undefined && bodyStageId !== null && bodyStageId !== ''
+            ? Number(bodyStageId)
+            : null;
+        if (bd && bs && Number.isFinite(bd) && Number.isFinite(bs)) {
+          oppDealId = bd;
+          oppStageId = bs;
+        }
+      } else if (applyMeta.legacy_deal_id != null && applyMeta.legacy_stage_id != null) {
+        oppDealId = applyMeta.legacy_deal_id;
+        oppStageId = applyMeta.legacy_stage_id;
+      }
+      if (
+        oppDealId &&
+        oppStageId &&
+        Number.isFinite(oppDealId) &&
+        Number.isFinite(oppStageId)
+      ) {
+        try {
+          await opportunitiesService.applyOpportunityFromDisposition(
+            tenantId,
+            user,
+            row.contact_id,
+            oppDealId,
+            oppStageId
+          );
+        } catch (oppErr) {
+          console.error('applyOpportunityFromDisposition:', oppErr?.message || oppErr);
+        }
+      }
     }
   }
 

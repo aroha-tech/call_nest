@@ -135,8 +135,23 @@ export async function create(tenantId, data, createdBy) {
   await query(
     `INSERT INTO dispositions 
      (id, tenant_id, dispo_type_id, contact_status_id, contact_temperature_id, name, code, next_action, is_connected, actions, created_from_default_id, is_active, created_by, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, tenantId, dispo_type_id, contact_status_id, contact_temperature_id, name, code, next_action, is_connected ? 1 : 0, actionsJson, created_from_default_id, is_active ?? 1, createdBy, createdBy]
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      tenantId,
+      dispo_type_id,
+      contact_status_id,
+      contact_temperature_id,
+      name,
+      code,
+      next_action,
+      is_connected ? 1 : 0,
+      actionsJson,
+      created_from_default_id,
+      is_active ?? 1,
+      createdBy,
+      createdBy,
+    ]
   );
 
   return findById(tenantId, id);
@@ -159,7 +174,7 @@ export async function update(tenantId, id, data, updatedBy) {
     next_action,
     is_connected,
     actions,
-    is_active
+    is_active,
   } = data;
   
   if (code && code !== disposition.code) {
@@ -183,7 +198,7 @@ export async function update(tenantId, id, data, updatedBy) {
   if (is_connected !== undefined) { updates.push('is_connected = ?'); params.push(is_connected ? 1 : 0); }
   if (actions !== undefined) { updates.push('actions = ?'); params.push(actions ? JSON.stringify(actions) : null); }
   if (is_active !== undefined) { updates.push('is_active = ?'); params.push(is_active); }
-  
+
   updates.push('updated_by = ?');
   params.push(updatedBy);
   params.push(id);

@@ -26,6 +26,8 @@ const PLATFORM_NAV_ITEMS = [
       { key: 'contact-statuses', label: 'Contact Statuses', path: '/admin/masters/contact-statuses' },
       { key: 'temperatures', label: 'Temperatures', path: '/admin/masters/temperatures' },
       { key: 'template-variables', label: 'Template Variables', path: '/admin/masters/template-variables' },
+      { key: 'campaign-types', label: 'Campaign Types', path: '/admin/masters/campaign-types' },
+      { key: 'campaign-statuses', label: 'Campaign Statuses', path: '/admin/masters/campaign-statuses' },
     ],
   },
   {
@@ -122,6 +124,12 @@ const TENANT_ADMIN_NAV_ITEMS = [
         label: 'Sent',
         path: '/email/sent',
         permissions: [PERMISSIONS.EMAIL_VIEW, PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.DIAL_EXECUTE],
+      },
+      {
+        key: 'meetings',
+        label: 'Meetings',
+        path: '/email/meetings',
+        permissions: [PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE],
       },
       {
         key: 'email-templates',
@@ -252,6 +260,12 @@ const MANAGER_NAV_ITEMS = [
         permissions: [PERMISSIONS.EMAIL_VIEW, PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.DIAL_EXECUTE],
       },
       {
+        key: 'meetings',
+        label: 'Meetings',
+        path: '/email/meetings',
+        permissions: [PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE],
+      },
+      {
         key: 'email-templates',
         label: 'Templates',
         path: '/email/templates',
@@ -337,6 +351,12 @@ const AGENT_NAV_ITEMS = [
         label: 'Sent',
         path: '/email/sent',
         permissions: [PERMISSIONS.EMAIL_VIEW, PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.DIAL_EXECUTE],
+      },
+      {
+        key: 'meetings',
+        label: 'Meetings',
+        path: '/email/meetings',
+        permissions: [PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE],
       },
       {
         key: 'email-templates',

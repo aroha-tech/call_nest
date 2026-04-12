@@ -243,7 +243,16 @@ export function DealsPage() {
     <div className={styles.page}>
       <PageHeader
         title="Deals"
-        description="Configure pipelines and stages (progress %). View the board by pipeline. One opportunity per contact per pipeline."
+        description={
+          <span className={styles.pageDescWrap}>
+            <span className={styles.pageLead}>
+              Pipelines define your sales path. Stages carry a progress % for forecasting; the board shows open deals by stage.
+            </span>
+            <span className={styles.pageSub}>
+              Add the full deal (amount, owner, close date, campaign, etc.) on each lead or contact — not here.
+            </span>
+          </span>
+        }
         actions={
           <Button type="button" variant="primary" size="sm" onClick={() => setDealModal({ mode: 'create', name: '', description: '', is_active: true })}>
             New pipeline
@@ -253,13 +262,27 @@ export function DealsPage() {
 
       {error && <Alert variant="error">{error}</Alert>}
 
-      <div className={styles.tabs}>
-        <button type="button" className={`${styles.tab} ${tab === 'setup' ? styles.tabActive : ''}`} onClick={() => setTab('setup')}>
-          Pipelines &amp; stages
-        </button>
-        <button type="button" className={`${styles.tab} ${tab === 'board' ? styles.tabActive : ''}`} onClick={() => setTab('board')}>
-          Board
-        </button>
+      <div className={styles.tabsWrap} role="tablist" aria-label="Deals views">
+        <div className={styles.tabs}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'setup'}
+            className={`${styles.tab} ${tab === 'setup' ? styles.tabActive : ''}`}
+            onClick={() => setTab('setup')}
+          >
+            Pipelines &amp; stages
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'board'}
+            className={`${styles.tab} ${tab === 'board' ? styles.tabActive : ''}`}
+            onClick={() => setTab('board')}
+          >
+            Board
+          </button>
+        </div>
       </div>
 
       {tab === 'setup' && (
@@ -389,12 +412,15 @@ export function DealsPage() {
       {tab === 'board' && (
         <>
           <div className={styles.boardToolbar}>
-            <Select
-              label="Pipeline"
-              value={boardDealId}
-              onChange={(e) => setBoardDealId(e.target.value)}
-              options={[{ value: '', label: '— Select —' }, ...dealOptions]}
-            />
+            <div className={styles.boardToolbarFields}>
+              <Select
+                className={styles.boardPipelineSelect}
+                label="Pipeline"
+                value={boardDealId}
+                onChange={(e) => setBoardDealId(e.target.value)}
+                options={[{ value: '', label: 'Choose a pipeline…' }, ...dealOptions]}
+              />
+            </div>
             <Button type="button" variant="secondary" size="sm" disabled={!boardDealId || boardLoading} onClick={fetchBoard}>
               Refresh
             </Button>
@@ -404,21 +430,37 @@ export function DealsPage() {
             <div className={styles.boardScroll}>
               {boardData.columns.map((col) => (
                 <div key={col.id} className={styles.boardCol}>
-                  <div className={styles.boardColTitle}>{col.name}</div>
-                  <div className={styles.boardColMeta}>
-                    {col.progression_percent}% · {col.opportunities?.length || 0} opps
+                  <div className={styles.boardColHead}>
+                    <div className={styles.boardColTitle}>{col.name}</div>
+                    <div className={styles.boardColMeta}>
+                      <span className={styles.boardColBadge}>{col.progression_percent}%</span>
+                      <span className={styles.boardColCount}>{col.opportunities?.length || 0} deals</span>
+                    </div>
                   </div>
-                  {(col.opportunities || []).map((o) => (
-                    <Link
-                      key={o.id}
-                      to={o.contact_type === 'lead' ? `/leads/${o.contact_id}` : `/contacts/${o.contact_id}`}
-                      className={styles.oppCard}
-                    >
-                      <div className={styles.oppName}>{o.display_name || o.email || `Contact #${o.contact_id}`}</div>
-                      {o.title ? <div className={styles.oppMeta}>{o.title}</div> : null}
-                      {o.amount != null ? <div className={styles.oppMeta}>₹ {Number(o.amount).toLocaleString()}</div> : null}
-                    </Link>
-                  ))}
+                  <div className={styles.boardColBody}>
+                    {(col.opportunities || []).length === 0 ? (
+                      <div className={styles.boardColEmpty}>No deals in this stage</div>
+                    ) : null}
+                    {(col.opportunities || []).map((o) => (
+                      <Link
+                        key={o.id}
+                        to={o.contact_type === 'lead' ? `/leads/${o.contact_id}` : `/contacts/${o.contact_id}`}
+                        className={styles.oppCard}
+                      >
+                        <div className={styles.oppName}>{o.display_name || o.email || `Contact #${o.contact_id}`}</div>
+                        {o.account_name ? <div className={styles.oppMeta}>{o.account_name}</div> : null}
+                        {o.title ? <div className={styles.oppMeta}>{o.title}</div> : null}
+                        {o.amount != null ? <div className={styles.oppMeta}>₹ {Number(o.amount).toLocaleString()}</div> : null}
+                        {o.expected_revenue != null ? (
+                          <div className={styles.oppMeta}>Exp. ₹ {Number(o.expected_revenue).toLocaleString()}</div>
+                        ) : null}
+                        {o.closing_date ? (
+                          <div className={styles.oppMeta}>Close {String(o.closing_date).slice(0, 10)}</div>
+                        ) : null}
+                        {o.owner_name ? <div className={styles.oppMeta}>{o.owner_name}</div> : null}
+                      </Link>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
@@ -427,18 +469,49 @@ export function DealsPage() {
       )}
 
       {dealModal && (
-        <Modal isOpen title={dealModal.mode === 'create' ? 'New pipeline' : 'Edit pipeline'} onClose={() => !saving && setDealModal(null)}>
-          <form onSubmit={saveDeal}>
-            <Input label="Name" value={dealModal.name} onChange={(e) => setDealModal((p) => ({ ...p, name: e.target.value }))} required />
-            <Input label="Description" value={dealModal.description || ''} onChange={(e) => setDealModal((p) => ({ ...p, description: e.target.value }))} />
-            <label className={styles.emptyHint} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
-              <input
-                type="checkbox"
-                checked={!!dealModal.is_active}
-                onChange={(e) => setDealModal((p) => ({ ...p, is_active: e.target.checked }))}
+        <Modal
+          isOpen
+          size="lg"
+          title={dealModal.mode === 'create' ? 'New pipeline' : 'Edit pipeline'}
+          onClose={() => !saving && setDealModal(null)}
+        >
+          <form onSubmit={saveDeal} className={styles.modalForm}>
+            <p className={styles.modalHint}>
+              A pipeline is a template (e.g. “Direct sales”). Stages belong to the pipeline; individual deals are added on contacts and leads.
+            </p>
+            <div className={styles.modalFields}>
+              <Input
+                label="Pipeline name"
+                placeholder="e.g. Enterprise sales"
+                value={dealModal.name}
+                onChange={(e) => setDealModal((p) => ({ ...p, name: e.target.value }))}
+                required
               />
-              Active
-            </label>
+              <div className={styles.fieldBlock}>
+                <label className={styles.textareaLabel} htmlFor="deal-pipeline-desc">
+                  Description
+                </label>
+                <textarea
+                  id="deal-pipeline-desc"
+                  className={styles.pipelineTextarea}
+                  rows={4}
+                  value={dealModal.description || ''}
+                  onChange={(e) => setDealModal((p) => ({ ...p, description: e.target.value }))}
+                  placeholder="Optional — who this pipeline is for, or how it differs from others."
+                />
+              </div>
+              <label className={styles.checkboxRow}>
+                <input
+                  type="checkbox"
+                  checked={!!dealModal.is_active}
+                  onChange={(e) => setDealModal((p) => ({ ...p, is_active: e.target.checked }))}
+                />
+                <span>
+                  <strong>Active</strong>
+                  <span className={styles.checkboxSub}>Inactive pipelines stay hidden when adding deals on records.</span>
+                </span>
+              </label>
+            </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => setDealModal(null)} disabled={saving}>
                 Cancel
@@ -452,34 +525,75 @@ export function DealsPage() {
       )}
 
       {stageModal && (
-        <Modal isOpen title={stageModal.mode === 'create' ? 'New stage' : 'Edit stage'} onClose={() => !saving && setStageModal(null)}>
-          <form onSubmit={saveStage}>
-            <Input label="Stage name" value={stageModal.name} onChange={(e) => setStageModal((p) => ({ ...p, name: e.target.value }))} required />
-            <Input
-              label="Progress % (0–100)"
-              type="number"
-              min={0}
-              max={100}
-              step={0.01}
-              value={stageModal.progression_percent}
-              onChange={(e) => setStageModal((p) => ({ ...p, progression_percent: e.target.value }))}
-            />
-            <label className={styles.emptyHint} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
-              <input
-                type="checkbox"
-                checked={!!stageModal.is_closed_won}
-                onChange={(e) => setStageModal((p) => ({ ...p, is_closed_won: e.target.checked, is_closed_lost: e.target.checked ? false : p.is_closed_lost }))}
-              />
-              Closed won
-            </label>
-            <label className={styles.emptyHint} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
-              <input
-                type="checkbox"
-                checked={!!stageModal.is_closed_lost}
-                onChange={(e) => setStageModal((p) => ({ ...p, is_closed_lost: e.target.checked, is_closed_won: e.target.checked ? false : p.is_closed_won }))}
-              />
-              Closed lost
-            </label>
+        <Modal
+          isOpen
+          size="lg"
+          title={stageModal.mode === 'create' ? 'New stage' : 'Edit stage'}
+          onClose={() => !saving && setStageModal(null)}
+        >
+          <form onSubmit={saveStage} className={styles.modalForm}>
+            <p className={styles.modalHint}>
+              Progress % drives default probability on deals in this stage. Mark at most one terminal outcome: won or lost.
+            </p>
+            <div className={styles.modalFields}>
+              <div className={styles.stageFormGrid}>
+                <Input
+                  label="Stage name"
+                  placeholder="e.g. Qualification"
+                  value={stageModal.name}
+                  onChange={(e) => setStageModal((p) => ({ ...p, name: e.target.value }))}
+                  required
+                />
+                <Input
+                  label="Progress %"
+                  hint="0–100 · used for forecasting weight"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                  value={stageModal.progression_percent}
+                  onChange={(e) => setStageModal((p) => ({ ...p, progression_percent: e.target.value }))}
+                />
+              </div>
+              <div className={styles.terminalBox}>
+                <div className={styles.terminalBoxTitle}>Terminal stage</div>
+                <p className={styles.terminalBoxHint}>Optional. Use for closed-won or closed-lost columns on the board.</p>
+                <label className={styles.checkboxRow}>
+                  <input
+                    type="checkbox"
+                    checked={!!stageModal.is_closed_won}
+                    onChange={(e) =>
+                      setStageModal((p) => ({
+                        ...p,
+                        is_closed_won: e.target.checked,
+                        is_closed_lost: e.target.checked ? false : p.is_closed_lost,
+                      }))
+                    }
+                  />
+                  <span>
+                    <strong>Closed won</strong>
+                    <span className={styles.checkboxSub}>Deal succeeds in this stage.</span>
+                  </span>
+                </label>
+                <label className={styles.checkboxRow}>
+                  <input
+                    type="checkbox"
+                    checked={!!stageModal.is_closed_lost}
+                    onChange={(e) =>
+                      setStageModal((p) => ({
+                        ...p,
+                        is_closed_lost: e.target.checked,
+                        is_closed_won: e.target.checked ? false : p.is_closed_won,
+                      }))
+                    }
+                  />
+                  <span>
+                    <strong>Closed lost</strong>
+                    <span className={styles.checkboxSub}>Deal ends unsuccessfully.</span>
+                  </span>
+                </label>
+              </div>
+            </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => setStageModal(null)} disabled={saving}>
                 Cancel

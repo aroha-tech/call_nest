@@ -55,6 +55,9 @@ INSERT IGNORE INTO permissions (code, description) VALUES
   ('email.view', 'View email templates, sent mail, and account list'),
   ('email.send', 'Send email from tenant accounts'),
   ('email.templates.manage', 'Create and edit email module templates'),
-  ('email.accounts.manage', 'Connect and manage email accounts (SMTP/OAuth)');
+  ('email.accounts.manage', 'Connect and manage email accounts (SMTP/OAuth)'),
+
+  ('meetings.view', 'View meetings calendar and list'),
+  ('meetings.manage', 'Create, edit, and delete meetings');
 
 SELECT CONCAT('Inserted ', ROW_COUNT(), ' permissions') AS status;

@@ -333,6 +333,15 @@ function IconWorkflowMap() {
   );
 }
 
+function IconCalendar() {
+  return (
+    <Icon>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </Icon>
+  );
+}
+
 const NAV_ICON_MAP = {
   dashboard: IconDashboard,
   tenants: IconBuilding,
@@ -344,6 +353,8 @@ const NAV_ICON_MAP = {
   'contact-statuses': IconUserCheck,
   temperatures: IconThermometer,
   'template-variables': IconBraces,
+  'campaign-types': IconMegaphone,
+  'campaign-statuses': IconPulse,
   'workflow-map': IconWorkflowMap,
   'dialer-workflow': IconPhone,
   'default-dispositions': IconListTree,
@@ -367,6 +378,7 @@ const NAV_ICON_MAP = {
   'email-sent': IconInbox,
   'email-templates': IconScrollText,
   'email-accounts': IconMail,
+  meetings: IconCalendar,
   settings: IconSettings,
   'settings-main': IconBuilding2,
   'contact-fields': IconBraces,

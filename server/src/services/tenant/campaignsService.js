@@ -27,6 +27,50 @@ function normalizeManagerId(value) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function normalizeOptionalUuid(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const s = String(value).trim();
+  return s || null;
+}
+
+async function resolveCampaignTypeMasterId(value) {
+  const id = normalizeOptionalUuid(value);
+  if (!id) return null;
+  const [row] = await query(
+    `SELECT id FROM campaign_types_master WHERE id = ? AND is_deleted = 0 AND is_active = 1`,
+    [id]
+  );
+  if (!row) {
+    const err = new Error('Invalid campaign_type_master_id');
+    err.status = 400;
+    throw err;
+  }
+  return id;
+}
+
+async function resolveCampaignStatusMasterId(value) {
+  const id = normalizeOptionalUuid(value);
+  if (!id) return null;
+  const [row] = await query(
+    `SELECT id FROM campaign_statuses_master WHERE id = ? AND is_deleted = 0 AND is_active = 1`,
+    [id]
+  );
+  if (!row) {
+    const err = new Error('Invalid campaign_status_master_id');
+    err.status = 400;
+    throw err;
+  }
+  return id;
+}
+
+const CAMPAIGN_LIST_SELECT = `c.*,
+  ctm.name AS campaign_type_name,
+  csm.name AS campaign_status_name`;
+
+const CAMPAIGN_LIST_JOIN = `campaigns c
+  LEFT JOIN campaign_types_master ctm ON ctm.id = c.campaign_type_master_id AND ctm.is_deleted = 0
+  LEFT JOIN campaign_statuses_master csm ON csm.id = c.campaign_status_master_id AND csm.is_deleted = 0`;
+
 function parseCampaignListQuery(query = {}) {
   const page = Math.max(1, parseInt(String(query.page ?? '1'), 10) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(String(query.limit ?? '20'), 10) || 20));
@@ -75,41 +119,43 @@ export async function listCampaigns(tenantId, user, query = {}) {
 }
 
 async function listCampaignsAdmin(tenantId, q, includeArchived) {
-  const where = ['tenant_id = ?'];
+  const where = ['c.tenant_id = ?'];
   const params = [tenantId];
 
   if (!includeArchived) {
-    where.push('deleted_at IS NULL');
+    where.push('c.deleted_at IS NULL');
   }
   if (q.show_paused) {
-    where.push("status IN ('active','paused')");
+    where.push("c.status IN ('active','paused')");
   } else {
-    where.push("status = 'active'");
+    where.push("c.status = 'active'");
   }
   if (q.search) {
-    where.push('name LIKE ?');
+    where.push('c.name LIKE ?');
     params.push(`%${q.search}%`);
   }
   if (q.type === 'static' || q.type === 'filter') {
-    where.push('type = ?');
+    where.push('c.type = ?');
     params.push(q.type);
   }
   if (q.manager_id === 'unassigned') {
-    where.push('manager_id IS NULL');
+    where.push('c.manager_id IS NULL');
   } else if (q.manager_id != null && q.manager_id !== '' && q.manager_id !== '__all__') {
     const mid = Number(q.manager_id);
     if (Number.isFinite(mid) && mid > 0) {
-      where.push('manager_id = ?');
+      where.push('c.manager_id = ?');
       params.push(mid);
     }
   }
 
   const whereSql = where.join(' AND ');
-  const [countRow] = await query(`SELECT COUNT(*) AS c FROM campaigns WHERE ${whereSql}`, params);
+  const [countRow] = await query(`SELECT COUNT(*) AS c FROM campaigns c WHERE ${whereSql}`, params);
   const total = Number(countRow?.c ?? 0);
 
   const rows = await query(
-    `SELECT * FROM campaigns WHERE ${whereSql} ORDER BY created_at DESC ${limitOffsetClause(q)}`,
+    `SELECT ${CAMPAIGN_LIST_SELECT}
+     FROM ${CAMPAIGN_LIST_JOIN}
+     WHERE ${whereSql} ORDER BY c.created_at DESC ${limitOffsetClause(q)}`,
     params
   );
 
@@ -126,27 +172,27 @@ async function listCampaignsAdmin(tenantId, q, includeArchived) {
 
 async function listCampaignsManager(tenantId, user, q) {
   const where = [
-    'tenant_id = ?',
-    'deleted_at IS NULL',
-    '(manager_id IS NULL OR manager_id = ?)',
+    'c.tenant_id = ?',
+    'c.deleted_at IS NULL',
+    '(c.manager_id IS NULL OR c.manager_id = ?)',
   ];
   const params = [tenantId, user.id];
 
   if (q.show_paused) {
-    where.push("status IN ('active','paused')");
+    where.push("c.status IN ('active','paused')");
   } else {
-    where.push("status = 'active'");
+    where.push("c.status = 'active'");
   }
   if (q.search) {
-    where.push('name LIKE ?');
+    where.push('c.name LIKE ?');
     params.push(`%${q.search}%`);
   }
   if (q.type === 'static' || q.type === 'filter') {
-    where.push('type = ?');
+    where.push('c.type = ?');
     params.push(q.type);
   }
   if (q.manager_id === 'unassigned') {
-    where.push('manager_id IS NULL');
+    where.push('c.manager_id IS NULL');
   } else if (q.manager_id != null && q.manager_id !== '' && q.manager_id !== '__all__') {
     const mid = Number(q.manager_id);
     if (Number.isFinite(mid) && mid > 0) {
@@ -156,17 +202,19 @@ async function listCampaignsManager(tenantId, user, q) {
           pagination: { page: q.page, limit: q.limit, total: 0, totalPages: 1 },
         };
       }
-      where.push('manager_id = ?');
+      where.push('c.manager_id = ?');
       params.push(mid);
     }
   }
 
   const whereSql = where.join(' AND ');
-  const [countRow] = await query(`SELECT COUNT(*) AS c FROM campaigns WHERE ${whereSql}`, params);
+  const [countRow] = await query(`SELECT COUNT(*) AS c FROM campaigns c WHERE ${whereSql}`, params);
   const total = Number(countRow?.c ?? 0);
 
   const rows = await query(
-    `SELECT * FROM campaigns WHERE ${whereSql} ORDER BY created_at DESC ${limitOffsetClause(q)}`,
+    `SELECT ${CAMPAIGN_LIST_SELECT}
+     FROM ${CAMPAIGN_LIST_JOIN}
+     WHERE ${whereSql} ORDER BY c.created_at DESC ${limitOffsetClause(q)}`,
     params
   );
 
@@ -220,7 +268,9 @@ async function listCampaignsAgent(tenantId, user, q) {
   const total = Number(countRow?.c ?? 0);
 
   const rows = await query(
-    `SELECT c.* FROM campaigns c WHERE ${whereSql} ORDER BY c.created_at DESC ${limitOffsetClause(q)}`,
+    `SELECT ${CAMPAIGN_LIST_SELECT}
+     FROM ${CAMPAIGN_LIST_JOIN}
+     WHERE ${whereSql} ORDER BY c.created_at DESC ${limitOffsetClause(q)}`,
     params
   );
 
@@ -248,6 +298,9 @@ export async function createCampaign(tenantId, user, payload) {
     manager_id,
     filters_json,
     status = 'active',
+    description,
+    campaign_type_master_id,
+    campaign_status_master_id,
   } = payload || {};
 
   if (!name || !String(name).trim()) {
@@ -295,12 +348,25 @@ export async function createCampaign(tenantId, user, payload) {
     filtersStored = JSON.stringify({ version: 2, rules });
   }
 
+  const desc =
+    description !== undefined && description !== null && String(description).trim() !== ''
+      ? String(description).trim()
+      : null;
+  const typeMasterId = await resolveCampaignTypeMasterId(campaign_type_master_id);
+  const statusMasterId = await resolveCampaignStatusMasterId(campaign_status_master_id);
+
   const result = await query(
-    `INSERT INTO campaigns (tenant_id, name, type, manager_id, created_by, updated_by, filters_json, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO campaigns (
+       tenant_id, name, description, campaign_type_master_id, campaign_status_master_id,
+       type, manager_id, created_by, updated_by, filters_json, status
+     )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
       String(name).trim(),
+      desc,
+      typeMasterId,
+      statusMasterId,
       type,
       resolvedManagerId,
       user.id,
@@ -311,7 +377,9 @@ export async function createCampaign(tenantId, user, payload) {
   );
 
   const [campaign] = await query(
-    `SELECT * FROM campaigns WHERE id = ? AND tenant_id = ? LIMIT 1`,
+    `SELECT ${CAMPAIGN_LIST_SELECT}
+     FROM ${CAMPAIGN_LIST_JOIN}
+     WHERE c.id = ? AND c.tenant_id = ? LIMIT 1`,
     [result.insertId, tenantId]
   );
 
@@ -327,7 +395,9 @@ export async function getCampaign(tenantId, user, campaignId) {
 
   if (user.role === 'admin') {
     const [row] = await query(
-      `SELECT * FROM campaigns WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1`,
+      `SELECT ${CAMPAIGN_LIST_SELECT}
+       FROM ${CAMPAIGN_LIST_JOIN}
+       WHERE c.id = ? AND c.tenant_id = ? AND c.deleted_at IS NULL LIMIT 1`,
       [id, tenantId]
     );
     return row || null;
@@ -335,10 +405,10 @@ export async function getCampaign(tenantId, user, campaignId) {
 
   if (user.role === 'manager') {
     const [row] = await query(
-      `SELECT * FROM campaigns
-       WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
-       
-         AND (manager_id IS NULL OR manager_id = ?)
+      `SELECT ${CAMPAIGN_LIST_SELECT}
+       FROM ${CAMPAIGN_LIST_JOIN}
+       WHERE c.id = ? AND c.tenant_id = ? AND c.deleted_at IS NULL
+         AND (c.manager_id IS NULL OR c.manager_id = ?)
        LIMIT 1`,
       [id, tenantId, user.id]
     );
@@ -348,18 +418,20 @@ export async function getCampaign(tenantId, user, campaignId) {
   const managerId = await getUserManagerId(tenantId, user.id);
   if (managerId != null) {
     const [row] = await query(
-      `SELECT * FROM campaigns
-       WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
-         AND (manager_id IS NULL OR manager_id = ?)
+      `SELECT ${CAMPAIGN_LIST_SELECT}
+       FROM ${CAMPAIGN_LIST_JOIN}
+       WHERE c.id = ? AND c.tenant_id = ? AND c.deleted_at IS NULL
+         AND (c.manager_id IS NULL OR c.manager_id = ?)
        LIMIT 1`,
       [id, tenantId, managerId]
     );
     return row || null;
   }
   const [row] = await query(
-    `SELECT * FROM campaigns
-     WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
-       AND manager_id IS NULL
+    `SELECT ${CAMPAIGN_LIST_SELECT}
+     FROM ${CAMPAIGN_LIST_JOIN}
+     WHERE c.id = ? AND c.tenant_id = ? AND c.deleted_at IS NULL
+       AND c.manager_id IS NULL
      LIMIT 1`,
     [id, tenantId]
   );
@@ -387,6 +459,9 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
     manager_id,
     filters_json,
     status,
+    description,
+    campaign_type_master_id,
+    campaign_status_master_id,
   } = payload || {};
 
   const updates = [];
@@ -395,6 +470,22 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
   if (name !== undefined) {
     updates.push('name = ?');
     params.push(name);
+  }
+  if (description !== undefined) {
+    const desc =
+      description !== null && String(description).trim() !== '' ? String(description).trim() : null;
+    updates.push('description = ?');
+    params.push(desc);
+  }
+  if (campaign_type_master_id !== undefined) {
+    const tid = await resolveCampaignTypeMasterId(campaign_type_master_id);
+    updates.push('campaign_type_master_id = ?');
+    params.push(tid);
+  }
+  if (campaign_status_master_id !== undefined) {
+    const sid = await resolveCampaignStatusMasterId(campaign_status_master_id);
+    updates.push('campaign_status_master_id = ?');
+    params.push(sid);
   }
   if (type !== undefined) {
     if (!['static', 'filter'].includes(type)) {
@@ -475,7 +566,9 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
   // Scenario 10: reassign campaign manager => reassign static campaign leads
   // We keep contacts.campaign_id unchanged, but move leads to the new manager's team.
   const updated = await query(
-    `SELECT * FROM campaigns WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1`,
+    `SELECT ${CAMPAIGN_LIST_SELECT}
+     FROM ${CAMPAIGN_LIST_JOIN}
+     WHERE c.id = ? AND c.tenant_id = ? AND c.deleted_at IS NULL LIMIT 1`,
     [campaignId, tenantId]
   );
   const updatedCampaign = updated?.[0];

@@ -37,7 +37,9 @@ WHERE r.name = 'admin'
     'email.view',
     'email.send',
     'email.templates.manage',
-    'email.accounts.manage'
+    'email.accounts.manage',
+    'meetings.view',
+    'meetings.manage'
   );
 
 -- MANAGER ROLE: Monitoring and reporting
@@ -66,7 +68,9 @@ WHERE r.name = 'manager'
     'whatsapp.logs.view',
     'email.view',
     'email.send',
-    'email.templates.manage'
+    'email.templates.manage',
+    'meetings.view',
+    'meetings.manage'
   );
 
 -- AGENT ROLE: Basic dialing and contact access
@@ -89,7 +93,9 @@ WHERE r.name = 'agent'
     'whatsapp.view',
     'whatsapp.send',
     'email.view',
-    'email.send'
+    'email.send',
+    'meetings.view',
+    'meetings.manage'
   );
 
 SELECT 'Role permissions mapped' AS status;

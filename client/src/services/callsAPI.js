@@ -35,7 +35,12 @@ export const callsAPI = {
       },
     }),
 
-  setDisposition: (attemptId, { disposition_id, notes } = {}) =>
-    axiosInstance.put(`${BASE}/${attemptId}/disposition`, { disposition_id: disposition_id ?? null, notes: notes ?? null }),
+  setDisposition: (attemptId, { disposition_id, notes, deal_id, stage_id } = {}) =>
+    axiosInstance.put(`${BASE}/${attemptId}/disposition`, {
+      disposition_id: disposition_id ?? null,
+      notes: notes ?? null,
+      ...(deal_id != null && deal_id !== '' ? { deal_id } : {}),
+      ...(stage_id != null && stage_id !== '' ? { stage_id } : {}),
+    }),
 };
 

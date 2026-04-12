@@ -20,6 +20,8 @@ import templateVariablesAdminRoutes from './routes/superAdmin/templateVariables.
 import tenantsAdminRoutes from './routes/superAdmin/tenants.js';
 import platformUsersAdminRoutes from './routes/superAdmin/platformUsers.js';
 import dashboardAdminRoutes from './routes/superAdmin/dashboard.js';
+import campaignTypesMasterRoutes from './routes/superAdmin/campaignTypesMaster.js';
+import campaignStatusesMasterRoutes from './routes/superAdmin/campaignStatusesMaster.js';
 
 // Tenant routes
 import dialingSetsRoutes from './routes/tenant/dialingSets.js';
@@ -49,6 +51,7 @@ import integrationsWebhookRoutes from './routes/integrationsWebhook.js';
 import callsRoutes from './routes/tenant/calls.js';
 import dialerSessionsRoutes from './routes/tenant/dialerSessions.js';
 import savedListFiltersRoutes from './routes/tenant/savedListFilters.js';
+import meetingsRoutes from './routes/tenant/meetings.js';
 
 const app = express();
 
@@ -130,6 +133,8 @@ app.use('/api/admin/template-variables', templateVariablesAdminRoutes);
 app.use('/api/admin/tenants', tenantsAdminRoutes);
 app.use('/api/admin/users', platformUsersAdminRoutes);
 app.use('/api/admin/dashboard', dashboardAdminRoutes);
+app.use('/api/admin/campaign-types', campaignTypesMasterRoutes);
+app.use('/api/admin/campaign-statuses', campaignStatusesMasterRoutes);
 
 // Tenant routes (tenant users only)
 app.use('/api/tenant/dialing-sets', dialingSetsRoutes);
@@ -156,6 +161,7 @@ app.use('/api/tenant/integrations', integrationsRoutes);
 app.use('/api/tenant/calls', callsRoutes);
 app.use('/api/tenant/dialer-sessions', dialerSessionsRoutes);
 app.use('/api/tenant/saved-list-filters', savedListFiltersRoutes);
+app.use('/api/tenant/meetings', meetingsRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);

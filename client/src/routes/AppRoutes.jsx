@@ -28,6 +28,8 @@ import { ContactTemperaturesPage } from '../features/disposition/pages/admin/Con
 import { DefaultDispositionsPage } from '../features/disposition/pages/admin/DefaultDispositionsPage';
 import { DefaultDialingSetsPage } from '../features/disposition/pages/admin/DefaultDialingSetsPage';
 import { TemplateVariablesPage } from '../features/disposition/pages/admin/TemplateVariablesPage';
+import { CampaignTypesPage } from '../features/disposition/pages/admin/CampaignTypesPage';
+import { CampaignStatusesPage } from '../features/disposition/pages/admin/CampaignStatusesPage';
 import { WhatsAppAccountsPage } from '../features/whatsapp/WhatsAppAccountsPage';
 import { WhatsAppTemplatesPage } from '../features/whatsapp/WhatsAppTemplatesPage';
 import { WhatsAppMessagesPage } from '../features/whatsapp/WhatsAppMessagesPage';
@@ -36,6 +38,7 @@ import { EmailLayout } from '../features/email/EmailLayout';
 import { EmailSentPage } from '../features/email/EmailSentPage';
 import { EmailTemplatesPage } from '../features/email/EmailTemplatesPage';
 import { EmailAccountsPage } from '../features/email/EmailAccountsPage';
+import { MeetingsPage } from '../pages/MeetingsPage';
 import { ContactsPage } from '../features/contacts/ContactsPage';
 import { ContactCustomFieldsPage } from '../features/contacts/ContactCustomFieldsPage';
 import { ContactTagsPage } from '../features/contacts/ContactTagsPage';
@@ -304,6 +307,20 @@ function TenantRoutes() {
               <AppShellLayout>
                 <EmailLayout>
                   <EmailSentPage />
+                </EmailLayout>
+              </AppShellLayout>
+            </ProtectedRoute>
+          </EmailModuleGate>
+        }
+      />
+      <Route
+        path="/email/meetings"
+        element={
+          <EmailModuleGate>
+            <ProtectedRoute permissions={[PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE]}>
+              <AppShellLayout>
+                <EmailLayout>
+                  <MeetingsPage />
                 </EmailLayout>
               </AppShellLayout>
             </ProtectedRoute>
@@ -734,6 +751,26 @@ function PlatformRoutes() {
           <ProtectedRoute>
             <AppShellLayout>
               <TemplateVariablesPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/masters/campaign-types"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <CampaignTypesPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/masters/campaign-statuses"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <CampaignStatusesPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

@@ -229,6 +229,7 @@ export function DispositionsPage({ readOnly = false }) {
     }
 
     const validActions = (formData.actions || []).filter(a => a.action_id);
+
     const submitData = {
       ...formData,
       contact_status_id: formData.contact_status_id || null,
@@ -640,7 +641,10 @@ export function DispositionsPage({ readOnly = false }) {
                 <Button type="button" variant="secondary" size="sm" onClick={handleAddAction}>+ Add Action</Button>
               )}
             </div>
-            
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px', marginBottom: '12px', lineHeight: 1.45 }}>
+              Add <strong>Apply pipeline / deal</strong> so agents pick the pipeline and stage on the dialer when they use this outcome.
+              To attach a deal from the record screen, use <strong>Deals / opportunities</strong> on the contact or lead.
+            </p>
             {(formData.actions || []).length === 0 ? (
               <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>No actions configured. Click "Add Action" to add one.</p>
             ) : (

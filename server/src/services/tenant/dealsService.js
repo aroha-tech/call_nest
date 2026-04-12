@@ -86,16 +86,40 @@ export async function getDealBoard(tenantId, user, dealId) {
 
   const { whereSQL, params } = buildOwnershipWhere(user);
   const ctWhere = whereSQL.replace(/\bc\./g, 'ct.');
-  const opps = await query(
-    `SELECT o.id, o.contact_id, o.deal_id, o.stage_id, o.title, o.amount, o.updated_at,
-            ct.display_name, ct.type AS contact_type, ct.email
+  const boardParams = [tenantId, dealId, ...params];
+
+  /** After migration 055; falls back if columns (e.g. owner_id) are not applied yet. */
+  const sqlExtended = `SELECT o.id, o.contact_id, o.deal_id, o.stage_id, o.title, o.amount, o.updated_at,
+            o.closing_date, o.expected_revenue, o.probability_percent,
+            o.owner_id, ou.name AS owner_name,
+            COALESCE(o.probability_percent, s.progression_percent) AS effective_probability,
+            ct.display_name, ct.type AS contact_type, ct.email, ct.company AS account_name
+     FROM opportunities o
+     INNER JOIN contacts ct ON ct.id = o.contact_id AND ct.tenant_id = o.tenant_id AND ct.deleted_at IS NULL
+     INNER JOIN deal_stages s ON s.id = o.stage_id AND s.tenant_id = o.tenant_id AND s.deleted_at IS NULL
+     LEFT JOIN users ou ON ou.id = o.owner_id
+     WHERE o.tenant_id = ? AND o.deal_id = ? AND o.deleted_at IS NULL
+       AND (${ctWhere})
+     ORDER BY o.updated_at DESC`;
+
+  const sqlLegacy = `SELECT o.id, o.contact_id, o.deal_id, o.stage_id, o.title, o.amount, o.updated_at,
+            ct.display_name, ct.type AS contact_type, ct.email, ct.company AS account_name
      FROM opportunities o
      INNER JOIN contacts ct ON ct.id = o.contact_id AND ct.tenant_id = o.tenant_id AND ct.deleted_at IS NULL
      WHERE o.tenant_id = ? AND o.deal_id = ? AND o.deleted_at IS NULL
        AND (${ctWhere})
-     ORDER BY o.updated_at DESC`,
-    [tenantId, dealId, ...params]
-  );
+     ORDER BY o.updated_at DESC`;
+
+  let opps;
+  try {
+    opps = await query(sqlExtended, boardParams);
+  } catch (err) {
+    if (err.code === 'ER_BAD_FIELD_ERROR' || err.errno === 1054) {
+      opps = await query(sqlLegacy, boardParams);
+    } else {
+      throw err;
+    }
+  }
 
   const byStage = new Map();
   for (const s of deal.stages) {

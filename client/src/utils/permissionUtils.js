@@ -102,6 +102,9 @@ export const PERMISSIONS = {
   EMAIL_TEMPLATES_MANAGE: 'email.templates.manage',
   EMAIL_ACCOUNTS_MANAGE: 'email.accounts.manage',
 
+  MEETINGS_VIEW: 'meetings.view',
+  MEETINGS_MANAGE: 'meetings.manage',
+
   // Dispositions
   DISPOSITIONS_MANAGE: 'dispositions.manage',
   /** View dispositions & dialing sets (read-only); agents */

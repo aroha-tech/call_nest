@@ -8,8 +8,10 @@ import { Alert } from '../components/ui/Alert';
 import { Spinner } from '../components/ui/Spinner';
 import { Select } from '../components/ui/Select';
 import { Input } from '../components/ui/Input';
+import { Modal, ModalFooter } from '../components/ui/Modal';
 import { callsAPI } from '../services/callsAPI';
 import { dialerSessionsAPI } from '../services/dialerSessionsAPI';
+import { dealsAPI } from '../services/dealsAPI';
 import { contactsAPI } from '../services/contactsAPI';
 import { templateVariablesAPI } from '../services/templateVariablesAPI';
 import { extractTemplateKeys, renderScriptHtml } from '../utils/callScriptHtml';
@@ -161,6 +163,10 @@ export function DialerSessionPage() {
   const pendingAttemptFromNextRef = useRef(null);
   const [templateSample, setTemplateSample] = useState(null);
   const [activeTemplateKeys, setActiveTemplateKeys] = useState(null);
+  const [pipelines, setPipelines] = useState([]);
+  const [dealPickDispo, setDealPickDispo] = useState(null);
+  const [dealPickDealId, setDealPickDealId] = useState('');
+  const [dealPickStageId, setDealPickStageId] = useState('');
   const [tick, setTick] = useState(0);
   const [uiTimer, setUiTimer] = useState(() => {
     if (!id) return { startedAtMs: null, pausedAtMs: null, pausedTotalMs: 0 };
@@ -187,6 +193,42 @@ export function DialerSessionPage() {
       // ignore
     }
   }, [id, uiTimer]);
+
+  useEffect(() => {
+    if (!session) {
+      setPipelines([]);
+      return;
+    }
+    let cancelled = false;
+    dealsAPI
+      .list({ include_inactive: false })
+      .then((res) => {
+        if (!cancelled) setPipelines(Array.isArray(res.data?.data) ? res.data.data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setPipelines([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
+  const dealPickPipeline = useMemo(
+    () => pipelines.find((p) => String(p.id) === String(dealPickDealId)),
+    [pipelines, dealPickDealId]
+  );
+  const dealPickStageOptions = useMemo(
+    () =>
+      (dealPickPipeline?.stages || []).map((s) => ({
+        value: String(s.id),
+        label: s.name,
+      })),
+    [dealPickPipeline]
+  );
+  const pipelineOptions = useMemo(
+    () => pipelines.map((p) => ({ value: String(p.id), label: p.name })),
+    [pipelines]
+  );
 
   const items = useMemo(
     () =>
@@ -648,7 +690,7 @@ export function DialerSessionPage() {
     return isDialerPhoneRowSelected(p);
   }
 
-  async function setDisposition(dispositionId, nextAction) {
+  async function setDisposition(dispositionId, nextAction, dealOpt = null) {
     const callingRow = items.find((i) => i.state === 'calling');
     const attemptId = coerceAttemptId(callingRow?.last_attempt_id) || lastAttemptId;
     if (!attemptId) {
@@ -663,7 +705,12 @@ export function DialerSessionPage() {
     setBusy(true);
     setError('');
     try {
-      const res = await callsAPI.setDisposition(attemptId, { disposition_id: dispId });
+      const payload = { disposition_id: dispId, notes: null };
+      if (dealOpt && dealOpt.deal_id != null && dealOpt.stage_id != null) {
+        payload.deal_id = dealOpt.deal_id;
+        payload.stage_id = dealOpt.stage_id;
+      }
+      const res = await callsAPI.setDisposition(attemptId, payload);
       const body = res?.data ?? {};
       const na = String(nextAction || '').toLowerCase();
 
@@ -685,6 +732,30 @@ export function DialerSessionPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function onDispositionButtonClick(d) {
+    if (d.requires_deal_selection) {
+      setError('');
+      setDealPickDispo(d);
+      setDealPickDealId('');
+      setDealPickStageId('');
+      return;
+    }
+    setDisposition(d.id, d.next_action);
+  }
+
+  async function confirmDealDispositionPick() {
+    if (!dealPickDispo) return;
+    const did = Number(dealPickDealId);
+    const sid = Number(dealPickStageId);
+    if (!did || !sid || !Number.isFinite(did) || !Number.isFinite(sid)) {
+      setError('Select a pipeline and stage for this outcome.');
+      return;
+    }
+    const d = dealPickDispo;
+    setDealPickDispo(null);
+    await setDisposition(d.id, d.next_action, { deal_id: did, stage_id: sid });
   }
 
   return (
@@ -1390,12 +1461,14 @@ export function DialerSessionPage() {
                         disabled={busy}
                         aria-disabled={!lastAttemptId}
                         title={!lastAttemptId ? 'Call at least one lead first' : d.next_action || ''}
-                        onClick={() => setDisposition(d.id, d.next_action)}
+                        onClick={() => onDispositionButtonClick(d)}
                       >
                         <span className={styles.dispoBtnBody}>
                           <span className={styles.dispoBtnText}>
                             <span className={styles.dispoBtnName}>{d.name}</span>
-                            {d.next_action ? (
+                            {d.requires_deal_selection ? (
+                              <span className={styles.dispoBtnHint}>pick pipeline</span>
+                            ) : d.next_action ? (
                               <span className={styles.dispoBtnHint}>{d.next_action}</span>
                             ) : null}
                           </span>
@@ -1411,6 +1484,49 @@ export function DialerSessionPage() {
             ) : null}
           </div>
           )}
+
+          <Modal
+            isOpen={!!dealPickDispo}
+            onClose={() => {
+              if (!busy) setDealPickDispo(null);
+            }}
+            title={dealPickDispo ? `Pipeline for “${dealPickDispo.name}”` : 'Pipeline'}
+            size="sm"
+            footer={
+              <ModalFooter>
+                <Button variant="ghost" onClick={() => setDealPickDispo(null)} disabled={busy}>
+                  Cancel
+                </Button>
+                <Button onClick={confirmDealDispositionPick} loading={busy}>
+                  Apply outcome
+                </Button>
+              </ModalFooter>
+            }
+          >
+            <p style={{ marginBottom: 12, color: 'var(--color-text-secondary)', fontSize: 14 }}>
+              Choose which pipeline and stage to attach to this contact for this outcome.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <Select
+                label="Pipeline"
+                value={dealPickDealId}
+                onChange={(e) => {
+                  setDealPickDealId(e.target.value);
+                  setDealPickStageId('');
+                }}
+                options={pipelineOptions}
+                placeholder="Select pipeline…"
+              />
+              <Select
+                label="Stage"
+                value={dealPickStageId}
+                onChange={(e) => setDealPickStageId(e.target.value)}
+                options={dealPickStageOptions}
+                placeholder={dealPickDealId ? 'Select stage…' : 'Select a pipeline first'}
+                disabled={!dealPickDealId}
+              />
+            </div>
+          </Modal>
         </>
       ) : null}
 

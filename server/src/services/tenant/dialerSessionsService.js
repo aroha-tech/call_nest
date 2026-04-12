@@ -1,5 +1,6 @@
 import { query, withConnection } from '../../config/db.js';
 import { startCallForContact } from './callsService.js';
+import { enrichDispositionsForDialerSession } from './dispositionApplyDealHelper.js';
 
 function normalizeIds(arr, max = 200) {
   if (!Array.isArray(arr)) return [];
@@ -106,13 +107,14 @@ export async function getSession(tenantId, user, sessionId) {
   // Dialing set dispositions (buttons) for this session
   let dispositions = [];
   if (sess.dialing_set_id) {
-    dispositions = await query(
+    const rawDispos = await query(
       `SELECT
           d.id,
           d.name,
           d.code,
           d.next_action,
-          d.is_connected
+          d.is_connected,
+          d.actions
        FROM dialing_set_dispositions dsd
        INNER JOIN dispositions d
          ON d.id = dsd.disposition_id AND d.tenant_id = dsd.tenant_id AND d.is_deleted = 0
@@ -120,6 +122,7 @@ export async function getSession(tenantId, user, sessionId) {
        ORDER BY dsd.order_index ASC`,
       [tenantId, String(sess.dialing_set_id)]
     );
+    dispositions = await enrichDispositionsForDialerSession(tenantId, rawDispos);
   }
 
   // Call script body (rendered in UI with variables)

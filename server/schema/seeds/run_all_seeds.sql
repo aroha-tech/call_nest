@@ -45,6 +45,8 @@ SOURCE D:/own_software/call_nest/server/schema/seeds/03_master/03_dispo_actions.
 SOURCE D:/own_software/call_nest/server/schema/seeds/03_master/04_contact_statuses.sql;
 SOURCE D:/own_software/call_nest/server/schema/seeds/03_master/05_contact_temperatures.sql;
 SOURCE D:/own_software/call_nest/server/schema/seeds/03_master/06_template_variables.sql;
+SOURCE D:/own_software/call_nest/server/schema/seeds/03_master/08_campaign_types_master.sql;
+SOURCE D:/own_software/call_nest/server/schema/seeds/03_master/09_campaign_statuses_master.sql;
 
 SET FOREIGN_KEY_CHECKS = 1;
 

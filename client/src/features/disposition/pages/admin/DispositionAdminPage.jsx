@@ -8,6 +8,8 @@ import { ContactStatusesPage } from './ContactStatusesPage';
 import { ContactTemperaturesPage } from './ContactTemperaturesPage';
 import { DefaultDispositionsPage } from './DefaultDispositionsPage';
 import { DefaultDialingSetsPage } from './DefaultDialingSetsPage';
+import { CampaignTypesPage } from './CampaignTypesPage';
+import { CampaignStatusesPage } from './CampaignStatusesPage';
 import styles from './DispositionAdminPage.module.scss';
 
 const tabs = [
@@ -18,6 +20,8 @@ const tabs = [
   { key: 'contact-temperatures', label: 'Temperatures', component: ContactTemperaturesPage },
   { key: 'default-dispositions', label: 'Default Dispositions', component: DefaultDispositionsPage },
   { key: 'default-dialing-sets', label: 'Default Dialing Sets', component: DefaultDialingSetsPage },
+  { key: 'campaign-types', label: 'Campaign Types', component: CampaignTypesPage },
+  { key: 'campaign-statuses', label: 'Campaign Statuses', component: CampaignStatusesPage },
 ];
 
 export function DispositionAdminPage() {
@@ -27,7 +31,7 @@ export function DispositionAdminPage() {
     <div className={styles.page}>
       <PageHeader
         title="Disposition Management"
-        description="Configure global disposition settings and default templates"
+        description="Configure global disposition settings, default templates, and campaign masters (Campaign Types & Campaign Statuses are also under System Masters)."
       />
 
       <Tabs>

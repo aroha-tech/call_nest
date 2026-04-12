@@ -32,6 +32,32 @@ export const dispoTypesAPI = {
   delete: (id) => axiosInstance.delete(`/api/admin/dispo-types/${id}`),
 };
 
+export const campaignTypesAPI = {
+  getAll: ({ search = '', includeInactive = false, page = 1, limit = 20 } = {}) =>
+    axiosInstance.get('/api/admin/campaign-types', {
+      params: { search, include_inactive: includeInactive, page, limit },
+    }),
+  getOptions: () => axiosInstance.get('/api/admin/campaign-types/options'),
+  getById: (id) => axiosInstance.get(`/api/admin/campaign-types/${id}`),
+  create: (data) => axiosInstance.post('/api/admin/campaign-types', data),
+  update: (id, data) => axiosInstance.put(`/api/admin/campaign-types/${id}`, data),
+  toggleActive: (id) => axiosInstance.post(`/api/admin/campaign-types/${id}/toggle-active`),
+  delete: (id) => axiosInstance.delete(`/api/admin/campaign-types/${id}`),
+};
+
+export const campaignStatusesAPI = {
+  getAll: ({ search = '', includeInactive = false, page = 1, limit = 20 } = {}) =>
+    axiosInstance.get('/api/admin/campaign-statuses', {
+      params: { search, include_inactive: includeInactive, page, limit },
+    }),
+  getOptions: () => axiosInstance.get('/api/admin/campaign-statuses/options'),
+  getById: (id) => axiosInstance.get(`/api/admin/campaign-statuses/${id}`),
+  create: (data) => axiosInstance.post('/api/admin/campaign-statuses', data),
+  update: (id, data) => axiosInstance.put(`/api/admin/campaign-statuses/${id}`, data),
+  toggleActive: (id) => axiosInstance.post(`/api/admin/campaign-statuses/${id}/toggle-active`),
+  delete: (id) => axiosInstance.delete(`/api/admin/campaign-statuses/${id}`),
+};
+
 // Disposition Actions
 export const dispoActionsAPI = {
   getAll: ({ search = '', includeInactive = false, page = 1, limit = 20 } = {}) =>
