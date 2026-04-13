@@ -40,7 +40,9 @@ export function IndustriesPage() {
         width: '120px',
         noTruncate: true,
         render: (_, item) => (
-          <Link to={`/admin/masters/industries/${item.id}/fields`}>Manage fields</Link>
+          <Link to={`/admin/masters/industry-lead-fields?industry=${encodeURIComponent(item.id)}`}>
+            Manage fields
+          </Link>
         ),
       },
     ],

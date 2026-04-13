@@ -357,7 +357,7 @@ export function LeadDataTable({
             >
               <span className={styles.headerInner}>
                 <span>{col.label}</span>
-                {col.sortKey && sortBy === col.sortKey ? (
+                {col.sortKey && !col.columnFilterOnly && sortBy === col.sortKey ? (
                   <span className={styles.sortMark} aria-hidden>
                     {sortDir === 'asc' ? '↑' : '↓'}
                   </span>

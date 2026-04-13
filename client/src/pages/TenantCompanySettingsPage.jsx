@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
@@ -22,6 +22,13 @@ import styles from './TenantCompanySettingsPage.module.scss';
 const SLUG_DEBOUNCE_MS = 400;
 const NO_INDUSTRY = '__none__';
 
+function sortIndustryFieldRows(a, b) {
+  const sa = Number(a.sort_order) || 0;
+  const sb = Number(b.sort_order) || 0;
+  if (sa !== sb) return sa - sb;
+  return String(a.label || '').localeCompare(String(b.label || ''));
+}
+
 export function TenantCompanySettingsPage() {
   const dispatch = useDispatch();
 
@@ -43,6 +50,7 @@ export function TenantCompanySettingsPage() {
   const [slugChangedNotice, setSlugChangedNotice] = useState(false);
 
   const [optionalIndustryFields, setOptionalIndustryFields] = useState([]);
+  const [coreIndustryFields, setCoreIndustryFields] = useState([]);
   const [optionalIndustryLoading, setOptionalIndustryLoading] = useState(false);
   const [optionalIndustrySaving, setOptionalIndustrySaving] = useState(false);
   const [optionalIndustryError, setOptionalIndustryError] = useState(null);
@@ -69,11 +77,17 @@ export function TenantCompanySettingsPage() {
     setOptionalIndustryLoading(true);
     setOptionalIndustryError(null);
     try {
-      const res = await tenantIndustryFieldsAPI.getOptionalSettings();
-      const rows = res?.data?.data?.fields ?? [];
+      const [optRes, defRes] = await Promise.all([
+        tenantIndustryFieldsAPI.getOptionalSettings(),
+        tenantIndustryFieldsAPI.getDefinitions(),
+      ]);
+      const rows = optRes?.data?.data?.fields ?? [];
       setOptionalIndustryFields(Array.isArray(rows) ? rows : []);
+      const defs = Array.isArray(defRes?.data?.data) ? defRes.data.data : [];
+      setCoreIndustryFields(defs.filter((d) => Number(d.is_optional) !== 1));
     } catch (err) {
       setOptionalIndustryFields([]);
+      setCoreIndustryFields([]);
       setOptionalIndustryError(err.response?.data?.error || err.message || 'Failed to load industry field options');
     } finally {
       setOptionalIndustryLoading(false);
@@ -81,11 +95,29 @@ export function TenantCompanySettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (bundle?.tenant?.id) loadOptionalIndustryFields();
-  }, [bundle?.tenant?.id, loadOptionalIndustryFields]);
+    if (!bundle?.tenant?.id || !bundle?.tenant?.industry_id) {
+      setOptionalIndustryFields([]);
+      setCoreIndustryFields([]);
+      return;
+    }
+    loadOptionalIndustryFields();
+  }, [bundle?.tenant?.id, bundle?.tenant?.industry_id, loadOptionalIndustryFields]);
 
   const tenant = bundle?.tenant;
   const industryOptionsRaw = bundle?.industry_options ?? [];
+
+  const sortedCoreIndustryFields = useMemo(
+    () => [...coreIndustryFields].sort(sortIndustryFieldRows),
+    [coreIndustryFields]
+  );
+  const selectedOptionalIndustryFields = useMemo(
+    () => [...optionalIndustryFields].filter((f) => f.is_enabled).sort(sortIndustryFieldRows),
+    [optionalIndustryFields]
+  );
+  const availableOptionalIndustryFields = useMemo(
+    () => [...optionalIndustryFields].filter((f) => !f.is_enabled).sort(sortIndustryFieldRows),
+    [optionalIndustryFields]
+  );
 
   useEffect(() => {
     if (!tenant) return;
@@ -262,106 +294,201 @@ export function TenantCompanySettingsPage() {
         </Alert>
       )}
 
-      <Card className={styles.card}>
-        <form onSubmit={handleSubmit} className={styles.form} noValidate>
-          <Input
-            label="Company name"
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              setFieldErrors((p) => {
-                const n = { ...p };
-                delete n.name;
-                return n;
-              });
-            }}
-            error={fieldErrors.name}
-            disabled={saving}
-            autoComplete="organization"
-          />
-
-          <Input
-            label="Workspace address (slug)"
-            value={slugInput}
-            onChange={(e) => {
-              setSlugInput(e.target.value);
-              setFieldErrors((p) => {
-                const n = { ...p };
-                delete n.slug;
-                return n;
-              });
-            }}
-            error={slugFieldError}
-            hint={
-              slugRemote.loading
-                ? 'Checking availability…'
-                : slugRemote.available === true && slugNormalized !== tenant.slug
-                  ? 'This address is available.'
-                  : 'Lowercase letters and hyphens only — used in your sign-in URL.'
-            }
-            disabled={saving}
-            autoComplete="off"
-          />
-
-          <Select
-            label="Industry"
-            value={industryId}
-            onChange={(e) => setIndustryId(e.target.value)}
-            options={industrySelectOptions}
-            disabled={saving}
-            placeholder="Select industry"
-          />
-
-          <div className={styles.actions}>
-            <Button type="submit" disabled={saving}>
-              {saving ? 'Saving…' : 'Save changes'}
-            </Button>
-          </div>
-        </form>
-      </Card>
-
-      {tenant?.industry_id ? (
+      <div
+        className={`${styles.layout} ${tenant?.industry_id ? styles.layoutSplit : ''}`.trim()}
+      >
         <Card className={styles.card}>
-          <h2 className={styles.sectionTitle}>Industry field packs</h2>
-          <p className={styles.muted}>
-            Optional fields defined for your industry can be turned on here. Required industry fields are always shown on
-            leads and contacts.
-          </p>
-          {optionalIndustryError ? (
-            <Alert variant="error" className={styles.alert}>
-              {optionalIndustryError}
-            </Alert>
-          ) : null}
-          {optionalIndustryLoading ? (
-            <p className={styles.muted}>Loading…</p>
-          ) : optionalIndustryFields.length === 0 ? (
-            <p className={styles.muted}>No optional industry fields are available.</p>
-          ) : (
-            <>
-              <div className={styles.optionalIndustryList}>
-                {optionalIndustryFields.map((f) => (
-                  <Checkbox
-                    key={f.id}
-                    label={`${f.label} (${f.field_key})`}
-                    checked={!!f.is_enabled}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setOptionalIndustryFields((prev) =>
-                        prev.map((row) => (row.id === f.id ? { ...row, is_enabled: checked } : row))
-                      );
-                    }}
-                  />
-                ))}
-              </div>
-              <div className={styles.actions}>
-                <Button type="button" onClick={handleSaveOptionalIndustryFields} disabled={optionalIndustrySaving}>
-                  {optionalIndustrySaving ? 'Saving…' : 'Save industry fields'}
-                </Button>
-              </div>
-            </>
-          )}
+          <form onSubmit={handleSubmit} className={styles.form} noValidate>
+            <Input
+              label="Company name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setFieldErrors((p) => {
+                  const n = { ...p };
+                  delete n.name;
+                  return n;
+                });
+              }}
+              error={fieldErrors.name}
+              disabled={saving}
+              autoComplete="organization"
+            />
+
+            <Input
+              label="Workspace address (slug)"
+              value={slugInput}
+              onChange={(e) => {
+                setSlugInput(e.target.value);
+                setFieldErrors((p) => {
+                  const n = { ...p };
+                  delete n.slug;
+                  return n;
+                });
+              }}
+              error={slugFieldError}
+              hint={
+                slugRemote.loading
+                  ? 'Checking availability…'
+                  : slugRemote.available === true && slugNormalized !== tenant.slug
+                    ? 'This address is available.'
+                    : 'Lowercase letters and hyphens only — used in your sign-in URL.'
+              }
+              disabled={saving}
+              autoComplete="off"
+            />
+
+            <Select
+              label="Industry"
+              value={industryId}
+              onChange={(e) => setIndustryId(e.target.value)}
+              options={industrySelectOptions}
+              disabled={saving}
+              placeholder="Select industry"
+            />
+
+            <div className={styles.actions}>
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Saving…' : 'Save changes'}
+              </Button>
+            </div>
+          </form>
         </Card>
-      ) : null}
+
+        {tenant?.industry_id ? (
+          <Card className={`${styles.card} ${styles.cardAside}`}>
+            <h2 className={styles.sectionTitle}>Industry field packs</h2>
+            <p className={styles.muted}>
+              “Always on your forms” is fixed for your industry. Optional packs are in two columns: not using yet, then
+              active for your workspace — save when you are done.
+            </p>
+            {optionalIndustryError ? (
+              <Alert variant="error" className={styles.alert}>
+                {optionalIndustryError}
+              </Alert>
+            ) : null}
+            {optionalIndustryLoading ? (
+              <p className={styles.muted}>Loading…</p>
+            ) : (
+              <>
+                {sortedCoreIndustryFields.length > 0 ? (
+                  <div className={`${styles.fieldGroup} ${styles.fieldGroupTop}`}>
+                    <h3 className={styles.fieldGroupTitle}>Always on your forms</h3>
+                    <p className={styles.fieldGroupHint}>
+                      Shown on every lead and contact — not controlled by the lists below.
+                    </p>
+                    <ul className={styles.fieldChipList}>
+                      {sortedCoreIndustryFields.map((f) => (
+                        <li key={f.id} className={styles.fieldChip}>
+                          <span className={styles.fieldChipLabel}>{f.label}</span>
+                          <span className={styles.fieldChipMeta}>{f.field_key}</span>
+                          {Number(f.is_required) === 1 ? (
+                            <span className={styles.fieldChipBadge}>Required</span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {optionalIndustryFields.length === 0 ? (
+                  <p className={styles.muted}>
+                    {sortedCoreIndustryFields.length > 0
+                      ? 'No optional field packs exist for this industry. The fields above are always included.'
+                      : 'No industry fields are configured for this industry yet.'}
+                  </p>
+                ) : (
+                  <>
+                    <div className={styles.optionalPacksBlock}>
+                      <div className={styles.optionalPacksHeading}>
+                        <h3 className={styles.optionalPacksTitle}>Optional field packs</h3>
+                        <p className={styles.optionalPacksSubtitle}>
+                          Two side-by-side lists: off vs on. Adjust checkboxes, then save.
+                        </p>
+                      </div>
+                      <div className={styles.optionalPacksRow}>
+                        <div
+                          className={`${styles.optionalPackPane} ${styles.optionalPackPaneAvailable}`}
+                          aria-labelledby="optional-packs-available-heading"
+                        >
+                          <div className={styles.optionalPackPaneHeader}>
+                            <h4 className={styles.optionalPackPaneTitle} id="optional-packs-available-heading">
+                              Not using yet
+                            </h4>
+                            <span className={styles.optionalPackPaneBadge} aria-hidden>
+                              {availableOptionalIndustryFields.length}
+                            </span>
+                          </div>
+                          <p className={styles.optionalPackPaneHint}>Check a box to show this field on leads and contacts.</p>
+                          {availableOptionalIndustryFields.length === 0 ? (
+                            <p className={styles.optionalPackPaneEmpty}>All optional packs are turned on.</p>
+                          ) : (
+                            <div className={styles.optionalIndustryList}>
+                              {availableOptionalIndustryFields.map((f) => (
+                                <Checkbox
+                                  key={f.id}
+                                  label={`${f.label} (${f.field_key})`}
+                                  checked={!!f.is_enabled}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setOptionalIndustryFields((prev) =>
+                                      prev.map((row) => (row.id === f.id ? { ...row, is_enabled: checked } : row))
+                                    );
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div
+                          className={`${styles.optionalPackPane} ${styles.optionalPackPaneActive}`}
+                          aria-labelledby="optional-packs-active-heading"
+                        >
+                          <div className={styles.optionalPackPaneHeader}>
+                            <h4 className={styles.optionalPackPaneTitle} id="optional-packs-active-heading">
+                              Active for your workspace
+                            </h4>
+                            <span className={styles.optionalPackPaneBadge} aria-hidden>
+                              {selectedOptionalIndustryFields.length}
+                            </span>
+                          </div>
+                          <p className={styles.optionalPackPaneHint}>Uncheck to hide from forms (after save).</p>
+                          {selectedOptionalIndustryFields.length === 0 ? (
+                            <p className={styles.optionalPackPaneEmpty}>
+                              None yet — turn on packs from “Not using yet.”
+                            </p>
+                          ) : (
+                            <div className={styles.optionalIndustryList}>
+                              {selectedOptionalIndustryFields.map((f) => (
+                                <Checkbox
+                                  key={f.id}
+                                  label={`${f.label} (${f.field_key})`}
+                                  checked={!!f.is_enabled}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setOptionalIndustryFields((prev) =>
+                                      prev.map((row) => (row.id === f.id ? { ...row, is_enabled: checked } : row))
+                                    );
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className={styles.actions}>
+                      <Button type="button" onClick={handleSaveOptionalIndustryFields} disabled={optionalIndustrySaving}>
+                        {optionalIndustrySaving ? 'Saving…' : 'Save industry fields'}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </Card>
+        ) : null}
+      </div>
     </div>
   );
 }

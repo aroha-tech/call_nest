@@ -348,6 +348,7 @@ const NAV_ICON_MAP = {
   users: IconUsers,
   masters: IconLayers,
   industries: IconFactory,
+  'industry-lead-fields': IconBraces,
   'dispo-types': IconTag,
   actions: IconZap,
   'contact-statuses': IconUserCheck,

@@ -86,6 +86,8 @@ export function LeadColumnSortFilterModal({
   sortDir,
   filterRule,
   onApply,
+  /** When true, only column filter applies (e.g. industry JSON fields — no list sort). */
+  filterOnly = false,
 }) {
   const [sortMode, setSortMode] = useState('default');
   const [filterOp, setFilterOp] = useState('none');
@@ -98,7 +100,9 @@ export function LeadColumnSortFilterModal({
   useEffect(() => {
     if (!isOpen || !column || !sortKey) return;
     setApplyError(null);
-    if (sortBy === sortKey) {
+    if (filterOnly) {
+      setSortMode('default');
+    } else if (sortBy === sortKey) {
       setSortMode(sortDir === 'asc' ? 'asc' : 'desc');
     } else {
       setSortMode('default');
@@ -111,7 +115,7 @@ export function LeadColumnSortFilterModal({
       setFilterOp('none');
       setFilterValue('');
     }
-  }, [isOpen, column, sortBy, sortDir, sortKey, filterRule]);
+  }, [isOpen, column, sortBy, sortDir, sortKey, filterRule, filterOnly]);
 
   const needsValue = useMemo(
     () => ['contains', 'not_contains', 'starts_with', 'ends_with'].includes(filterOp),
@@ -131,8 +135,10 @@ export function LeadColumnSortFilterModal({
     setApplyError(null);
     if (!column || !sortKey) return;
     let sort = 'default';
-    if (sortMode === 'asc') sort = 'asc';
-    else if (sortMode === 'desc') sort = 'desc';
+    if (!filterOnly) {
+      if (sortMode === 'asc') sort = 'asc';
+      else if (sortMode === 'desc') sort = 'desc';
+    }
 
     let filter = null;
     if (filterOp && filterOp !== 'none') {
@@ -156,7 +162,7 @@ export function LeadColumnSortFilterModal({
 
   if (!column || !sortKey) return null;
 
-  const hasColumnSort = sortBy === sortKey;
+  const hasColumnSort = !filterOnly && sortBy === sortKey;
   const showStatusBanner = hasColumnSort || !!activeFilterSummary;
 
   return (
@@ -182,7 +188,9 @@ export function LeadColumnSortFilterModal({
         </ModalFooter>
       }
     >
-      <p className={styles.modalSubtitle}>Sort and filter this column for the current leads list.</p>
+      <p className={styles.modalSubtitle}>
+        {filterOnly ? 'Filter this column for the current list.' : 'Sort and filter this column for the current leads list.'}
+      </p>
 
       {showStatusBanner ? (
         <div className={styles.statusBanner} role="status">
@@ -196,6 +204,7 @@ export function LeadColumnSortFilterModal({
       ) : null}
 
       <div className={styles.panels}>
+        {!filterOnly ? (
         <section className={styles.panel} aria-labelledby="lead-col-sort-heading">
           <div className={styles.panelHead}>
             <span className={styles.panelIcon} aria-hidden>
@@ -247,6 +256,7 @@ export function LeadColumnSortFilterModal({
             </label>
           </div>
         </section>
+        ) : null}
 
         <section className={styles.panel} aria-labelledby="lead-col-filter-heading">
           <div className={styles.panelHead}>

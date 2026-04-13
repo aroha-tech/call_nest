@@ -67,6 +67,7 @@ import {
 } from './ListActionsMenuIcons';
 import { savedListFiltersAPI } from '../../services/savedListFiltersAPI';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
+import { industryFieldColumnId } from './industryFieldColumnIds';
 
 const FILTER_ALL = '__all__';
 
@@ -441,6 +442,14 @@ export function ContactsPage({ type, mode = 'crm' }) {
   const [contactCustomFieldDefs, setContactCustomFieldDefs] = useState([]);
   /** Platform industry catalog fields for this tenant's industry (contacts.industry_profile). */
   const [industryFieldDefs, setIndustryFieldDefs] = useState([]);
+  const industryFieldRuleOptions = useMemo(
+    () =>
+      (industryFieldDefs || []).map((d) => ({
+        value: industryFieldColumnId(d.field_key),
+        label: `${d.label || d.field_key} (industry)`,
+      })),
+    [industryFieldDefs]
+  );
   const leadApplicableColumns = useMemo(
     () =>
       type === 'lead'
@@ -1487,12 +1496,14 @@ export function ContactsPage({ type, mode = 'crm' }) {
 
   const applyLeadColumnPanel = useCallback(
     (col, { sort, filter }) => {
-      if (sort === 'default') {
-        setLeadSortBy(null);
-        setLeadSortDir('desc');
-      } else {
-        setLeadSortBy(col.sortKey);
-        setLeadSortDir(sort);
+      if (!col.columnFilterOnly) {
+        if (sort === 'default') {
+          setLeadSortBy(null);
+          setLeadSortDir('desc');
+        } else {
+          setLeadSortBy(col.sortKey);
+          setLeadSortDir(sort);
+        }
       }
       setLeadColumnFilters((prev) => {
         const rest = prev.filter((r) => r.field !== col.id);
@@ -1507,12 +1518,14 @@ export function ContactsPage({ type, mode = 'crm' }) {
 
   const applyContactColumnPanel = useCallback(
     (col, { sort, filter }) => {
-      if (sort === 'default') {
-        setContactSortBy(null);
-        setContactSortDir('desc');
-      } else {
-        setContactSortBy(col.sortKey);
-        setContactSortDir(sort);
+      if (!col.columnFilterOnly) {
+        if (sort === 'default') {
+          setContactSortBy(null);
+          setContactSortDir('desc');
+        } else {
+          setContactSortBy(col.sortKey);
+          setContactSortDir(sort);
+        }
       }
       setContactColumnFilters((prev) => {
         const rest = prev.filter((r) => r.field !== col.id);
@@ -2016,6 +2029,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
           sortBy={leadSortBy}
           sortDir={leadSortDir}
           filterRule={leadColumnFilters.find((r) => r.field === leadColumnPanelCol?.id)}
+          filterOnly={!!leadColumnPanelCol?.columnFilterOnly}
           onApply={(payload) => {
             if (leadColumnPanelCol) applyLeadColumnPanel(leadColumnPanelCol, payload);
           }}
@@ -2030,6 +2044,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
           sortBy={contactSortBy}
           sortDir={contactSortDir}
           filterRule={contactColumnFilters.find((r) => r.field === contactColumnPanelCol?.id)}
+          filterOnly={!!contactColumnPanelCol?.columnFilterOnly}
           onApply={(payload) => {
             if (contactColumnPanelCol) applyContactColumnPanel(contactColumnPanelCol, payload);
           }}
@@ -2105,6 +2120,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
             initialLastCalledPreset={
               filterModalBasicsFromSnapshot?.initialLastCalledPreset ?? lastCalledPreset
             }
+            industryFieldRuleOptions={industryFieldRuleOptions}
             existingSavedFilters={savedFilters.map((f) => ({ id: f.id, name: f.name }))}
           />
         </>

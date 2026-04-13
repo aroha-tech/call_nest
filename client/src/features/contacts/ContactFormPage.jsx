@@ -68,6 +68,32 @@ function parseMultiselectStored(raw) {
     .filter(Boolean);
 }
 
+function isRequiredFlag(v) {
+  return v === 1 || v === true || v === '1';
+}
+
+/** Whether value is missing/invalid for a required tenant or industry dynamic field. */
+function isTypedDynamicFieldValueEmpty(fieldType, raw) {
+  if (raw === undefined || raw === null) return true;
+  if (fieldType === 'boolean') {
+    return String(raw).trim() === '';
+  }
+  if (fieldType === 'multiselect' || fieldType === 'multiselect_dropdown') {
+    return parseMultiselectStored(raw).length === 0;
+  }
+  if (fieldType === 'number') {
+    const s = String(raw).trim();
+    if (s === '') return true;
+    return !Number.isFinite(Number(s.replace(/,/g, '')));
+  }
+  return String(raw).trim() === '';
+}
+
+function requiredLabelText(label, required) {
+  const base = label || '';
+  return required ? `${base} *` : base;
+}
+
 function uniqueLabelError(phones) {
   const seen = new Set();
   for (const p of phones || []) {
@@ -521,6 +547,16 @@ export function ContactFormPage({ defaultType }) {
     [campaignList]
   );
 
+  const clearDynamicFieldError = useCallback((scope, id) => {
+    const key = `${scope}:${id}`;
+    setFormErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
   const buildSubmitPayload = () => {
     const phones = (formData.phones || []).map((p) => {
       const cc = String(p.country_code || DEFAULT_COUNTRY_CODE).trim();
@@ -647,6 +683,23 @@ export function ContactFormPage({ defaultType }) {
         break;
       }
     }
+
+    for (const f of industryFieldDefs) {
+      if (!isRequiredFlag(f.is_required)) continue;
+      const raw = formData?.industryValuesMap?.[f.field_key];
+      if (isTypedDynamicFieldValueEmpty(f.type, raw)) {
+        errs[`industry:${f.field_key}`] = `${f.label || f.field_key} is required`;
+      }
+    }
+
+    for (const f of customFields) {
+      if (!isRequiredFlag(f.is_required)) continue;
+      const raw = formData?.customValuesMap?.[f.field_id];
+      if (isTypedDynamicFieldValueEmpty(f.type, raw)) {
+        errs[`custom:${f.field_id}`] = `${f.label || f.name || 'Field'} is required`;
+      }
+    }
+
     return errs;
   };
 
@@ -1340,7 +1393,8 @@ export function ContactFormPage({ defaultType }) {
           </h2>
           {showFormHints ? (
             <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
-              Defined by your platform admin for your industry. Enable optional packs under Company settings.
+              Defined by your platform admin for your industry. Enable optional packs under Company settings. Fields
+              marked * are required before save.
             </p>
           ) : null}
           {!loadingIndustryFields && industryFieldDefs.length === 0 ? (
@@ -1351,7 +1405,11 @@ export function ContactFormPage({ defaultType }) {
             {industryFieldDefs.map((f) => {
               const value = formData?.industryValuesMap?.[f.field_key] ?? '';
               const options = normalizeOptions(f.options_json);
+              const req = isRequiredFlag(f.is_required);
+              const lbl = requiredLabelText(f.label, req);
+              const indFieldErr = formErrors[`industry:${f.field_key}`];
               const setIndustryMap = (key, nextVal) => {
+                clearDynamicFieldError('industry', key);
                 const nextMap = { ...(formData.industryValuesMap || {}) };
                 nextMap[key] = nextVal;
                 setFormData((prev) => ({ ...prev, industryValuesMap: nextMap }));
@@ -1361,11 +1419,12 @@ export function ContactFormPage({ defaultType }) {
                 return (
                   <Select
                     key={f.field_key}
-                    label={f.label}
+                    label={lbl}
                     value={value || ''}
                     onChange={(e) => setIndustryMap(f.field_key, e.target.value)}
                     options={options.map((opt) => ({ value: String(opt), label: String(opt) }))}
-                    placeholder="Select..."
+                    placeholder={req ? 'Select…' : 'Select...'}
+                    error={indFieldErr}
                   />
                 );
               }
@@ -1378,7 +1437,12 @@ export function ContactFormPage({ defaultType }) {
                 };
                 return (
                   <div key={f.field_key} className={styles.customFieldFull}>
-                    <div className={styles.customMultiselectLabel}>{f.label}</div>
+                    <div className={styles.customMultiselectLabel}>{lbl}</div>
+                    {indFieldErr ? (
+                      <p className={styles.fieldErrorText} role="alert">
+                        {indFieldErr}
+                      </p>
+                    ) : null}
                     {options.length === 0 ? (
                       <p className={styles.customMultiselectEmpty}>No options configured for this field.</p>
                     ) : (
@@ -1412,12 +1476,13 @@ export function ContactFormPage({ defaultType }) {
                 return (
                   <div key={f.field_key} className={styles.customFieldFull}>
                     <MultiSelectDropdown
-                      label={f.label}
+                      label={lbl}
                       options={options}
                       value={value}
                       placeholder="Select…"
                       searchable={options.length > 12}
                       onChange={(next) => setIndustryMap(f.field_key, next)}
+                      error={indFieldErr}
                     />
                   </div>
                 );
@@ -1425,28 +1490,33 @@ export function ContactFormPage({ defaultType }) {
 
               if (f.type === 'boolean') {
                 return (
-                  <label
-                    key={f.field_key}
-                    className={`${styles.customFieldFull} ${styles.primaryCheck} ${styles.customBooleanRow}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={String(value).toLowerCase() === 'true' || value === '1'}
-                      onChange={(e) => setIndustryMap(f.field_key, e.target.checked ? 'true' : 'false')}
-                    />
-                    <span className={styles.booleanLabel}>{f.label}</span>
-                  </label>
+                  <div key={f.field_key} className={`${styles.customFieldFull} ${styles.customBooleanRow}`}>
+                    <label className={`${styles.primaryCheck} ${styles.customBooleanRow}`}>
+                      <input
+                        type="checkbox"
+                        checked={String(value).toLowerCase() === 'true' || value === '1'}
+                        onChange={(e) => setIndustryMap(f.field_key, e.target.checked ? 'true' : 'false')}
+                      />
+                      <span className={styles.booleanLabel}>{lbl}</span>
+                    </label>
+                    {indFieldErr ? (
+                      <p className={styles.fieldErrorText} role="alert">
+                        {indFieldErr}
+                      </p>
+                    ) : null}
+                  </div>
                 );
               }
 
               return (
                 <Input
                   key={f.field_key}
-                  label={f.label}
+                  label={lbl}
                   value={value}
                   onChange={(e) => setIndustryMap(f.field_key, e.target.value)}
                   type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
-                  placeholder={f.is_required ? 'Required' : 'Optional'}
+                  placeholder={req ? 'Required' : 'Optional'}
+                  error={indFieldErr}
                 />
               );
             })}
@@ -1459,7 +1529,9 @@ export function ContactFormPage({ defaultType }) {
             {loadingCustomFields ? <span className={styles.loadingInline}>Loading…</span> : null}
           </h2>
           {showFormHints ? (
-            <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>Tenant-defined; blank clears on save.</p>
+            <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
+              Tenant-defined. Optional fields can be left blank; fields marked * are required before save.
+            </p>
           ) : null}
           {!loadingCustomFields && customFields.length === 0 ? (
             <p className={styles.customEmpty}>No custom fields configured for this tenant.</p>
@@ -1469,20 +1541,25 @@ export function ContactFormPage({ defaultType }) {
             {customFields.map((f) => {
               const value = formData?.customValuesMap?.[f.field_id] ?? '';
               const options = normalizeOptions(f.options_json);
+              const req = isRequiredFlag(f.is_required);
+              const lbl = requiredLabelText(f.label, req);
+              const cfFieldErr = formErrors[`custom:${f.field_id}`];
 
               if (f.type === 'select') {
                 return (
                   <Select
                     key={f.field_id}
-                    label={f.label}
+                    label={lbl}
                     value={value || ''}
                     onChange={(e) => {
+                      clearDynamicFieldError('custom', f.field_id);
                       const nextMap = { ...(formData.customValuesMap || {}) };
                       nextMap[f.field_id] = e.target.value;
                       setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
                     }}
                     options={options.map((opt) => ({ value: String(opt), label: String(opt) }))}
                     placeholder="Select..."
+                    error={cfFieldErr}
                   />
                 );
               }
@@ -1490,6 +1567,7 @@ export function ContactFormPage({ defaultType }) {
               if (f.type === 'multiselect') {
                 const selected = new Set(parseMultiselectStored(value).map(String));
                 const setMultiselect = (nextSet) => {
+                  clearDynamicFieldError('custom', f.field_id);
                   const ordered = options.map(String).filter((o) => nextSet.has(o));
                   const nextMap = { ...(formData.customValuesMap || {}) };
                   nextMap[f.field_id] = ordered.length ? JSON.stringify(ordered) : '';
@@ -1497,7 +1575,12 @@ export function ContactFormPage({ defaultType }) {
                 };
                 return (
                   <div key={f.field_id} className={styles.customFieldFull}>
-                    <div className={styles.customMultiselectLabel}>{f.label}</div>
+                    <div className={styles.customMultiselectLabel}>{lbl}</div>
+                    {cfFieldErr ? (
+                      <p className={styles.fieldErrorText} role="alert">
+                        {cfFieldErr}
+                      </p>
+                    ) : null}
                     {options.length === 0 ? (
                       <p className={styles.customMultiselectEmpty}>
                         No options configured. Add comma-separated options under Settings → Custom fields.
@@ -1533,16 +1616,18 @@ export function ContactFormPage({ defaultType }) {
                 return (
                   <div key={f.field_id} className={styles.customFieldFull}>
                     <MultiSelectDropdown
-                      label={f.label}
+                      label={lbl}
                       options={options}
                       value={value}
                       placeholder="Select…"
                       searchable={options.length > 12}
                       onChange={(next) => {
+                        clearDynamicFieldError('custom', f.field_id);
                         const nextMap = { ...(formData.customValuesMap || {}) };
                         nextMap[f.field_id] = next;
                         setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
                       }}
+                      error={cfFieldErr}
                     />
                   </div>
                 );
@@ -1550,33 +1635,43 @@ export function ContactFormPage({ defaultType }) {
 
               if (f.type === 'boolean') {
                 return (
-                  <label key={f.field_id} className={`${styles.customFieldFull} ${styles.primaryCheck} ${styles.customBooleanRow}`}>
-                    <input
-                      type="checkbox"
-                      checked={String(value).toLowerCase() === 'true' || value === '1'}
-                      onChange={(e) => {
-                        const nextMap = { ...(formData.customValuesMap || {}) };
-                        nextMap[f.field_id] = e.target.checked ? 'true' : 'false';
-                        setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
-                      }}
-                    />
-                    <span className={styles.booleanLabel}>{f.label}</span>
-                  </label>
+                  <div key={f.field_id} className={`${styles.customFieldFull} ${styles.customBooleanRow}`}>
+                    <label className={`${styles.primaryCheck} ${styles.customBooleanRow}`}>
+                      <input
+                        type="checkbox"
+                        checked={String(value).toLowerCase() === 'true' || value === '1'}
+                        onChange={(e) => {
+                          clearDynamicFieldError('custom', f.field_id);
+                          const nextMap = { ...(formData.customValuesMap || {}) };
+                          nextMap[f.field_id] = e.target.checked ? 'true' : 'false';
+                          setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
+                        }}
+                      />
+                      <span className={styles.booleanLabel}>{lbl}</span>
+                    </label>
+                    {cfFieldErr ? (
+                      <p className={styles.fieldErrorText} role="alert">
+                        {cfFieldErr}
+                      </p>
+                    ) : null}
+                  </div>
                 );
               }
 
               return (
                 <Input
                   key={f.field_id}
-                  label={f.label}
+                  label={lbl}
                   value={value}
                   onChange={(e) => {
+                    clearDynamicFieldError('custom', f.field_id);
                     const nextMap = { ...(formData.customValuesMap || {}) };
                     nextMap[f.field_id] = e.target.value;
                     setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
                   }}
                   type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
-                  placeholder="Optional"
+                  placeholder={req ? 'Required' : 'Optional'}
+                  error={cfFieldErr}
                 />
               );
             })}

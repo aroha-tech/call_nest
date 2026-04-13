@@ -1,15 +1,42 @@
 @use '../styles/variables' as *;
 
 .page {
-  max-width: 640px;
+  /* Use full main-column width (no max-width) so settings cards stretch on wide screens */
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
 }
 
 .alert {
   margin-bottom: $space-4;
 }
 
-.card {
+.layout {
+  display: grid;
+  gap: $space-4;
+  grid-template-columns: 1fr;
   margin-top: $space-4;
+}
+
+.layoutSplit {
+  @media (min-width: 960px) {
+    /* Equal columns: both company form and industry packs use available width */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: $space-5;
+    align-items: start;
+  }
+}
+
+.card {
+  margin-top: 0;
+}
+
+.cardAside {
+  @media (min-width: 960px) {
+    position: sticky;
+    top: $space-4;
+    align-self: start;
+  }
 }
 
 .form {
@@ -24,7 +51,11 @@
 
 .muted {
   color: var(--color-text-muted);
-  margin-top: $space-3;
+  margin-top: $space-2;
+}
+
+.sectionTitle + .muted {
+  margin-top: 0;
 }
 
 .meta {
@@ -43,5 +74,165 @@
   display: flex;
   flex-direction: column;
   gap: $space-3;
-  margin-top: $space-3;
+  margin-top: $space-2;
+}
+
+.optionalPacksBlock {
+  margin-top: $space-4;
+  padding-top: $space-4;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.optionalPacksHeading {
+  margin-bottom: $space-3;
+}
+
+.optionalPacksTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  margin: 0 0 $space-1;
+  color: var(--color-text-primary, inherit);
+}
+
+.optionalPacksSubtitle {
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  margin: 0;
+  line-height: $line-height-snug;
+}
+
+.optionalPacksRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-4;
+  align-items: stretch;
+  flex-direction: column-reverse;
+
+  @media (min-width: 560px) {
+    flex-direction: row;
+  }
+}
+
+.optionalPackPane {
+  /* Equal flex basis so both panes grow and use the full card width on wide layouts */
+  flex: 1 1 0;
+  min-width: min(100%, 200px);
+  box-sizing: border-box;
+  padding: $space-4;
+  border-radius: $radius-md;
+  min-height: 5.5rem;
+}
+
+.optionalPackPaneAvailable {
+  border: 1px dashed var(--color-border-subtle);
+  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.02));
+}
+
+.optionalPackPaneActive {
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated, rgba(0, 0, 0, 0.02));
+  box-shadow: $shadow-xs;
+}
+
+.optionalPackPaneHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-2;
+  margin-bottom: $space-1;
+}
+
+.optionalPackPaneTitle {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  margin: 0;
+  line-height: $line-height-tight;
+  color: var(--color-text-primary, inherit);
+}
+
+.optionalPackPaneBadge {
+  flex-shrink: 0;
+  font-size: $font-size-2xs;
+  font-weight: $font-weight-semibold;
+  min-width: 1.25rem;
+  padding: 2px 6px;
+  text-align: center;
+  border-radius: $radius-full;
+  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.06));
+  color: var(--color-text-muted);
+}
+
+.optionalPackPaneHint {
+  font-size: $font-size-2xs;
+  color: var(--color-text-muted);
+  margin: 0 0 $space-2;
+  line-height: $line-height-snug;
+}
+
+.optionalPackPaneEmpty {
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  margin: $space-2 0 0;
+  line-height: $line-height-normal;
+}
+
+.fieldGroup {
+  margin: 0;
+}
+
+.fieldGroupTop {
+  margin-top: $space-4;
+}
+
+.fieldGroupTitle {
+  font-size: $font-size-md;
+  font-weight: 600;
+  margin: 0 0 $space-1;
+}
+
+.fieldGroupHint {
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  margin: 0 0 $space-2;
+  line-height: 1.4;
+}
+
+.fieldChipList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
+.fieldChip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: $space-2;
+  padding: $space-2 $space-3;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 6px;
+  font-size: $font-size-sm;
+}
+
+.fieldChipLabel {
+  font-weight: 500;
+}
+
+.fieldChipMeta {
+  color: var(--color-text-muted);
+  font-size: $font-size-xs;
+}
+
+.fieldChipBadge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
 }

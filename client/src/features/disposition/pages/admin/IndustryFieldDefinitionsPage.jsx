@@ -1,6 +1,4 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { PageHeader } from '../../../../components/ui/PageHeader';
 import { Button } from '../../../../components/ui/Button';
 import { Input } from '../../../../components/ui/Input';
 import { Select } from '../../../../components/ui/Select';
@@ -43,9 +41,12 @@ function parseOptionsFromHint(text) {
     .filter(Boolean);
 }
 
-export function IndustryFieldDefinitionsPage() {
-  const { industryId } = useParams();
-
+/**
+ * Table + modals for one industry’s field definitions (used inside {@link IndustryLeadFieldsHubPage}).
+ * @param {Object} props
+ * @param {string} props.industryId
+ */
+export function IndustryFieldDefinitionsView({ industryId }) {
   const fetchIndustry = useCallback(() => industriesAPI.getById(industryId), [industryId]);
   const { data: industryRes, loading: loadingIndustry } = useAsyncData(fetchIndustry, [fetchIndustry], {
     transform: (r) => r?.data?.data ?? null,
@@ -86,12 +87,15 @@ export function IndustryFieldDefinitionsPage() {
 
   const openCreate = () => {
     setEditing(null);
+    const maxSo =
+      fields.length === 0 ? -1 : Math.max(...fields.map((f) => Number(f.sort_order) || 0));
+    const nextSort = maxSo + 1;
     setForm({
       field_key: '',
       label: '',
       type: 'text',
       optionsHint: '',
-      sort_order: '0',
+      sort_order: String(nextSort),
       is_required: false,
       is_optional: false,
       is_active: true,
@@ -169,44 +173,38 @@ export function IndustryFieldDefinitionsPage() {
   };
 
   const title = useMemo(() => industry?.name || 'Industry', [industry?.name]);
+  const sortedFields = useMemo(() => {
+    return [...fields].sort((a, b) => {
+      const sa = Number(a.sort_order) || 0;
+      const sb = Number(b.sort_order) || 0;
+      if (sa !== sb) return sa - sb;
+      return String(a.label || '').localeCompare(String(b.label || ''), undefined, { sensitivity: 'base' });
+    });
+  }, [fields]);
   const { hasCompletedInitialFetch } = useTableLoadingState(loadingFields);
 
-  if (!industryId) {
-    return <Alert variant="error">Missing industry</Alert>;
-  }
+  if (!industryId) return null;
 
-  return (
-    <div className={styles.page}>
-      <PageHeader
-        title={`Industry fields — ${title}`}
-        description="Define lead/contact fields for tenants assigned to this industry. Non-optional fields appear for every tenant; optional fields can be enabled per tenant in Company settings."
-        actions={
-          <div className={styles.headerActions}>
-            <Link className={styles.backLink} to="/admin/masters/industries">
-              ← Industries
-            </Link>
-            <Button onClick={openCreate}>+ Add field</Button>
-          </div>
-        }
-      />
-
+  const main = (
+    <>
       {loadingIndustry ? <Spinner /> : null}
-      {!loadingIndustry && !industry ? (
-        <Alert variant="error">Industry not found.</Alert>
-      ) : null}
+      {!loadingIndustry && !industry ? <Alert variant="error">Industry not found.</Alert> : null}
 
       {fieldsError ? <Alert variant="error">{String(fieldsError)}</Alert> : null}
 
       <div className={listStyles.tableCard}>
         <TableDataRegion loading={loadingFields} hasCompletedInitialFetch={hasCompletedInitialFetch}>
           {fields.length === 0 && !loadingFields ? (
-            <p className={styles.empty}>No fields yet. Add fields that apply to this vertical (e.g. policy dates for insurance).</p>
+            <p className={styles.empty}>
+              No fields yet. Add fields that apply to this vertical (e.g. policy dates for insurance).
+            </p>
           ) : (
             <Table variant="adminList">
               <TableHead>
                 <TableRow>
                   <TableHeaderCell>Key</TableHeaderCell>
                   <TableHeaderCell>Label</TableHeaderCell>
+                  <TableHeaderCell width="88px">Sort</TableHeaderCell>
                   <TableHeaderCell>Type</TableHeaderCell>
                   <TableHeaderCell>Required</TableHeaderCell>
                   <TableHeaderCell>Optional pack</TableHeaderCell>
@@ -217,10 +215,11 @@ export function IndustryFieldDefinitionsPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {fields.map((row) => (
+                {sortedFields.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell>{row.field_key}</TableCell>
                     <TableCell>{row.label}</TableCell>
+                    <TableCell>{row.sort_order ?? 0}</TableCell>
                     <TableCell>{FIELD_TYPE_OPTIONS.find((o) => o.value === row.type)?.label || row.type}</TableCell>
                     <TableCell>{row.is_required ? 'Yes' : 'No'}</TableCell>
                     <TableCell>{row.is_optional ? 'Yes' : 'No'}</TableCell>
@@ -297,6 +296,11 @@ export function IndustryFieldDefinitionsPage() {
             label="Sort order"
             value={form.sort_order}
             onChange={(e) => setForm((p) => ({ ...p, sort_order: e.target.value }))}
+            hint={
+              editing
+                ? 'Lower numbers appear first on tenant forms and lists.'
+                : 'Prefilled with the next value (max + 1). You can change it before saving.'
+            }
           />
           <Checkbox
             label="Required when visible"
@@ -315,6 +319,18 @@ export function IndustryFieldDefinitionsPage() {
           />
         </form>
       </Modal>
+    </>
+  );
+
+  return (
+    <div className={styles.embeddedWrap}>
+      <div className={styles.embeddedBar}>
+        <h2 className={styles.embeddedTitle}>Fields for {title}</h2>
+        <Button type="button" onClick={openCreate}>
+          + Add field
+        </Button>
+      </div>
+      {main}
     </div>
   );
 }

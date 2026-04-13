@@ -39,7 +39,7 @@ function IconPropertyRules() {
   );
 }
 
-/** Must match server COLUMN_FILTER_FIELDS + COLUMN_FILTER_OPS. */
+/** Core fields — must match server COLUMN_FILTER_FIELDS + COLUMN_FILTER_OPS. Industry fields use `ind:field_key` (server validates against tenant definitions). */
 const FIELD_OPTIONS = [
   { value: 'display_name', label: 'Name / display' },
   { value: 'primary_phone', label: 'Primary phone' },
@@ -117,9 +117,9 @@ function fieldOptionsForRow(rows, rowIndex, allOptions) {
   return filtered;
 }
 
-function firstUnusedFieldKey(rows) {
+function firstUnusedFieldKey(rows, allOptions) {
   const used = new Set(rows.map((r) => r.field));
-  const found = FIELD_OPTIONS.find((o) => !used.has(o.value));
+  const found = allOptions.find((o) => !used.has(o.value));
   return found?.value ?? null;
 }
 
@@ -158,6 +158,8 @@ export function ContactAdvancedFilterModal({
   initialLastCalledPreset = FILTER_ALL,
   /** For duplicate-name checks: `{ id, name }[]` */
   existingSavedFilters = [],
+  /** `{ value: 'ind:field_key', label }[]` — tenant industry profile fields */
+  industryFieldRuleOptions = [],
 }) {
   const [filterName, setFilterName] = useState('');
   const [filterNameError, setFilterNameError] = useState('');
@@ -236,14 +238,18 @@ export function ContactAdvancedFilterModal({
     initialLastCalledPreset,
   ]);
 
-  const fieldSelectOptions = useMemo(() => FIELD_OPTIONS.map((o) => ({ value: o.value, label: o.label })), []);
+  const allFieldOptions = useMemo(() => {
+    const base = FIELD_OPTIONS.map((o) => ({ value: o.value, label: o.label }));
+    const ind = (industryFieldRuleOptions || []).filter((o) => o?.value && o?.label);
+    return ind.length ? [...base, ...ind] : base;
+  }, [industryFieldRuleOptions]);
 
   const fieldOptionsPerRow = useMemo(
-    () => rows.map((_, idx) => fieldOptionsForRow(rows, idx, fieldSelectOptions)),
-    [rows, fieldSelectOptions]
+    () => rows.map((_, idx) => fieldOptionsForRow(rows, idx, allFieldOptions)),
+    [rows, allFieldOptions]
   );
 
-  const canAddPropertyRow = firstUnusedFieldKey(rows) != null && rows.length < 12;
+  const canAddPropertyRow = firstUnusedFieldKey(rows, allFieldOptions) != null && rows.length < 12;
 
   const buildPayload = () => ({
     columnRules: normalizeRows(rows),
@@ -260,7 +266,7 @@ export function ContactAdvancedFilterModal({
 
   const addRow = () => {
     setRows((prev) => {
-      const nextField = firstUnusedFieldKey(prev);
+      const nextField = firstUnusedFieldKey(prev, allFieldOptions);
       if (!nextField || prev.length >= 12) return prev;
       return [...prev, { field: nextField, op: 'contains', value: '' }];
     });
@@ -479,7 +485,7 @@ export function ContactAdvancedFilterModal({
                   aria-label={`Property field, row ${idx + 1}`}
                   value={row.field}
                   onChange={(e) => patchRow(idx, { field: e.target.value })}
-                  options={fieldOptionsPerRow[idx] ?? fieldSelectOptions}
+                  options={fieldOptionsPerRow[idx] ?? allFieldOptions}
                   className={styles.fieldSel}
                 />
                 <Select

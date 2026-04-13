@@ -53,13 +53,18 @@ export function mergeApplicableLeadColumnsWithCustomFields(applicableBase, custo
  */
 export function buildIndustryFieldColumnDefs(definitions) {
   if (!Array.isArray(definitions)) return [];
-  return definitions.map((d) => ({
-    id: industryFieldColumnId(d.field_key),
-    label: d.label || d.field_key,
-    category: 'extra',
-    industryFieldType: d.type,
-    sortKey: null,
-  }));
+  return definitions.map((d) => {
+    const id = industryFieldColumnId(d.field_key);
+    return {
+      id,
+      label: d.label || d.field_key,
+      category: 'extra',
+      industryFieldType: d.type,
+      /** Enables header filter panel; list sort stays default (no server sort by JSON). */
+      sortKey: id,
+      columnFilterOnly: true,
+    };
+  });
 }
 
 /**

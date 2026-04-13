@@ -69,6 +69,13 @@
   line-height: $line-height-normal;
 }
 
+.fieldErrorText {
+  margin: $space-1 0 $space-2;
+  font-size: $font-size-xs;
+  line-height: $line-height-normal;
+  color: var(--color-danger);
+}
+
 .viewShell {
   pointer-events: auto;
 }

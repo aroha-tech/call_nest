@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { useAppSelector } from '../app/hooks';
 import { selectIsAuthenticated, selectUser, selectPermissions } from '../features/auth/authSelectors';
 import { useTenant } from '../context/TenantContext';
@@ -21,7 +21,7 @@ import { hasPermission, hasAnyPermission, PERMISSIONS } from '../utils/permissio
 import { DispositionSettingsPage } from '../features/disposition/pages/tenant/DispositionSettingsPage';
 import { DispositionAdminPage } from '../features/disposition/pages/admin/DispositionAdminPage';
 import { IndustriesPage } from '../features/disposition/pages/admin/IndustriesPage';
-import { IndustryFieldDefinitionsPage } from '../features/disposition/pages/admin/IndustryFieldDefinitionsPage';
+import { IndustryLeadFieldsHubPage } from '../features/disposition/pages/admin/IndustryLeadFieldsHubPage';
 import { DispoTypesPage } from '../features/disposition/pages/admin/DispoTypesPage';
 import { DispoActionsPage } from '../features/disposition/pages/admin/DispoActionsPage';
 import { ContactStatusesPage } from '../features/disposition/pages/admin/ContactStatusesPage';
@@ -109,6 +109,17 @@ function PublicOnlyRoute({ children }) {
     return <Navigate to="/" replace />;
   }
   return children;
+}
+
+/** Old URL `/admin/masters/industries/:id/fields` → hub with `?industry=` pre-selected. */
+function AdminIndustryFieldsLegacyRedirect() {
+  const { industryId } = useParams();
+  return (
+    <Navigate
+      to={`/admin/masters/industry-lead-fields?industry=${encodeURIComponent(industryId || '')}`}
+      replace
+    />
+  );
 }
 
 function MarketingRoutes() {
@@ -707,11 +718,21 @@ function PlatformRoutes() {
         }
       />
       <Route
+        path="/admin/masters/industry-lead-fields"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <IndustryLeadFieldsHubPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/admin/masters/industries/:industryId/fields"
         element={
           <ProtectedRoute>
             <AppShellLayout>
-              <IndustryFieldDefinitionsPage />
+              <AdminIndustryFieldsLegacyRedirect />
             </AppShellLayout>
           </ProtectedRoute>
         }

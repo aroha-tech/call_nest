@@ -21,6 +21,11 @@ const PLATFORM_NAV_ITEMS = [
     section: 'Masters',
     children: [
       { key: 'industries', label: 'Industries', path: '/admin/masters/industries' },
+      {
+        key: 'industry-lead-fields',
+        label: 'Industry lead fields',
+        path: '/admin/masters/industry-lead-fields',
+      },
       { key: 'dispo-types', label: 'Dispo Types', path: '/admin/masters/dispo-types' },
       { key: 'actions', label: 'Actions', path: '/admin/masters/actions' },
       { key: 'contact-statuses', label: 'Contact Statuses', path: '/admin/masters/contact-statuses' },

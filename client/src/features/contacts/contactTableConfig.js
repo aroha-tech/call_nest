@@ -133,13 +133,17 @@ export function mergeApplicableContactColumnsWithCustomFields(applicableBase, cu
  */
 export function buildIndustryFieldColumnDefsForContacts(definitions) {
   if (!Array.isArray(definitions)) return [];
-  return definitions.map((d) => ({
-    id: industryFieldColumnId(d.field_key),
-    label: d.label || d.field_key,
-    category: 'extra',
-    industryFieldType: d.type,
-    sortKey: null,
-  }));
+  return definitions.map((d) => {
+    const id = industryFieldColumnId(d.field_key);
+    return {
+      id,
+      label: d.label || d.field_key,
+      category: 'extra',
+      industryFieldType: d.type,
+      sortKey: id,
+      columnFilterOnly: true,
+    };
+  });
 }
 
 export function mergeApplicableContactColumnsWithIndustryFields(applicableBase, definitions) {

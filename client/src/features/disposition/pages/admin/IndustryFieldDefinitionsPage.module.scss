@@ -29,3 +29,23 @@
   color: var(--color-text-muted, #64748b);
   margin: 0;
 }
+
+.embeddedWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.embeddedBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.embeddedTitle {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}

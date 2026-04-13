@@ -357,13 +357,26 @@ const COLUMN_FILTER_FIELDS = new Set([
   'created_at',
 ]);
 
+/** Matches client `industryFieldColumnId` / contacts.industry_profile object keys */
+const INDUSTRY_LIST_FILTER_COL_PREFIX = 'ind:';
+const INDUSTRY_PROFILE_JSON_KEY_RE = /^[a-z0-9_]{2,100}$/;
+
+function parseIndustryProfileListFilterField(field) {
+  if (!field || typeof field !== 'string') return null;
+  if (!field.startsWith(INDUSTRY_LIST_FILTER_COL_PREFIX)) return null;
+  const key = field.slice(INDUSTRY_LIST_FILTER_COL_PREFIX.length);
+  if (!INDUSTRY_PROFILE_JSON_KEY_RE.test(key)) return null;
+  return key;
+}
+
 const COLUMN_FILTER_OPS = new Set(['empty', 'not_empty', 'contains', 'not_contains', 'starts_with', 'ends_with']);
 
 /**
  * @param {unknown} raw
+ * @param {Set<string>|undefined} allowedIndustryFieldKeys — when a Set, only these `field_key`s accept `ind:` rules (from tenant effective industry fields).
  * @returns {Array<{ field: string, op: string, value?: string }>}
  */
-export function normalizeContactListColumnFilters(raw) {
+export function normalizeContactListColumnFilters(raw, allowedIndustryFieldKeys) {
   if (raw === undefined || raw === null || raw === '') return [];
   let arr;
   try {
@@ -377,13 +390,103 @@ export function normalizeContactListColumnFilters(raw) {
     if (!item || typeof item !== 'object') continue;
     const field = String(item.field || '').trim();
     const op = String(item.op || '').trim();
-    if (!COLUMN_FILTER_FIELDS.has(field) || !COLUMN_FILTER_OPS.has(op)) continue;
+    const indKey = parseIndustryProfileListFilterField(field);
+    if (indKey) {
+      if (allowedIndustryFieldKeys instanceof Set && !allowedIndustryFieldKeys.has(indKey)) continue;
+    } else if (!COLUMN_FILTER_FIELDS.has(field)) {
+      continue;
+    }
+    if (!COLUMN_FILTER_OPS.has(op)) continue;
     const value = item.value == null ? '' : String(item.value).trim();
     if (value.length > 200) continue;
     if (['contains', 'not_contains', 'starts_with', 'ends_with'].includes(op) && value === '') continue;
     byField.set(field, { field, op, value });
   }
   return [...byField.values()].slice(0, 12);
+}
+
+/**
+ * @param {string[]} whereClauses
+ * @param {unknown[]} params
+ * @param {string} fieldKey — safe [a-z0-9_]+ key inside industry_profile JSON
+ * @param {string} op
+ * @param {string} value
+ */
+function applyIndustryProfileColumnFilter(whereClauses, params, fieldKey, op, value) {
+  const path = `$.${fieldKey}`;
+  const likeWord = (v) => `%${v}%`;
+  const starts = (v) => `${v}%`;
+  const ends = (v) => `%${v}`;
+
+  if (op === 'empty') {
+    whereClauses.push(
+      `(
+        c.industry_profile IS NULL
+        OR NOT JSON_CONTAINS_PATH(c.industry_profile, 'one', ?)
+        OR JSON_TYPE(JSON_EXTRACT(c.industry_profile, ?)) = 'NULL'
+        OR (
+          JSON_TYPE(JSON_EXTRACT(c.industry_profile, ?)) = 'STRING'
+          AND TRIM(JSON_UNQUOTE(JSON_EXTRACT(c.industry_profile, ?))) = ''
+        )
+        OR (
+          JSON_TYPE(JSON_EXTRACT(c.industry_profile, ?)) = 'ARRAY'
+          AND COALESCE(JSON_LENGTH(JSON_EXTRACT(c.industry_profile, ?)), 0) = 0
+        )
+      )`
+    );
+    params.push(path, path, path, path, path, path);
+    return;
+  }
+  if (op === 'not_empty') {
+    whereClauses.push(
+      `(
+        c.industry_profile IS NOT NULL
+        AND JSON_CONTAINS_PATH(c.industry_profile, 'one', ?)
+        AND JSON_TYPE(JSON_EXTRACT(c.industry_profile, ?)) != 'NULL'
+        AND NOT (
+          JSON_TYPE(JSON_EXTRACT(c.industry_profile, ?)) = 'STRING'
+          AND TRIM(JSON_UNQUOTE(JSON_EXTRACT(c.industry_profile, ?))) = ''
+        )
+        AND NOT (
+          JSON_TYPE(JSON_EXTRACT(c.industry_profile, ?)) = 'ARRAY'
+          AND COALESCE(JSON_LENGTH(JSON_EXTRACT(c.industry_profile, ?)), 0) = 0
+        )
+      )`
+    );
+    params.push(path, path, path, path, path, path);
+    return;
+  }
+  if (op === 'contains') {
+    whereClauses.push(
+      `(c.industry_profile IS NOT NULL AND JSON_CONTAINS_PATH(c.industry_profile, 'one', ?) AND CAST(JSON_EXTRACT(c.industry_profile, ?) AS CHAR) LIKE ?)`
+    );
+    params.push(path, path, likeWord(value));
+    return;
+  }
+  if (op === 'not_contains') {
+    whereClauses.push(
+      `(
+        c.industry_profile IS NULL
+        OR NOT JSON_CONTAINS_PATH(c.industry_profile, 'one', ?)
+        OR CAST(JSON_EXTRACT(c.industry_profile, ?) AS CHAR) NOT LIKE ?
+      )`
+    );
+    params.push(path, path, likeWord(value));
+    return;
+  }
+  if (op === 'starts_with') {
+    whereClauses.push(
+      `(c.industry_profile IS NOT NULL AND JSON_CONTAINS_PATH(c.industry_profile, 'one', ?) AND CAST(JSON_EXTRACT(c.industry_profile, ?) AS CHAR) LIKE ?)`
+    );
+    params.push(path, path, starts(value));
+    return;
+  }
+  if (op === 'ends_with') {
+    whereClauses.push(
+      `(c.industry_profile IS NOT NULL AND JSON_CONTAINS_PATH(c.industry_profile, 'one', ?) AND CAST(JSON_EXTRACT(c.industry_profile, ?) AS CHAR) LIKE ?)`
+    );
+    params.push(path, path, ends(value));
+  }
 }
 
 /**
@@ -399,6 +502,11 @@ function applyContactListColumnFilters(whereClauses, params, rules) {
   const ends = (v) => `%${v}`;
 
   for (const { field, op, value } of rules) {
+    const indKey = parseIndustryProfileListFilterField(field);
+    if (indKey) {
+      applyIndustryProfileColumnFilter(whereClauses, params, indKey, op, value);
+      continue;
+    }
     switch (field) {
       case 'display_name':
         if (op === 'empty') {
@@ -826,7 +934,9 @@ async function prepareContactListFinalWhere(
     filterUnassignedManagers,
   });
 
-  const normalizedColumnFilters = normalizeContactListColumnFilters(columnFilters);
+  const effIndFields = await tenantIndustryFieldsService.getEffectiveFieldDefinitions(tenantId);
+  const allowedIndustryFieldKeys = new Set(effIndFields.map((d) => String(d.field_key)));
+  const normalizedColumnFilters = normalizeContactListColumnFilters(columnFilters, allowedIndustryFieldKeys);
   applyContactListColumnFilters(whereClauses, params, normalizedColumnFilters);
 
   const finalWhere = `WHERE ${whereClauses.join(' AND ')}`;
