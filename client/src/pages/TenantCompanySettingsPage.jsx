@@ -5,9 +5,11 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Card } from '../components/ui/Card';
+import { Checkbox } from '../components/ui/Checkbox';
 import { Alert } from '../components/ui/Alert';
 import { useMutation } from '../hooks/useAsyncData';
 import { tenantCompanyAPI } from '../services/tenantCompanyAPI';
+import { tenantIndustryFieldsAPI } from '../services/tenantIndustryFieldsAPI';
 import { getTenantSlugStatus } from '../features/auth/authAPI';
 import { workspaceCompanyUpdated } from '../features/auth/authSlice';
 import {
@@ -40,6 +42,11 @@ export function TenantCompanySettingsPage() {
   const [saveError, setSaveError] = useState(null);
   const [slugChangedNotice, setSlugChangedNotice] = useState(false);
 
+  const [optionalIndustryFields, setOptionalIndustryFields] = useState([]);
+  const [optionalIndustryLoading, setOptionalIndustryLoading] = useState(false);
+  const [optionalIndustrySaving, setOptionalIndustrySaving] = useState(false);
+  const [optionalIndustryError, setOptionalIndustryError] = useState(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
@@ -57,6 +64,25 @@ export function TenantCompanySettingsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const loadOptionalIndustryFields = useCallback(async () => {
+    setOptionalIndustryLoading(true);
+    setOptionalIndustryError(null);
+    try {
+      const res = await tenantIndustryFieldsAPI.getOptionalSettings();
+      const rows = res?.data?.data?.fields ?? [];
+      setOptionalIndustryFields(Array.isArray(rows) ? rows : []);
+    } catch (err) {
+      setOptionalIndustryFields([]);
+      setOptionalIndustryError(err.response?.data?.error || err.message || 'Failed to load industry field options');
+    } finally {
+      setOptionalIndustryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (bundle?.tenant?.id) loadOptionalIndustryFields();
+  }, [bundle?.tenant?.id, loadOptionalIndustryFields]);
 
   const tenant = bundle?.tenant;
   const industryOptionsRaw = bundle?.industry_options ?? [];
@@ -180,6 +206,22 @@ export function TenantCompanySettingsPage() {
       }
     }
     await load();
+    await loadOptionalIndustryFields();
+  };
+
+  const handleSaveOptionalIndustryFields = async () => {
+    setOptionalIndustrySaving(true);
+    setOptionalIndustryError(null);
+    try {
+      const enabled_field_ids = optionalIndustryFields.filter((f) => f.is_enabled).map((f) => f.id);
+      const res = await tenantIndustryFieldsAPI.putOptionalSettings(enabled_field_ids);
+      const rows = res?.data?.data?.fields ?? [];
+      setOptionalIndustryFields(Array.isArray(rows) ? rows : []);
+    } catch (err) {
+      setOptionalIndustryError(err.response?.data?.error || err.message || 'Save failed');
+    } finally {
+      setOptionalIndustrySaving(false);
+    }
   };
 
   if (loading) {
@@ -277,6 +319,49 @@ export function TenantCompanySettingsPage() {
           </div>
         </form>
       </Card>
+
+      {tenant?.industry_id ? (
+        <Card className={styles.card}>
+          <h2 className={styles.sectionTitle}>Industry field packs</h2>
+          <p className={styles.muted}>
+            Optional fields defined for your industry can be turned on here. Required industry fields are always shown on
+            leads and contacts.
+          </p>
+          {optionalIndustryError ? (
+            <Alert variant="error" className={styles.alert}>
+              {optionalIndustryError}
+            </Alert>
+          ) : null}
+          {optionalIndustryLoading ? (
+            <p className={styles.muted}>Loading…</p>
+          ) : optionalIndustryFields.length === 0 ? (
+            <p className={styles.muted}>No optional industry fields are available.</p>
+          ) : (
+            <>
+              <div className={styles.optionalIndustryList}>
+                {optionalIndustryFields.map((f) => (
+                  <Checkbox
+                    key={f.id}
+                    label={`${f.label} (${f.field_key})`}
+                    checked={!!f.is_enabled}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setOptionalIndustryFields((prev) =>
+                        prev.map((row) => (row.id === f.id ? { ...row, is_enabled: checked } : row))
+                      );
+                    }}
+                  />
+                ))}
+              </div>
+              <div className={styles.actions}>
+                <Button type="button" onClick={handleSaveOptionalIndustryFields} disabled={optionalIndustrySaving}>
+                  {optionalIndustrySaving ? 'Saving…' : 'Save industry fields'}
+                </Button>
+              </div>
+            </>
+          )}
+        </Card>
+      ) : null}
     </div>
   );
 }

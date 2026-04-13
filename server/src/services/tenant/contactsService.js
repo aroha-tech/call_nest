@@ -35,6 +35,7 @@ import {
 } from '../../utils/leadImportCsvHelpers.js';
 import * as contactTagsService from './contactTagsService.js';
 import * as contactAssignmentHistoryService from './contactAssignmentHistoryService.js';
+import * as tenantIndustryFieldsService from './tenantIndustryFieldsService.js';
 
 function assertUniquePhoneLabels(phones) {
   if (!Array.isArray(phones)) return;
@@ -813,9 +814,9 @@ async function prepareContactListFinalWhere(
         SELECT 1 FROM contact_tag_assignments cta_s
         INNER JOIN contact_tags ct_s ON ct_s.id = cta_s.tag_id AND ct_s.tenant_id = cta_s.tenant_id
         WHERE cta_s.contact_id = c.id AND cta_s.tenant_id = c.tenant_id AND ct_s.deleted_at IS NULL AND ct_s.name LIKE ?
-      ))`
+      ) OR (c.industry_profile IS NOT NULL AND CAST(c.industry_profile AS CHAR) LIKE ?))`
     );
-    params.push(q, q, q, q, q, q, q);
+    params.push(q, q, q, q, q, q, q, q);
   }
 
   await applyContactListFilters(tenantId, user, whereClauses, params, {
@@ -916,6 +917,7 @@ export async function listContacts(
         c.industry,
         c.date_of_birth,
         c.tax_id,
+        c.industry_profile,
         (SELECT GROUP_CONCAT(DISTINCT ct.name ORDER BY ct.name SEPARATOR ', ')
          FROM contact_tag_assignments cta
          INNER JOIN contact_tags ct ON ct.id = cta.tag_id AND ct.tenant_id = cta.tenant_id
@@ -947,6 +949,12 @@ export async function listContacts(
 
   /** field_id → value_text per contact for list columns (Customize columns → tenant custom fields). */
   if (data.length > 0) {
+    for (const row of data) {
+      const ip = tenantIndustryFieldsService.parseIndustryProfileColumn(row.industry_profile);
+      if (ip != null) row.industry_profile = ip;
+      else delete row.industry_profile;
+    }
+
     const contactIds = data.map((row) => row.id);
     const placeholders = contactIds.map(() => '?').join(',');
     const cfRows = await query(
@@ -1109,6 +1117,7 @@ export async function getContactById(id, tenantId, user) {
         c.industry,
         c.date_of_birth,
         c.tax_id,
+        c.industry_profile,
         c.manager_id,
         c.assigned_user_id,
         c.status_id,
@@ -1131,6 +1140,13 @@ export async function getContactById(id, tenantId, user) {
   );
 
   if (!row) return null;
+
+  const industryProfile = tenantIndustryFieldsService.parseIndustryProfileColumn(row.industry_profile);
+  if (industryProfile != null) {
+    row.industry_profile = industryProfile;
+  } else {
+    delete row.industry_profile;
+  }
 
   const phones = await query(
     `SELECT id, phone, label, is_primary, created_at
@@ -1253,6 +1269,7 @@ async function buildContactInsertRow(
     industry,
     date_of_birth,
     tax_id,
+    industry_profile,
     tag_ids,
     status_id,
     campaign_id,
@@ -1262,6 +1279,17 @@ async function buildContactInsertRow(
     custom_fields = [],
     created_source,
   } = payload;
+
+  let industryProfileJson = null;
+  if (industry_profile !== undefined) {
+    const v = await tenantIndustryFieldsService.validateIndustryProfileForTenant(tenantId, industry_profile);
+    if (v.error) {
+      const err = new Error(v.error);
+      err.status = 400;
+      throw err;
+    }
+    industryProfileJson = v.jsonStr;
+  }
 
   let resolvedManagerId = manager_id || null;
   let resolvedAssignedUserId = assigned_user_id || null;
@@ -1318,6 +1346,7 @@ async function buildContactInsertRow(
     trimStr(industry),
     dob,
     trimStr(tax_id),
+    industryProfileJson,
     resolvedManagerId,
     resolvedAssignedUserId,
     resolvedStatusId,
@@ -1367,9 +1396,10 @@ async function flushImportCreateBuffer(
       );
     }
 
-    const placeholders = built.map(() => `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).join(
-      ', '
-    );
+    const placeholders = built.map(
+      () =>
+        `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).join(', ');
     const flatParams = built.flatMap((b) => b.insertParams);
     const n = buffer.length;
 
@@ -1398,6 +1428,7 @@ async function flushImportCreateBuffer(
         industry,
         date_of_birth,
         tax_id,
+        industry_profile,
         manager_id,
         assigned_user_id,
         status_id,
@@ -1571,13 +1602,14 @@ export async function createContact(tenantId, user, payload, options = {}) {
         industry,
         date_of_birth,
         tax_id,
+        industry_profile,
         manager_id,
         assigned_user_id,
         status_id,
         campaign_id,
         created_source,
         created_by
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     insertParams
   );
 
@@ -1795,6 +1827,7 @@ export async function updateContact(id, tenantId, user, payload, options = {}) {
     industry,
     date_of_birth,
     tax_id,
+    industry_profile,
     tag_ids,
     status_id,
     campaign_id,
@@ -1895,6 +1928,16 @@ export async function updateContact(id, tenantId, user, payload, options = {}) {
   if (tax_id !== undefined) {
     updates.push('tax_id = ?');
     params.push(trimStr(tax_id));
+  }
+  if (industry_profile !== undefined) {
+    const v = await tenantIndustryFieldsService.validateIndustryProfileForTenant(tenantId, industry_profile);
+    if (v.error) {
+      const err = new Error(v.error);
+      err.status = 400;
+      throw err;
+    }
+    updates.push('industry_profile = ?');
+    params.push(v.jsonStr);
   }
   if (convertingLeadToContact && convertedStatusId) {
     updates.push('status_id = ?');
@@ -3343,6 +3386,7 @@ export async function exportContactsCsv(
         c.industry,
         c.date_of_birth,
         c.tax_id,
+        c.industry_profile,
         c.call_count_total,
         c.last_called_at,
         (SELECT GROUP_CONCAT(DISTINCT ct.name ORDER BY ct.name SEPARATOR ', ')
@@ -3529,6 +3573,7 @@ export async function exportContactsCsv(
     'industry',
     'date_of_birth',
     'tax_id',
+    'industry_profile_json',
     'tags',
     'campaign_id',
     'campaign_name',
@@ -3575,6 +3620,11 @@ export async function exportContactsCsv(
       c.industry,
       dob,
       c.tax_id,
+      c.industry_profile
+        ? typeof c.industry_profile === 'string'
+          ? c.industry_profile
+          : JSON.stringify(c.industry_profile)
+        : '',
       c.tag_names || '',
       c.campaign_id,
       c.campaign_name,

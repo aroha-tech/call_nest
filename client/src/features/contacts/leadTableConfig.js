@@ -15,6 +15,7 @@ const LEGACY_LEAD_TABLE_COLUMNS_STORAGE_KEY_V2 = 'callnest.leadList.visibleColum
  */
 
 import { customFieldColumnId, parseCustomFieldColumnId } from './customFieldColumnIds';
+import { industryFieldColumnId } from './industryFieldColumnIds';
 
 /** Back-compat exports (used by LeadDataTable / ContactsPage). */
 export const LEAD_CUSTOM_FIELD_COL_PREFIX = 'cf:';
@@ -44,6 +45,29 @@ export function buildLeadCustomFieldColumnDefs(customFields) {
  */
 export function mergeApplicableLeadColumnsWithCustomFields(applicableBase, customFields) {
   return [...applicableBase, ...buildLeadCustomFieldColumnDefs(customFields)];
+}
+
+/**
+ * @param {Array<{ field_key: string, label?: string, type?: string }>} definitions
+ * @returns {LeadColumnDef[]}
+ */
+export function buildIndustryFieldColumnDefs(definitions) {
+  if (!Array.isArray(definitions)) return [];
+  return definitions.map((d) => ({
+    id: industryFieldColumnId(d.field_key),
+    label: d.label || d.field_key,
+    category: 'extra',
+    industryFieldType: d.type,
+    sortKey: null,
+  }));
+}
+
+/**
+ * @param {LeadColumnDef[]} applicableBase
+ * @param {Array<{ field_key: string, label?: string, type?: string }>} definitions
+ */
+export function mergeApplicableLeadColumnsWithIndustryFields(applicableBase, definitions) {
+  return [...applicableBase, ...buildIndustryFieldColumnDefs(definitions)];
 }
 
 /** @type {LeadColumnDef[]} */

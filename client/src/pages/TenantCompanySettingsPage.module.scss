@@ -32,3 +32,16 @@
   color: var(--color-text-muted);
   margin: 0;
 }
+
+.sectionTitle {
+  font-size: $font-size-lg;
+  font-weight: 600;
+  margin: 0 0 $space-2;
+}
+
+.optionalIndustryList {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+  margin-top: $space-3;
+}

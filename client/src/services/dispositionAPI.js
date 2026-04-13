@@ -18,6 +18,16 @@ export const industriesAPI = {
   delete: (id) => axiosInstance.delete(`/api/admin/industries/${id}`),
 };
 
+export const industryFieldDefinitionsAPI = {
+  list: (industryId) => axiosInstance.get(`/api/admin/industries/${industryId}/field-definitions`),
+  create: (industryId, data) =>
+    axiosInstance.post(`/api/admin/industries/${industryId}/field-definitions`, data),
+  update: (industryId, fieldId, data) =>
+    axiosInstance.put(`/api/admin/industries/${industryId}/field-definitions/${fieldId}`, data),
+  remove: (industryId, fieldId) =>
+    axiosInstance.delete(`/api/admin/industries/${industryId}/field-definitions/${fieldId}`),
+};
+
 // Disposition Types
 export const dispoTypesAPI = {
   getAll: ({ search = '', includeInactive = false, page = 1, limit = 20 } = {}) =>

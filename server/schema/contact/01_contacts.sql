@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS contacts (
   industry VARCHAR(150) NULL,
   date_of_birth DATE NULL,
   tax_id VARCHAR(50) NULL,
+  industry_profile JSON NULL COMMENT 'Industry-specific field values (object keyed by field_key)',
 
   -- Ownership
   manager_id BIGINT UNSIGNED NULL,

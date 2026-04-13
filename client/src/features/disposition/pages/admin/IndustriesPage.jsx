@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { MasterCRUDPage } from '../../components/MasterCRUDPage';
 import { useIndustries } from '../../hooks/useMasterData';
 import { StatusBadge } from '../../../../components/ui/Badge';
@@ -32,6 +33,15 @@ export function IndustriesPage() {
         label: 'Updated',
         width: '128px',
         render: (v) => formatDateTime(v),
+      },
+      {
+        key: 'fields_nav',
+        label: 'Lead fields',
+        width: '120px',
+        noTruncate: true,
+        render: (_, item) => (
+          <Link to={`/admin/masters/industries/${item.id}/fields`}>Manage fields</Link>
+        ),
       },
     ],
     [formatDateTime]

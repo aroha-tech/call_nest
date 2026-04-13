@@ -22,6 +22,7 @@ import platformUsersAdminRoutes from './routes/superAdmin/platformUsers.js';
 import dashboardAdminRoutes from './routes/superAdmin/dashboard.js';
 import campaignTypesMasterRoutes from './routes/superAdmin/campaignTypesMaster.js';
 import campaignStatusesMasterRoutes from './routes/superAdmin/campaignStatusesMaster.js';
+import industryFieldDefinitionsRoutes from './routes/superAdmin/industryFieldDefinitions.js';
 
 // Tenant routes
 import dialingSetsRoutes from './routes/tenant/dialingSets.js';
@@ -52,6 +53,7 @@ import callsRoutes from './routes/tenant/calls.js';
 import dialerSessionsRoutes from './routes/tenant/dialerSessions.js';
 import savedListFiltersRoutes from './routes/tenant/savedListFilters.js';
 import meetingsRoutes from './routes/tenant/meetings.js';
+import tenantIndustryFieldsRoutes from './routes/tenant/industryFields.js';
 
 const app = express();
 
@@ -121,6 +123,7 @@ app.use('/api/template-variables', templateVariablesRoutes);
 
 // Super Admin routes (platform admin only)
 app.use('/api/admin/industries', industriesRoutes);
+app.use('/api/admin/industries/:industryId/field-definitions', industryFieldDefinitionsRoutes);
 app.use('/api/admin/dispo-types', dispoTypesMasterRoutes);
 app.use('/api/admin/dispo-actions', dispoActionsMasterRoutes);
 app.use('/api/admin/contact-statuses', contactStatusMasterRoutes);
@@ -162,6 +165,7 @@ app.use('/api/tenant/calls', callsRoutes);
 app.use('/api/tenant/dialer-sessions', dialerSessionsRoutes);
 app.use('/api/tenant/saved-list-filters', savedListFiltersRoutes);
 app.use('/api/tenant/meetings', meetingsRoutes);
+app.use('/api/tenant/industry-fields', tenantIndustryFieldsRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);

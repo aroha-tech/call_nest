@@ -12,6 +12,7 @@ import { Alert } from '../../components/ui/Alert';
 import { Spinner } from '../../components/ui/Spinner';
 import { ConfirmModal } from '../../components/ui/Modal';
 import { contactsAPI } from '../../services/contactsAPI';
+import { tenantIndustryFieldsAPI } from '../../services/tenantIndustryFieldsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
 import { campaignsAPI } from '../../services/campaignsAPI';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
@@ -118,11 +119,13 @@ export function ContactFormPage({ defaultType }) {
   const type = defaultType; // 'lead' or 'contact' from route wrapper
 
   const [customFields, setCustomFields] = useState([]);
+  const [industryFieldDefs, setIndustryFieldDefs] = useState([]);
   const [tenantUsers, setTenantUsers] = useState([]);
   const [campaignList, setCampaignList] = useState([]);
   const [contactTagOptions, setContactTagOptions] = useState([]);
   const { data: contactStatuses = [], loading: contactStatusesLoading } = useContactStatusesOptions();
   const [loadingCustomFields, setLoadingCustomFields] = useState(false);
+  const [loadingIndustryFields, setLoadingIndustryFields] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [formErrors, setFormErrors] = useState({});
   const [displayNameTouched, setDisplayNameTouched] = useState(false);
@@ -151,6 +154,7 @@ export function ContactFormPage({ defaultType }) {
     tax_id: '',
     phones: [{ country_code: DEFAULT_COUNTRY_CODE, number: '', label: 'mobile', is_primary: true }],
     customValuesMap: {},
+    industryValuesMap: {},
     manager_id: '',
     assigned_user_id: '',
     campaign_id: '',
@@ -212,6 +216,22 @@ export function ContactFormPage({ defaultType }) {
   useEffect(() => {
     fetchCustomFields();
   }, [fetchCustomFields]);
+
+  const fetchIndustryFields = useCallback(async () => {
+    setLoadingIndustryFields(true);
+    try {
+      const res = await tenantIndustryFieldsAPI.getDefinitions();
+      setIndustryFieldDefs(Array.isArray(res?.data?.data) ? res.data.data : []);
+    } catch {
+      setIndustryFieldDefs([]);
+    } finally {
+      setLoadingIndustryFields(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchIndustryFields();
+  }, [fetchIndustryFields]);
 
   useEffect(() => {
     let cancelled = false;
@@ -324,6 +344,18 @@ export function ContactFormPage({ defaultType }) {
       tax_id: contact.tax_id ?? '',
       phones: mappedPhones,
       customValuesMap: prev.customValuesMap || {},
+      industryValuesMap: (() => {
+        const p = contact.industry_profile;
+        if (!p || typeof p !== 'object') return {};
+        const out = {};
+        for (const [k, v] of Object.entries(p)) {
+          if (v === null || v === undefined) out[k] = '';
+          else if (Array.isArray(v)) out[k] = JSON.stringify(v);
+          else if (typeof v === 'boolean') out[k] = v ? '1' : '0';
+          else out[k] = String(v);
+        }
+        return out;
+      })(),
       manager_id: contact.manager_id != null ? String(contact.manager_id) : '',
       assigned_user_id: contact.assigned_user_id != null ? String(contact.assigned_user_id) : '',
       campaign_id: contact.campaign_id != null ? String(contact.campaign_id) : '',
@@ -512,6 +544,27 @@ export function ContactFormPage({ defaultType }) {
       })
       .filter(Boolean);
 
+    let industry_profile;
+    if (industryFieldDefs.length > 0) {
+      const o = {};
+      for (const f of industryFieldDefs) {
+        const raw = formData?.industryValuesMap?.[f.field_key];
+        const empty = raw === undefined || raw === null || String(raw).trim() === '';
+        if (empty) continue;
+        if (f.type === 'boolean') {
+          const s = String(raw).toLowerCase();
+          o[f.field_key] = ['1', 'true', 'yes', 'on'].includes(s);
+        } else if (f.type === 'number') {
+          o[f.field_key] = Number(String(raw).replace(/,/g, ''));
+        } else if (f.type === 'multiselect' || f.type === 'multiselect_dropdown') {
+          o[f.field_key] = parseMultiselectStored(raw);
+        } else {
+          o[f.field_key] = String(raw).trim();
+        }
+      }
+      industry_profile = o;
+    }
+
     const base = {
       type,
       display_name: formData.display_name,
@@ -533,6 +586,7 @@ export function ContactFormPage({ defaultType }) {
       tag_ids: (formData.tag_ids || []).map((id) => Number(id)).filter((n) => Number.isFinite(n) && n > 0),
       phones,
       custom_fields,
+      ...(industry_profile !== undefined ? { industry_profile } : {}),
     };
 
     if (!isNew) {
@@ -713,6 +767,19 @@ export function ContactFormPage({ defaultType }) {
 
   function formatCustomFieldForView(field) {
     const raw = formData?.customValuesMap?.[field.field_id];
+    if (raw == null || raw === '') return '—';
+    if (field.type === 'boolean') {
+      return String(raw).toLowerCase() === 'true' || raw === '1' ? 'Yes' : 'No';
+    }
+    if (field.type === 'multiselect' || field.type === 'multiselect_dropdown') {
+      const arr = parseMultiselectStored(raw);
+      return arr.length ? arr.join(', ') : '—';
+    }
+    return formatViewText(raw);
+  }
+
+  function formatIndustryFieldForView(field) {
+    const raw = formData?.industryValuesMap?.[field.field_key];
     if (raw == null || raw === '') return '—';
     if (field.type === 'boolean') {
       return String(raw).toLowerCase() === 'true' || raw === '1' ? 'Yes' : 'No';
@@ -1266,6 +1333,126 @@ export function ContactFormPage({ defaultType }) {
           </section>
         ) : null}
 
+        <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-industry">
+          <h2 id="contact-section-industry" className={styles.sectionTitle}>
+            Industry fields
+            {loadingIndustryFields ? <span className={styles.loadingInline}>Loading…</span> : null}
+          </h2>
+          {showFormHints ? (
+            <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
+              Defined by your platform admin for your industry. Enable optional packs under Company settings.
+            </p>
+          ) : null}
+          {!loadingIndustryFields && industryFieldDefs.length === 0 ? (
+            <p className={styles.customEmpty}>No industry fields for this workspace.</p>
+          ) : null}
+
+          <div className={styles.customFieldsGridDense}>
+            {industryFieldDefs.map((f) => {
+              const value = formData?.industryValuesMap?.[f.field_key] ?? '';
+              const options = normalizeOptions(f.options_json);
+              const setIndustryMap = (key, nextVal) => {
+                const nextMap = { ...(formData.industryValuesMap || {}) };
+                nextMap[key] = nextVal;
+                setFormData((prev) => ({ ...prev, industryValuesMap: nextMap }));
+              };
+
+              if (f.type === 'select') {
+                return (
+                  <Select
+                    key={f.field_key}
+                    label={f.label}
+                    value={value || ''}
+                    onChange={(e) => setIndustryMap(f.field_key, e.target.value)}
+                    options={options.map((opt) => ({ value: String(opt), label: String(opt) }))}
+                    placeholder="Select..."
+                  />
+                );
+              }
+
+              if (f.type === 'multiselect') {
+                const selected = new Set(parseMultiselectStored(value).map(String));
+                const setMultiselect = (nextSet) => {
+                  const ordered = options.map(String).filter((o) => nextSet.has(o));
+                  setIndustryMap(f.field_key, ordered.length ? JSON.stringify(ordered) : '');
+                };
+                return (
+                  <div key={f.field_key} className={styles.customFieldFull}>
+                    <div className={styles.customMultiselectLabel}>{f.label}</div>
+                    {options.length === 0 ? (
+                      <p className={styles.customMultiselectEmpty}>No options configured for this field.</p>
+                    ) : (
+                      <div className={styles.customMultiselectGroup} role="group" aria-label={f.label}>
+                        {options.map((opt, optIdx) => {
+                          const optStr = String(opt);
+                          const cid = `ind-ms-${f.field_key}-${optIdx}`;
+                          return (
+                            <Checkbox
+                              key={cid}
+                              id={cid}
+                              label={optStr}
+                              checked={selected.has(optStr)}
+                              onChange={(e) => {
+                                const next = new Set(selected);
+                                if (e.target.checked) next.add(optStr);
+                                else next.delete(optStr);
+                                setMultiselect(next);
+                              }}
+                              className={styles.customMultiselectCheck}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              if (f.type === 'multiselect_dropdown') {
+                return (
+                  <div key={f.field_key} className={styles.customFieldFull}>
+                    <MultiSelectDropdown
+                      label={f.label}
+                      options={options}
+                      value={value}
+                      placeholder="Select…"
+                      searchable={options.length > 12}
+                      onChange={(next) => setIndustryMap(f.field_key, next)}
+                    />
+                  </div>
+                );
+              }
+
+              if (f.type === 'boolean') {
+                return (
+                  <label
+                    key={f.field_key}
+                    className={`${styles.customFieldFull} ${styles.primaryCheck} ${styles.customBooleanRow}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={String(value).toLowerCase() === 'true' || value === '1'}
+                      onChange={(e) => setIndustryMap(f.field_key, e.target.checked ? 'true' : 'false')}
+                    />
+                    <span className={styles.booleanLabel}>{f.label}</span>
+                  </label>
+                );
+              }
+
+              return (
+                <Input
+                  key={f.field_key}
+                  label={f.label}
+                  value={value}
+                  onChange={(e) => setIndustryMap(f.field_key, e.target.value)}
+                  type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
+                  placeholder={f.is_required ? 'Required' : 'Optional'}
+                />
+              );
+            })}
+          </div>
+        </section>
+
         <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-custom">
           <h2 id="contact-section-custom" className={styles.sectionTitle}>
             Custom fields
@@ -1528,6 +1715,22 @@ export function ContactFormPage({ defaultType }) {
                   </div>
                 </section>
               ) : null}
+
+              <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-industry">
+                <h2 id="view-section-industry" className={styles.sectionTitle}>
+                  Industry fields
+                </h2>
+                {!loadingIndustryFields && industryFieldDefs.length === 0 ? (
+                  <p className={styles.customEmpty}>No industry fields for this workspace.</p>
+                ) : null}
+                <div className={styles.fieldGridDense}>
+                  {industryFieldDefs.map((f) => (
+                    <ViewField key={f.field_key} label={f.label}>
+                      {formatIndustryFieldForView(f)}
+                    </ViewField>
+                  ))}
+                </div>
+              </section>
 
               <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-custom">
                 <h2 id="view-section-custom" className={styles.sectionTitle}>

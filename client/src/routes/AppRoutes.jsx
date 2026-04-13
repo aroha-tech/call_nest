@@ -21,6 +21,7 @@ import { hasPermission, hasAnyPermission, PERMISSIONS } from '../utils/permissio
 import { DispositionSettingsPage } from '../features/disposition/pages/tenant/DispositionSettingsPage';
 import { DispositionAdminPage } from '../features/disposition/pages/admin/DispositionAdminPage';
 import { IndustriesPage } from '../features/disposition/pages/admin/IndustriesPage';
+import { IndustryFieldDefinitionsPage } from '../features/disposition/pages/admin/IndustryFieldDefinitionsPage';
 import { DispoTypesPage } from '../features/disposition/pages/admin/DispoTypesPage';
 import { DispoActionsPage } from '../features/disposition/pages/admin/DispoActionsPage';
 import { ContactStatusesPage } from '../features/disposition/pages/admin/ContactStatusesPage';
@@ -701,6 +702,16 @@ function PlatformRoutes() {
           <ProtectedRoute>
             <AppShellLayout>
               <IndustriesPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/masters/industries/:industryId/fields"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <IndustryFieldDefinitionsPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

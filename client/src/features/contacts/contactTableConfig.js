@@ -1,4 +1,5 @@
 import { customFieldColumnId } from './customFieldColumnIds';
+import { industryFieldColumnId } from './industryFieldColumnIds';
 
 export const CONTACT_TABLE_COLUMNS_STORAGE_KEY = 'callnest.contactList.visibleColumns.v1';
 
@@ -125,5 +126,23 @@ export function buildContactCustomFieldColumnDefs(customFields) {
  */
 export function mergeApplicableContactColumnsWithCustomFields(applicableBase, customFields) {
   return [...applicableBase, ...buildContactCustomFieldColumnDefs(customFields)];
+}
+
+/**
+ * @param {Array<{ field_key: string, label?: string, type?: string }>} definitions
+ */
+export function buildIndustryFieldColumnDefsForContacts(definitions) {
+  if (!Array.isArray(definitions)) return [];
+  return definitions.map((d) => ({
+    id: industryFieldColumnId(d.field_key),
+    label: d.label || d.field_key,
+    category: 'extra',
+    industryFieldType: d.type,
+    sortKey: null,
+  }));
+}
+
+export function mergeApplicableContactColumnsWithIndustryFields(applicableBase, definitions) {
+  return [...applicableBase, ...buildIndustryFieldColumnDefsForContacts(definitions)];
 }
 

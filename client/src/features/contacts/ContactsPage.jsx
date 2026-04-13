@@ -5,6 +5,7 @@ import { selectUser } from '../../features/auth/authSelectors';
 import { usePermission, useAnyPermission } from '../../hooks/usePermission';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import { contactsAPI } from '../../services/contactsAPI';
+import { tenantIndustryFieldsAPI } from '../../services/tenantIndustryFieldsAPI';
 import { campaignsAPI } from '../../services/campaignsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
 import { getMe as getMeAPI } from '../auth/authAPI';
@@ -29,6 +30,7 @@ import {
   leadCustomFieldColumnId,
   loadLeadVisibleColumnIds,
   mergeApplicableLeadColumnsWithCustomFields,
+  mergeApplicableLeadColumnsWithIndustryFields,
   saveLeadVisibleColumnIds,
 } from './leadTableConfig';
 import {
@@ -36,6 +38,7 @@ import {
   getDefaultVisibleContactColumnIds,
   loadContactVisibleColumnIds,
   mergeApplicableContactColumnsWithCustomFields,
+  mergeApplicableContactColumnsWithIndustryFields,
   saveContactVisibleColumnIds,
 } from './contactTableConfig';
 import listStyles from '../../components/admin/adminDataList.module.scss';
@@ -436,28 +439,36 @@ export function ContactsPage({ type, mode = 'crm' }) {
   /** Tenant-defined contact custom fields — columns in Customize + values from list API `custom_field_values`. */
   const [leadCustomFieldDefs, setLeadCustomFieldDefs] = useState([]);
   const [contactCustomFieldDefs, setContactCustomFieldDefs] = useState([]);
+  /** Platform industry catalog fields for this tenant's industry (contacts.industry_profile). */
+  const [industryFieldDefs, setIndustryFieldDefs] = useState([]);
   const leadApplicableColumns = useMemo(
     () =>
       type === 'lead'
         ? mergeApplicableLeadColumnsWithCustomFields(
-            getApplicableLeadColumns({
-              showCampaign,
-              showManagerAgent: showManagerAgentColumns,
-            }),
+            mergeApplicableLeadColumnsWithIndustryFields(
+              getApplicableLeadColumns({
+                showCampaign,
+                showManagerAgent: showManagerAgentColumns,
+              }),
+              industryFieldDefs
+            ),
             leadCustomFieldDefs
           )
         : [],
-    [type, showCampaign, showManagerAgentColumns, leadCustomFieldDefs]
+    [type, showCampaign, showManagerAgentColumns, industryFieldDefs, leadCustomFieldDefs]
   );
   const contactApplicableColumns = useMemo(
     () =>
       type === 'contact'
         ? mergeApplicableContactColumnsWithCustomFields(
-            getApplicableContactColumns({ showManagerAgent: showManagerAgentColumns }),
+            mergeApplicableContactColumnsWithIndustryFields(
+              getApplicableContactColumns({ showManagerAgent: showManagerAgentColumns }),
+              industryFieldDefs
+            ),
             contactCustomFieldDefs
           )
         : [],
-    [type, showManagerAgentColumns, contactCustomFieldDefs]
+    [type, showManagerAgentColumns, industryFieldDefs, contactCustomFieldDefs]
   );
   const [leadVisibleColumnIds, setLeadVisibleColumnIds] = useState(() =>
     type === 'lead'
@@ -686,6 +697,23 @@ export function ContactsPage({ type, mode = 'crm' }) {
       cancelled = true;
     };
   }, [type, canRead]);
+
+  useEffect(() => {
+    if (!canRead) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await tenantIndustryFieldsAPI.getDefinitions();
+        const list = res?.data?.data ?? [];
+        if (!cancelled) setIndustryFieldDefs(Array.isArray(list) ? list : []);
+      } catch {
+        if (!cancelled) setIndustryFieldDefs([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canRead]);
 
   /** Re-read localStorage when applicable set grows (e.g. custom fields loaded) so `cf:*` prefs apply. */
   useEffect(() => {

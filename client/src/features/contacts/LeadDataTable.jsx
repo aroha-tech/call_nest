@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 
 import styles from './LeadDataTable.module.scss';
 import { parseCustomFieldColumnId } from './customFieldColumnIds';
+import { parseIndustryFieldColumnId } from './industryFieldColumnIds';
 import { IconPhone } from './ListActionsMenuIcons';
 
 const ACTION_MENU_MIN_W = 160;
@@ -238,6 +239,21 @@ export function LeadDataTable({
   };
 
   const renderCell = (col, c) => {
+    const indKey = parseIndustryFieldColumnId(col.id);
+    if (indKey != null) {
+      const prof = c.industry_profile;
+      const raw = prof && typeof prof === 'object' && !Array.isArray(prof) ? prof[indKey] : null;
+      if (raw === null || raw === undefined || raw === '') return '—';
+      if (col.industryFieldType === 'boolean') {
+        const s = String(raw).toLowerCase();
+        if (s === '1' || s === 'true' || s === 'yes') return 'Yes';
+        if (s === '0' || s === 'false' || s === 'no') return 'No';
+      }
+      if (Array.isArray(raw)) return raw.join(', ');
+      if (typeof raw === 'object') return JSON.stringify(raw);
+      return String(raw);
+    }
+
     const cfId = parseCustomFieldColumnId(col.id);
     if (cfId != null) {
       const map = c.custom_field_values || {};
