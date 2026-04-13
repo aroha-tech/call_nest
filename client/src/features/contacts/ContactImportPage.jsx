@@ -12,6 +12,11 @@ import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown';
 import { contactsAPI } from '../../services/contactsAPI';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
+import {
+  DEFAULT_PHONE_COUNTRY_CODE,
+  getCallingCodeOptionsForSelect,
+  normalizeCallingCode,
+} from '../../utils/phoneInput';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import styles from './ContactImportPage.module.scss';
 
@@ -100,7 +105,7 @@ export function ContactImportPage({ type }) {
 
   const [file, setFile] = useState(null);
   const [mode, setMode] = useState('skip'); // skip | update
-  const [defaultCountryCode, setDefaultCountryCode] = useState('+91');
+  const [defaultCountryCode, setDefaultCountryCode] = useState(DEFAULT_PHONE_COUNTRY_CODE);
   const [tagOptions, setTagOptions] = useState([]);
   const [tenantUsers, setTenantUsers] = useState([]);
   const [importTagsJson, setImportTagsJson] = useState('');
@@ -280,7 +285,7 @@ export function ContactImportPage({ type }) {
         file,
         type,
         mode,
-        default_country_code: defaultCountryCode || '+91',
+        default_country_code: normalizeCallingCode(defaultCountryCode || DEFAULT_PHONE_COUNTRY_CODE),
         mapping,
         limit: 12,
       });
@@ -463,7 +468,7 @@ export function ContactImportPage({ type }) {
         file,
         type,
         mode,
-        default_country_code: defaultCountryCode || '+91',
+        default_country_code: normalizeCallingCode(defaultCountryCode || DEFAULT_PHONE_COUNTRY_CODE),
         mapping,
         tag_ids: tag_ids.length > 0 ? tag_ids : undefined,
         import_manager_id: canSetImportOwnership && importManagerId ? importManagerId : undefined,
@@ -609,14 +614,14 @@ export function ContactImportPage({ type }) {
                       ]}
                       placeholder="Select mode..."
                     />
-                    <Input
+                    <Select
                       label="Default country code"
-                      value={defaultCountryCode}
+                      value={normalizeCallingCode(defaultCountryCode)}
                       onChange={(e) => {
                         setDefaultCountryCode(e.target.value);
                         setReviewData(null);
                       }}
-                      placeholder="+91"
+                      options={getCallingCodeOptionsForSelect(defaultCountryCode)}
                     />
                   </div>
 
@@ -679,7 +684,7 @@ export function ContactImportPage({ type }) {
                     ·
                   </span>
                   <span>
-                    <strong>Country:</strong> {defaultCountryCode || '+91'}
+                    <strong>Country:</strong> {normalizeCallingCode(defaultCountryCode || DEFAULT_PHONE_COUNTRY_CODE)}
                   </span>
                 </div>
                 <Button

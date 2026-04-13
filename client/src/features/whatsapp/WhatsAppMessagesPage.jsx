@@ -23,6 +23,15 @@ import { usePermissions } from '../../hooks/usePermission';
 import { PERMISSIONS } from '../../utils/permissionUtils';
 import { useAppSelector } from '../../app/hooks';
 import { selectUser } from '../../features/auth/authSelectors';
+import {
+  DEFAULT_PHONE_COUNTRY_CODE,
+  PHONE_NATIONAL_MAX_DIGITS,
+  buildE164FromParts,
+  clampNationalDigits,
+  getCallingCodeOptionsForSelect,
+  normalizeCallingCode,
+  splitE164ToParts,
+} from '../../utils/phoneInput';
 
 const STATUS_VARIANTS = {
   pending: 'muted',
@@ -184,9 +193,11 @@ export function WhatsAppMessagesPage() {
 
   const openSend = (initialPhone = '') => {
     setSendMode('template');
+    const parts = splitE164ToParts(initialPhone);
     setSendForm({
       whatsapp_account_id: accounts?.[0]?.id ? String(accounts[0].id) : '',
-      phone: initialPhone,
+      phone_country_code: normalizeCallingCode(parts.country_code),
+      phone_national: parts.national,
       template_id: '',
       bodyParamValues: {},
       message_text: '',
@@ -233,11 +244,12 @@ export function WhatsAppMessagesPage() {
   const handleSend = async (e) => {
     e.preventDefault();
     setSendError(null);
-    const phoneDigits = sendForm.phone?.trim().replace(/\D/g, '');
-    if (!phoneDigits) {
-      setSendError('Phone number is required');
+    const national = clampNationalDigits(sendForm.phone_national);
+    if (!national || national.length !== PHONE_NATIONAL_MAX_DIGITS) {
+      setSendError(`Phone number must be exactly ${PHONE_NATIONAL_MAX_DIGITS} digits (plus country code)`);
       return;
     }
+    const fullPhone = buildE164FromParts(sendForm.phone_country_code, national);
     if (!sendForm.whatsapp_account_id) {
       setSendError('Select a WhatsApp account');
       return;
@@ -266,7 +278,7 @@ export function WhatsAppMessagesPage() {
       }
       const payload = {
         whatsapp_account_id: Number(sendForm.whatsapp_account_id),
-        phone: sendForm.phone.trim(),
+        phone: fullPhone,
         message_text,
       };
       const result = await sendTextMutation.mutate(payload);
@@ -290,7 +302,7 @@ export function WhatsAppMessagesPage() {
 
     const payload = {
       whatsapp_account_id: Number(sendForm.whatsapp_account_id),
-      phone: sendForm.phone.trim(),
+      phone: fullPhone,
       template_id: Number(sendForm.template_id),
       body_parameters,
       force_manual: effectiveMode === 'manual',
@@ -630,12 +642,33 @@ export function WhatsAppMessagesPage() {
             options={accountOptions}
             placeholder="Select account"
           />
-          <Input
-            label="Phone number"
-            value={sendForm.phone}
-            onChange={(e) => setSendForm({ ...sendForm, phone: e.target.value })}
-            placeholder="+91XXXXXXXXXX"
-          />
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ flex: '0 1 200px', minWidth: 160 }}>
+              <Select
+                label="Country code"
+                value={normalizeCallingCode(sendForm.phone_country_code)}
+                onChange={(e) =>
+                  setSendForm({ ...sendForm, phone_country_code: e.target.value })
+                }
+                options={getCallingCodeOptionsForSelect(sendForm.phone_country_code)}
+              />
+            </div>
+            <div style={{ flex: '1 1 200px', minWidth: 160 }}>
+              <Input
+                label="Phone number"
+                value={sendForm.phone_national}
+                onChange={(e) =>
+                  setSendForm({
+                    ...sendForm,
+                    phone_national: clampNationalDigits(e.target.value),
+                  })
+                }
+                placeholder={`${PHONE_NATIONAL_MAX_DIGITS}-digit number`}
+                inputMode="numeric"
+                maxLength={PHONE_NATIONAL_MAX_DIGITS}
+              />
+            </div>
+          </div>
 
           {sendMode === 'text' ? (
             <div style={{ marginTop: 12 }}>

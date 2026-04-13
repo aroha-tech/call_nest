@@ -498,3 +498,63 @@
     z-index: 1;
   }
 }
+
+.sortableSectionWrap {
+  min-width: 0;
+}
+
+.sortableSectionInner {
+  display: flex;
+  gap: $space-2;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.sectionDragHandle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-height: 36px;
+  margin-top: $space-1;
+  padding: 0;
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: $radius-sm;
+  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.04));
+  color: var(--color-text-muted);
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-primary-500) 55%, transparent);
+    outline-offset: 2px;
+  }
+}
+
+.sectionDragGrip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  opacity: 0.85;
+}
+
+.sectionDragContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.sectionDragOverlay {
+  min-width: 0;
+  max-width: min(520px, 92vw);
+  cursor: grabbing;
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.14),
+    0 4px 10px rgba(0, 0, 0, 0.08);
+  border-radius: $radius-md;
+  opacity: 0.98;
+}

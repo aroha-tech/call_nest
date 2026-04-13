@@ -16,6 +16,14 @@ import { contactsAPI } from '../services/contactsAPI';
 import { templateVariablesAPI } from '../services/templateVariablesAPI';
 import { extractTemplateKeys, renderScriptHtml } from '../utils/callScriptHtml';
 import { useToast } from '../context/ToastContext';
+import {
+  DEFAULT_PHONE_COUNTRY_CODE,
+  PHONE_NATIONAL_MAX_DIGITS,
+  buildE164FromParts,
+  clampNationalDigits,
+  getCallingCodeOptionsForSelect,
+  normalizeCallingCode,
+} from '../utils/phoneInput';
 import styles from './DialerSessionPage.module.scss';
 
 /** Display-only: maps `contact_phones.label` ENUM (and primary) to a short title. */
@@ -155,6 +163,7 @@ export function DialerSessionPage() {
   const [busy, setBusy] = useState(false);
   const [addPhoneOpen, setAddPhoneOpen] = useState(false);
   const [addPhoneLabel, setAddPhoneLabel] = useState('');
+  const [addPhoneCountryCode, setAddPhoneCountryCode] = useState(DEFAULT_PHONE_COUNTRY_CODE);
   const [addPhoneValue, setAddPhoneValue] = useState('');
   /** Bumps when POST /next applies session — stale in-flight GET /session must not overwrite. */
   const loadEpochRef = useRef(0);
@@ -441,6 +450,7 @@ export function DialerSessionPage() {
   useEffect(() => {
     setAddPhoneOpen(false);
     setAddPhoneValue('');
+    setAddPhoneCountryCode(DEFAULT_PHONE_COUNTRY_CODE);
   }, [currentItem?.contact_id]);
 
   useEffect(() => {
@@ -604,11 +614,12 @@ export function DialerSessionPage() {
   async function submitAddPhone() {
     const cid = currentItem?.contact_id;
     if (!cid || !addPhoneLabel) return;
-    const raw = String(addPhoneValue || '').trim();
-    if (!raw) {
-      setError('Enter a phone number');
+    const national = clampNationalDigits(addPhoneValue);
+    if (!national || national.length !== PHONE_NATIONAL_MAX_DIGITS) {
+      setError(`Enter a ${PHONE_NATIONAL_MAX_DIGITS}-digit phone number`);
       return;
     }
+    const raw = buildE164FromParts(addPhoneCountryCode, national);
     setBusy(true);
     setError('');
     try {
@@ -636,6 +647,7 @@ export function DialerSessionPage() {
       }
       setAddPhoneOpen(false);
       setAddPhoneValue('');
+      setAddPhoneCountryCode(DEFAULT_PHONE_COUNTRY_CODE);
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || 'Failed to add number');
     } finally {
@@ -1042,14 +1054,24 @@ export function DialerSessionPage() {
                                   }))}
                                   disabled={busy}
                                 />
+                                <Select
+                                  className={styles.activeCallAddPhoneSelect}
+                                  label="Country code"
+                                  value={normalizeCallingCode(addPhoneCountryCode)}
+                                  onChange={(e) => setAddPhoneCountryCode(e.target.value)}
+                                  options={getCallingCodeOptionsForSelect(addPhoneCountryCode)}
+                                  disabled={busy}
+                                />
                                 <Input
                                   className={styles.activeCallAddPhoneInput}
                                   label="Number"
                                   value={addPhoneValue}
-                                  onChange={(e) => setAddPhoneValue(e.target.value)}
-                                  placeholder="+1…"
+                                  onChange={(e) => setAddPhoneValue(clampNationalDigits(e.target.value))}
+                                  placeholder={`${PHONE_NATIONAL_MAX_DIGITS} digits`}
                                   disabled={busy}
-                                  autoComplete="tel"
+                                  inputMode="numeric"
+                                  maxLength={PHONE_NATIONAL_MAX_DIGITS}
+                                  autoComplete="tel-national"
                                 />
                                 <div className={styles.activeCallAddPhoneActions}>
                                   <Button size="sm" variant="primary" disabled={busy} onClick={submitAddPhone}>
@@ -1062,6 +1084,7 @@ export function DialerSessionPage() {
                                     onClick={() => {
                                       setAddPhoneOpen(false);
                                       setAddPhoneValue('');
+                                      setAddPhoneCountryCode(DEFAULT_PHONE_COUNTRY_CODE);
                                     }}
                                   >
                                     Cancel
@@ -1141,14 +1164,24 @@ export function DialerSessionPage() {
                                   }))}
                                   disabled={busy}
                                 />
+                                <Select
+                                  className={styles.activeCallAddPhoneSelect}
+                                  label="Country code"
+                                  value={normalizeCallingCode(addPhoneCountryCode)}
+                                  onChange={(e) => setAddPhoneCountryCode(e.target.value)}
+                                  options={getCallingCodeOptionsForSelect(addPhoneCountryCode)}
+                                  disabled={busy}
+                                />
                                 <Input
                                   className={styles.activeCallAddPhoneInput}
                                   label="Number"
                                   value={addPhoneValue}
-                                  onChange={(e) => setAddPhoneValue(e.target.value)}
-                                  placeholder="+1…"
+                                  onChange={(e) => setAddPhoneValue(clampNationalDigits(e.target.value))}
+                                  placeholder={`${PHONE_NATIONAL_MAX_DIGITS} digits`}
                                   disabled={busy}
-                                  autoComplete="tel"
+                                  inputMode="numeric"
+                                  maxLength={PHONE_NATIONAL_MAX_DIGITS}
+                                  autoComplete="tel-national"
                                 />
                                 <div className={styles.activeCallAddPhoneActions}>
                                   <Button size="sm" variant="primary" disabled={busy} onClick={submitAddPhone}>
@@ -1161,6 +1194,7 @@ export function DialerSessionPage() {
                                     onClick={() => {
                                       setAddPhoneOpen(false);
                                       setAddPhoneValue('');
+                                      setAddPhoneCountryCode(DEFAULT_PHONE_COUNTRY_CODE);
                                     }}
                                   >
                                     Cancel

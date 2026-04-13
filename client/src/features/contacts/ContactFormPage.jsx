@@ -19,6 +19,25 @@ import { contactTagsAPI } from '../../services/contactTagsAPI';
 import { ContactOpportunitiesSection } from './ContactOpportunitiesSection';
 import { useContactStatusesOptions } from '../disposition/hooks/useMasterData';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
+import {
+  DEFAULT_PHONE_COUNTRY_CODE,
+  PHONE_NATIONAL_MAX_DIGITS,
+  splitE164ToParts,
+  getCallingCodeOptionsForSelect,
+  normalizeCallingCode,
+  clampNationalDigits,
+  onlyNationalDigits,
+} from '../../utils/phoneInput';
+import { ContactFormDraggableColumns } from './ContactFormDraggableColumns';
+import {
+  CONTACT_FORM_SECTION_IDS,
+  DEFAULT_CONTACT_FORM_COLUMNS,
+  loadContactFormColumns,
+  saveContactFormColumns,
+  reconcileContactFormColumns,
+} from './contactFormLayout';
+import { createContactFormEditSectionRenderers } from './contactFormEditRenderers';
+import { createContactFormViewSectionRenderers } from './contactFormViewRenderers';
 import styles from './ContactFormPage.module.scss';
 
 const PHONE_LABEL_OPTIONS = [
@@ -28,8 +47,6 @@ const PHONE_LABEL_OPTIONS = [
   { value: 'work', label: 'Work' },
   { value: 'other', label: 'Other' },
 ];
-
-const DEFAULT_COUNTRY_CODE = '+91';
 
 function normalizeOptions(options_json) {
   if (!options_json) return [];
@@ -110,17 +127,6 @@ function formatViewText(v) {
   return s.trim() ? s : '—';
 }
 
-function formatRecordDate(iso) {
-  if (iso == null || iso === '') return '—';
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return String(iso);
-    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-  } catch {
-    return String(iso);
-  }
-}
-
 function ViewField({ label, children, className = '' }) {
   const showDash = children == null || children === '';
   return (
@@ -143,6 +149,7 @@ export function ContactFormPage({ defaultType }) {
   const id = params.id;
   const isNew = !id || id === 'new';
   const type = defaultType; // 'lead' or 'contact' from route wrapper
+  const isLeadRoute = location.pathname.startsWith('/leads');
 
   const [customFields, setCustomFields] = useState([]);
   const [industryFieldDefs, setIndustryFieldDefs] = useState([]);
@@ -159,6 +166,8 @@ export function ContactFormPage({ defaultType }) {
   const didApplyNewStatusDefault = useRef(false);
   const editSnapshotRef = useRef(null);
   const [isEditing, setIsEditing] = useState(() => !!isNew);
+  const [layoutEditMode, setLayoutEditMode] = useState(false);
+  const [formColumns, setFormColumns] = useState(() => loadContactFormColumns(type));
 
   const [formData, setFormData] = useState({
     type,
@@ -178,7 +187,7 @@ export function ContactFormPage({ defaultType }) {
     industry: '',
     date_of_birth: '',
     tax_id: '',
-    phones: [{ country_code: DEFAULT_COUNTRY_CODE, number: '', label: 'mobile', is_primary: true }],
+    phones: [{ country_code: DEFAULT_PHONE_COUNTRY_CODE, number: '', label: 'mobile', is_primary: true }],
     customValuesMap: {},
     industryValuesMap: {},
     manager_id: '',
@@ -187,27 +196,6 @@ export function ContactFormPage({ defaultType }) {
     tag_ids: [],
     status_id: '',
   });
-
-  function splitPhoneE164(value) {
-    const raw = String(value || '').trim();
-    if (!raw) return { country_code: DEFAULT_COUNTRY_CODE, number: '' };
-    const compact = raw.replace(/[^\d+]/g, '');
-
-    // Prefer splitting by default country code if it matches.
-    const defaultCcDigits = DEFAULT_COUNTRY_CODE.replace(/[^\d]/g, '');
-    if (compact.startsWith(`+${defaultCcDigits}`) && compact.length > (`+${defaultCcDigits}`.length + 5)) {
-      return {
-        country_code: `+${defaultCcDigits}`,
-        number: compact.slice((`+${defaultCcDigits}`).length).replace(/\D/g, ''),
-      };
-    }
-
-    // Generic fallback: +<1-3 digits country code> + rest
-    const m = compact.match(/^\+(\d{1,3})(\d{6,15})$/);
-    if (m) return { country_code: `+${m[1]}`, number: m[2] };
-    // Fallback: take only digits as number
-    return { country_code: DEFAULT_COUNTRY_CODE, number: raw.replace(/\D/g, '') };
-  }
 
   const fetchContact = useCallback(
     () => (isNew ? Promise.resolve({ data: { data: null } }) : contactsAPI.getById(id)),
@@ -340,12 +328,16 @@ export function ContactFormPage({ defaultType }) {
       ? contact.phones
       : (contact.primary_phone ? [{ phone: contact.primary_phone, label: 'mobile', is_primary: 1 }] : []);
     const mappedPhones = contactPhones.length > 0
-      ? contactPhones.map((p) => ({
-          ...splitPhoneE164(p.phone),
-          label: p.label || 'mobile',
-          is_primary: !!p.is_primary,
-        }))
-      : [{ country_code: DEFAULT_COUNTRY_CODE, number: '', label: 'mobile', is_primary: true }];
+      ? contactPhones.map((p) => {
+          const parts = splitE164ToParts(p.phone);
+          return {
+            country_code: parts.country_code,
+            number: parts.national,
+            label: p.label || 'mobile',
+            is_primary: !!p.is_primary,
+          };
+        })
+      : [{ country_code: DEFAULT_PHONE_COUNTRY_CODE, number: '', label: 'mobile', is_primary: true }];
     setFormData((prev) => ({
       ...prev,
       type: contact.type,
@@ -559,9 +551,8 @@ export function ContactFormPage({ defaultType }) {
 
   const buildSubmitPayload = () => {
     const phones = (formData.phones || []).map((p) => {
-      const cc = String(p.country_code || DEFAULT_COUNTRY_CODE).trim();
-      const num = String(p.number || '').trim().replace(/\D/g, '');
-      const normalizedCc = cc.startsWith('+') ? cc : `+${cc.replace(/\D/g, '')}`;
+      const normalizedCc = normalizeCallingCode(p.country_code || DEFAULT_PHONE_COUNTRY_CODE);
+      const num = clampNationalDigits(p.number || '');
       const phone = num ? `${normalizedCc}${num}` : '';
       return {
         phone,
@@ -677,9 +668,9 @@ export function ContactFormPage({ defaultType }) {
     if (phoneErr) errs.phones = phoneErr;
     // Optional: validate phone format for rows where number entered
     for (const p of formData.phones || []) {
-      const num = String(p.number || '').trim();
-      if (num && num.replace(/\D/g, '').length < 6) {
-        errs.phones = 'Phone number looks too short';
+      const digits = onlyNationalDigits(p.number);
+      if (digits.length > 0 && digits.length !== PHONE_NATIONAL_MAX_DIGITS) {
+        errs.phones = `Phone number must be exactly ${PHONE_NATIONAL_MAX_DIGITS} digits`;
         break;
       }
     }
@@ -712,6 +703,7 @@ export function ContactFormPage({ defaultType }) {
       editSnapshotRef.current = JSON.parse(JSON.stringify(formData));
     }
     setIsEditing(true);
+    setLayoutEditMode(false);
     setSubmitError(null);
     setFormErrors({});
     setSearchParams({ mode: 'edit' }, { replace: true });
@@ -723,6 +715,7 @@ export function ContactFormPage({ defaultType }) {
       editSnapshotRef.current = null;
     }
     setIsEditing(false);
+    setLayoutEditMode(false);
     setSubmitError(null);
     setFormErrors({});
     setSearchParams({ mode: 'view' }, { replace: true });
@@ -743,6 +736,7 @@ export function ContactFormPage({ defaultType }) {
       } else {
         await refetchContact();
         setIsEditing(false);
+        setLayoutEditMode(false);
         editSnapshotRef.current = null;
         setSearchParams({ mode: 'view' }, { replace: true });
       }
@@ -752,7 +746,6 @@ export function ContactFormPage({ defaultType }) {
   };
 
   const title = isNew ? `Add ${type === 'lead' ? 'Lead' : 'Contact'}` : `Edit ${type === 'lead' ? 'Lead' : 'Contact'}`;
-  const isLeadRoute = location.pathname.startsWith('/leads');
   const recordLabel = type === 'lead' ? 'lead' : 'contact';
   const pageDescription = isNew
     ? `Create a ${recordLabel}: name, tags, phones${
@@ -814,6 +807,66 @@ export function ContactFormPage({ defaultType }) {
     return perms.includes('leads.update') && perms.includes('contacts.update');
   }, [isNew, contact, type, role, perms]);
 
+  const formLayoutVisibility = useMemo(() => {
+    const s = new Set([
+      CONTACT_FORM_SECTION_IDS.IDENTITY,
+      CONTACT_FORM_SECTION_IDS.LOCATION,
+      CONTACT_FORM_SECTION_IDS.STATUS,
+      CONTACT_FORM_SECTION_IDS.PHONES,
+      CONTACT_FORM_SECTION_IDS.TAGS,
+      CONTACT_FORM_SECTION_IDS.INDUSTRY,
+      CONTACT_FORM_SECTION_IDS.CUSTOM,
+    ]);
+    if (!isNew && contact) s.add(CONTACT_FORM_SECTION_IDS.RECORD);
+    const showAssignment =
+      (role === 'admin' && isNew) ||
+      (role === 'manager' && isNew) ||
+      (role === 'agent' && isNew && type === 'lead') ||
+      (!isNew && (role === 'admin' || role === 'manager'));
+    if (showAssignment) s.add(CONTACT_FORM_SECTION_IDS.ASSIGNMENT);
+    return s;
+  }, [isNew, contact, role, type]);
+
+  useEffect(() => {
+    const loaded = loadContactFormColumns(type);
+    setFormColumns(reconcileContactFormColumns(loaded, formLayoutVisibility, type));
+  }, [type, formLayoutVisibility]);
+
+  useEffect(() => {
+    saveContactFormColumns(type, formColumns);
+  }, [type, formColumns]);
+
+  const editSectionRenderers = createContactFormEditSectionRenderers({
+    styles,
+    isNew,
+    contact,
+    type,
+    role,
+    isLeadRoute,
+    showFormHints,
+    isEditing,
+    formData,
+    setFormData,
+    setDisplayNameTouched,
+    formErrors,
+    contactStatusesLoading,
+    contactStatuses,
+    availableLabelOptions,
+    contactTagOptions,
+    managerSelectOptions,
+    agentSelectOptions,
+    campaignSelectOptions,
+    loadingIndustryFields,
+    industryFieldDefs,
+    loadingCustomFields,
+    customFields,
+    clearDynamicFieldError,
+    setConvertTypeOpen,
+    canConvertRecordType,
+  });
+
+  const renderEditSection = (sectionId) => editSectionRenderers[sectionId]?.() ?? null;
+
   const phoneLabelText = (label) =>
     PHONE_LABEL_OPTIONS.find((o) => o.value === (label || 'mobile').toLowerCase())?.label ??
     (label || 'mobile');
@@ -843,6 +896,29 @@ export function ContactFormPage({ defaultType }) {
     }
     return formatViewText(raw);
   }
+
+  const viewSectionRenderers = createContactFormViewSectionRenderers({
+    styles,
+    ViewField,
+    isNew,
+    contact,
+    isLeadRoute,
+    role,
+    formData,
+    statusDisplay,
+    phoneLabelText,
+    contactTagOptions,
+    managerDisplay,
+    agentDisplay,
+    campaignDisplay,
+    loadingIndustryFields,
+    industryFieldDefs,
+    formatIndustryFieldForView,
+    loadingCustomFields,
+    customFields,
+    formatCustomFieldForView,
+  });
+  const renderViewSection = (sectionId) => viewSectionRenderers[sectionId]?.() ?? null;
 
   if (!isNew && loadingContact && !contact) {
     return (
@@ -903,6 +979,29 @@ export function ContactFormPage({ defaultType }) {
                 </div>
                 {isEditing ? (
                   <>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setLayoutEditMode((v) => !v)}>
+                      {layoutEditMode ? 'Done arranging' : 'Arrange sections'}
+                    </Button>
+                    {layoutEditMode ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const defaults =
+                            DEFAULT_CONTACT_FORM_COLUMNS[type] || DEFAULT_CONTACT_FORM_COLUMNS.lead;
+                          setFormColumns(
+                            reconcileContactFormColumns(
+                              { left: [...defaults.left], right: [...defaults.right] },
+                              formLayoutVisibility,
+                              type
+                            )
+                          );
+                        }}
+                      >
+                        Reset layout
+                      </Button>
+                    ) : null}
                     <Button variant="ghost" onClick={handleCancelEdit}>
                       Cancel
                     </Button>
@@ -914,6 +1013,29 @@ export function ContactFormPage({ defaultType }) {
               </>
             ) : (
               <>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setLayoutEditMode((v) => !v)}>
+                  {layoutEditMode ? 'Done arranging' : 'Arrange sections'}
+                </Button>
+                {layoutEditMode ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const defaults =
+                        DEFAULT_CONTACT_FORM_COLUMNS[type] || DEFAULT_CONTACT_FORM_COLUMNS.lead;
+                      setFormColumns(
+                        reconcileContactFormColumns(
+                          { left: [...defaults.left], right: [...defaults.right] },
+                          formLayoutVisibility,
+                          type
+                        )
+                      );
+                    }}
+                  >
+                    Reset layout
+                  </Button>
+                ) : null}
                 <Button variant="ghost" onClick={() => navigate(-1)}>
                   Cancel
                 </Button>
@@ -931,919 +1053,21 @@ export function ContactFormPage({ defaultType }) {
 
       {isNew || isEditing ? (
       <form id="contact-record-form" onSubmit={handleSubmit} className={`${styles.form} ${styles.formCompact}`}>
-        <div className={styles.formLayout}>
-          <div className={styles.formLayoutCol}>
-            {!isNew && contact ? (
-              <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-record">
-                <h2 id="contact-section-record" className={styles.sectionTitle}>
-                  Record
-                </h2>
-                <div className={styles.recordMetaGrid}>
-                  <ViewField label="Created">{formatRecordDate(contact.created_at)}</ViewField>
-                  <ViewField label="Last updated">{formatRecordDate(contact.updated_at)}</ViewField>
-                </div>
-                {isEditing && canConvertRecordType ? (
-                  <div className={styles.convertTypeRow}>
-                    <Button type="button" variant="secondary" size="sm" onClick={() => setConvertTypeOpen(true)}>
-                      {type === 'lead' ? 'Convert to contact' : 'Convert to lead'}
-                    </Button>
-                  </div>
-                ) : null}
-              </section>
-            ) : null}
-        <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-identity">
-          <h2 id="contact-section-identity" className={styles.sectionTitle}>
-            {isLeadRoute ? 'Lead details' : 'Contact details'}
-          </h2>
-          {showFormHints ? (
-            <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
-              Display name required; first name or email required. Display name follows first + last until you edit it.
-            </p>
-          ) : null}
-          <div className={styles.fieldGridDense}>
-            <Input
-              label="First name"
-              value={formData.first_name}
-              onChange={(e) => setFormData((p) => ({ ...p, first_name: e.target.value }))}
-              error={formErrors.first_name}
-            />
-            <Input
-              label="Last name"
-              value={formData.last_name}
-              onChange={(e) => setFormData((p) => ({ ...p, last_name: e.target.value }))}
-            />
-            <Input
-              required
-              label="Display name"
-              value={formData.display_name}
-              onChange={(e) => {
-                setDisplayNameTouched(true);
-                setFormData((p) => ({ ...p, display_name: e.target.value }));
-              }}
-              error={formErrors.display_name}
-            />
-            <Input
-              label="Email"
-              value={formData.email}
-              onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
-              type="email"
-              autoComplete="email"
-            />
-            <Input
-              label="Company"
-              value={formData.company}
-              onChange={(e) => setFormData((p) => ({ ...p, company: e.target.value }))}
-            />
-            <Input
-              label="Job title"
-              value={formData.job_title}
-              onChange={(e) => setFormData((p) => ({ ...p, job_title: e.target.value }))}
-            />
-            <Input
-              label="Industry"
-              value={formData.industry}
-              onChange={(e) => setFormData((p) => ({ ...p, industry: e.target.value }))}
-            />
-            <Input
-              label="Website"
-              value={formData.website}
-              onChange={(e) => setFormData((p) => ({ ...p, website: e.target.value }))}
-              type="url"
-              placeholder="https://"
-            />
-            <Input
-              label="Date of birth"
-              value={formData.date_of_birth}
-              onChange={(e) => setFormData((p) => ({ ...p, date_of_birth: e.target.value }))}
-              type="date"
-            />
-            <Input
-              label="GST / PAN / Tax ID"
-              value={formData.tax_id}
-              onChange={(e) => setFormData((p) => ({ ...p, tax_id: e.target.value }))}
-            />
-          </div>
-        </section>
-
-        <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-location">
-          <h2 id="contact-section-location" className={styles.sectionTitle}>
-            Location
-          </h2>
-          {showFormHints ? (
-            <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>Street, city, and country used in lists and export.</p>
-          ) : null}
-          <div className={styles.fieldGridDense}>
-            <Input
-              label="Address line 1"
-              value={formData.address}
-              onChange={(e) => setFormData((p) => ({ ...p, address: e.target.value }))}
-              className={styles.fullWidthFieldDense}
-            />
-            <Input
-              label="Address line 2"
-              value={formData.address_line_2}
-              onChange={(e) => setFormData((p) => ({ ...p, address_line_2: e.target.value }))}
-              className={styles.fullWidthFieldDense}
-            />
-            <Input label="City" value={formData.city} onChange={(e) => setFormData((p) => ({ ...p, city: e.target.value }))} />
-            <Input
-              label="State / region"
-              value={formData.state}
-              onChange={(e) => setFormData((p) => ({ ...p, state: e.target.value }))}
-            />
-            <Input
-              label="Country"
-              value={formData.country}
-              onChange={(e) => setFormData((p) => ({ ...p, country: e.target.value }))}
-              autoComplete="country-name"
-            />
-            <Input
-              label="PIN / postal code"
-              value={formData.pin_code}
-              onChange={(e) => setFormData((p) => ({ ...p, pin_code: e.target.value }))}
-            />
-          </div>
-        </section>
-
-        <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-status">
-          <h2 id="contact-section-status" className={styles.sectionTitle}>
-            Status
-          </h2>
-          {showFormHints ? (
-            <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
-              Lifecycle stage from Admin → Masters → Contact statuses.
-            </p>
-          ) : null}
-          <div className={styles.fieldGridDense}>
-            <Select
-              label="Contact status"
-              value={formData.status_id || ''}
-              onChange={(e) => setFormData((p) => ({ ...p, status_id: e.target.value }))}
-              disabled={contactStatusesLoading}
-              allowEmpty
-              placeholder="— None —"
-              options={contactStatuses.map((s) => ({
-                value: s.id,
-                label: s.name ? `${s.name}${s.code ? ` (${s.code})` : ''}` : s.code || s.id,
-              }))}
-            />
-          </div>
-        </section>
-          </div>
-          <div className={styles.formLayoutCol}>
-
-        <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-phones">
-          <div className={styles.sectionHeader}>
-            <div className={styles.sectionHeaderText}>
-              <h2 id="contact-section-phones" className={styles.sectionTitle}>
-                Phone numbers
-              </h2>
-              {showFormHints ? (
-                <p className={`${styles.sectionDesc} ${styles.sectionDescTight}`}>One label per row; one primary when possible.</p>
-              ) : null}
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              disabled={availableLabelOptions.length === 0}
-              onClick={() => {
-                const nextLabel = availableLabelOptions[0]?.value || 'other';
-                setFormData((prev) => ({
-                  ...prev,
-                  phones: [...(prev.phones || []), { country_code: DEFAULT_COUNTRY_CODE, number: '', label: nextLabel, is_primary: false }],
-                }));
-              }}
-            >
-              + Add phone
-            </Button>
-          </div>
-
-          <div className={styles.phoneList}>
-            {(formData.phones || []).map((p, idx) => {
-              const used = new Set((formData.phones || []).map((x, i) => (i === idx ? null : (x.label || 'mobile').toLowerCase())).filter(Boolean));
-              const labelOptionsForRow = PHONE_LABEL_OPTIONS.filter((o) => !used.has(o.value) || o.value === (p.label || 'mobile'));
-              return (
-                <div key={idx} className={`${styles.phoneRow} ${styles.phoneRowCompact}`}>
-                  <div className={styles.phoneCc}>
-                    <Input
-                      label={idx === 0 ? 'Country code' : undefined}
-                      value={p.country_code || DEFAULT_COUNTRY_CODE}
-                      onChange={(e) => {
-                        const next = [...formData.phones];
-                        next[idx] = { ...next[idx], country_code: e.target.value };
-                        setFormData((prev) => ({ ...prev, phones: next }));
-                      }}
-                      placeholder="+91"
-                    />
-                  </div>
-                  <div className={styles.phoneNum}>
-                    <Input
-                      label={idx === 0 ? 'Number' : undefined}
-                      value={p.number || ''}
-                      onChange={(e) => {
-                        const next = [...formData.phones];
-                        next[idx] = { ...next[idx], number: e.target.value };
-                        setFormData((prev) => ({ ...prev, phones: next }));
-                      }}
-                      placeholder="9876543210"
-                      inputMode="tel"
-                    />
-                  </div>
-                  <div className={styles.phoneLabel}>
-                    <Select
-                      label={idx === 0 ? 'Label' : undefined}
-                      value={p.label || 'mobile'}
-                      onChange={(e) => {
-                        const next = [...formData.phones];
-                        next[idx] = { ...next[idx], label: e.target.value };
-                        setFormData((prev) => ({ ...prev, phones: next }));
-                      }}
-                      options={labelOptionsForRow}
-                    />
-                  </div>
-                  <div className={styles.phoneTail}>
-                    <label className={styles.primaryCheck}>
-                      <input
-                        type="checkbox"
-                        checked={!!p.is_primary}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          const next = [...formData.phones];
-                          if (checked) {
-                            next.forEach((row, i) => {
-                              next[i] = { ...row, is_primary: i === idx };
-                            });
-                          } else {
-                            next[idx] = { ...next[idx], is_primary: false };
-                          }
-                          setFormData((prev) => ({ ...prev, phones: next }));
-                        }}
-                      />
-                      Primary
-                    </label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={(formData.phones || []).length <= 1}
-                      onClick={() => {
-                        const next = (formData.phones || []).filter((_, i) => i !== idx);
-                        if (next.length > 0 && !next.some((x) => x.is_primary)) {
-                          next[0].is_primary = true;
-                        }
-                        setFormData((prev) => ({ ...prev, phones: next }));
-                      }}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-tags">
-          <h2 id="contact-section-tags" className={styles.sectionTitle}>
-            Tags
-          </h2>
-          {showFormHints ? (
-            <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>Tenant tag catalog (Settings → Contact tags).</p>
-          ) : null}
-          {(formData.tag_ids || []).length === 0 ? (
-            <p className={styles.tagEmptyHint}>No tags yet — add one below.</p>
-          ) : null}
-          <div className={styles.tagChips} role="list">
-            {(formData.tag_ids || []).map((tid) => {
-              const label = contactTagOptions.find((o) => o.value === String(tid))?.label || tid;
-              return (
-                <span key={tid} className={styles.tagChip} role="listitem">
-                  <span className={styles.tagChipLabel}>{label}</span>
-                  <button
-                    type="button"
-                    className={styles.tagRemove}
-                    onClick={() =>
-                      setFormData((p) => ({
-                        ...p,
-                        tag_ids: (p.tag_ids || []).filter((x) => String(x) !== String(tid)),
-                      }))
-                    }
-                    aria-label={`Remove tag ${label}`}
-                  >
-                    ×
-                  </button>
-                </span>
-              );
-            })}
-          </div>
-          <select
-            className={styles.tagAddSelect}
-            aria-label="Add tag"
-            value=""
-            onChange={(e) => {
-              const v = e.target.value;
-              if (!v) return;
-              setFormData((p) => {
-                const cur = p.tag_ids || [];
-                if (cur.map(String).includes(v)) return p;
-                return { ...p, tag_ids: [...cur, v] };
-              });
-              e.target.value = '';
-            }}
-          >
-            <option value="">Add tag…</option>
-            {contactTagOptions
-              .filter((o) => !(formData.tag_ids || []).map(String).includes(o.value))
-              .map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-          </select>
-        </section>
-
-        {role === 'admin' && isNew ? (
-          <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-ownership">
-            <h2 id="contact-section-ownership" className={styles.sectionTitle}>
-              Ownership (optional)
-            </h2>
-            {showFormHints ? (
-              <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
-                Optional manager, agent, and campaign; leave empty for unassigned pool.
-              </p>
-            ) : null}
-            <div className={styles.assignGrid}>
-              <Select
-                label="Manager"
-                value={formData.manager_id}
-                onChange={(e) => setFormData((p) => ({ ...p, manager_id: e.target.value }))}
-                placeholder="— None —"
-                options={[{ value: '', label: '— None —' }, ...managerSelectOptions]}
-              />
-              <Select
-                label="Assigned agent"
-                value={formData.assigned_user_id}
-                onChange={(e) => setFormData((p) => ({ ...p, assigned_user_id: e.target.value }))}
-                placeholder="— None —"
-                options={[{ value: '', label: '— None —' }, ...agentSelectOptions]}
-              />
-              <Select
-                label="Campaign"
-                value={formData.campaign_id}
-                onChange={(e) => setFormData((p) => ({ ...p, campaign_id: e.target.value }))}
-                placeholder="— None —"
-                options={[{ value: '', label: '— None —' }, ...campaignSelectOptions]}
-              />
-            </div>
-          </section>
-        ) : null}
-
-        {role === 'manager' && isNew ? (
-          <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-new-manager-assign">
-            <h2 id="contact-section-new-manager-assign" className={styles.sectionTitle}>
-              Campaign &amp; assignment (optional)
-            </h2>
-            {showFormHints ? (
-              <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
-                Defaults to you as manager; optional team agent and campaign.
-              </p>
-            ) : null}
-            <div className={styles.assignGrid}>
-              <Select
-                label="Assigned agent"
-                value={formData.assigned_user_id}
-                onChange={(e) => setFormData((p) => ({ ...p, assigned_user_id: e.target.value }))}
-                placeholder="— Myself (default) —"
-                options={[{ value: '', label: '— Myself (default) —' }, ...agentSelectOptions]}
-              />
-              <Select
-                label="Campaign"
-                value={formData.campaign_id}
-                onChange={(e) => setFormData((p) => ({ ...p, campaign_id: e.target.value }))}
-                placeholder="— None —"
-                options={[{ value: '', label: '— None —' }, ...campaignSelectOptions]}
-              />
-            </div>
-          </section>
-        ) : null}
-
-        {role === 'agent' && isNew && type === 'lead' ? (
-          <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-new-agent-campaign">
-            <h2 id="contact-section-new-agent-campaign" className={styles.sectionTitle}>
-              Campaign (optional)
-            </h2>
-            {showFormHints ? (
-              <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>Optional campaign; you stay assigned.</p>
-            ) : null}
-            <div className={styles.assignGrid}>
-              <Select
-                label="Campaign"
-                value={formData.campaign_id}
-                onChange={(e) => setFormData((p) => ({ ...p, campaign_id: e.target.value }))}
-                placeholder="— None —"
-                options={[{ value: '', label: '— None —' }, ...campaignSelectOptions]}
-              />
-            </div>
-          </section>
-        ) : null}
-
-        {!isNew && (role === 'admin' || role === 'manager') ? (
-          <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-assign">
-            <h2 id="contact-section-assign" className={styles.sectionTitle}>
-              Assignment
-            </h2>
-            {showFormHints ? (
-              <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
-                {role === 'manager' ? 'Team agent and campaign.' : 'Manager, agent, and campaign.'}
-              </p>
-            ) : null}
-            <div className={styles.assignGrid}>
-              {role === 'admin' ? (
-                <Select
-                  label="Manager"
-                  value={formData.manager_id}
-                  onChange={(e) => setFormData((p) => ({ ...p, manager_id: e.target.value }))}
-                  placeholder="— Unassigned pool —"
-                  options={[{ value: '', label: '— Unassigned pool —' }, ...managerSelectOptions]}
-                />
-              ) : null}
-              <Select
-                label="Assigned agent"
-                value={formData.assigned_user_id}
-                onChange={(e) => setFormData((p) => ({ ...p, assigned_user_id: e.target.value }))}
-                placeholder="— Unassigned —"
-                options={[{ value: '', label: '— Unassigned —' }, ...agentSelectOptions]}
-              />
-              <Select
-                label="Campaign"
-                value={formData.campaign_id}
-                onChange={(e) => setFormData((p) => ({ ...p, campaign_id: e.target.value }))}
-                placeholder="— None —"
-                options={[{ value: '', label: '— None —' }, ...campaignSelectOptions]}
-              />
-            </div>
-          </section>
-        ) : null}
-
-        <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-industry">
-          <h2 id="contact-section-industry" className={styles.sectionTitle}>
-            Industry fields
-            {loadingIndustryFields ? <span className={styles.loadingInline}>Loading…</span> : null}
-          </h2>
-          {showFormHints ? (
-            <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
-              Defined by your platform admin for your industry. Enable optional packs under Company settings. Fields
-              marked * are required before save.
-            </p>
-          ) : null}
-          {!loadingIndustryFields && industryFieldDefs.length === 0 ? (
-            <p className={styles.customEmpty}>No industry fields for this workspace.</p>
-          ) : null}
-
-          <div className={styles.customFieldsGridDense}>
-            {industryFieldDefs.map((f) => {
-              const value = formData?.industryValuesMap?.[f.field_key] ?? '';
-              const options = normalizeOptions(f.options_json);
-              const req = isRequiredFlag(f.is_required);
-              const lbl = requiredLabelText(f.label, req);
-              const indFieldErr = formErrors[`industry:${f.field_key}`];
-              const setIndustryMap = (key, nextVal) => {
-                clearDynamicFieldError('industry', key);
-                const nextMap = { ...(formData.industryValuesMap || {}) };
-                nextMap[key] = nextVal;
-                setFormData((prev) => ({ ...prev, industryValuesMap: nextMap }));
-              };
-
-              if (f.type === 'select') {
-                return (
-                  <Select
-                    key={f.field_key}
-                    label={lbl}
-                    value={value || ''}
-                    onChange={(e) => setIndustryMap(f.field_key, e.target.value)}
-                    options={options.map((opt) => ({ value: String(opt), label: String(opt) }))}
-                    placeholder={req ? 'Select…' : 'Select...'}
-                    error={indFieldErr}
-                  />
-                );
-              }
-
-              if (f.type === 'multiselect') {
-                const selected = new Set(parseMultiselectStored(value).map(String));
-                const setMultiselect = (nextSet) => {
-                  const ordered = options.map(String).filter((o) => nextSet.has(o));
-                  setIndustryMap(f.field_key, ordered.length ? JSON.stringify(ordered) : '');
-                };
-                return (
-                  <div key={f.field_key} className={styles.customFieldFull}>
-                    <div className={styles.customMultiselectLabel}>{lbl}</div>
-                    {indFieldErr ? (
-                      <p className={styles.fieldErrorText} role="alert">
-                        {indFieldErr}
-                      </p>
-                    ) : null}
-                    {options.length === 0 ? (
-                      <p className={styles.customMultiselectEmpty}>No options configured for this field.</p>
-                    ) : (
-                      <div className={styles.customMultiselectGroup} role="group" aria-label={f.label}>
-                        {options.map((opt, optIdx) => {
-                          const optStr = String(opt);
-                          const cid = `ind-ms-${f.field_key}-${optIdx}`;
-                          return (
-                            <Checkbox
-                              key={cid}
-                              id={cid}
-                              label={optStr}
-                              checked={selected.has(optStr)}
-                              onChange={(e) => {
-                                const next = new Set(selected);
-                                if (e.target.checked) next.add(optStr);
-                                else next.delete(optStr);
-                                setMultiselect(next);
-                              }}
-                              className={styles.customMultiselectCheck}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-
-              if (f.type === 'multiselect_dropdown') {
-                return (
-                  <div key={f.field_key} className={styles.customFieldFull}>
-                    <MultiSelectDropdown
-                      label={lbl}
-                      options={options}
-                      value={value}
-                      placeholder="Select…"
-                      searchable={options.length > 12}
-                      onChange={(next) => setIndustryMap(f.field_key, next)}
-                      error={indFieldErr}
-                    />
-                  </div>
-                );
-              }
-
-              if (f.type === 'boolean') {
-                return (
-                  <div key={f.field_key} className={`${styles.customFieldFull} ${styles.customBooleanRow}`}>
-                    <label className={`${styles.primaryCheck} ${styles.customBooleanRow}`}>
-                      <input
-                        type="checkbox"
-                        checked={String(value).toLowerCase() === 'true' || value === '1'}
-                        onChange={(e) => setIndustryMap(f.field_key, e.target.checked ? 'true' : 'false')}
-                      />
-                      <span className={styles.booleanLabel}>{lbl}</span>
-                    </label>
-                    {indFieldErr ? (
-                      <p className={styles.fieldErrorText} role="alert">
-                        {indFieldErr}
-                      </p>
-                    ) : null}
-                  </div>
-                );
-              }
-
-              return (
-                <Input
-                  key={f.field_key}
-                  label={lbl}
-                  value={value}
-                  onChange={(e) => setIndustryMap(f.field_key, e.target.value)}
-                  type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
-                  placeholder={req ? 'Required' : 'Optional'}
-                  error={indFieldErr}
-                />
-              );
-            })}
-          </div>
-        </section>
-
-        <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-custom">
-          <h2 id="contact-section-custom" className={styles.sectionTitle}>
-            Custom fields
-            {loadingCustomFields ? <span className={styles.loadingInline}>Loading…</span> : null}
-          </h2>
-          {showFormHints ? (
-            <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
-              Tenant-defined. Optional fields can be left blank; fields marked * are required before save.
-            </p>
-          ) : null}
-          {!loadingCustomFields && customFields.length === 0 ? (
-            <p className={styles.customEmpty}>No custom fields configured for this tenant.</p>
-          ) : null}
-
-          <div className={styles.customFieldsGridDense}>
-            {customFields.map((f) => {
-              const value = formData?.customValuesMap?.[f.field_id] ?? '';
-              const options = normalizeOptions(f.options_json);
-              const req = isRequiredFlag(f.is_required);
-              const lbl = requiredLabelText(f.label, req);
-              const cfFieldErr = formErrors[`custom:${f.field_id}`];
-
-              if (f.type === 'select') {
-                return (
-                  <Select
-                    key={f.field_id}
-                    label={lbl}
-                    value={value || ''}
-                    onChange={(e) => {
-                      clearDynamicFieldError('custom', f.field_id);
-                      const nextMap = { ...(formData.customValuesMap || {}) };
-                      nextMap[f.field_id] = e.target.value;
-                      setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
-                    }}
-                    options={options.map((opt) => ({ value: String(opt), label: String(opt) }))}
-                    placeholder="Select..."
-                    error={cfFieldErr}
-                  />
-                );
-              }
-
-              if (f.type === 'multiselect') {
-                const selected = new Set(parseMultiselectStored(value).map(String));
-                const setMultiselect = (nextSet) => {
-                  clearDynamicFieldError('custom', f.field_id);
-                  const ordered = options.map(String).filter((o) => nextSet.has(o));
-                  const nextMap = { ...(formData.customValuesMap || {}) };
-                  nextMap[f.field_id] = ordered.length ? JSON.stringify(ordered) : '';
-                  setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
-                };
-                return (
-                  <div key={f.field_id} className={styles.customFieldFull}>
-                    <div className={styles.customMultiselectLabel}>{lbl}</div>
-                    {cfFieldErr ? (
-                      <p className={styles.fieldErrorText} role="alert">
-                        {cfFieldErr}
-                      </p>
-                    ) : null}
-                    {options.length === 0 ? (
-                      <p className={styles.customMultiselectEmpty}>
-                        No options configured. Add comma-separated options under Settings → Custom fields.
-                      </p>
-                    ) : (
-                      <div className={styles.customMultiselectGroup} role="group" aria-label={f.label}>
-                        {options.map((opt, optIdx) => {
-                          const optStr = String(opt);
-                          const id = `cf-ms-${f.field_id}-${optIdx}`;
-                          return (
-                            <Checkbox
-                              key={id}
-                              id={id}
-                              label={optStr}
-                              checked={selected.has(optStr)}
-                              onChange={(e) => {
-                                const next = new Set(selected);
-                                if (e.target.checked) next.add(optStr);
-                                else next.delete(optStr);
-                                setMultiselect(next);
-                              }}
-                              className={styles.customMultiselectCheck}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-
-              if (f.type === 'multiselect_dropdown') {
-                return (
-                  <div key={f.field_id} className={styles.customFieldFull}>
-                    <MultiSelectDropdown
-                      label={lbl}
-                      options={options}
-                      value={value}
-                      placeholder="Select…"
-                      searchable={options.length > 12}
-                      onChange={(next) => {
-                        clearDynamicFieldError('custom', f.field_id);
-                        const nextMap = { ...(formData.customValuesMap || {}) };
-                        nextMap[f.field_id] = next;
-                        setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
-                      }}
-                      error={cfFieldErr}
-                    />
-                  </div>
-                );
-              }
-
-              if (f.type === 'boolean') {
-                return (
-                  <div key={f.field_id} className={`${styles.customFieldFull} ${styles.customBooleanRow}`}>
-                    <label className={`${styles.primaryCheck} ${styles.customBooleanRow}`}>
-                      <input
-                        type="checkbox"
-                        checked={String(value).toLowerCase() === 'true' || value === '1'}
-                        onChange={(e) => {
-                          clearDynamicFieldError('custom', f.field_id);
-                          const nextMap = { ...(formData.customValuesMap || {}) };
-                          nextMap[f.field_id] = e.target.checked ? 'true' : 'false';
-                          setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
-                        }}
-                      />
-                      <span className={styles.booleanLabel}>{lbl}</span>
-                    </label>
-                    {cfFieldErr ? (
-                      <p className={styles.fieldErrorText} role="alert">
-                        {cfFieldErr}
-                      </p>
-                    ) : null}
-                  </div>
-                );
-              }
-
-              return (
-                <Input
-                  key={f.field_id}
-                  label={lbl}
-                  value={value}
-                  onChange={(e) => {
-                    clearDynamicFieldError('custom', f.field_id);
-                    const nextMap = { ...(formData.customValuesMap || {}) };
-                    nextMap[f.field_id] = e.target.value;
-                    setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
-                  }}
-                  type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
-                  placeholder={req ? 'Required' : 'Optional'}
-                  error={cfFieldErr}
-                />
-              );
-            })}
-          </div>
-        </section>
-          </div>
-        </div>
+        <ContactFormDraggableColumns
+          layoutEditMode={layoutEditMode && (isNew || isEditing)}
+          columns={formColumns}
+          onColumnsChange={setFormColumns}
+          renderSection={renderEditSection}
+        />
       </form>
       ) : (
         <div className={`${styles.form} ${styles.formCompact} ${styles.viewShell}`} aria-live="polite">
-          <div className={styles.formLayout}>
-            <div className={styles.formLayoutCol}>
-              {!isNew && contact ? (
-                <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-record">
-                  <h2 id="view-section-record" className={styles.sectionTitle}>
-                    Record
-                  </h2>
-                  <div className={styles.recordMetaGrid}>
-                    <ViewField label="Created">{formatRecordDate(contact.created_at)}</ViewField>
-                    <ViewField label="Last updated">{formatRecordDate(contact.updated_at)}</ViewField>
-                  </div>
-                </section>
-              ) : null}
-              <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-identity">
-                <h2 id="view-section-identity" className={styles.sectionTitle}>
-                  {isLeadRoute ? 'Lead details' : 'Contact details'}
-                </h2>
-                <div className={styles.fieldGridDense}>
-                  <ViewField label="First name">{formatViewText(formData.first_name)}</ViewField>
-                  <ViewField label="Last name">{formatViewText(formData.last_name)}</ViewField>
-                  <ViewField label="Display name">{formatViewText(formData.display_name)}</ViewField>
-                  <ViewField label="Email">{formatViewText(formData.email)}</ViewField>
-                  <ViewField label="Company">{formatViewText(formData.company)}</ViewField>
-                  <ViewField label="Job title">{formatViewText(formData.job_title)}</ViewField>
-                  <ViewField label="Industry">{formatViewText(formData.industry)}</ViewField>
-                  <ViewField label="Website">
-                    {formData.website?.trim() ? (
-                      <a
-                        href={
-                          /^https?:\/\//i.test(formData.website.trim())
-                            ? formData.website.trim()
-                            : `https://${formData.website.trim()}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={styles.viewLink}
-                      >
-                        {formData.website.trim()}
-                      </a>
-                    ) : (
-                      '—'
-                    )}
-                  </ViewField>
-                  <ViewField label="Date of birth">{formatViewText(formData.date_of_birth)}</ViewField>
-                  <ViewField label="GST / PAN / Tax ID">{formatViewText(formData.tax_id)}</ViewField>
-                </div>
-              </section>
-
-              <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-location">
-                <h2 id="view-section-location" className={styles.sectionTitle}>
-                  Location
-                </h2>
-                <div className={styles.fieldGridDense}>
-                  <ViewField label="Address line 1" className={styles.fullWidthFieldDense}>
-                    {formatViewText(formData.address)}
-                  </ViewField>
-                  <ViewField label="Address line 2" className={styles.fullWidthFieldDense}>
-                    {formatViewText(formData.address_line_2)}
-                  </ViewField>
-                  <ViewField label="City">{formatViewText(formData.city)}</ViewField>
-                  <ViewField label="State / region">{formatViewText(formData.state)}</ViewField>
-                  <ViewField label="Country">{formatViewText(formData.country)}</ViewField>
-                  <ViewField label="PIN / postal code">{formatViewText(formData.pin_code)}</ViewField>
-                </div>
-              </section>
-
-              <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-status">
-                <h2 id="view-section-status" className={styles.sectionTitle}>
-                  Status
-                </h2>
-                <div className={styles.fieldGridDense}>
-                  <ViewField label="Contact status">{statusDisplay}</ViewField>
-                </div>
-              </section>
-            </div>
-
-            <div className={styles.formLayoutCol}>
-              <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-phones">
-                <h2 id="view-section-phones" className={styles.sectionTitle}>
-                  Phone numbers
-                </h2>
-                <ul className={styles.viewPhoneList}>
-                  {(formData.phones || []).map((p, idx) => {
-                    const num = String(p.number || '').trim();
-                    const line = num
-                      ? `${p.country_code || DEFAULT_COUNTRY_CODE} ${num} · ${phoneLabelText(p.label)}${p.is_primary ? ' · Primary' : ''}`
-                      : `${p.country_code || DEFAULT_COUNTRY_CODE} (no number) · ${phoneLabelText(p.label)}`;
-                    return (
-                      <li key={idx} className={styles.viewPhoneItem}>
-                        {line}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-
-              <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-tags">
-                <h2 id="view-section-tags" className={styles.sectionTitle}>
-                  Tags
-                </h2>
-                {(formData.tag_ids || []).length === 0 ? (
-                  <p className={styles.tagEmptyHint}>—</p>
-                ) : (
-                  <div className={styles.tagChips} role="list">
-                    {(formData.tag_ids || []).map((tid) => {
-                      const label = contactTagOptions.find((o) => o.value === String(tid))?.label || tid;
-                      return (
-                        <span key={tid} className={styles.tagChip} role="listitem">
-                          <span className={styles.tagChipLabel}>{label}</span>
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-
-              {!isNew && (role === 'admin' || role === 'manager') ? (
-                <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-assign">
-                  <h2 id="view-section-assign" className={styles.sectionTitle}>
-                    Assignment
-                  </h2>
-                  <div className={styles.fieldGridDense}>
-                    {role === 'admin' ? <ViewField label="Manager">{managerDisplay}</ViewField> : null}
-                    <ViewField label="Assigned agent">{agentDisplay}</ViewField>
-                    <ViewField label="Campaign">{campaignDisplay}</ViewField>
-                  </div>
-                </section>
-              ) : null}
-
-              <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-industry">
-                <h2 id="view-section-industry" className={styles.sectionTitle}>
-                  Industry fields
-                </h2>
-                {!loadingIndustryFields && industryFieldDefs.length === 0 ? (
-                  <p className={styles.customEmpty}>No industry fields for this workspace.</p>
-                ) : null}
-                <div className={styles.fieldGridDense}>
-                  {industryFieldDefs.map((f) => (
-                    <ViewField key={f.field_key} label={f.label}>
-                      {formatIndustryFieldForView(f)}
-                    </ViewField>
-                  ))}
-                </div>
-              </section>
-
-              <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-custom">
-                <h2 id="view-section-custom" className={styles.sectionTitle}>
-                  Custom fields
-                </h2>
-                {!loadingCustomFields && customFields.length === 0 ? (
-                  <p className={styles.customEmpty}>No custom fields configured for this tenant.</p>
-                ) : null}
-                <div className={styles.fieldGridDense}>
-                  {customFields.map((f) => (
-                    <ViewField key={f.field_id} label={f.label}>
-                      {formatCustomFieldForView(f)}
-                    </ViewField>
-                  ))}
-                </div>
-              </section>
-            </div>
-          </div>
+          <ContactFormDraggableColumns
+            layoutEditMode={false}
+            columns={formColumns}
+            onColumnsChange={setFormColumns}
+            renderSection={renderViewSection}
+          />
         </div>
       )}
 

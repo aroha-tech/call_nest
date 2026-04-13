@@ -15,6 +15,11 @@ import styles from './IntegrationsPage.module.scss';
 
 import { integrationsAPI } from '../../services/integrationsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
+import {
+  DEFAULT_PHONE_COUNTRY_CODE,
+  getCallingCodeOptionsForSelect,
+  normalizeCallingCode,
+} from '../../utils/phoneInput';
 
 const PROVIDER_OPTIONS = [
   { value: 'meta_lead_ads', label: 'Meta Lead Ads' },
@@ -44,7 +49,7 @@ export function IntegrationsPage() {
       tokens_json: {},
       webhook_secret: '',
       default_owner_user_id: '',
-      default_country_code: '+91',
+      default_country_code: DEFAULT_PHONE_COUNTRY_CODE,
       is_active: 1,
     }),
     []
@@ -82,7 +87,7 @@ export function IntegrationsPage() {
       tokens_json: tokens,
       webhook_secret: item.webhook_secret || '',
       default_owner_user_id: item.default_owner_user_id != null ? String(item.default_owner_user_id) : '',
-      default_country_code: item.default_country_code || '+91',
+      default_country_code: item.default_country_code || DEFAULT_PHONE_COUNTRY_CODE,
       is_active: item.is_active === 0 ? 0 : 1,
     });
     setTokensText(JSON.stringify(tokens, null, 2));
@@ -117,7 +122,7 @@ export function IntegrationsPage() {
       tokens_json: parsedTokens,
       webhook_secret: formData.webhook_secret?.trim() || null,
       default_owner_user_id: formData.default_owner_user_id ? Number(formData.default_owner_user_id) : null,
-      default_country_code: formData.default_country_code?.trim() || '+91',
+      default_country_code: normalizeCallingCode(formData.default_country_code || DEFAULT_PHONE_COUNTRY_CODE),
       is_active: formData.is_active,
     };
 
@@ -248,11 +253,11 @@ export function IntegrationsPage() {
             placeholder="Select owner user"
           />
 
-          <Input
+          <Select
             label="Default country code"
-            value={formData.default_country_code}
+            value={normalizeCallingCode(formData.default_country_code)}
             onChange={(e) => setFormData((p) => ({ ...p, default_country_code: e.target.value }))}
-            placeholder="+91"
+            options={getCallingCodeOptionsForSelect(formData.default_country_code)}
           />
 
           <Select
