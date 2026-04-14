@@ -4,7 +4,8 @@ import { validateTenantSlugFormat } from '../../utils/tenantSlugRules.js';
 async function findTenantRow(tenantId) {
   const [row] = await query(
     `SELECT t.id, t.name, t.slug, t.industry_id, t.created_at, t.updated_at,
-            i.name AS industry_name
+            i.name AS industry_name,
+            i.code AS industry_code
      FROM tenants t
      LEFT JOIN industries i ON i.id = t.industry_id AND i.is_deleted = 0
      WHERE t.id = ? AND t.is_deleted = 0`,

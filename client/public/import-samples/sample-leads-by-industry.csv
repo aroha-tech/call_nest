@@ -1,0 +1,7 @@
+first_name,last_name,email,mobile,city,state,company,job_title,industry,lead_source,status
+Priya,Sharma,priya.sharma@example.com,9876543210,Mumbai,Maharashtra,Skyline Realtors,Home buyer,Real Estate,Website,New
+Rajesh,Iyer,rajesh.iyer@example.com,9876543211,Bengaluru,Karnataka,,,Insurance,Google Ads,Follow-up
+Anita,Patel,,9876543212,Ahmedabad,Gujarat,Bright Coaching Centre,Parent,Education,Referral,New
+Sumit,Khan,sumit.khan@example.com,9876543213,New Delhi,Delhi,City Care Clinic,,Healthcare,JustDial,New
+Neha,Verma,neha.verma@example.com,9876543214,Pune,Maharashtra,TechFlow India Pvt Ltd,IT Manager,B2B SaaS,LinkedIn,Qualified
+Vikram,Singh,vikram.singh@example.com,9876543215,Chennai,Tamil Nadu,AutoMax Motors,Enquiry,Automotive,Walk-in,New

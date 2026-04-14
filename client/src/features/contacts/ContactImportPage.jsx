@@ -2,6 +2,8 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { selectUser } from '../../features/auth/authSelectors';
+import { tenantCompanyAPI } from '../../services/tenantCompanyAPI';
+import { resolveImportSamplesForTenantIndustry } from './importSampleByIndustry';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Alert } from '../../components/ui/Alert';
@@ -26,6 +28,13 @@ const CSV_IMPORT_MAX_BYTES =
     ? Number(import.meta.env.VITE_CSV_IMPORT_MAX_MB) * 1024 * 1024
     : 5 * 1024 * 1024;
 const CSV_IMPORT_MAX_MB = Math.round(CSV_IMPORT_MAX_BYTES / 1024 / 1024);
+
+/** Public folder — `client/public/import-samples/` */
+function importSampleHref(filename) {
+  const base = import.meta.env.BASE_URL || '/';
+  const prefix = base.endsWith('/') ? base : `${base}/`;
+  return `${prefix}import-samples/${filename}`;
+}
 
 const NEW_CUSTOM_VALUE = '__new_custom__';
 
@@ -121,6 +130,84 @@ export function ContactImportPage({ type }) {
   const [reviewData, setReviewData] = useState(null);
   const [resolvingPreview, setResolvingPreview] = useState(false);
   const previewDebounceRef = useRef(null);
+
+  /** From GET /api/tenant/company — drives which sample CSV we offer */
+  const [workspaceIndustry, setWorkspaceIndustry] = useState(null);
+  const [workspaceIndustryLoading, setWorkspaceIndustryLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user || user.isPlatformAdmin) {
+      setWorkspaceIndustry(null);
+      setWorkspaceIndustryLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setWorkspaceIndustryLoading(true);
+    (async () => {
+      try {
+        const res = await tenantCompanyAPI.get();
+        const t = res?.data?.data?.tenant;
+        if (!cancelled) {
+          setWorkspaceIndustry(
+            t
+              ? {
+                  industryCode: t.industry_code ?? null,
+                  industryName: t.industry_name ?? null,
+                }
+              : null
+          );
+        }
+      } catch {
+        if (!cancelled) setWorkspaceIndustry(null);
+      } finally {
+        if (!cancelled) setWorkspaceIndustryLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.isPlatformAdmin]);
+
+  const importSampleBundle = useMemo(
+    () =>
+      resolveImportSamplesForTenantIndustry({
+        industryCode: workspaceIndustry?.industryCode,
+        industryName: workspaceIndustry?.industryName,
+      }),
+    [workspaceIndustry?.industryCode, workspaceIndustry?.industryName]
+  );
+
+  const importSampleLinks = useMemo(() => {
+    const { tailored, minimal } = importSampleBundle;
+    const links = [];
+    if (tailored) links.push(tailored);
+    links.push(minimal);
+    return links;
+  }, [importSampleBundle]);
+
+  const importSampleIntro = useMemo(() => {
+    if (user?.isPlatformAdmin) {
+      return 'Signed in as platform admin — use the minimal template below, or open Import from a tenant workspace for an industry-matched example.';
+    }
+    if (workspaceIndustryLoading) return 'Loading sample for your workspace…';
+    const { tailored } = importSampleBundle;
+    const named = workspaceIndustry?.industryName?.trim();
+    if (tailored) {
+      return named
+        ? `Example headers for ${named}. Replace phone numbers with your data; map extra columns in step 3.`
+        : 'Example headers for your industry. Replace phone numbers with your data; map extra columns in step 3.';
+    }
+    if (workspaceIndustry?.industryCode || named) {
+      return 'No tailored example for this industry code yet — use the minimal template below or map your file in step 3.';
+    }
+    return 'Set your industry under Company settings to get a tailored example. The minimal template works for any import.';
+  }, [
+    importSampleBundle,
+    user?.isPlatformAdmin,
+    workspaceIndustry?.industryCode,
+    workspaceIndustry?.industryName,
+    workspaceIndustryLoading,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -591,6 +678,24 @@ export function ContactImportPage({ type }) {
                       <div style={{ marginTop: 6 }}>
                         <b>Max file size:</b> {CSV_IMPORT_MAX_MB} MB · <b>Max rows per run:</b> 2000 (split larger files).
                       </div>
+                      <div className={styles.sampleCsvBlock}>
+                        <div className={styles.sampleCsvTitle}>Sample CSV (download)</div>
+                        <p className={styles.sampleCsvIntro}>{importSampleIntro}</p>
+                        <ul className={styles.sampleCsvList}>
+                          {importSampleLinks.map(({ filename, label }) => (
+                            <li key={filename}>
+                              <a
+                                href={importSampleHref(filename)}
+                                download={filename}
+                                className={styles.sampleCsvLink}
+                                title={filename}
+                              >
+                                {label}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                 </div>
 
@@ -1023,6 +1128,10 @@ export function ContactImportPage({ type }) {
                 </div>
                 <div style={{ marginTop: 6 }}>
                   <b>Multiple phones</b>: use columns like phone_mobile, phone_work, or phone:mobile in the header.
+                </div>
+                <div style={{ marginTop: 6 }}>
+                  <b>Sample CSV</b>: the <b>Upload file</b> panel offers a template for your workspace industry (when set)
+                  plus a minimal template.
                 </div>
               </div>
             </div>
