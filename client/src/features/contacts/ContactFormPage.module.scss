@@ -22,27 +22,185 @@
   gap: $space-3;
 }
 
+// Two independent columns (flex): cards stack vertically on each side without sharing row heights,
+// so a short block on one side does not leave a tall empty gap beside a tall block on the other.
 .formLayout {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: $space-3;
-  align-items: start;
 
   @media (min-width: 900px) {
-    grid-template-columns: 1fr 1fr;
+    flex-direction: row;
+    align-items: flex-start;
     gap: $space-4;
   }
 
   @media (min-width: 1440px) {
     gap: $space-5;
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   }
 }
 
 .formLayoutCol {
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: $space-3;
+}
+
+.formLayoutArrange {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+  min-height: 240px;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+// Read-only section grid (same order as arrange mode).
+.formLayoutUnified {
+  width: 100%;
   min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.formLayoutArrangeCol {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.formLayoutArrangeColLabel {
+  margin: 0 0 $space-2;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.formLayoutArrangeEmpty {
+  margin: 0;
+  padding: $space-4 0;
+  font-size: $font-size-sm;
+  color: var(--color-text-muted);
+}
+
+/** View mode: two independent columns — row heights are not coupled (no dead space beside short cards). */
+.contactFormSectionViewRoot {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.contactFormTwoCol {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+  width: 100%;
+  align-items: stretch;
+  box-sizing: border-box;
+
+  @media (min-width: 900px) {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: $space-4;
+  }
+}
+
+.contactFormCol {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/** Arrange mode: same flex layout as view + dashed chrome (WYSIWYG while dragging). */
+.contactFormSectionGridArrange {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+  width: 100%;
+  box-sizing: border-box;
+  padding: $space-2;
+  border-radius: $radius-md;
+  border: 1px dashed var(--color-border-subtle);
+  background: color-mix(in srgb, var(--color-bg-subtle) 35%, transparent);
+}
+
+.contactFormSectionCard {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.contactFormSectionChrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-2;
+  margin-bottom: $space-2;
+  padding: $space-1 $space-2;
+  border-radius: $radius-sm;
+  border: 1px dashed var(--color-border-subtle);
+  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.06));
+}
+
+.contactFormSectionDrag {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 2px $space-2;
+  border: none;
+  border-radius: $radius-sm;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: 2px;
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-primary-500) 55%, transparent);
+    outline-offset: 2px;
+  }
+}
+
+.contactFormSectionFullLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
+  margin: 0;
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+
+  input {
+    margin: 0;
+  }
+}
+
+.contactFormSectionBody {
+  min-width: 0;
+}
+
+.formLayoutArrangeHint {
+  margin: (-$space-1) 0 $space-3;
+  padding: 0;
+  width: 100%;
+  font-size: $font-size-xs;
+  line-height: $line-height-normal;
+  color: var(--color-text-muted);
+  flex: 1 1 100%;
 }
 
 .fieldGridDense {

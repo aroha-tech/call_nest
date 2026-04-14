@@ -28,10 +28,10 @@ import {
   clampNationalDigits,
   onlyNationalDigits,
 } from '../../utils/phoneInput';
-import { ContactFormDraggableColumns } from './ContactFormDraggableColumns';
+import { ContactFormSectionLayout } from './ContactFormSectionLayout';
 import {
   CONTACT_FORM_SECTION_IDS,
-  DEFAULT_CONTACT_FORM_COLUMNS,
+  createDefaultContactFormLayout,
   loadContactFormColumns,
   saveContactFormColumns,
   reconcileContactFormColumns,
@@ -988,11 +988,9 @@ export function ContactFormPage({ defaultType }) {
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          const defaults =
-                            DEFAULT_CONTACT_FORM_COLUMNS[type] || DEFAULT_CONTACT_FORM_COLUMNS.lead;
                           setFormColumns(
                             reconcileContactFormColumns(
-                              { left: [...defaults.left], right: [...defaults.right] },
+                              createDefaultContactFormLayout(type),
                               formLayoutVisibility,
                               type
                             )
@@ -1022,14 +1020,8 @@ export function ContactFormPage({ defaultType }) {
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      const defaults =
-                        DEFAULT_CONTACT_FORM_COLUMNS[type] || DEFAULT_CONTACT_FORM_COLUMNS.lead;
                       setFormColumns(
-                        reconcileContactFormColumns(
-                          { left: [...defaults.left], right: [...defaults.right] },
-                          formLayoutVisibility,
-                          type
-                        )
+                        reconcileContactFormColumns(createDefaultContactFormLayout(type), formLayoutVisibility, type)
                       );
                     }}
                   >
@@ -1053,7 +1045,7 @@ export function ContactFormPage({ defaultType }) {
 
       {isNew || isEditing ? (
       <form id="contact-record-form" onSubmit={handleSubmit} className={`${styles.form} ${styles.formCompact}`}>
-        <ContactFormDraggableColumns
+        <ContactFormSectionLayout
           layoutEditMode={layoutEditMode && (isNew || isEditing)}
           columns={formColumns}
           onColumnsChange={setFormColumns}
@@ -1062,7 +1054,7 @@ export function ContactFormPage({ defaultType }) {
       </form>
       ) : (
         <div className={`${styles.form} ${styles.formCompact} ${styles.viewShell}`} aria-live="polite">
-          <ContactFormDraggableColumns
+          <ContactFormSectionLayout
             layoutEditMode={false}
             columns={formColumns}
             onColumnsChange={setFormColumns}
