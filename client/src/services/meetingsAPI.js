@@ -3,7 +3,10 @@ import { axiosInstance } from './axiosInstance';
 const BASE = '/api/tenant/meetings';
 
 export const meetingsAPI = {
-  /** @param {{ from?: string, to?: string, email_account_id?: string|number }} [params] */
+  /**
+   * Calendar: pass `from` + `to` (omit `page`). Paginated list: pass `page` (≥1), optional `limit`, `search`.
+   * @param {{ from?: string, to?: string, email_account_id?: string|number, page?: number, limit?: number, search?: string }} [params]
+   */
   list: (params) => axiosInstance.get(BASE, { params }),
 
   /** @param {{ email_account_id?: string|number }} [params] */

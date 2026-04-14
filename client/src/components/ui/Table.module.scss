@@ -59,6 +59,14 @@
   white-space: nowrap;
 }
 
+/** Opt-in: last column holds long emails / labels — do not cap at 140px */
+.tableAdminList.tableAdminListFlexibleLast .cell:last-child,
+.tableAdminList.tableAdminListFlexibleLast .headerCell:last-child {
+  width: auto;
+  min-width: 12rem;
+  max-width: none;
+}
+
 /** Badge / status columns: explicit min width for narrow content */
 .tableAdminList .cell.noTruncate,
 .tableAdminList .headerCell.noTruncate {

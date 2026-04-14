@@ -80,6 +80,78 @@ export async function listInRange(tenantId, { email_account_id = null, from = nu
   return query(sql2, p2);
 }
 
+const LIST_SELECT = `
+    SELECT
+      m.id,
+      m.tenant_id,
+      m.email_account_id,
+      m.title,
+      m.description,
+      m.location,
+      m.attendee_email,
+      m.start_at,
+      m.end_at,
+      m.meeting_status,
+      m.created_at,
+      m.updated_at,
+      ea.email_address AS account_email,
+      COALESCE(ea.account_name, ea.email_address) AS account_label
+    FROM tenant_meetings m
+    INNER JOIN email_accounts ea
+      ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id AND ea.is_deleted = 0
+`;
+
+/**
+ * Paginated list with optional search (title, attendee, location, description).
+ * @param {number} tenantId
+ * @param {{ email_account_id?: number|string|null, search?: string|null, page?: number, limit?: number }} opts
+ */
+export async function listPaged(tenantId, { email_account_id = null, search = null, page = 1, limit = 20 } = {}) {
+  const lim = Math.min(100, Math.max(1, Number(limit) || 20));
+  const pg = Math.max(1, Number(page) || 1);
+  const offset = (pg - 1) * lim;
+
+  let where = 'WHERE m.tenant_id = ? AND m.deleted_at IS NULL';
+  const params = [tenantId];
+  if (email_account_id != null && email_account_id !== '') {
+    const eid = Number(email_account_id);
+    if (Number.isFinite(eid)) {
+      where += ' AND m.email_account_id = ?';
+      params.push(eid);
+    }
+  }
+  const q = search && String(search).trim() ? String(search).trim() : '';
+  if (q) {
+    const like = `%${q}%`;
+    where += ' AND (m.title LIKE ? OR m.attendee_email LIKE ? OR m.location LIKE ? OR m.description LIKE ?)';
+    params.push(like, like, like, like);
+  }
+
+  const countSql = `
+    SELECT COUNT(*) AS c
+    FROM tenant_meetings m
+    INNER JOIN email_accounts ea
+      ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id AND ea.is_deleted = 0
+    ${where}`;
+  const [countRow] = await query(countSql, params);
+  const total = Number(countRow?.c) || 0;
+  const totalPages = Math.max(1, Math.ceil(total / lim));
+
+  // Inline LIMIT/OFFSET: some MySQL builds reject bound parameters for LIMIT in prepared statements (ER_WRONG_ARGUMENTS).
+  const limInt = Math.min(100, Math.max(1, Math.floor(Number(lim) || 20)));
+  const offsetInt = Math.max(0, Math.floor(Number(offset) || 0));
+  const sql = `${LIST_SELECT} ${where} ORDER BY m.start_at DESC, m.id DESC LIMIT ${limInt} OFFSET ${offsetInt}`;
+  const rows = await query(sql, params);
+
+  return {
+    rows,
+    total,
+    page: pg,
+    limit: lim,
+    totalPages,
+  };
+}
+
 /**
  * Dashboard metrics (7 buckets).
  * @param {number} tenantId

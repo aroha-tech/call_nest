@@ -1,12 +1,19 @@
 import React from 'react';
 import styles from './Table.module.scss';
 
-export function Table({ children, className = '', tableClassName = '', variant = 'default' }) {
+export function Table({
+  children,
+  className = '',
+  tableClassName = '',
+  variant = 'default',
+  /** When variant=adminList, allow the last column to grow (e.g. long emails) instead of a 140px cap */
+  flexibleLastColumn = false,
+}) {
   const admin = variant === 'adminList';
   return (
     <div className={`${styles.wrapper} ${admin ? styles.wrapperAdminList : ''} ${className}`}>
       <table
-        className={`${styles.table} ${admin ? styles.tableAdminList : ''} ${tableClassName}`.trim()}
+        className={`${styles.table} ${admin ? styles.tableAdminList : ''} ${admin && flexibleLastColumn ? styles.tableAdminListFlexibleLast : ''} ${tableClassName}`.trim()}
       >
         {children}
       </table>

@@ -9,6 +9,13 @@ import { meetingsAPI } from '../services/meetingsAPI';
 import { emailAccountsAPI } from '../services/emailAPI';
 import { usePermissions } from '../hooks/usePermission';
 import { PERMISSIONS } from '../utils/permissionUtils';
+import { MeetingMetricCards } from '../features/meetings/MeetingMetricCards';
+import { Pagination, PaginationPageSize } from '../components/ui/Pagination';
+import { SearchInput } from '../components/ui/SearchInput';
+import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '../components/ui/Table';
+import { Badge } from '../components/ui/Badge';
+import { TableDataRegion } from '../components/admin/TableDataRegion';
+import listStyles from '../components/admin/adminDataList.module.scss';
 import styles from './MeetingsPage.module.scss';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -110,6 +117,31 @@ function meetingPreviewKindLabel(kind) {
   return 'Cancelled';
 }
 
+function formatMeetingWhen(v) {
+  if (!v) return '—';
+  try {
+    const d = new Date(String(v).replace(' ', 'T'));
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+  } catch {
+    return '—';
+  }
+}
+
+function meetingStatusBadgeVariant(status) {
+  switch (status) {
+    case 'completed':
+      return 'success';
+    case 'cancelled':
+      return 'danger';
+    case 'rescheduled':
+      return 'warning';
+    case 'scheduled':
+    default:
+      return 'primary';
+  }
+}
+
 export function MeetingsPage() {
   const { canAny } = usePermissions();
   const canManage = canAny([PERMISSIONS.MEETINGS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]);
@@ -121,7 +153,17 @@ export function MeetingsPage() {
   const [accounts, setAccounts] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [metrics, setMetrics] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [metricsLoading, setMetricsLoading] = useState(true);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [viewMode, setViewMode] = useState('calendar');
+  const [listPage, setListPage] = useState(1);
+  const [listLimit, setListLimit] = useState(20);
+  const [listSearch, setListSearch] = useState('');
+  const [listRows, setListRows] = useState([]);
+  const [listPagination, setListPagination] = useState({ total: 0, page: 1, limit: 20, totalPages: 1 });
+  const [listLoading, setListLoading] = useState(false);
+  const [listHasCompletedInitialFetch, setListHasCompletedInitialFetch] = useState(false);
+  const [dataVersion, setDataVersion] = useState(0);
   const [error, setError] = useState(null);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -175,30 +217,95 @@ export function MeetingsPage() {
 
   const { from, to } = useMemo(() => monthRange(year, month0), [year, month0]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = { from, to };
-      if (emailFilter) params.email_account_id = emailFilter;
-      const [listRes, metRes] = await Promise.all([
-        meetingsAPI.list(params),
-        meetingsAPI.metrics({ email_account_id: emailFilter || undefined }),
-      ]);
-      setMeetings(listRes?.data?.data ?? []);
-      setMetrics(metRes?.data?.data ?? null);
-    } catch (e) {
-      setError(e?.response?.data?.error || e?.message || 'Failed to load meetings');
-      setMeetings([]);
-      setMetrics(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [from, to, emailFilter]);
+  useEffect(() => {
+    let cancelled = false;
+    setMetricsLoading(true);
+    meetingsAPI
+      .metrics({ email_account_id: emailFilter || undefined })
+      .then((res) => {
+        if (!cancelled) setMetrics(res?.data?.data ?? null);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setError(e?.response?.data?.error || e?.message || 'Failed to load metrics');
+          setMetrics(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setMetricsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [emailFilter]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (viewMode !== 'calendar') return;
+    let cancelled = false;
+    setCalendarLoading(true);
+    setError(null);
+    const params = { from, to };
+    if (emailFilter) params.email_account_id = emailFilter;
+    meetingsAPI
+      .list(params)
+      .then((res) => {
+        if (!cancelled) setMeetings(res?.data?.data ?? []);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setError(e?.response?.data?.error || e?.message || 'Failed to load calendar');
+          setMeetings([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCalendarLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewMode, from, to, emailFilter, dataVersion]);
+
+  const bumpMeetingsData = useCallback(() => {
+    setDataVersion((v) => v + 1);
+    meetingsAPI.metrics({ email_account_id: emailFilter || undefined }).then((res) => setMetrics(res?.data?.data ?? null)).catch(() => {});
+  }, [emailFilter]);
+
+  useEffect(() => {
+    if (viewMode !== 'list') return;
+    let cancelled = false;
+    setListLoading(true);
+    setError(null);
+    meetingsAPI
+      .list({
+        page: listPage,
+        limit: listLimit,
+        search: listSearch || undefined,
+        email_account_id: emailFilter || undefined,
+      })
+      .then((res) => {
+        if (!cancelled) {
+          setListRows(res?.data?.data ?? []);
+          setListPagination(res?.data?.pagination ?? { total: 0, page: listPage, limit: listLimit, totalPages: 1 });
+          setListHasCompletedInitialFetch(true);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setError(e?.response?.data?.error || e?.message || 'Failed to load meetings');
+          setListRows([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setListLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewMode, listPage, listLimit, listSearch, emailFilter, dataVersion]);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [emailFilter]);
 
   const byDay = useMemo(() => {
     const map = new Map();
@@ -229,6 +336,15 @@ export function MeetingsPage() {
     [accounts]
   );
 
+  /** Default new meeting block on a chosen calendar day (local 9:00–10:00). */
+  function dayDefaultsForCreate(dayDate) {
+    const start = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 9, 0, 0, 0);
+    const end = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 10, 0, 0, 0);
+    const toLocal = (d) =>
+      `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    return { start_at: toLocal(start), end_at: toLocal(end) };
+  }
+
   function openCreate() {
     if (!formAccountOptions.length) {
       setError('Connect an email account under Email → Accounts before scheduling meetings.');
@@ -244,6 +360,28 @@ export function MeetingsPage() {
       description: '',
       start_at: '',
       end_at: '',
+      meeting_status: 'scheduled',
+    });
+    setModalOpen(true);
+  }
+
+  function openCreateForDay(dayDate) {
+    if (!canManage) return;
+    if (!formAccountOptions.length) {
+      setError('Connect an email account under Email → Accounts before scheduling meetings.');
+      return;
+    }
+    const first = formAccountOptions[0]?.value || '';
+    const { start_at, end_at } = dayDefaultsForCreate(dayDate);
+    setEditing(null);
+    setForm({
+      email_account_id: first,
+      title: '',
+      attendee_email: '',
+      location: '',
+      description: '',
+      start_at,
+      end_at,
       meeting_status: 'scheduled',
     });
     setModalOpen(true);
@@ -289,7 +427,7 @@ export function MeetingsPage() {
         await meetingsAPI.create(payload);
       }
       setModalOpen(false);
-      await load();
+      bumpMeetingsData();
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Save failed');
     } finally {
@@ -447,7 +585,7 @@ export function MeetingsPage() {
     try {
       await meetingsAPI.delete(deleteTarget.id);
       setDeleteTarget(null);
-      await load();
+      bumpMeetingsData();
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Delete failed');
     } finally {
@@ -463,17 +601,7 @@ export function MeetingsPage() {
 
   const monthTitle = new Date(year, month0, 1).toLocaleString(undefined, { month: 'long', year: 'numeric' });
 
-  const metricItems = metrics
-    ? [
-        { key: 'total', label: 'Total Meetings', value: metrics.total },
-        { key: 'scheduled', label: 'Scheduled Meetings', value: metrics.scheduled },
-        { key: 'upcoming', label: 'Upcoming Meetings', value: metrics.upcoming },
-        { key: 'completed', label: 'Completed Meetings', value: metrics.completed },
-        { key: 'cancelled', label: 'Cancelled Meetings', value: metrics.cancelled },
-        { key: 'rescheduled', label: 'Rescheduled Meetings', value: metrics.rescheduled },
-        { key: 'today', label: "Today's Meetings", value: metrics.today },
-      ]
-    : [];
+  const listTotalPages = Math.max(1, listPagination.totalPages || 1);
 
   return (
     <div className={styles.page}>
@@ -495,45 +623,46 @@ export function MeetingsPage() {
         </Alert>
       )}
 
-      <div className={styles.metricsRow}>
-        {loading && !metrics
-          ? Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className={styles.metricCard}>
-                <div className={styles.metricValue}>—</div>
-                <div className={styles.metricLabel}>…</div>
-              </div>
-            ))
-          : metricItems.map((m) => (
-              <div key={m.key} className={styles.metricCard}>
-                <div className={styles.metricValue}>{m.value}</div>
-                <div className={styles.metricLabel}>{m.label}</div>
-              </div>
-            ))}
-      </div>
+      <MeetingMetricCards data={metrics} loading={metricsLoading} />
 
       <div className={styles.toolbar}>
-        <div className={styles.monthNav}>
-          <Button type="button" variant="secondary" size="sm" onClick={() => shiftMonth(-1)}>
-            ←
-          </Button>
-          <span className={styles.monthTitle}>{monthTitle}</span>
-          <Button type="button" variant="secondary" size="sm" onClick={() => shiftMonth(1)}>
-            →
-          </Button>
+        <div className={styles.viewToggle} role="group" aria-label="View mode">
           <Button
             type="button"
-            variant="ghost"
+            variant={viewMode === 'calendar' ? 'primary' : 'secondary'}
             size="sm"
-            onClick={() => {
-              const t = new Date();
-              setYear(t.getFullYear());
-              setMonth0(t.getMonth());
-            }}
+            onClick={() => setViewMode('calendar')}
           >
-            Today
+            Calendar
+          </Button>
+          <Button type="button" variant={viewMode === 'list' ? 'primary' : 'secondary'} size="sm" onClick={() => setViewMode('list')}>
+            List
           </Button>
         </div>
-        <div style={{ minWidth: 220 }}>
+        {viewMode === 'calendar' ? (
+          <div className={styles.monthNav}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => shiftMonth(-1)}>
+              ←
+            </Button>
+            <span className={styles.monthTitle}>{monthTitle}</span>
+            <Button type="button" variant="secondary" size="sm" onClick={() => shiftMonth(1)}>
+              →
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const t = new Date();
+                setYear(t.getFullYear());
+                setMonth0(t.getMonth());
+              }}
+            >
+              Today
+            </Button>
+          </div>
+        ) : null}
+        <div className={styles.toolbarAccount}>
           <Select
             label="Email account"
             value={emailFilter}
@@ -543,48 +672,151 @@ export function MeetingsPage() {
         </div>
       </div>
 
-      <div className={styles.calendarWrap}>
-        <div className={styles.calHeader}>
-          {WEEKDAYS.map((w) => (
-            <div key={w} className={styles.calHeaderCell}>
-              {w}
-            </div>
-          ))}
-        </div>
-        <div className={styles.calGrid}>
-          {cells.map((cell, idx) => {
-            const key = toYmd(cell.date);
-            const dayMeetings = byDay.get(key) || [];
-            const isToday = key === todayYmd;
-            return (
-              <div
-                key={`${idx}-${key}`}
-                className={`${styles.calCell} ${cell.inMonth ? '' : styles.calCellMuted} ${isToday ? styles.calCellToday : ''}`}
-              >
-                <div className={styles.calDayNum}>{cell.date.getDate()}</div>
-                {dayMeetings.slice(0, 4).map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className={styles.meetingChip}
-                    title={`${m.title} (${m.meeting_status})`}
-                    onClick={() => openEdit(m)}
-                  >
-                    {String(m.start_at || '').slice(11, 16)} {m.title}
-                  </button>
-                ))}
-                {dayMeetings.length > 4 ? (
-                  <div className={styles.listHint}>+{dayMeetings.length - 4} more</div>
-                ) : null}
+      {viewMode === 'calendar' ? (
+        <div className={styles.calendarWrap}>
+          <div className={styles.calHeader}>
+            {WEEKDAYS.map((w) => (
+              <div key={w} className={styles.calHeaderCell}>
+                {w}
               </div>
-            );
-          })}
+            ))}
+          </div>
+          <div className={styles.calGrid}>
+            {cells.map((cell, idx) => {
+              const key = toYmd(cell.date);
+              const dayMeetings = byDay.get(key) || [];
+              const isToday = key === todayYmd;
+              const dayLabel = cell.date.toLocaleDateString(undefined, {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+              });
+              return (
+                <div
+                  key={`${idx}-${key}`}
+                  className={`${styles.calCell} ${cell.inMonth ? '' : styles.calCellMuted} ${isToday ? styles.calCellToday : ''} ${canManage ? styles.calCellInteractive : ''}`}
+                  role={canManage ? 'button' : undefined}
+                  tabIndex={canManage ? 0 : undefined}
+                  aria-label={canManage ? `Add meeting on ${dayLabel}` : undefined}
+                  onClick={canManage ? () => openCreateForDay(cell.date) : undefined}
+                  onKeyDown={
+                    canManage
+                      ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            openCreateForDay(cell.date);
+                          }
+                        }
+                      : undefined
+                  }
+                >
+                  <div className={styles.calDayNum}>{cell.date.getDate()}</div>
+                  {dayMeetings.slice(0, 4).map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      className={styles.meetingChip}
+                      title={`${m.title} (${m.meeting_status})`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEdit(m);
+                      }}
+                    >
+                      {String(m.start_at || '').slice(11, 16)} {m.title}
+                    </button>
+                  ))}
+                  {dayMeetings.length > 4 ? (
+                    <div className={styles.listHint} onClick={(e) => e.stopPropagation()}>
+                      +{dayMeetings.length - 4} more
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+          {calendarLoading ? <div className={styles.calendarLoadingOverlay}>Loading…</div> : null}
         </div>
-      </div>
+      ) : (
+        <div className={listStyles.tableCard}>
+          <div className={listStyles.tableCardToolbarTop}>
+            <div className={listStyles.tableCardToolbarLeft}>
+              <PaginationPageSize
+                limit={listPagination.limit ?? listLimit}
+                onLimitChange={(n) => {
+                  setListLimit(n);
+                  setListPage(1);
+                }}
+              />
+            </div>
+            <SearchInput
+              value={listSearch}
+              onSearch={(v) => {
+                setListSearch(v);
+                setListPage(1);
+              }}
+              placeholder="Search title, attendee, location… (Enter)"
+              className={listStyles.searchInToolbar}
+            />
+          </div>
+          <TableDataRegion loading={listLoading} hasCompletedInitialFetch={listHasCompletedInitialFetch}>
+            {listRows.length === 0 && !listLoading ? (
+              <div className={listStyles.tableCardEmpty}>
+                <p className={styles.listHint} style={{ margin: 0 }}>
+                  No meetings match your filters. Try another search or email account.
+                </p>
+              </div>
+            ) : (
+              <div className={listStyles.tableCardBody}>
+                <Table variant="adminList" flexibleLastColumn>
+                  <TableHead>
+                    <TableRow>
+                      <TableHeaderCell>Title</TableHeaderCell>
+                      <TableHeaderCell width="120px">Status</TableHeaderCell>
+                      <TableHeaderCell width="160px">Start</TableHeaderCell>
+                      <TableHeaderCell width="160px">End</TableHeaderCell>
+                      <TableHeaderCell>Attendee</TableHeaderCell>
+                      <TableHeaderCell>Account</TableHeaderCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {listRows.map((row) => (
+                      <TableRow key={row.id} onClick={() => openEdit(row)} className={styles.listRowClickable}>
+                        <TableCell noTruncate>{row.title || '—'}</TableCell>
+                        <TableCell>
+                          <Badge variant={meetingStatusBadgeVariant(row.meeting_status)} size="sm">
+                            {row.meeting_status || '—'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{formatMeetingWhen(row.start_at)}</TableCell>
+                        <TableCell>{formatMeetingWhen(row.end_at)}</TableCell>
+                        <TableCell>{row.attendee_email || '—'}</TableCell>
+                        <TableCell>{row.account_label || row.account_email || '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </TableDataRegion>
+          <div className={listStyles.tableCardFooterPagination}>
+            <Pagination
+              page={listPagination.page ?? listPage}
+              totalPages={listTotalPages}
+              total={listPagination.total ?? 0}
+              limit={listPagination.limit ?? listLimit}
+              onPageChange={setListPage}
+              hidePageSize
+            />
+          </div>
+        </div>
+      )}
 
       <p className={styles.listHint}>
-        Metrics reflect all meetings{emailFilter ? ' for the selected account' : ''}. Calendar shows the current month in
-        your local time.
+        Metrics reflect all meetings{emailFilter ? ' for the selected account' : ''}.
+        {viewMode === 'calendar'
+          ? ' The calendar shows the current month in your local time.'
+          : ' The list is sorted by start time (newest first) and supports search across title, attendee, location, and notes.'}
       </p>
 
       <Modal
