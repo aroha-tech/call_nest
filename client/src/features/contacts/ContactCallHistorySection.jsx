@@ -7,7 +7,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Pagination } from '../../components/ui/Pagination';
 import { Button } from '../../components/ui/Button';
 import styles from './ContactCallHistorySection.module.scss';
-import { sanitizeAttemptNotesForDisplay } from '../../utils/callAttemptNotesDisplay';
+import { buildAttemptHistoryEntries } from '../../utils/callAttemptNotesDisplay';
 
 function formatWhen(iso) {
   if (iso == null || iso === '') return '—';
@@ -31,7 +31,7 @@ export function ContactCallHistorySection({ contactId }) {
   const canView = canAny(['dial.execute', 'dial.monitor']);
 
   const [page, setPage] = useState(1);
-  const [limit] = useState(12);
+  const limit = 10;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [payload, setPayload] = useState(null);
@@ -57,7 +57,11 @@ export function ContactCallHistorySection({ contactId }) {
     } finally {
       setLoading(false);
     }
-  }, [canView, contactId, page, limit]);
+  }, [canView, contactId, limit, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [contactId]);
 
   useEffect(() => {
     load();
@@ -66,7 +70,7 @@ export function ContactCallHistorySection({ contactId }) {
   if (!canView) return null;
 
   const rows = Array.isArray(payload?.data) ? payload.data : [];
-  const pagination = payload?.pagination ?? { page: 1, limit, total: 0, totalPages: 1 };
+  const pagination = payload?.pagination ?? { page, limit, total: 0, totalPages: 1 };
 
   return (
     <section className={styles.section} aria-labelledby="contact-section-call-history">
@@ -108,36 +112,33 @@ export function ContactCallHistorySection({ contactId }) {
         <>
           <div className={styles.timelineScroll}>
             <ol className={styles.timeline}>
-              {rows.map((row) => {
-                const when = formatWhen(row.started_at || row.created_at);
+              {rows.flatMap((row) => {
                 const agent =
                   row.agent_name?.trim() ||
                   (row.agent_user_id != null ? `User #${row.agent_user_id}` : '—');
                 const phone = row.phone_e164?.trim() || '—';
-                const dispo = row.disposition_name?.trim() || null;
-                const noteClean = sanitizeAttemptNotesForDisplay(row.notes != null ? String(row.notes) : '');
-                const note = noteClean.length ? noteClean : null;
-                const summaryParts = [dispo, note].filter(Boolean);
-                const summary = summaryParts.length ? summaryParts.join(' — ') : '—';
-
-                return (
-                  <li key={row.id} className={styles.item}>
-                    <div className={styles.logLine}>
-                      — {when} by {agent} — {phone} — {summary}
-                    </div>
-                    <div className={styles.metaRow}>
-                      <span>Attempt #{row.id}</span>
-                      <span className={styles.metaSep}>·</span>
-                      <span>{row.status || '—'}</span>
-                      {row.provider ? (
-                        <>
-                          <span className={styles.metaSep}>·</span>
-                          <span>{row.provider}</span>
-                        </>
-                      ) : null}
-                    </div>
-                  </li>
-                );
+                const attemptEntries = buildAttemptHistoryEntries(row);
+                return attemptEntries.map((entry) => {
+                  const when = formatWhen(entry.whenIso || row.started_at || row.created_at);
+                  return (
+                    <li key={entry.key} className={styles.item}>
+                      <div className={styles.logLine}>
+                        — {when} by {agent} — {phone} — {entry.text}
+                      </div>
+                      <div className={styles.metaRow}>
+                        <span>Attempt #{row.id}</span>
+                        <span className={styles.metaSep}>·</span>
+                        <span>{row.status || '—'}</span>
+                        {row.provider ? (
+                          <>
+                            <span className={styles.metaSep}>·</span>
+                            <span>{row.provider}</span>
+                          </>
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                });
               })}
             </ol>
           </div>

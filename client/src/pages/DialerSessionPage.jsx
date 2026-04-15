@@ -26,6 +26,7 @@ import {
 } from '../utils/phoneInput';
 import {
   attemptHasDialerVisibleHistory,
+  buildAttemptHistoryEntries,
   sanitizeAttemptNotesForDisplay,
 } from '../utils/callAttemptNotesDisplay';
 import styles from './DialerSessionPage.module.scss';
@@ -82,6 +83,16 @@ function formatDialerHistoryLine(row) {
   const note = noteClean.length ? noteClean : null;
   const summary = [dispo, note].filter(Boolean).join(' — ') || '—';
   return `— ${when} by ${agent} — ${phone} — ${summary}`;
+}
+
+function formatDialerHistoryEntryLine(row, entry) {
+  const when = formatDialerLogWhen(entry?.whenIso || row.started_at || row.created_at);
+  const agent =
+    row.agent_name?.trim() ||
+    (row.agent_user_id != null ? `User #${row.agent_user_id}` : '—');
+  const phone = row.phone_e164?.trim() || '—';
+  const text = entry?.text != null && String(entry.text).trim() ? String(entry.text).trim() : '—';
+  return `— ${when} by ${agent} — ${phone} — ${text}`;
 }
 
 function formatTimerHms(ms) {
@@ -1708,18 +1719,20 @@ export function DialerSessionPage() {
                             ) : (
                               <div className={styles.dialPrevHistoryScroll}>
                                 <ul className={styles.dialPrevHistoryList}>
-                                  {previousCallLogRows.map((row) => (
-                                    <li
-                                      key={row.id}
-                                      className={`${styles.dialPrevHistoryItem} ${
-                                        lastAttemptId && Number(row.id) === Number(lastAttemptId)
-                                          ? styles.dialPrevHistoryCurrent
-                                          : ''
-                                      }`.trim()}
-                                    >
-                                      {formatDialerHistoryLine(row)}
-                                    </li>
-                                  ))}
+                                  {previousCallLogRows.flatMap((row) =>
+                                    buildAttemptHistoryEntries(row).map((entry) => (
+                                      <li
+                                        key={entry.key}
+                                        className={`${styles.dialPrevHistoryItem} ${
+                                          lastAttemptId && Number(row.id) === Number(lastAttemptId)
+                                            ? styles.dialPrevHistoryCurrent
+                                            : ''
+                                        }`.trim()}
+                                      >
+                                        {formatDialerHistoryEntryLine(row, entry)}
+                                      </li>
+                                    ))
+                                  )}
                                 </ul>
                               </div>
                             )}
@@ -1740,18 +1753,20 @@ export function DialerSessionPage() {
                     ) : (
                       <div className={styles.dialPrevHistoryScroll}>
                         <ul className={styles.dialPrevHistoryList}>
-                          {callHistoryRows.map((row) => (
+                        {callHistoryRows.flatMap((row) =>
+                          buildAttemptHistoryEntries(row).map((entry) => (
                             <li
-                              key={row.id}
+                              key={entry.key}
                               className={`${styles.dialPrevHistoryItem} ${
                                 lastAttemptId && Number(row.id) === Number(lastAttemptId)
                                   ? styles.dialPrevHistoryCurrent
                                   : ''
                               }`.trim()}
                             >
-                              {formatDialerHistoryLine(row)}
+                              {formatDialerHistoryEntryLine(row, entry)}
                             </li>
-                          ))}
+                          ))
+                        )}
                         </ul>
                       </div>
                     )}

@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppSelector } from '../app/hooks';
 import { selectUser } from '../features/auth/authSelectors';
 import { usePermissions } from '../hooks/usePermission';
@@ -14,9 +14,18 @@ import { callsAPI } from '../services/callsAPI';
 import { dispositionsAPI } from '../services/dispositionAPI';
 import { tenantUsersAPI } from '../services/tenantUsersAPI';
 import { savedListFiltersAPI } from '../services/savedListFiltersAPI';
+import { BrowseSavedFiltersModal } from '../features/contacts/BrowseSavedFiltersModal';
+import { FilterOptionsModal } from '../features/contacts/FilterOptionsModal';
 import listStyles from '../components/admin/adminDataList.module.scss';
 import styles from './ActivitiesPage.module.scss';
 import { sanitizeAttemptNotesForDisplay } from '../utils/callAttemptNotesDisplay';
+import { MultiSelectDropdown } from '../components/ui/MultiSelectDropdown';
+import { SearchInput } from '../components/ui/SearchInput';
+import { TableDataRegion } from '../components/admin/TableDataRegion';
+import { Badge } from '../components/ui/Badge';
+import { CallHistoryCards } from './CallHistoryCards';
+import { CallHistoryFilterModal } from './CallHistoryFilterModal';
+import { CallHistoryDataTable } from './CallHistoryDataTable';
 
 function safeDateTime(v) {
   if (!v) return '—';
@@ -30,12 +39,14 @@ function safeDateTime(v) {
 }
 
 export function ActivitiesPage() {
+  const navigate = useNavigate();
   const user = useAppSelector(selectUser);
   const { canAny } = usePermissions();
   const canView = canAny(['dial.execute', 'dial.monitor']);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const contactFilter = (searchParams.get('contact_id') || '').trim();
+  const qParam = (searchParams.get('q') || '').trim();
 
   const setContactFilter = useCallback(
     (raw) => {
@@ -55,8 +66,9 @@ export function ActivitiesPage() {
   );
 
   const [page, setPage] = useState(1);
-  const [limit] = useState(20);
+  const [limit, setLimit] = useState(20);
   const [loading, setLoading] = useState(false);
+  const [hasCompletedInitialFetch, setHasCompletedInitialFetch] = useState(false);
   const [error, setError] = useState('');
   const [payload, setPayload] = useState(null);
 
@@ -65,34 +77,72 @@ export function ActivitiesPage() {
   const [starting, setStarting] = useState(false);
 
   const [dispositions, setDispositions] = useState([]);
-  const [dispositionFilter, setDispositionFilter] = useState('');
-  const [agentFilter, setAgentFilter] = useState('');
+  const [dispositionFilterMulti, setDispositionFilterMulti] = useState('');
+  const [directionFilterMulti, setDirectionFilterMulti] = useState('');
+  const [statusFilterMulti, setStatusFilterMulti] = useState('');
+  const [connectedFilterMulti, setConnectedFilterMulti] = useState('');
+  const [agentFilterMulti, setAgentFilterMulti] = useState('');
+  const [todayOnly, setTodayOnly] = useState(false);
   const [startedAfter, setStartedAfter] = useState('');
   const [startedBefore, setStartedBefore] = useState('');
   const [tenantAgents, setTenantAgents] = useState([]);
   const [savedFilters, setSavedFilters] = useState([]);
-  const [savedPick, setSavedPick] = useState('');
+  const [filterOptionsOpen, setFilterOptionsOpen] = useState(false);
+  const [browseSavedOpen, setBrowseSavedOpen] = useState(false);
+  const [editingSavedFilterId, setEditingSavedFilterId] = useState(null);
+  const [editingSavedFilterName, setEditingSavedFilterName] = useState('');
+  const [editingSavedFilterSnapshot, setEditingSavedFilterSnapshot] = useState(null);
 
-  const dispoOptions = useMemo(
-    () => [{ value: '', label: '— No disposition —' }, ...dispositions.map((d) => ({ value: String(d.id), label: d.name || d.code || d.id }))],
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [metrics, setMetrics] = useState(null);
+
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const [sortBy, setSortBy] = useState('');
+  const [sortDir, setSortDir] = useState('desc');
+
+  const [searchQuery, setSearchQuery] = useState(qParam);
+  useEffect(() => setSearchQuery(qParam), [qParam]);
+
+  const dispositionOptions = useMemo(
+    () => (dispositions || []).map((d) => ({ value: String(d.id), label: d.name || d.code || d.id })),
     [dispositions]
   );
 
-  const dispoFilterOptions = useMemo(
-    () => [{ value: '', label: 'All dispositions' }, ...dispositions.map((d) => ({ value: String(d.id), label: d.name || d.code || d.id }))],
-    [dispositions]
+  const agentOptions = useMemo(
+    () =>
+      (tenantAgents || [])
+        .map((u) => ({ value: String(u.id), label: u.name || u.email || `#${u.id}` }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [tenantAgents]
   );
 
-  const agentFilterOptions = useMemo(() => {
-    const opts = tenantAgents
-      .map((u) => ({ value: String(u.id), label: u.name || u.email || `#${u.id}` }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-    return [{ value: '', label: 'All agents' }, ...opts];
-  }, [tenantAgents]);
+  const directionOptions = useMemo(
+    () => [
+      { value: 'outbound', label: 'Outgoing' },
+      { value: 'inbound', label: 'Incoming' },
+    ],
+    []
+  );
 
-  const savedFilterOptions = useMemo(
-    () => [{ value: '', label: 'Saved filters…' }, ...savedFilters.map((f) => ({ value: String(f.id), label: f.name }))],
-    [savedFilters]
+  const statusOptions = useMemo(
+    () => [
+      { value: 'queued', label: 'Queued' },
+      { value: 'ringing', label: 'Ringing' },
+      { value: 'connected', label: 'Connected' },
+      { value: 'completed', label: 'Completed' },
+      { value: 'failed', label: 'Failed' },
+      { value: 'cancelled', label: 'Cancelled' },
+    ],
+    []
+  );
+
+  const connectedOptions = useMemo(
+    () => [
+      { value: '1', label: 'Connected' },
+      { value: '0', label: 'Not connected' },
+    ],
+    []
   );
 
   async function load() {
@@ -103,17 +153,26 @@ export function ActivitiesPage() {
       const res = await callsAPI.list({
         page,
         limit,
+        q: searchQuery?.trim() ? searchQuery.trim() : undefined,
         contact_id: contactFilter || undefined,
-        disposition_id: dispositionFilter || undefined,
-        agent_user_id: agentFilter || undefined,
+        disposition_id: dispositionFilterMulti || undefined,
+        direction: directionFilterMulti || undefined,
+        status: statusFilterMulti || undefined,
+        is_connected: connectedFilterMulti || undefined,
+        agent_user_id: agentFilterMulti || undefined,
         started_after: startedAfter || undefined,
         started_before: startedBefore || undefined,
+        today_only: todayOnly,
         meaningful_only: true,
+        sort_by: sortBy || undefined,
+        sort_dir: sortDir || undefined,
       });
       setPayload(res?.data ?? null);
+      setHasCompletedInitialFetch(true);
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || 'Failed to load activities');
       setPayload(null);
+      setHasCompletedInitialFetch(true);
     } finally {
       setLoading(false);
     }
@@ -122,7 +181,64 @@ export function ActivitiesPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, limit, canView, contactFilter, dispositionFilter, agentFilter, startedAfter, startedBefore]);
+  }, [
+    page,
+    limit,
+    canView,
+    searchQuery,
+    contactFilter,
+    dispositionFilterMulti,
+    directionFilterMulti,
+    statusFilterMulti,
+    connectedFilterMulti,
+    todayOnly,
+    agentFilterMulti,
+    startedAfter,
+    startedBefore,
+    sortBy,
+    sortDir,
+  ]);
+
+  const loadMetrics = useCallback(async () => {
+    if (!canView) return;
+    setMetricsLoading(true);
+    try {
+      const res = await callsAPI.metrics({
+        q: searchQuery?.trim() ? searchQuery.trim() : undefined,
+        contact_id: contactFilter || undefined,
+        disposition_id: dispositionFilterMulti || undefined,
+        direction: directionFilterMulti || undefined,
+        status: statusFilterMulti || undefined,
+        is_connected: connectedFilterMulti || undefined,
+        agent_user_id: agentFilterMulti || undefined,
+        started_after: startedAfter || undefined,
+        started_before: startedBefore || undefined,
+        today_only: todayOnly,
+        meaningful_only: true,
+      });
+      setMetrics(res?.data?.data ?? null);
+    } catch {
+      setMetrics(null);
+    } finally {
+      setMetricsLoading(false);
+    }
+  }, [
+    canView,
+    contactFilter,
+    searchQuery,
+    dispositionFilterMulti,
+    directionFilterMulti,
+    statusFilterMulti,
+    connectedFilterMulti,
+    agentFilterMulti,
+    startedAfter,
+    startedBefore,
+    todayOnly,
+  ]);
+
+  useEffect(() => {
+    loadMetrics();
+  }, [loadMetrics]);
 
   useEffect(() => {
     if (!canView) return;
@@ -168,53 +284,157 @@ export function ActivitiesPage() {
 
   const applyCallHistorySnapshot = (snap) => {
     if (!snap || snap.version !== 1) return;
-    setDispositionFilter(snap.dispositionFilter ?? '');
-    setAgentFilter(snap.agentFilter ?? '');
+    setDispositionFilterMulti(snap.dispositionFilterMulti ?? '');
+    setDirectionFilterMulti(snap.directionFilterMulti ?? '');
+    setStatusFilterMulti(snap.statusFilterMulti ?? '');
+    setConnectedFilterMulti(snap.connectedFilterMulti ?? '');
+    setAgentFilterMulti(snap.agentFilterMulti ?? '');
+    setSearchQuery(snap.searchQuery ?? '');
+    setTodayOnly(Boolean(snap.todayOnly));
     setStartedAfter(snap.startedAfter ?? '');
     setStartedBefore(snap.startedBefore ?? '');
     setContactFilter(snap.contactIdFilter ?? snap.contact_id ?? '');
     setPage(1);
   };
 
-  const handleSavedCallFilterPick = (e) => {
-    const id = e.target.value;
-    setSavedPick(id);
-    if (!id) return;
-    const row = savedFilters.find((f) => String(f.id) === id);
-    let snap = row?.filter_json;
-    if (snap == null) return;
+  const parseSavedListFilterSnapshot = (row) => {
+    if (!row?.filter_json) return null;
+    let snap = row.filter_json;
     if (typeof snap === 'string') {
       try {
         snap = JSON.parse(snap);
       } catch {
-        return;
+        return null;
       }
     }
-    applyCallHistorySnapshot(snap);
+    if (!snap || snap.version !== 1) return null;
+    return snap;
   };
 
-  const saveCurrentCallFilter = async () => {
-    const name = window.prompt('Name for this filter');
-    if (!name || !String(name).trim()) return;
-    const filter_json = {
-      version: 1,
-      dispositionFilter,
-      agentFilter,
-      startedAfter,
-      startedBefore,
-      contactIdFilter: contactFilter,
-    };
-    try {
-      await savedListFiltersAPI.create({ entity_type: 'call_history', name: String(name).trim(), filter_json });
-      const res = await savedListFiltersAPI.list({ entity_type: 'call_history' });
-      setSavedFilters(res?.data?.data ?? []);
-    } catch (e) {
-      setError(e?.response?.data?.error || e?.message || 'Could not save filter');
-    }
-  };
+  const buildCallHistorySnapshot = ({
+    contactFilter: cf,
+    dispositionFilterMulti: dMulti,
+    directionFilterMulti: dirMulti,
+    statusFilterMulti: sMulti,
+    connectedFilterMulti: cMulti,
+    agentFilterMulti: aMulti,
+    todayOnly: tOnly,
+    startedAfter: sAfter,
+    startedBefore: sBefore,
+  }) => ({
+    version: 1,
+    dispositionFilterMulti: dMulti ?? '',
+    directionFilterMulti: dirMulti ?? '',
+    statusFilterMulti: sMulti ?? '',
+    connectedFilterMulti: cMulti ?? '',
+    agentFilterMulti: aMulti ?? '',
+    searchQuery: searchQuery ?? '',
+    todayOnly: Boolean(tOnly),
+    startedAfter: sAfter ?? '',
+    startedBefore: sBefore ?? '',
+    contactIdFilter: cf ?? contactFilter ?? '',
+  });
 
   const rows = payload?.data ?? [];
   const pagination = payload?.pagination ?? { page, limit, total: 0, totalPages: 1 };
+  const totalPages = Math.max(1, pagination.totalPages || 1);
+
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [selectAllMatchingLoading, setSelectAllMatchingLoading] = useState(false);
+  const [selectionIsAllMatching, setSelectionIsAllMatching] = useState(false);
+  const allOnPageIds = useMemo(() => rows.map((r) => String(r.id)), [rows]);
+  const allOnPageSelected = useMemo(
+    () => allOnPageIds.length > 0 && allOnPageIds.every((id) => selectedIds.has(id)),
+    [allOnPageIds, selectedIds]
+  );
+
+  const toggleSelect = useCallback((id) => {
+    const key = String(id);
+    setSelectionIsAllMatching(false);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAllOnPage = useCallback(() => {
+    setSelectionIsAllMatching(false);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const allSelected = allOnPageIds.length > 0 && allOnPageIds.every((id) => next.has(id));
+      if (allSelected) allOnPageIds.forEach((id) => next.delete(id));
+      else allOnPageIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }, [allOnPageIds]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setSelectionIsAllMatching(false);
+  }, []);
+
+  const handleSelectAllMatchingToggle = useCallback(async () => {
+    if (selectionIsAllMatching && selectedIds.size > 0) {
+      clearSelection();
+      return;
+    }
+    setSelectAllMatchingLoading(true);
+    try {
+      const res = await callsAPI.listIds({
+        q: searchQuery?.trim() ? searchQuery.trim() : undefined,
+        contact_id: contactFilter || undefined,
+        disposition_id: dispositionFilterMulti || undefined,
+        direction: directionFilterMulti || undefined,
+        status: statusFilterMulti || undefined,
+        is_connected: connectedFilterMulti || undefined,
+        agent_user_id: agentFilterMulti || undefined,
+        started_after: startedAfter || undefined,
+        started_before: startedBefore || undefined,
+        today_only: todayOnly,
+        meaningful_only: true,
+      });
+      const { ids = [], total = 0, truncated, cap } = res?.data ?? {};
+      if (truncated) {
+        window.alert(
+          `Your filters match ${total} records. Only the first ${cap} IDs were loaded for selection — narrow filters to include everyone in bulk actions.`
+        );
+      }
+      setSelectedIds(new Set(ids.map((x) => String(x))));
+      setSelectionIsAllMatching(ids.length > 0);
+    } catch (e) {
+      window.alert(e?.response?.data?.error || e?.message || 'Could not select all matching records.');
+    } finally {
+      setSelectAllMatchingLoading(false);
+    }
+  }, [
+    selectionIsAllMatching,
+    selectedIds.size,
+    clearSelection,
+    searchQuery,
+    contactFilter,
+    dispositionFilterMulti,
+    directionFilterMulti,
+    statusFilterMulti,
+    connectedFilterMulti,
+    agentFilterMulti,
+    startedAfter,
+    startedBefore,
+    todayOnly,
+  ]);
+
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actionsRef = useRef(null);
+  useEffect(() => {
+    const onDoc = (e) => {
+      const el = actionsRef.current;
+      if (!actionsOpen || !el) return;
+      if (!el.contains(e.target)) setActionsOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [actionsOpen]);
 
   const startSingle = async () => {
     setStarting(true);
@@ -244,15 +464,24 @@ export function ActivitiesPage() {
     );
   }
 
+  const hasActiveFilters = Boolean(
+    String(searchQuery || '').trim() ||
+      String(contactFilter || '').trim() ||
+      dispositionFilterMulti ||
+      directionFilterMulti ||
+      statusFilterMulti ||
+      connectedFilterMulti ||
+      agentFilterMulti ||
+      todayOnly ||
+      startedAfter ||
+      startedBefore
+  );
+
   return (
     <div className={listStyles.page}>
       <PageHeader
-        title="Activities"
-        description={
-          contactFilter
-            ? `Call attempts for contact #${contactFilter} (and dispositions). Clear the contact filter to see all.`
-            : `Call attempts and dispositions (${user?.role || 'user'} scope).`
-        }
+        title="Call history"
+        description="Calls, outcomes, and notes (tenant-scoped; role restrictions apply)."
         actions={
           <div className={styles.headerActions}>
             <Select
@@ -276,168 +505,287 @@ export function ActivitiesPage() {
       />
 
       {error ? <Alert variant="error">{error}</Alert> : null}
-
-      <div className={styles.filterCard}>
-        <div className={styles.filterRow}>
-          <Input
-            label="Contact / lead ID"
-            value={contactFilter}
-            onChange={(e) => setContactFilter(e.target.value)}
-            placeholder="e.g. 123 — show attempts for this record"
-            inputMode="numeric"
-          />
-          <Select
-            label="Disposition"
-            value={dispositionFilter}
-            onChange={(e) => {
-              setDispositionFilter(e.target.value);
-              setPage(1);
-            }}
-            options={dispoFilterOptions}
-          />
-          {(user?.role === 'admin' || user?.role === 'manager') && (
-            <Select
-              label="Agent"
-              value={agentFilter}
-              onChange={(e) => {
-                setAgentFilter(e.target.value);
-                setPage(1);
-              }}
-              options={agentFilterOptions}
-            />
-          )}
-          <Input
-            label="Started after"
-            type="datetime-local"
-            value={startedAfter}
-            onChange={(e) => {
-              setStartedAfter(e.target.value);
-              setPage(1);
-            }}
-          />
-          <Input
-            label="Started before"
-            type="datetime-local"
-            value={startedBefore}
-            onChange={(e) => {
-              setStartedBefore(e.target.value);
-              setPage(1);
-            }}
-          />
-        </div>
-        <div className={styles.filterRow}>
-          <Select
-            label="Saved filter"
-            value={savedPick}
-            onChange={handleSavedCallFilterPick}
-            options={savedFilterOptions}
-          />
-          <Button type="button" variant="secondary" onClick={saveCurrentCallFilter}>
-            Save current filter
-          </Button>
-        </div>
-      </div>
+      <CallHistoryCards data={metrics} loading={metricsLoading} />
 
       <div className={listStyles.tableCard}>
-        <div className={styles.cardBody}>
-          {loading ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Spinner size="sm" /> Loading…
+        <div className={listStyles.tableCardToolbarTop}>
+          <div className={listStyles.tableCardToolbarLeft}>
+            <div className={listStyles.bulkToolbarSlot}>
+              {selectedIds.size > 0 ? (
+                <span className={listStyles.bulkSelectionCount}>{selectedIds.size} selected</span>
+              ) : (
+                <span className={listStyles.bulkToolbarHint}>Select rows for bulk actions.</span>
+              )}
             </div>
-          ) : null}
+          </div>
+          <div className={styles.callsToolbarRight}>
+            {hasActiveFilters ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setContactFilter('');
+                  setSearchQuery('');
+                  setDispositionFilterMulti('');
+                  setDirectionFilterMulti('');
+                  setStatusFilterMulti('');
+                  setConnectedFilterMulti('');
+                  setAgentFilterMulti('');
+                  setStartedAfter('');
+                  setStartedBefore('');
+                  setTodayOnly(false);
+                  clearSelection();
+                  setEditingSavedFilterId(null);
+                  setEditingSavedFilterName('');
+                  setEditingSavedFilterSnapshot(null);
+                  setPage(1);
+                }}
+              >
+                Reset
+              </Button>
+            ) : null}
 
-          {!loading && rows.length === 0 ? (
-            <div className={styles.empty}>No call attempts yet. Start a dummy call to test.</div>
-          ) : null}
+            {rows.length > 0 && (pagination.total || 0) > 0 ? (
+              <Button type="button" size="sm" variant="secondary" onClick={toggleSelectAllOnPage}>
+                {allOnPageSelected ? 'Deselect all' : 'Select all'}
+              </Button>
+            ) : null}
 
-          {!loading && rows.length > 0 ? (
-            <>
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>When</th>
-                      <th>Attempt</th>
-                      <th>Contact</th>
-                      <th>Phone</th>
-                      <th>Agent</th>
-                      <th>Provider</th>
-                      <th>Status</th>
-                      <th>Disposition</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r) => (
-                      <ActivityRow key={r.id} row={r} dispoOptions={dispoOptions} onSaved={load} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div style={{ marginTop: 16 }}>
-                <Pagination
-                  page={pagination.page || page}
-                  totalPages={pagination.totalPages || 1}
-                  total={pagination.total || 0}
-                  limit={pagination.limit || limit}
-                  onPageChange={setPage}
-                />
-              </div>
-            </>
-          ) : null}
+            <div className={styles.actionsWrap} ref={actionsRef}>
+              <Button type="button" size="sm" variant="secondary" onClick={() => setActionsOpen((v) => !v)}>
+                Actions
+              </Button>
+              {actionsOpen ? (
+                <div className={styles.actionsMenu} role="menu">
+                  <button
+                    type="button"
+                    className={styles.actionsItem}
+                    onClick={() => {
+                      setFilterOptionsOpen(true);
+                      setActionsOpen(false);
+                    }}
+                  >
+                    Filters
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.actionsItem}
+                    onClick={() => {
+                      void handleSelectAllMatchingToggle();
+                      setActionsOpen(false);
+                    }}
+                  >
+                    {selectionIsAllMatching && selectedIds.size > 0 ? 'Deselect all (matching)' : 'Select all (matching)'}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.actionsItem}
+                    disabled={selectedIds.size === 0}
+                    onClick={() => {
+                      clearSelection();
+                      setActionsOpen(false);
+                    }}
+                  >
+                    Clear selection
+                  </button>
+                </div>
+              ) : null}
+            </div>
+
+            <SearchInput
+              value={searchQuery}
+              onSearch={(v) => {
+                const t = String(v ?? '').trim();
+                setSearchQuery(t);
+                setPage(1);
+                clearSelection();
+                setSearchParams(
+                  (prev) => {
+                    const p = new URLSearchParams(prev);
+                    if (t) p.set('q', t);
+                    else p.delete('q');
+                    return p;
+                  },
+                  { replace: true }
+                );
+              }}
+              placeholder="Search... (press Enter)"
+              className={styles.callsSearch}
+            />
+          </div>
+        </div>
+
+        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+          {rows.length === 0 ? (
+            <div className={listStyles.tableCardEmpty}>No call history rows match your filters.</div>
+          ) : (
+            <div className={listStyles.tableCardBodyLead}>
+              <CallHistoryDataTable
+                rows={rows}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onToggleSelectAllOnPage={() => toggleSelectAllOnPage()}
+                allOnPageSelected={allOnPageSelected}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSortChange={({ sortBy: sb, sortDir: sd }) => {
+                  setSortBy(sb);
+                  setSortDir(sd);
+                  setPage(1);
+                  clearSelection();
+                }}
+                onOpenContact={(r) => navigate(`/leads/${r.contact_id}?mode=view`)}
+                formatWhen={(v) => safeDateTime(v)}
+                notesPreview={(r) => sanitizeAttemptNotesForDisplay(r.notes || '').slice(0, 120) || '—'}
+              />
+            </div>
+          )}
+        </TableDataRegion>
+
+        <div className={listStyles.tableCardFooterPagination}>
+          <Pagination
+            page={pagination.page || page}
+            totalPages={totalPages}
+            total={pagination.total || 0}
+            limit={pagination.limit || limit}
+            onPageChange={(p) => setPage(p)}
+            onLimitChange={(nextLimit) => {
+              setLimit(nextLimit);
+              setPage(1);
+            }}
+          />
         </div>
       </div>
+
+      <CallHistoryFilterModal
+        isOpen={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        values={{
+          contactFilter,
+          dispositionFilterMulti,
+          directionFilterMulti,
+          statusFilterMulti,
+          connectedFilterMulti,
+          agentFilterMulti,
+          todayOnly,
+          startedAfter,
+          startedBefore,
+        }}
+        dispositionOptions={dispositionOptions}
+        agentOptions={agentOptions}
+        directionOptions={directionOptions}
+        statusOptions={statusOptions}
+        connectedOptions={connectedOptions}
+        canPickAgents={user?.role === 'admin' || user?.role === 'manager'}
+        onReset={() => {
+          setContactFilter('');
+          setDispositionFilterMulti('');
+          setDirectionFilterMulti('');
+          setStatusFilterMulti('');
+          setConnectedFilterMulti('');
+          setAgentFilterMulti('');
+          setTodayOnly(false);
+          setStartedAfter('');
+          setStartedBefore('');
+          setPage(1);
+          clearSelection();
+        }}
+        onApply={(next) => {
+          setContactFilter(next?.contactFilter ?? '');
+          setDispositionFilterMulti(next?.dispositionFilterMulti ?? '');
+          setDirectionFilterMulti(next?.directionFilterMulti ?? '');
+          setStatusFilterMulti(next?.statusFilterMulti ?? '');
+          setConnectedFilterMulti(next?.connectedFilterMulti ?? '');
+          setAgentFilterMulti(next?.agentFilterMulti ?? '');
+          setTodayOnly(Boolean(next?.todayOnly));
+          setStartedAfter(next?.startedAfter ?? '');
+          setStartedBefore(next?.startedBefore ?? '');
+          setPage(1);
+          clearSelection();
+          setEditingSavedFilterId(null);
+          setEditingSavedFilterName('');
+          setEditingSavedFilterSnapshot(null);
+        }}
+        savedFilterId={editingSavedFilterId}
+        initialSavedFilterName={editingSavedFilterName}
+        existingSavedFilters={savedFilters.map((f) => ({ id: f.id, name: f.name }))}
+        onSaveNamedFilter={async (name, next) => {
+          try {
+            const snap = buildCallHistorySnapshot(next || {});
+            await savedListFiltersAPI.create({ entity_type: 'call_history', name, filter_json: snap });
+            const res = await savedListFiltersAPI.list({ entity_type: 'call_history' });
+            setSavedFilters(res?.data?.data ?? []);
+          } catch (e) {
+            setError(e?.response?.data?.error || e?.message || 'Could not save filter');
+          }
+        }}
+        onUpdateNamedFilter={async (id, name, next) => {
+          try {
+            const snap = buildCallHistorySnapshot(next || {});
+            await savedListFiltersAPI.update(id, { name, filter_json: snap });
+            const res = await savedListFiltersAPI.list({ entity_type: 'call_history' });
+            setSavedFilters(res?.data?.data ?? []);
+          } catch (e) {
+            setError(e?.response?.data?.error || e?.message || 'Could not update filter');
+          }
+        }}
+      />
+
+      <FilterOptionsModal
+        isOpen={filterOptionsOpen}
+        onClose={() => setFilterOptionsOpen(false)}
+        onCreateNew={() => {
+          setEditingSavedFilterId(null);
+          setEditingSavedFilterName('');
+          setEditingSavedFilterSnapshot(null);
+          setFiltersOpen(true);
+        }}
+        onBrowseExisting={() => setBrowseSavedOpen(true)}
+      />
+
+      <BrowseSavedFiltersModal
+        isOpen={browseSavedOpen}
+        onClose={() => setBrowseSavedOpen(false)}
+        filters={savedFilters}
+        onApply={(f) => {
+          const snap = parseSavedListFilterSnapshot(f);
+          if (!snap) return;
+          applyCallHistorySnapshot(snap);
+          clearSelection();
+          setEditingSavedFilterId(null);
+          setEditingSavedFilterName('');
+          setEditingSavedFilterSnapshot(null);
+        }}
+        onDelete={async (f) => {
+          await savedListFiltersAPI.remove(f.id);
+          const res = await savedListFiltersAPI.list({ entity_type: 'call_history' });
+          setSavedFilters(res?.data?.data ?? []);
+        }}
+        onEdit={(f) => {
+          const snap = parseSavedListFilterSnapshot(f);
+          if (!snap || !f?.id) return;
+          setEditingSavedFilterId(f.id);
+          setEditingSavedFilterName(String(f.name || '').trim());
+          setEditingSavedFilterSnapshot(snap);
+          applyCallHistorySnapshot(snap);
+          setBrowseSavedOpen(false);
+          setFiltersOpen(true);
+        }}
+      />
     </div>
   );
 }
 
-function ActivityRow({ row, dispoOptions, onSaved }) {
-  const [saving, setSaving] = useState(false);
-  const [dispositionId, setDispositionId] = useState(row.disposition_id ? String(row.disposition_id) : '');
-  const [notes, setNotes] = useState(() =>
-    sanitizeAttemptNotesForDisplay(row.notes != null ? String(row.notes) : '')
-  );
-
-  async function save() {
-    setSaving(true);
-    try {
-      const trimmed = String(notes ?? '').trim();
-      await callsAPI.setDisposition(row.id, {
-        disposition_id: dispositionId || null,
-        ...(trimmed ? { notes: trimmed } : { clear_notes: true }),
-      });
-      await onSaved?.();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <tr>
-      <td>{safeDateTime(row.created_at)}</td>
-      <td>#{row.id}</td>
-      <td>
-        {row.display_name ? (
-          <>
-            {row.display_name} <span style={{ opacity: 0.6 }}>({row.contact_id})</span>
-          </>
-        ) : (
-          row.contact_id
-        )}
-      </td>
-      <td>{row.phone_e164 || '—'}</td>
-      <td>{row.agent_name || (row.agent_user_id ? `#${row.agent_user_id}` : '—')}</td>
-      <td>{row.provider}</td>
-      <td>{row.status}</td>
-      <td>
-        <div className={styles.dispoCell}>
-          <Select value={dispositionId} onChange={(e) => setDispositionId(e.target.value)} options={dispoOptions} />
-          <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes (optional)" />
-          <Button size="sm" variant="secondary" onClick={save} disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
-          </Button>
-        </div>
-      </td>
-    </tr>
-  );
+function formatDuration(sec) {
+  const n = Number(sec ?? 0);
+  if (!Number.isFinite(n) || n <= 0) return '0s';
+  const s = Math.floor(n);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${r}s`;
+  return `${r}s`;
 }
 
