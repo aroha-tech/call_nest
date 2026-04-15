@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAppSelector } from '../app/hooks';
 import { selectUser } from '../features/auth/authSelectors';
 import { usePermissions } from '../hooks/usePermission';
@@ -15,6 +16,7 @@ import { tenantUsersAPI } from '../services/tenantUsersAPI';
 import { savedListFiltersAPI } from '../services/savedListFiltersAPI';
 import listStyles from '../components/admin/adminDataList.module.scss';
 import styles from './ActivitiesPage.module.scss';
+import { sanitizeAttemptNotesForDisplay } from '../utils/callAttemptNotesDisplay';
 
 function safeDateTime(v) {
   if (!v) return '—';
@@ -31,6 +33,26 @@ export function ActivitiesPage() {
   const user = useAppSelector(selectUser);
   const { canAny } = usePermissions();
   const canView = canAny(['dial.execute', 'dial.monitor']);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const contactFilter = (searchParams.get('contact_id') || '').trim();
+
+  const setContactFilter = useCallback(
+    (raw) => {
+      setPage(1);
+      const t = String(raw ?? '').trim();
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (t) p.set('contact_id', t);
+          else p.delete('contact_id');
+          return p;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
 
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
@@ -81,10 +103,12 @@ export function ActivitiesPage() {
       const res = await callsAPI.list({
         page,
         limit,
+        contact_id: contactFilter || undefined,
         disposition_id: dispositionFilter || undefined,
         agent_user_id: agentFilter || undefined,
         started_after: startedAfter || undefined,
         started_before: startedBefore || undefined,
+        meaningful_only: true,
       });
       setPayload(res?.data ?? null);
     } catch (e) {
@@ -98,7 +122,7 @@ export function ActivitiesPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, limit, canView, dispositionFilter, agentFilter, startedAfter, startedBefore]);
+  }, [page, limit, canView, contactFilter, dispositionFilter, agentFilter, startedAfter, startedBefore]);
 
   useEffect(() => {
     if (!canView) return;
@@ -148,6 +172,7 @@ export function ActivitiesPage() {
     setAgentFilter(snap.agentFilter ?? '');
     setStartedAfter(snap.startedAfter ?? '');
     setStartedBefore(snap.startedBefore ?? '');
+    setContactFilter(snap.contactIdFilter ?? snap.contact_id ?? '');
     setPage(1);
   };
 
@@ -177,6 +202,7 @@ export function ActivitiesPage() {
       agentFilter,
       startedAfter,
       startedBefore,
+      contactIdFilter: contactFilter,
     };
     try {
       await savedListFiltersAPI.create({ entity_type: 'call_history', name: String(name).trim(), filter_json });
@@ -222,7 +248,11 @@ export function ActivitiesPage() {
     <div className={listStyles.page}>
       <PageHeader
         title="Activities"
-        description={`Call attempts and dispositions (${user?.role || 'user'} scope).`}
+        description={
+          contactFilter
+            ? `Call attempts for contact #${contactFilter} (and dispositions). Clear the contact filter to see all.`
+            : `Call attempts and dispositions (${user?.role || 'user'} scope).`
+        }
         actions={
           <div className={styles.headerActions}>
             <Select
@@ -249,6 +279,13 @@ export function ActivitiesPage() {
 
       <div className={styles.filterCard}>
         <div className={styles.filterRow}>
+          <Input
+            label="Contact / lead ID"
+            value={contactFilter}
+            onChange={(e) => setContactFilter(e.target.value)}
+            placeholder="e.g. 123 — show attempts for this record"
+            inputMode="numeric"
+          />
           <Select
             label="Disposition"
             value={dispositionFilter}
@@ -356,14 +393,17 @@ export function ActivitiesPage() {
 function ActivityRow({ row, dispoOptions, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [dispositionId, setDispositionId] = useState(row.disposition_id ? String(row.disposition_id) : '');
-  const [notes, setNotes] = useState(row.notes || '');
+  const [notes, setNotes] = useState(() =>
+    sanitizeAttemptNotesForDisplay(row.notes != null ? String(row.notes) : '')
+  );
 
   async function save() {
     setSaving(true);
     try {
+      const trimmed = String(notes ?? '').trim();
       await callsAPI.setDisposition(row.id, {
         disposition_id: dispositionId || null,
-        notes: notes || null,
+        ...(trimmed ? { notes: trimmed } : { clear_notes: true }),
       });
       await onSaved?.();
     } finally {

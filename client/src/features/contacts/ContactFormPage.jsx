@@ -17,8 +17,10 @@ import { tenantUsersAPI } from '../../services/tenantUsersAPI';
 import { campaignsAPI } from '../../services/campaignsAPI';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
 import { ContactOpportunitiesSection } from './ContactOpportunitiesSection';
+import { ContactCallHistorySection } from './ContactCallHistorySection';
 import { useContactStatusesOptions } from '../disposition/hooks/useMasterData';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
+import { usePermissions } from '../../hooks/usePermission';
 import {
   DEFAULT_PHONE_COUNTRY_CODE,
   PHONE_NATIONAL_MAX_DIGITS,
@@ -145,6 +147,8 @@ export function ContactFormPage({ defaultType }) {
   const modeParam = searchParams.get('mode');
   const authUser = useAppSelector(selectUser);
   const role = authUser?.role ?? 'agent';
+  const { canAny } = usePermissions();
+  const canViewCallHistory = canAny(['dial.execute', 'dial.monitor']);
 
   const id = params.id;
   const isNew = !id || id === 'new';
@@ -195,6 +199,7 @@ export function ContactFormPage({ defaultType }) {
     campaign_id: '',
     tag_ids: [],
     status_id: '',
+    notes: '',
   });
 
   const fetchContact = useCallback(
@@ -383,6 +388,7 @@ export function ContactFormPage({ defaultType }) {
           ? contact.tags.map((t) => String(t.id))
           : [],
       status_id: contact.status_id != null ? String(contact.status_id) : '',
+      notes: contact.notes != null ? String(contact.notes) : '',
     }));
   }, [contact, isNew]);
 
@@ -610,6 +616,7 @@ export function ContactFormPage({ defaultType }) {
       industry: formData.industry?.trim() || null,
       date_of_birth: formData.date_of_birth?.trim() || null,
       tax_id: formData.tax_id?.trim() || null,
+      notes: formData.notes?.trim() ? String(formData.notes).trim() : null,
       tag_ids: (formData.tag_ids || []).map((id) => Number(id)).filter((n) => Number.isFinite(n) && n > 0),
       phones,
       custom_fields,
@@ -811,6 +818,7 @@ export function ContactFormPage({ defaultType }) {
     const s = new Set([
       CONTACT_FORM_SECTION_IDS.IDENTITY,
       CONTACT_FORM_SECTION_IDS.LOCATION,
+      CONTACT_FORM_SECTION_IDS.NOTES,
       CONTACT_FORM_SECTION_IDS.STATUS,
       CONTACT_FORM_SECTION_IDS.PHONES,
       CONTACT_FORM_SECTION_IDS.TAGS,
@@ -955,6 +963,16 @@ export function ContactFormPage({ defaultType }) {
                 <Button variant="ghost" onClick={() => navigate(-1)}>
                   Back
                 </Button>
+                {canViewCallHistory && id ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => navigate(`/calls/history?contact_id=${encodeURIComponent(String(id))}`)}
+                  >
+                    Call attempts and notes
+                  </Button>
+                ) : null}
                 <div className={styles.viewEditToggle} role="group" aria-label="View or edit record">
                   <Button
                     type="button"
@@ -1088,11 +1106,14 @@ export function ContactFormPage({ defaultType }) {
       />
 
       {!isNew && contact ? (
-        <ContactOpportunitiesSection
-          contactId={id}
-          contactType={contact.type || type}
-          accountName={contact?.company || ''}
-        />
+        <>
+          <ContactCallHistorySection key={id} contactId={id} />
+          <ContactOpportunitiesSection
+            contactId={id}
+            contactType={contact.type || type}
+            accountName={contact?.company || ''}
+          />
+        </>
       ) : null}
     </div>
   );

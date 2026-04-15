@@ -266,6 +266,29 @@ export function createContactFormEditSectionRenderers(ctx) {
       </section>
     ),
 
+    [CONTACT_FORM_SECTION_IDS.NOTES]: () => (
+      <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-notes">
+        <h2 id="contact-section-notes" className={styles.sectionTitle}>
+          Contact notes
+        </h2>
+        {showFormHints ? (
+          <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
+            Persistent notes on this record. Notes for a specific call are saved on the call attempt when you set a
+            disposition.
+          </p>
+        ) : null}
+        <textarea
+          id="contact-notes-input"
+          className={styles.notesTextarea}
+          value={formData.notes ?? ''}
+          onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
+          placeholder="General notes about this lead or contact…"
+          rows={5}
+          disabled={!isEditing}
+        />
+      </section>
+    ),
+
     [CONTACT_FORM_SECTION_IDS.STATUS]: () => (
       <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-status">
         <h2 id="contact-section-status" className={styles.sectionTitle}>

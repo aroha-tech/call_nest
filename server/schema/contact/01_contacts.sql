@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS contacts (
   industry VARCHAR(150) NULL,
   date_of_birth DATE NULL,
   tax_id VARCHAR(50) NULL,
+  notes TEXT NULL COMMENT 'Contact-level notes; per-call notes are on contact_call_attempts',
   industry_profile JSON NULL COMMENT 'Industry-specific field values (object keyed by field_key)',
 
   -- Ownership

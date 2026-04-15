@@ -27,8 +27,18 @@ export async function list(req, res, next) {
   try {
     const tenantId = req.tenant?.id;
     if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
-    const { page = '1', limit = '20', contact_id, disposition_id, agent_user_id, started_after, started_before } =
-      req.query;
+    const {
+      page = '1',
+      limit = '20',
+      contact_id,
+      disposition_id,
+      agent_user_id,
+      started_after,
+      started_before,
+      meaningful_only,
+    } = req.query;
+    const meaningfulOnly =
+      meaningful_only === '1' || String(meaningful_only || '').toLowerCase() === 'true';
     const data = await callsService.listCallAttempts(tenantId, req.user, {
       page: parseInt(page, 10),
       limit: parseInt(limit, 10),
@@ -43,8 +53,23 @@ export async function list(req, res, next) {
         started_before === undefined || started_before === null || String(started_before).trim() === ''
           ? undefined
           : String(started_before).trim(),
+      meaningful_only: meaningfulOnly,
     });
     res.json(data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function patchNotes(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
+    const { notes } = req.body || {};
+    const row = await callsService.updateAttemptNotesOnly(tenantId, req.user, req.params.id, {
+      notes: notes === undefined ? null : notes,
+    });
+    res.json({ ok: true, data: row });
   } catch (err) {
     next(err);
   }

@@ -22,6 +22,8 @@ export const callsAPI = {
     agent_user_id,
     started_after,
     started_before,
+    /** Only attempts with a disposition and/or agent-visible notes (excludes “dial started” stubs). */
+    meaningful_only,
   } = {}) =>
     axiosInstance.get(`${BASE}`, {
       params: {
@@ -32,8 +34,12 @@ export const callsAPI = {
         agent_user_id: agent_user_id || undefined,
         started_after: started_after || undefined,
         started_before: started_before || undefined,
+        meaningful_only: meaningful_only ? '1' : undefined,
       },
     }),
+
+  patchNotes: (attemptId, { notes } = {}) =>
+    axiosInstance.patch(`${BASE}/${attemptId}/notes`, { notes: notes ?? null }),
 
   setDisposition: (attemptId, { disposition_id, notes, deal_id, stage_id } = {}) =>
     axiosInstance.put(`${BASE}/${attemptId}/disposition`, {

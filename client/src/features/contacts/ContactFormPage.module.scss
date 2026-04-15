@@ -217,6 +217,43 @@
   grid-column: 1 / -1;
 }
 
+.notesTextarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  padding: $space-2 $space-3;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  font-family: inherit;
+  line-height: $line-height-normal;
+  color: var(--color-text-primary);
+  background-color: var(--color-input-bg);
+  border: 1px solid var(--color-input-border);
+  border-radius: $radius-sm;
+  box-sizing: border-box;
+  transition: border-color $transition-fast, box-shadow $transition-fast;
+
+  &::placeholder {
+    color: var(--color-input-placeholder);
+  }
+
+  &:focus:not(:disabled) {
+    outline: none;
+    border-color: var(--color-input-border-focus);
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+  }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+}
+
+.viewNotesMultiline {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .sectionCompact {
   padding: $space-3 $space-4;
 }

@@ -207,6 +207,8 @@ export async function listCallAttempts(
     agent_user_id,
     started_after,
     started_before,
+    /** Omit rows that only exist from starting a dial (no disposition and no agent-visible notes). */
+    meaningful_only = false,
   } = {}
 ) {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -223,10 +225,10 @@ export async function listCallAttempts(
   }
 
   if (disposition_id !== undefined && disposition_id !== null && disposition_id !== '') {
-    const did = Number(disposition_id);
-    if (Number.isFinite(did) && did > 0) {
+    const dispKey = String(disposition_id).trim();
+    if (dispKey && dispKey !== '0') {
       where.push('cca.disposition_id = ?');
-      params.push(did);
+      params.push(dispKey);
     }
   }
 
@@ -284,11 +286,23 @@ export async function listCallAttempts(
     params.push(user.id);
   }
 
+  if (meaningful_only) {
+    // disposition_id is CHAR(36) UUID — never use `> 0` (MySQL casts UUID to 0 and drops every row).
+    where.push(`(
+      (cca.disposition_id IS NOT NULL AND TRIM(cca.disposition_id) <> '' AND cca.disposition_id <> '0')
+      OR (
+        cca.notes IS NOT NULL
+        AND TRIM(cca.notes) <> ''
+        AND TRIM(cca.notes) NOT REGEXP '^dialer_session:[0-9]+$'
+      )
+    )`);
+  }
+
   const whereSql = where.join(' AND ');
   const [countRow] = await query(`SELECT COUNT(*) AS total FROM contact_call_attempts cca WHERE ${whereSql}`, params);
   const total = countRow?.total ?? 0;
 
-  const rows = await query(
+   const rows = await query(
     `SELECT
         cca.id,
         cca.contact_id,
@@ -308,11 +322,14 @@ export async function listCallAttempts(
         cca.created_at,
         c.display_name,
         p.phone AS phone_e164,
-        u.name AS agent_name
+        u.name AS agent_name,
+        d.name AS disposition_name
      FROM contact_call_attempts cca
      LEFT JOIN contacts c ON c.id = cca.contact_id AND c.tenant_id = cca.tenant_id
      LEFT JOIN contact_phones p ON p.id = cca.contact_phone_id AND p.tenant_id = cca.tenant_id
      LEFT JOIN users u ON u.id = cca.agent_user_id AND u.tenant_id = cca.tenant_id
+     LEFT JOIN dispositions d
+       ON d.id = cca.disposition_id AND d.tenant_id = cca.tenant_id AND d.is_deleted = 0
      WHERE ${whereSql}
      ORDER BY cca.created_at DESC, cca.id DESC
      LIMIT ${limitNum} OFFSET ${offset}`,
@@ -330,11 +347,51 @@ export async function listCallAttempts(
   };
 }
 
+/**
+ * Update call notes only (no disposition change, no dialer queue side effects).
+ */
+export async function updateAttemptNotesOnly(tenantId, user, attemptId, { notes = null } = {}) {
+  const id = Number(attemptId);
+  if (!id) {
+    const err = new Error('Invalid attempt id');
+    err.status = 400;
+    throw err;
+  }
+
+  const where = ['tenant_id = ?', 'id = ?'];
+  const params = [tenantId, id];
+  if (user.role === 'agent') {
+    where.push('(agent_user_id = ? OR created_by = ?)');
+    params.push(user.id, user.id);
+  } else if (user.role === 'manager') {
+    where.push('(manager_id = ? OR created_by = ?)');
+    params.push(user.id, user.id);
+  }
+
+  const notesVal = notes != null && String(notes).trim() ? String(notes).slice(0, 2000) : null;
+  const updateResult = await query(
+    `UPDATE contact_call_attempts SET notes = ? WHERE ${where.join(' AND ')}`,
+    [notesVal, ...params]
+  );
+  const affected = Number(updateResult?.affectedRows ?? 0);
+  if (affected === 0) {
+    const err = new Error('Call attempt not found or you do not have access');
+    err.status = 404;
+    throw err;
+  }
+
+  const [row] = await query(
+    `SELECT id, contact_id, disposition_id, notes FROM contact_call_attempts WHERE tenant_id = ? AND id = ? LIMIT 1`,
+    [tenantId, id]
+  );
+  return row;
+}
+
 export async function setAttemptDisposition(
   tenantId,
   user,
   attemptId,
-  { disposition_id = null, notes = null, deal_id: bodyDealId, stage_id: bodyStageId } = {}
+  body = {}
 ) {
   const id = Number(attemptId);
   if (!id) {
@@ -342,6 +399,13 @@ export async function setAttemptDisposition(
     err.status = 400;
     throw err;
   }
+
+  const {
+    disposition_id = null,
+    notes: notesFromBody,
+    deal_id: bodyDealId,
+    stage_id: bodyStageId,
+  } = body;
 
   // Only update attempts within scope (agents: their own; managers: their team; admin: any tenant).
   // Managers who dial often have contacts with NULL or stale manager_id; startCallForContact always sets created_by to the dialing user.
@@ -374,12 +438,37 @@ export async function setAttemptDisposition(
     }
   }
 
-  const updateResult = await query(
-    `UPDATE contact_call_attempts
-     SET disposition_id = ?, notes = ?
-     WHERE ${where.join(' AND ')}`,
-    [dispForDb, notes ? String(notes).slice(0, 2000) : null, ...params]
-  );
+  // Do not overwrite notes with null when the dialer sends an empty textarea after "Save notes"
+  // (notes were already stored via PATCH). Only set `notes` when non-empty, or when `clear_notes`
+  // is explicit (e.g. Activities row editor).
+  const clearNotes =
+    body.clear_notes === true || String(body.clear_notes || '').toLowerCase() === 'true';
+  let updateNotesColumn = false;
+  let notesVal = null;
+  if (clearNotes) {
+    updateNotesColumn = true;
+    notesVal = null;
+  } else if (notesFromBody !== undefined && notesFromBody !== null) {
+    const t = String(notesFromBody).trim();
+    if (t.length > 0) {
+      updateNotesColumn = true;
+      notesVal = t.slice(0, 2000);
+    }
+  }
+
+  const updateResult = updateNotesColumn
+    ? await query(
+        `UPDATE contact_call_attempts
+         SET disposition_id = ?, notes = ?
+         WHERE ${where.join(' AND ')}`,
+        [dispForDb, notesVal, ...params]
+      )
+    : await query(
+        `UPDATE contact_call_attempts
+         SET disposition_id = ?
+         WHERE ${where.join(' AND ')}`,
+        [dispForDb, ...params]
+      );
 
   const affected = Number(updateResult?.affectedRows ?? 0);
   if (affected === 0) {

@@ -135,6 +135,21 @@ export function createContactFormViewSectionRenderers(ctx) {
       </section>
     ),
 
+    [CONTACT_FORM_SECTION_IDS.NOTES]: () => (
+      <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-notes">
+        <h2 id="view-section-notes" className={styles.sectionTitle}>
+          Contact notes
+        </h2>
+        <ViewField label="Notes" className={styles.fullWidthFieldDense}>
+          {formData.notes != null && String(formData.notes).trim() ? (
+            <span className={styles.viewNotesMultiline}>{formData.notes}</span>
+          ) : (
+            '—'
+          )}
+        </ViewField>
+      </section>
+    ),
+
     [CONTACT_FORM_SECTION_IDS.STATUS]: () => (
       <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-status">
         <h2 id="view-section-status" className={styles.sectionTitle}>

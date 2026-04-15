@@ -454,7 +454,7 @@ registerSuggestions('property', PROPERTY_KEYS);
 registerSuggestions('budget', BUDGET_KEYS);
 registerSuggestions('pin_code', PIN_CODE_KEYS);
 registerSuggestions('services', SERVICES_KEYS);
-registerSuggestions('remark', REMARK_KEYS);
+registerSuggestions('notes', REMARK_KEYS);
 registerSuggestions('remark_status', REMARK_STATUS_KEYS);
 registerSuggestions('assign_date', ASSIGN_DATE_KEYS);
 registerSuggestions('lead_date', LEAD_DATE_KEYS);
@@ -472,14 +472,13 @@ registerSuggestions('tax_id', TAX_ID_KEYS);
 
 /**
  * Legacy import keys that map to auto-created custom fields (see contactsService PROVIDER_COLUMNS_AUTO_CF).
- * These are NOT core `contacts` columns — UI lists tenant custom fields instead; suggestions resolve to
- * `custom:id` when a field with this name exists, else ignore (user creates via "new custom field").
+ * Dialer/CRM "notes" columns suggest the core `notes` field (contact-level). Remaining keys here are NOT core
+ * `contacts` columns — UI lists tenant custom fields; suggestions resolve to `custom:id` when a field name exists.
  */
 export const LEGACY_PROVIDER_IMPORT_KEYS = new Set([
   'property',
   'budget',
   'services',
-  'remark',
   'remark_status',
   'assign_date',
   'lead_date',
@@ -512,6 +511,7 @@ export const IMPORT_CORE_FIELD_OPTIONS = [
   { key: 'industry', label: 'Industry' },
   { key: 'date_of_birth', label: 'Date of birth' },
   { key: 'tax_id', label: 'Tax ID (GST / PAN / etc.)' },
+  { key: 'notes', label: 'Contact notes' },
 ];
 
 export const IMPORT_CORE_TARGET_KEYS = new Set(IMPORT_CORE_FIELD_OPTIONS.map((o) => o.key));

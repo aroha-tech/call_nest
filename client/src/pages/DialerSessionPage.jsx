@@ -24,6 +24,10 @@ import {
   getCallingCodeOptionsForSelect,
   normalizeCallingCode,
 } from '../utils/phoneInput';
+import {
+  attemptHasDialerVisibleHistory,
+  sanitizeAttemptNotesForDisplay,
+} from '../utils/callAttemptNotesDisplay';
 import styles from './DialerSessionPage.module.scss';
 
 /** Display-only: maps `contact_phones.label` ENUM (and primary) to a short title. */
@@ -52,6 +56,32 @@ function safeDateTime(v) {
   } catch {
     return '—';
   }
+}
+
+/** Call log lines (script / activity panels) */
+function formatDialerLogWhen(iso) {
+  if (iso == null || iso === '') return '—';
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  } catch {
+    return '—';
+  }
+}
+
+function formatDialerHistoryLine(row) {
+  const when = formatDialerLogWhen(row.started_at || row.created_at);
+  const agent =
+    row.agent_name?.trim() ||
+    (row.agent_user_id != null ? `User #${row.agent_user_id}` : '—');
+  const phone = row.phone_e164?.trim() || '—';
+  const dispo = row.disposition_name?.trim() || null;
+  const noteRaw = row.notes != null ? String(row.notes) : '';
+  const noteClean = sanitizeAttemptNotesForDisplay(noteRaw);
+  const note = noteClean.length ? noteClean : null;
+  const summary = [dispo, note].filter(Boolean).join(' — ') || '—';
+  return `— ${when} by ${agent} — ${phone} — ${summary}`;
 }
 
 function formatTimerHms(ms) {
@@ -167,6 +197,7 @@ export function DialerSessionPage() {
   const [addPhoneValue, setAddPhoneValue] = useState('');
   /** Bumps when POST /next applies session — stale in-flight GET /session must not overwrite. */
   const loadEpochRef = useRef(0);
+  const callNotesHydrateEpochRef = useRef(0);
   const callNextInFlightRef = useRef(false);
   /** If session payload ever lacks last_attempt_id on a calling row, still allow dispo until refetch. */
   const pendingAttemptFromNextRef = useRef(null);
@@ -176,6 +207,16 @@ export function DialerSessionPage() {
   const [dealPickDispo, setDealPickDispo] = useState(null);
   const [dealPickDealId, setDealPickDealId] = useState('');
   const [dealPickStageId, setDealPickStageId] = useState('');
+  /** Saved on contact_call_attempts when setting disposition (not the same as contact-level notes). */
+  const [callNotes, setCallNotes] = useState('');
+  const [dialWorkspaceTab, setDialWorkspaceTab] = useState('script');
+  const [openDialContactNotes, setOpenDialContactNotes] = useState(true);
+  const [openDialCallNotes, setOpenDialCallNotes] = useState(true);
+  const [openDialPrevHistory, setOpenDialPrevHistory] = useState(true);
+  const [contactNotesDraft, setContactNotesDraft] = useState('');
+  const [callHistoryRows, setCallHistoryRows] = useState([]);
+  const [savingDialCallNotes, setSavingDialCallNotes] = useState(false);
+  const [savingDialContactNotes, setSavingDialContactNotes] = useState(false);
   const [tick, setTick] = useState(0);
   const [uiTimer, setUiTimer] = useState(() => {
     if (!id) return { startedAtMs: null, pausedAtMs: null, pausedTotalMs: 0 };
@@ -248,6 +289,7 @@ export function DialerSessionPage() {
     [session?.items]
   );
   const currentItem = useMemo(() => resolveCurrentItem(items), [items]);
+
   const lastAttemptId = useMemo(() => {
     const fromItems = resolveLastAttemptId(items);
     if (fromItems) {
@@ -261,6 +303,62 @@ export function DialerSessionPage() {
     }
     return pendingAttemptFromNextRef.current || null;
   }, [items]);
+
+  const reloadCallHistory = useCallback(async () => {
+    const cid = currentItem?.contact_id;
+    if (!cid) {
+      setCallHistoryRows([]);
+      return;
+    }
+    try {
+      const res = await callsAPI.list({
+        contact_id: cid,
+        page: 1,
+        limit: 30,
+        meaningful_only: true,
+      });
+      setCallHistoryRows(Array.isArray(res?.data?.data) ? res.data.data : []);
+    } catch {
+      setCallHistoryRows([]);
+    }
+  }, [currentItem?.contact_id]);
+
+  useEffect(() => {
+    setContactNotesDraft(contact?.notes != null ? String(contact.notes) : '');
+  }, [contact?.id, contact?.notes]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cid = currentItem?.contact_id;
+    const aid = lastAttemptId;
+    const epoch = ++callNotesHydrateEpochRef.current;
+    if (!cid || !aid) {
+      if (!cancelled) setCallNotes('');
+      return;
+    }
+    (async () => {
+      try {
+        const res = await callsAPI.list({ contact_id: cid, limit: 50, page: 1 });
+        const rows = res?.data?.data ?? [];
+        const row = rows.find((r) => Number(r.id) === Number(aid));
+        if (cancelled || epoch !== callNotesHydrateEpochRef.current) return;
+        setCallNotes(sanitizeAttemptNotesForDisplay(row?.notes != null ? String(row.notes) : ''));
+      } catch {
+        if (cancelled || epoch !== callNotesHydrateEpochRef.current) return;
+        setCallNotes('');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [lastAttemptId, currentItem?.contact_id]);
+
+  /** Script tab only: hide attempts that only exist from "Call next" with no dispo and no saved notes. */
+  const previousCallLogRows = useMemo(
+    () => callHistoryRows.filter((r) => attemptHasDialerVisibleHistory(r)),
+    [callHistoryRows]
+  );
+
   const queuedCount = useMemo(() => items.filter((i) => i.state === 'queued').length, [items]);
   const calledCount = useMemo(() => items.filter((i) => i.state === 'called').length, [items]);
   const failedCount = useMemo(() => items.filter((i) => i.state === 'failed').length, [items]);
@@ -381,6 +479,14 @@ export function DialerSessionPage() {
   }, [leadContact]);
 
   const sessionEnded = session?.status === 'completed' || session?.status === 'cancelled';
+
+  useEffect(() => {
+    if (!session || sessionEnded) {
+      setCallHistoryRows([]);
+      return;
+    }
+    reloadCallHistory();
+  }, [session?.id, sessionEnded, reloadCallHistory, session]);
 
   const sessionDisplayNo = useMemo(() => {
     const n = Number(session?.user_session_no);
@@ -717,23 +823,30 @@ export function DialerSessionPage() {
     setBusy(true);
     setError('');
     try {
-      const payload = { disposition_id: dispId, notes: null };
+      const rawNotes = String(callNotes || '').trim();
+      const notes =
+        rawNotes.length > 2000 ? rawNotes.slice(0, 2000) : rawNotes.length > 0 ? rawNotes : null;
+      const payload = { disposition_id: dispId, notes };
       if (dealOpt && dealOpt.deal_id != null && dealOpt.stage_id != null) {
         payload.deal_id = dealOpt.deal_id;
         payload.stage_id = dealOpt.stage_id;
       }
       const res = await callsAPI.setDisposition(attemptId, payload);
       const body = res?.data ?? {};
+      callNotesHydrateEpochRef.current += 1;
+      setCallNotes('');
       const na = String(nextAction || '').toLowerCase();
 
       if (body.session && Array.isArray(body.session.items)) {
         loadEpochRef.current += 1;
         pendingAttemptFromNextRef.current = coerceAttemptId(body.dialer?.attempt?.id);
         setSession(body.session);
+        await reloadCallHistory();
         return;
       }
 
       await load();
+      await reloadCallHistory();
       if (!na.includes('next_number')) {
         if (na.includes('next_contact') || (na.includes('next') && !na.includes('next_number'))) {
           await callNext();
@@ -768,6 +881,49 @@ export function DialerSessionPage() {
     const d = dealPickDispo;
     setDealPickDispo(null);
     await setDisposition(d.id, d.next_action, { deal_id: did, stage_id: sid });
+  }
+
+  async function saveDialCallNotesClick() {
+    const aid = lastAttemptId;
+    if (!aid) {
+      showToast('No active call attempt to save notes for.', 'warning');
+      return;
+    }
+    setSavingDialCallNotes(true);
+    try {
+      const raw = String(callNotes || '').trim();
+      const notes = raw.length > 2000 ? raw.slice(0, 2000) : raw.length > 0 ? raw : null;
+      await callsAPI.patchNotes(aid, { notes });
+      callNotesHydrateEpochRef.current += 1;
+      setCallNotes('');
+      showToast('Call notes saved.', 'success');
+      await reloadCallHistory();
+    } catch (e) {
+      showToast(e.response?.data?.error || e.message || 'Could not save call notes', 'error');
+    } finally {
+      setSavingDialCallNotes(false);
+    }
+  }
+
+  async function saveDialContactNotesClick() {
+    const cid = currentItem?.contact_id;
+    if (!cid) {
+      showToast('No contact selected.', 'warning');
+      return;
+    }
+    setSavingDialContactNotes(true);
+    try {
+      await contactsAPI.update(cid, {
+        notes: contactNotesDraft?.trim() ? String(contactNotesDraft).trim() : null,
+      });
+      const res = await contactsAPI.getById(cid);
+      setContact(res?.data?.data ?? null);
+      showToast('Contact notes saved.', 'success');
+    } catch (e) {
+      showToast(e.response?.data?.error || e.message || 'Could not save contact notes', 'error');
+    } finally {
+      setSavingDialContactNotes(false);
+    }
   }
 
   return (
@@ -1366,63 +1522,243 @@ export function DialerSessionPage() {
                       {leadContact?.city || '—'}
                     </dd>
                   </div>
-                  <div className={styles.contactRow}>
-                    <dt className={styles.metaLabel}>Notes</dt>
-                    <dd
-                      className={`${styles.metaValue} ${
-                        contactDetailPending && !leadContact?.notes ? styles.metaPlaceholder : ''
-                      }`}
-                    >
-                      {leadContact?.notes || '—'}
-                    </dd>
-                  </div>
                 </dl>
               </div>
             </aside>
 
             <main className={styles.center}>
               <div className={`${styles.card} ${styles.cardScript}`}>
-                <div className={styles.cardTitleRow}>
-                  <div className={styles.scriptTitleBlock}>
-                    <div className={styles.scriptEyebrow}>Call script</div>
-                    <div className={styles.scriptTitle}>{session?.script?.script_name || 'Script'}</div>
-                  </div>
+                <div className={styles.workspaceTabBar} role="tablist" aria-label="Dial workspace">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={dialWorkspaceTab === 'script'}
+                    className={`${styles.workspaceTab} ${dialWorkspaceTab === 'script' ? styles.workspaceTabActive : ''}`.trim()}
+                    onClick={() => setDialWorkspaceTab('script')}
+                  >
+                    Script
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={dialWorkspaceTab === 'activity'}
+                    className={`${styles.workspaceTab} ${dialWorkspaceTab === 'activity' ? styles.workspaceTabActive : ''}`.trim()}
+                    onClick={() => setDialWorkspaceTab('activity')}
+                  >
+                    Activity
+                  </button>
+                  <button type="button" className={styles.workspaceTab} disabled title="Not available">
+                    Email
+                  </button>
+                  <button type="button" className={styles.workspaceTab} disabled title="Not available">
+                    Website
+                  </button>
                 </div>
-                {import.meta?.env?.DEV && missingTemplateKeys.length > 0 ? (
-                  <div className={styles.devWarn} role="status">
-                    <div className={styles.devWarnTitle}>Missing template variables</div>
-                    <div className={styles.devWarnBody}>
-                      {missingTemplateKeys.map((k) => (
-                        <code key={k} className={styles.devWarnCode}>
-                          {k}
-                        </code>
-                      ))}
+
+                {dialWorkspaceTab === 'script' ? (
+                  <>
+                    <div className={styles.cardTitleRow}>
+                      <div className={styles.scriptTitleBlock}>
+                        <div className={styles.scriptEyebrow}>Call script</div>
+                        <div className={styles.scriptTitle}>{session?.script?.script_name || 'Script'}</div>
+                      </div>
                     </div>
-                    <div className={styles.devWarnHint}>
-                      Add these keys in <code>template_variables</code> or replace them in the script editor.
+                    {import.meta?.env?.DEV && missingTemplateKeys.length > 0 ? (
+                      <div className={styles.devWarn} role="status">
+                        <div className={styles.devWarnTitle}>Missing template variables</div>
+                        <div className={styles.devWarnBody}>
+                          {missingTemplateKeys.map((k) => (
+                            <code key={k} className={styles.devWarnCode}>
+                              {k}
+                            </code>
+                          ))}
+                        </div>
+                        <div className={styles.devWarnHint}>
+                          Add these keys in <code>template_variables</code> or replace them in the script editor.
+                        </div>
+                      </div>
+                    ) : null}
+                    <div className={styles.scriptReadingSurface}>
+                      {String(session?.script?.script_body || '').trim() ? (
+                        <div
+                          className={styles.scriptBody}
+                          dangerouslySetInnerHTML={{
+                            __html: renderScriptHtml(
+                              session?.script?.script_body,
+                              leadContact,
+                              user,
+                              tenant,
+                              templateSample
+                            ),
+                          }}
+                        />
+                      ) : (
+                        <div className={styles.scriptEmpty}>
+                          No script text is set for this session. Ask an admin to attach a call script to the dialing
+                          set.
+                        </div>
+                      )}
                     </div>
+
+                    <div className={styles.dialNotesStack}>
+                      <div className={styles.dialCollapsible}>
+                        <button
+                          type="button"
+                          className={styles.dialCollapsibleHead}
+                          aria-expanded={openDialContactNotes}
+                          onClick={() => setOpenDialContactNotes((v) => !v)}
+                        >
+                          <span>Contact notes</span>
+                          <span className={styles.dialCollapsibleIcon} aria-hidden>
+                            {openDialContactNotes ? '−' : '+'}
+                          </span>
+                        </button>
+                        {openDialContactNotes ? (
+                          <div className={styles.dialCollapsibleBody}>
+                            <p className={styles.dialCollapsibleHint}>
+                              Saved on the lead/contact record. Use Save — dispositions do not change this.
+                            </p>
+                            <textarea
+                              className={styles.dialCenterNotesArea}
+                              value={contactNotesDraft}
+                              onChange={(e) => setContactNotesDraft(e.target.value)}
+                              placeholder="Notes about this person (all calls)…"
+                              rows={4}
+                              disabled={busy || contactDetailPending || !currentItem?.contact_id}
+                              maxLength={60000}
+                            />
+                            <div className={styles.dialNotesSaveRow}>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={saveDialContactNotesClick}
+                                disabled={
+                                  busy || savingDialContactNotes || contactDetailPending || !currentItem?.contact_id
+                                }
+                                loading={savingDialContactNotes}
+                              >
+                                Save
+                              </Button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className={styles.dialCollapsible}>
+                        <button
+                          type="button"
+                          className={styles.dialCollapsibleHead}
+                          aria-expanded={openDialCallNotes}
+                          onClick={() => setOpenDialCallNotes((v) => !v)}
+                        >
+                          <span>Call notes</span>
+                          <span className={styles.dialCollapsibleIcon} aria-hidden>
+                            {openDialCallNotes ? '−' : '+'}
+                          </span>
+                        </button>
+                        {openDialCallNotes ? (
+                          <div className={styles.dialCollapsibleBody}>
+                            <p className={styles.dialCollapsibleHint}>
+                              Saved on this dial attempt. Use Save, or they are sent again when you pick a disposition.
+                            </p>
+                            <textarea
+                              id="dialer-call-notes-center"
+                              className={styles.dialCenterNotesArea}
+                              value={callNotes}
+                              onChange={(e) => setCallNotes(e.target.value)}
+                              placeholder="What happened on this call? (optional)"
+                              rows={4}
+                              maxLength={2000}
+                              disabled={busy || !lastAttemptId}
+                            />
+                            <div className={styles.dialNotesSaveRow}>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={saveDialCallNotesClick}
+                                disabled={busy || savingDialCallNotes || !lastAttemptId}
+                                loading={savingDialCallNotes}
+                              >
+                                Save
+                              </Button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className={styles.dialCollapsible}>
+                        <button
+                          type="button"
+                          className={styles.dialCollapsibleHead}
+                          aria-expanded={openDialPrevHistory}
+                          onClick={() => setOpenDialPrevHistory((v) => !v)}
+                        >
+                          <span>Previous call notes</span>
+                          <span className={styles.dialCollapsibleIcon} aria-hidden>
+                            {openDialPrevHistory ? '−' : '+'}
+                          </span>
+                        </button>
+                        {openDialPrevHistory ? (
+                          <div className={styles.dialCollapsibleBody}>
+                            {previousCallLogRows.length === 0 ? (
+                              <p className={styles.dialPrevHistoryEmpty}>
+                                No notes or dispositions logged yet. Save call notes or pick an outcome to see entries
+                                here.
+                              </p>
+                            ) : (
+                              <div className={styles.dialPrevHistoryScroll}>
+                                <ul className={styles.dialPrevHistoryList}>
+                                  {previousCallLogRows.map((row) => (
+                                    <li
+                                      key={row.id}
+                                      className={`${styles.dialPrevHistoryItem} ${
+                                        lastAttemptId && Number(row.id) === Number(lastAttemptId)
+                                          ? styles.dialPrevHistoryCurrent
+                                          : ''
+                                      }`.trim()}
+                                    >
+                                      {formatDialerHistoryLine(row)}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </>
+                ) : dialWorkspaceTab === 'activity' ? (
+                  <div className={styles.dialActivityPanel}>
+                    <div className={styles.dialActivityTitle}>All dial attempts (this lead)</div>
+                    <p className={styles.dialActivitySub}>
+                      Newest first. Only attempts with a disposition and/or saved call notes (same as Previous call
+                      notes).
+                    </p>
+                    {callHistoryRows.length === 0 ? (
+                      <p className={styles.dialPrevHistoryEmpty}>No call attempts for this lead yet.</p>
+                    ) : (
+                      <div className={styles.dialPrevHistoryScroll}>
+                        <ul className={styles.dialPrevHistoryList}>
+                          {callHistoryRows.map((row) => (
+                            <li
+                              key={row.id}
+                              className={`${styles.dialPrevHistoryItem} ${
+                                lastAttemptId && Number(row.id) === Number(lastAttemptId)
+                                  ? styles.dialPrevHistoryCurrent
+                                  : ''
+                              }`.trim()}
+                            >
+                              {formatDialerHistoryLine(row)}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                ) : null}
-                <div className={styles.scriptReadingSurface}>
-                  {String(session?.script?.script_body || '').trim() ? (
-                    <div
-                      className={styles.scriptBody}
-                      dangerouslySetInnerHTML={{
-                        __html: renderScriptHtml(
-                          session?.script?.script_body,
-                          leadContact,
-                          user,
-                          tenant,
-                          templateSample
-                        ),
-                      }}
-                    />
-                  ) : (
-                    <div className={styles.scriptEmpty}>
-                      No script text is set for this session. Ask an admin to attach a call script to the dialing set.
-                    </div>
-                  )}
-                </div>
+                ) : (
+                  <div className={styles.dialTabPlaceholder}>This tab is not available in Call Nest yet.</div>
+                )}
               </div>
 
               <div className={`${styles.card} ${styles.cardQueue}`}>
@@ -1481,7 +1817,10 @@ export function DialerSessionPage() {
               <div className={`${styles.card} ${styles.cardDispo}`}>
                 <div className={styles.dispoHeader}>
                   <div className={styles.dispoTitle}>Outcomes</div>
-                  <p className={styles.dispoSub}>After the call, pick a disposition to log and continue.</p>
+                  <p className={styles.dispoSub}>
+                    After the call, pick a disposition to log and continue. Call notes are in the Script tab — they
+                    are sent with the disposition if you have not saved them already.
+                  </p>
                 </div>
                 <div className={styles.dispoList}>
                   {(session?.dispositions || []).length === 0 ? (

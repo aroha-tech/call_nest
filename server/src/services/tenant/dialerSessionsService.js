@@ -235,7 +235,6 @@ async function runCallNextAfterLock(tenantId, user, sid) {
       contact_id: next.contact_id,
       contact_phone_id: next.contact_phone_id != null ? next.contact_phone_id : null,
       provider: session.provider || 'dummy',
-      notes: `dialer_session:${sid}`,
     });
     await query(
       `UPDATE dialer_session_items

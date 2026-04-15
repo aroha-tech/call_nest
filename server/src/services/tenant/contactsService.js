@@ -69,6 +69,14 @@ function trimStr(v) {
   return t === '' ? null : t;
 }
 
+/** TEXT column — cap length defensively (UTF-8 safe slice on JS string). */
+const CONTACT_NOTES_MAX_LEN = 60000;
+function normalizeContactNotesForDb(v) {
+  const t = trimStr(v);
+  if (t == null) return null;
+  return t.length > CONTACT_NOTES_MAX_LEN ? t.slice(0, CONTACT_NOTES_MAX_LEN) : t;
+}
+
 /** Normalize CSV cell for contact_custom_field_values.value_text by field type. */
 function normalizeImportedCustomFieldValue(raw, fieldType) {
   if (raw === null || raw === undefined) return null;
@@ -1227,6 +1235,7 @@ export async function getContactById(id, tenantId, user) {
         c.industry,
         c.date_of_birth,
         c.tax_id,
+        c.notes,
         c.industry_profile,
         c.manager_id,
         c.assigned_user_id,
@@ -1379,6 +1388,7 @@ async function buildContactInsertRow(
     industry,
     date_of_birth,
     tax_id,
+    notes,
     industry_profile,
     tag_ids,
     status_id,
@@ -1456,6 +1466,7 @@ async function buildContactInsertRow(
     trimStr(industry),
     dob,
     trimStr(tax_id),
+    notes !== undefined && notes !== null ? normalizeContactNotesForDb(notes) : null,
     industryProfileJson,
     resolvedManagerId,
     resolvedAssignedUserId,
@@ -1508,7 +1519,7 @@ async function flushImportCreateBuffer(
 
     const placeholders = built.map(
       () =>
-        `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).join(', ');
     const flatParams = built.flatMap((b) => b.insertParams);
     const n = buffer.length;
@@ -1538,6 +1549,7 @@ async function flushImportCreateBuffer(
         industry,
         date_of_birth,
         tax_id,
+        notes,
         industry_profile,
         manager_id,
         assigned_user_id,
@@ -1712,6 +1724,7 @@ export async function createContact(tenantId, user, payload, options = {}) {
         industry,
         date_of_birth,
         tax_id,
+        notes,
         industry_profile,
         manager_id,
         assigned_user_id,
@@ -1719,7 +1732,7 @@ export async function createContact(tenantId, user, payload, options = {}) {
         campaign_id,
         created_source,
         created_by
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     insertParams
   );
 
@@ -1938,6 +1951,7 @@ export async function updateContact(id, tenantId, user, payload, options = {}) {
     date_of_birth,
     tax_id,
     industry_profile,
+    notes,
     tag_ids,
     status_id,
     campaign_id,
@@ -2038,6 +2052,10 @@ export async function updateContact(id, tenantId, user, payload, options = {}) {
   if (tax_id !== undefined) {
     updates.push('tax_id = ?');
     params.push(trimStr(tax_id));
+  }
+  if (notes !== undefined) {
+    updates.push('notes = ?');
+    params.push(normalizeContactNotesForDb(notes));
   }
   if (industry_profile !== undefined) {
     const v = await tenantIndustryFieldsService.validateIndustryProfileForTenant(tenantId, industry_profile);
@@ -2855,6 +2873,7 @@ const CONTACT_DEFAULT_EXTRA_KEYS = [
   'industry',
   'date_of_birth',
   'tax_id',
+  'notes',
 ];
 
 const CONTACT_DEFAULT_EXTRA_KEY_SET = new Set(CONTACT_DEFAULT_EXTRA_KEYS);
@@ -2864,7 +2883,6 @@ const PROVIDER_COLUMNS_AUTO_CF = [
   { key: 'property', label: 'Property', type: 'text' },
   { key: 'budget', label: 'Budget', type: 'number' },
   { key: 'services', label: 'Services', type: 'text' },
-  { key: 'remark', label: 'Remark', type: 'text' },
   { key: 'remark_status', label: 'Remark Status', type: 'text' },
   { key: 'assign_date', label: 'Assign Date', type: 'date' },
   { key: 'lead_date', label: 'Lead Date', type: 'date' },
@@ -2888,7 +2906,7 @@ const PROVIDER_ALIAS_BY_KEY = {
   date_of_birth: DATE_OF_BIRTH_KEYS,
   tax_id: TAX_ID_KEYS,
   services: SERVICES_KEYS,
-  remark: REMARK_KEYS,
+  notes: REMARK_KEYS,
   remark_status: REMARK_STATUS_KEYS,
   assign_date: ASSIGN_DATE_KEYS,
   lead_date: LEAD_DATE_KEYS,
@@ -2901,7 +2919,12 @@ function applyCoreDefaultsFromNormalized(normalized, mappedCore = {}, headerMapp
   for (const key of CONTACT_DEFAULT_EXTRA_KEYS) {
     let val = mappedCore[key];
     if (val !== undefined && val !== null && String(val).trim() !== '') {
-      out[key] = key === 'date_of_birth' ? normalizeDateOfBirthForDb(val) : trimStr(val);
+      out[key] =
+        key === 'date_of_birth'
+          ? normalizeDateOfBirthForDb(val)
+          : key === 'notes'
+            ? normalizeContactNotesForDb(val)
+            : trimStr(val);
       continue;
     }
     let picked = pickFirstByAliasKeysRespectingIgnore(
@@ -2921,7 +2944,12 @@ function applyCoreDefaultsFromNormalized(normalized, mappedCore = {}, headerMapp
       }
     }
     if (picked === undefined || picked === null || !String(picked).trim()) continue;
-    out[key] = key === 'date_of_birth' ? normalizeDateOfBirthForDb(picked) : trimStr(picked);
+    out[key] =
+      key === 'date_of_birth'
+        ? normalizeDateOfBirthForDb(picked)
+        : key === 'notes'
+          ? normalizeContactNotesForDb(picked)
+          : trimStr(picked);
   }
   return out;
 }
@@ -3078,7 +3106,16 @@ async function resolveCsvRowToImportPayload(
       else if (target === 'status') mappedStatusName = val;
       else if (CONTACT_DEFAULT_EXTRA_KEY_SET.has(target)) {
         if (val === null || !String(val).trim()) continue;
-        mappedCore[target] = target === 'date_of_birth' ? normalizeDateOfBirthForDb(val) : trimStr(val);
+        mappedCore[target] =
+          target === 'date_of_birth'
+            ? normalizeDateOfBirthForDb(val)
+            : target === 'notes'
+              ? normalizeContactNotesForDb(val)
+              : trimStr(val);
+      } else if (target === 'remark') {
+        // Legacy import maps: "remark" used to be an auto custom field; store on contacts.notes.
+        if (val === null || !String(val).trim()) continue;
+        mappedCore.notes = normalizeContactNotesForDb(val);
       } else if (PROVIDER_COLUMNS_AUTO_CF.some((d) => d.key === target)) {
         if (val === null || !String(val).trim()) continue;
         const def = PROVIDER_COLUMNS_AUTO_CF.find((d) => d.key === target);
@@ -3315,6 +3352,7 @@ const EXPORT_CORE_KEY_WHITELIST = new Set([
   'industry',
   'date_of_birth',
   'tax_id',
+  'notes',
   'tag_names',
   'campaign_id',
   'campaign_name',
@@ -3353,6 +3391,7 @@ const EXPORT_HEADER_LABEL = {
   industry: 'industry',
   date_of_birth: 'date_of_birth',
   tax_id: 'tax_id',
+  notes: 'notes',
   tag_names: 'tags',
   campaign_id: 'campaign_id',
   campaign_name: 'campaign_name',
@@ -3496,6 +3535,7 @@ export async function exportContactsCsv(
         c.industry,
         c.date_of_birth,
         c.tax_id,
+        c.notes,
         c.industry_profile,
         c.call_count_total,
         c.last_called_at,
