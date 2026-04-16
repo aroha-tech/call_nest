@@ -1,0 +1,86 @@
+@use '../styles/variables' as *;
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+}
+
+.sectionLabel {
+  margin: 0 0 $space-2;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.criteriaGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: $space-3;
+
+  @media (max-width: 720px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dateGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-3;
+
+  @media (max-width: 520px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.todayRow {
+  padding-top: $space-1;
+}
+
+.saveStrip {
+  margin-top: $space-1;
+  padding-top: $space-4;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.saveStripTitle {
+  margin: 0 0 $space-2;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: var(--color-text-secondary);
+}
+
+.saveStripRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: $space-3;
+}
+
+.saveNameInput {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+/** Keeps 3-column alignment when agent dropdown is hidden (non-managers). */
+.gridPad {
+  min-height: 1px;
+  pointer-events: none;
+}
+
+.footerRow {
+  justify-content: space-between !important;
+  flex-wrap: wrap;
+  width: 100%;
+  align-items: center;
+  gap: $space-3;
+}
+
+.footerCluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2;
+  align-items: center;
+}

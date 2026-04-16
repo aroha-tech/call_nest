@@ -5,6 +5,22 @@
   align-items: flex-end;
 }
 
+.contactScopeBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  background: var(--color-info-subtle, rgba(59, 130, 246, 0.12));
+  color: var(--color-text-primary);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+}
+
 .filterCard {
   margin-bottom: 16px;
   padding: 16px;
@@ -38,60 +54,35 @@
   overflow: auto;
 }
 
-.callsToolbarRight {
+/** Match Contacts / Leads: controls align right of toolbar, search grows */
+.toolbarSearchAndBulk {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.toolbarControlBtn {
+  min-width: 7.25rem;
+  justify-content: center;
+}
+
+.toolbarResetIcon {
+  flex-shrink: 0;
+  display: block;
+}
+
+.toolbarSearchField {
+  width: 100%;
+  flex: 1;
+  min-width: 200px;
+  max-width: 420px;
 }
 
 .callsSearch {
   min-width: 260px;
-}
-
-.actionsWrap {
-  position: relative;
-}
-
-.actionsMenu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
-  min-width: 220px;
-  background: var(--color-bg-elevated, #252536);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  padding: 8px;
-  z-index: 50;
-}
-
-.actionsItem {
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  border: none;
-  color: var(--color-text-primary, #e2e8f0);
-  padding: 8px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.06);
-  }
-
-  &:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-}
-
-.todayOnly {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 12px;
-  opacity: 0.85;
-  height: 34px;
 }
 
 .table {

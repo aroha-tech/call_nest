@@ -713,7 +713,11 @@ export function ContactFormPage({ defaultType }) {
     setLayoutEditMode(false);
     setSubmitError(null);
     setFormErrors({});
-    setSearchParams({ mode: 'edit' }, { replace: true });
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('mode', 'edit');
+      return p;
+    }, { replace: true });
   }, [formData, setSearchParams]);
 
   const handleCancelEdit = useCallback(() => {
@@ -725,7 +729,11 @@ export function ContactFormPage({ defaultType }) {
     setLayoutEditMode(false);
     setSubmitError(null);
     setFormErrors({});
-    setSearchParams({ mode: 'view' }, { replace: true });
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('mode', 'view');
+      return p;
+    }, { replace: true });
   }, [setSearchParams]);
 
   const handleSubmit = async (e) => {
@@ -745,7 +753,11 @@ export function ContactFormPage({ defaultType }) {
         setIsEditing(false);
         setLayoutEditMode(false);
         editSnapshotRef.current = null;
-        setSearchParams({ mode: 'view' }, { replace: true });
+        setSearchParams((prev) => {
+          const p = new URLSearchParams(prev);
+          p.set('mode', 'view');
+          return p;
+        }, { replace: true });
       }
     } else {
       setSubmitError(result?.error || 'Save failed');

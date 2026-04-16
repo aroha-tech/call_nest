@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { Checkbox } from '../../components/ui/Checkbox';
 import { Alert } from '../../components/ui/Alert';
 import { contactsAPI } from '../../services/contactsAPI';
+import { callsAPI } from '../../services/callsAPI';
 import styles from './ExportCsvModal.module.scss';
 
 function buildInitialIncludedOrder(applicableColumns, visibleColumnIds) {
@@ -18,6 +19,8 @@ export function ExportCsvModal({
   isOpen,
   onClose,
   type,
+  /** `'contacts'` (default) uses contacts API; `'calls'` uses call history export. */
+  exportEntity = 'contacts',
   /** Same shape as contactsAPI.getAll / list-ids filters (search, filter_*, column_filters, …). */
   listQueryParams,
   applicableColumns,
@@ -116,12 +119,18 @@ export function ExportCsvModal({
         body.selected_ids = [...selectedIds];
       }
 
-      const res = await contactsAPI.exportCsvPost(listQueryParams || {}, body);
+      const res =
+        exportEntity === 'calls'
+          ? await callsAPI.exportCsvPost(listQueryParams || {}, body)
+          : await contactsAPI.exportCsvPost(listQueryParams || {}, body);
       const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${type === 'lead' ? 'leads' : 'contacts'}_export.csv`;
+      a.download =
+        exportEntity === 'calls'
+          ? 'call_history_export.csv'
+          : `${type === 'lead' ? 'leads' : 'contacts'}_export.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -136,13 +145,14 @@ export function ExportCsvModal({
   };
 
   const selectedDisabled = !allowSelectedScope || !selectedIds || selectedIds.size === 0;
-  const noun = type === 'lead' ? 'leads' : 'contacts';
+  const noun =
+    exportEntity === 'calls' ? 'call history' : type === 'lead' ? 'leads' : 'contacts';
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Export ${noun} (CSV)`}
+      title={exportEntity === 'calls' ? 'Export call history (CSV)' : `Export ${noun} (CSV)`}
       size="lg"
       closeOnOverlay
       closeOnEscape

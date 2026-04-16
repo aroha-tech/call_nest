@@ -65,8 +65,22 @@ export async function getSession(tenantId, user, sessionId) {
   );
   if (!sess) return null;
 
-  // Agents/managers can only see their own sessions for now
-  if (user.role !== 'admin' && Number(sess.created_by_user_id) !== Number(user.id)) {
+  if (user.role === 'admin') {
+    // tenant-wide
+  } else if (user.role === 'manager') {
+    const creatorId = Number(sess.created_by_user_id);
+    if (creatorId !== Number(user.id)) {
+      const [agentRow] = await query(
+        `SELECT id FROM users WHERE tenant_id = ? AND id = ? AND manager_id = ? AND is_deleted = 0 LIMIT 1`,
+        [tenantId, creatorId, user.id]
+      );
+      if (!agentRow) {
+        const err = new Error('Forbidden');
+        err.status = 403;
+        throw err;
+      }
+    }
+  } else if (Number(sess.created_by_user_id) !== Number(user.id)) {
     const err = new Error('Forbidden');
     err.status = 403;
     throw err;
@@ -139,6 +153,137 @@ export async function getSession(tenantId, user, sessionId) {
   }
 
   return { ...sess, items, dispositions, script };
+}
+
+function parseMultiDialerStatus(raw) {
+  if (raw == null || raw === '') return [];
+  if (Array.isArray(raw)) return raw.map((x) => String(x).trim().toLowerCase()).filter(Boolean);
+  const s = String(raw).trim();
+  if (!s) return [];
+  if (s.startsWith('[')) {
+    try {
+      const arr = JSON.parse(s);
+      if (Array.isArray(arr)) return arr.map((x) => String(x).trim().toLowerCase()).filter(Boolean);
+    } catch {
+      /* ignore */
+    }
+  }
+  return s
+    .split(/[,;|]/)
+    .map((x) => String(x).trim().toLowerCase())
+    .filter(Boolean);
+}
+
+const DIAL_SESSION_STATUS = new Set(['ready', 'active', 'paused', 'completed', 'cancelled']);
+
+/**
+ * Paginated dial sessions for the tenant. Admin: all; manager: own + direct reports; agent: own only.
+ */
+export async function listDialSessions(
+  tenantId,
+  user,
+  {
+    page = 1,
+    limit = 20,
+    q,
+    status,
+    provider,
+    created_after,
+    created_before,
+  } = {}
+) {
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+  const offset = (pageNum - 1) * limitNum;
+
+  const where = ['ds.tenant_id = ?'];
+  const params = [tenantId];
+
+  if (user.role === 'admin') {
+    /* tenant-wide */
+  } else if (user.role === 'manager') {
+    where.push(
+      `(ds.created_by_user_id = ? OR ds.created_by_user_id IN (SELECT id FROM users WHERE tenant_id = ? AND manager_id = ? AND role = 'agent' AND is_deleted = 0))`
+    );
+    params.push(user.id, tenantId, user.id);
+  } else {
+    where.push('ds.created_by_user_id = ?');
+    params.push(user.id);
+  }
+
+  const qTrim = q != null && String(q).trim() ? String(q).trim() : '';
+  if (qTrim) {
+    const n = parseInt(qTrim, 10);
+    if (String(n) === qTrim && n > 0) {
+      where.push('(ds.id = ? OR ds.user_session_no = ?)');
+      params.push(n, n);
+    } else {
+      where.push('(CAST(ds.user_session_no AS CHAR) LIKE ? OR CAST(ds.id AS CHAR) LIKE ?)');
+      params.push(`%${qTrim}%`, `%${qTrim}%`);
+    }
+  }
+
+  if (provider != null && String(provider).trim() !== '') {
+    where.push('ds.provider = ?');
+    params.push(String(provider).trim());
+  }
+
+  const sts = parseMultiDialerStatus(status).filter((s) => DIAL_SESSION_STATUS.has(s));
+  if (sts.length === 1) {
+    where.push('ds.status = ?');
+    params.push(sts[0]);
+  } else if (sts.length > 1) {
+    const ph = sts.map(() => '?').join(', ');
+    where.push(`ds.status IN (${ph})`);
+    params.push(...sts);
+  }
+
+  if (created_after) {
+    where.push('ds.created_at >= ?');
+    params.push(created_after);
+  }
+  if (created_before) {
+    where.push('ds.created_at <= ?');
+    params.push(created_before);
+  }
+
+  const whereSql = where.join(' AND ');
+
+  const [countRow] = await query(
+    `SELECT COUNT(*) AS total FROM dialer_sessions ds WHERE ${whereSql}`,
+    params
+  );
+  const total = Number(countRow?.total) || 0;
+
+  const rows = await query(
+    `SELECT
+        ds.id,
+        ds.user_session_no,
+        ds.provider,
+        ds.status,
+        ds.started_at,
+        ds.ended_at,
+        ds.created_at,
+        ds.created_by_user_id,
+        u.name AS creator_name,
+        (SELECT COUNT(*) FROM dialer_session_items dsi WHERE dsi.tenant_id = ds.tenant_id AND dsi.session_id = ds.id) AS items_count
+     FROM dialer_sessions ds
+     LEFT JOIN users u ON u.id = ds.created_by_user_id AND u.tenant_id = ds.tenant_id
+     WHERE ${whereSql}
+     ORDER BY ds.created_at DESC, ds.id DESC
+     LIMIT ${limitNum} OFFSET ${offset}`,
+    params
+  );
+
+  return {
+    data: rows,
+    pagination: {
+      page: pageNum,
+      limit: limitNum,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limitNum)),
+    },
+  };
 }
 
 async function pickNextQueuedItem(tenantId, sessionId) {

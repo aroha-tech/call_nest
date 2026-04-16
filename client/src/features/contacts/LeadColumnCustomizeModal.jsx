@@ -46,6 +46,10 @@ export function LeadColumnCustomizeModal({
   title = 'Customize columns',
   getDefaults,
   persistVisibleIds,
+  /** Column id that stays visible and fixed first (leads: display_name). */
+  pinnedColumnId = 'display_name',
+  /** Label for non-extra, non-custom columns in the picker (leads: "Lead"). */
+  standardColumnTagLabel = 'Lead',
 }) {
   const [visibleOrdered, setVisibleOrdered] = useState([]);
   const [search, setSearch] = useState('');
@@ -60,6 +64,11 @@ export function LeadColumnCustomizeModal({
   const [addErrors, setAddErrors] = useState({});
   const [addSubmitError, setAddSubmitError] = useState(null);
   const [addSaving, setAddSaving] = useState(false);
+
+  const pinnedLabel = useMemo(
+    () => applicableColumns.find((c) => c.id === pinnedColumnId)?.label || 'Primary column',
+    [applicableColumns, pinnedColumnId]
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -77,11 +86,11 @@ export function LeadColumnCustomizeModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    const hasDn = applicableColumns.some((c) => c.id === 'display_name');
-    const rest = visibleColumnIds.filter((id) => id !== 'display_name');
-    const ordered = hasDn ? ['display_name', ...rest] : [...visibleColumnIds];
+    const hasPinned = applicableColumns.some((c) => c.id === pinnedColumnId);
+    const rest = visibleColumnIds.filter((id) => id !== pinnedColumnId);
+    const ordered = hasPinned ? [pinnedColumnId, ...rest] : [...visibleColumnIds];
     setVisibleOrdered(ordered);
-  }, [isOpen, visibleColumnIds, applicableColumns]);
+  }, [isOpen, visibleColumnIds, applicableColumns, pinnedColumnId]);
 
   const resetAddFieldForm = () => {
     setAddName('');
@@ -157,32 +166,35 @@ export function LeadColumnCustomizeModal({
   );
 
   const hideColumn = (id) => {
-    if (id === 'display_name') return;
+    if (id === pinnedColumnId) return;
     setVisibleOrdered((prev) => prev.filter((x) => x !== id));
   };
 
   const showColumn = (id) => {
     setVisibleOrdered((prev) => {
       if (prev.includes(id)) return prev;
-      const head = prev[0] === 'display_name' ? ['display_name'] : [];
-      const tail = prev[0] === 'display_name' ? prev.slice(1) : [...prev];
+      const head = prev[0] === pinnedColumnId ? [pinnedColumnId] : [];
+      const tail = prev[0] === pinnedColumnId ? prev.slice(1) : [...prev];
       return [...head, ...tail, id];
     });
   };
 
-  const handleDragStart = useCallback((e, id) => {
-    if (id === 'display_name') {
-      e.preventDefault();
-      return;
-    }
-    e.dataTransfer.setData('text/plain', id);
-    e.dataTransfer.effectAllowed = 'move';
-    setDraggingId(id);
-  }, []);
+  const handleDragStart = useCallback(
+    (e, id) => {
+      if (id === pinnedColumnId) {
+        e.preventDefault();
+        return;
+      }
+      e.dataTransfer.setData('text/plain', id);
+      e.dataTransfer.effectAllowed = 'move';
+      setDraggingId(id);
+    },
+    [pinnedColumnId]
+  );
 
   const handleDragEnd = useCallback(() => {
     setDraggingId(null);
-  }, []);
+  }, [pinnedColumnId]);
 
   const handleDragOver = useCallback((e) => {
     e.preventDefault();
@@ -192,12 +204,12 @@ export function LeadColumnCustomizeModal({
   const handleDropOnRow = useCallback((e, targetId) => {
     e.preventDefault();
     const draggedId = e.dataTransfer.getData('text/plain');
-    if (!draggedId || draggedId === 'display_name' || targetId === 'display_name') return;
+    if (!draggedId || draggedId === pinnedColumnId || targetId === pinnedColumnId) return;
     if (draggedId === targetId) return;
 
     setVisibleOrdered((prev) => {
-      const head = prev[0] === 'display_name' ? ['display_name'] : [];
-      const tail = prev[0] === 'display_name' ? prev.slice(1) : [...prev];
+      const head = prev[0] === pinnedColumnId ? [pinnedColumnId] : [];
+      const tail = prev[0] === pinnedColumnId ? prev.slice(1) : [...prev];
       const from = tail.indexOf(draggedId);
       const to = tail.indexOf(targetId);
       if (from < 0 || to < 0) return prev;
@@ -207,7 +219,7 @@ export function LeadColumnCustomizeModal({
       return head.length ? [...head, ...next] : next;
     });
     setDraggingId(null);
-  }, []);
+  }, [pinnedColumnId]);
 
   const handleDefault = () => {
     const fn = getDefaults || getDefaultVisibleLeadColumnIds;
@@ -215,10 +227,10 @@ export function LeadColumnCustomizeModal({
   };
 
   const handleSave = () => {
-    const ensured = visibleOrdered.includes('display_name')
+    const ensured = visibleOrdered.includes(pinnedColumnId)
       ? visibleOrdered
-      : applicableColumns.some((c) => c.id === 'display_name')
-        ? ['display_name', ...visibleOrdered.filter((id) => id !== 'display_name')]
+      : applicableColumns.some((c) => c.id === pinnedColumnId)
+        ? [pinnedColumnId, ...visibleOrdered.filter((id) => id !== pinnedColumnId)]
         : visibleOrdered;
     const persist = persistVisibleIds || saveLeadVisibleColumnIds;
     persist(ensured);
@@ -272,7 +284,8 @@ export function LeadColumnCustomizeModal({
             Visible <span className={styles.sectionCount}>({visibleCount}/{total})</span>
           </h3>
           <p className={styles.sectionSub}>
-            Drag the handle to reorder. Uncheck to move a field to &quot;Not visible&quot;. Display name always stays on.
+            Drag the handle to reorder. Uncheck to move a field to &quot;Not visible&quot;. {pinnedLabel} always stays
+            on.
           </p>
           <ul
             className={styles.list}
@@ -281,7 +294,7 @@ export function LeadColumnCustomizeModal({
             aria-label="Visible columns"
           >
             {visibleFiltered.map((col) => {
-              const locked = col.id === 'display_name';
+              const locked = col.id === pinnedColumnId;
               const isDragging = draggingId === col.id;
               return (
                 <li
@@ -321,7 +334,11 @@ export function LeadColumnCustomizeModal({
                     <span className={styles.rowLabel}>{col.label}</span>
                   </label>
                   <span className={styles.fieldTag}>
-                    {col.category === 'custom' ? 'Custom' : col.category === 'extra' ? 'Extra' : 'Lead'}
+                    {col.category === 'custom'
+                      ? 'Custom'
+                      : col.category === 'extra'
+                        ? 'Extra'
+                        : standardColumnTagLabel}
                   </span>
                   {locked ? <span className={styles.pill}>Always</span> : null}
                 </li>
@@ -346,7 +363,11 @@ export function LeadColumnCustomizeModal({
                   <span className={styles.rowLabel}>{col.label}</span>
                 </label>
                 <span className={styles.fieldTag}>
-                  {col.category === 'custom' ? 'Custom' : col.category === 'extra' ? 'Extra' : 'Lead'}
+                  {col.category === 'custom'
+                    ? 'Custom'
+                    : col.category === 'extra'
+                      ? 'Extra'
+                      : standardColumnTagLabel}
                 </span>
               </li>
             ))}

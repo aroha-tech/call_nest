@@ -63,6 +63,12 @@ const TENANT_ADMIN_NAV_ITEMS = [
   { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
   { key: 'dialer', label: 'Dialer', path: '/dialer', permission: PERMISSIONS.DIAL_EXECUTE },
   { key: 'call-history', label: 'Call history', path: '/calls/history', permission: PERMISSIONS.DIAL_EXECUTE },
+  {
+    key: 'dial-sessions',
+    label: 'Dial sessions',
+    path: '/calls/dial-sessions',
+    permissions: [PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR],
+  },
   { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
   { key: 'workflow-map', label: 'Workflow', path: '/workflow/map', permission: PERMISSIONS.DASHBOARD_VIEW },
   {
@@ -196,6 +202,12 @@ const MANAGER_NAV_ITEMS = [
   { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
   { key: 'dialer', label: 'Dialer', path: '/dialer', permission: PERMISSIONS.DIAL_EXECUTE },
   { key: 'call-history', label: 'Call history', path: '/calls/history', permission: PERMISSIONS.DIAL_EXECUTE },
+  {
+    key: 'dial-sessions',
+    label: 'Dial sessions',
+    path: '/calls/dial-sessions',
+    permissions: [PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR],
+  },
   { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
   { key: 'users', label: 'My team', path: '/users', permissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM] },
   { key: 'workflow-map', label: 'Workflow', path: '/workflow/map', permission: PERMISSIONS.DASHBOARD_VIEW },
@@ -305,6 +317,12 @@ const AGENT_NAV_ITEMS = [
   { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
   { key: 'dialer', label: 'Dialer', path: '/dialer', permission: PERMISSIONS.DIAL_EXECUTE },
   { key: 'call-history', label: 'Call history', path: '/calls/history', permission: PERMISSIONS.DIAL_EXECUTE },
+  {
+    key: 'dial-sessions',
+    label: 'Dial sessions',
+    path: '/calls/dial-sessions',
+    permissions: [PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR],
+  },
   { key: 'workflow-map', label: 'Workflow', path: '/workflow/map', permission: PERMISSIONS.DASHBOARD_VIEW },
   {
     key: 'dialer-workflow',

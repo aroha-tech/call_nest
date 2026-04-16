@@ -31,6 +31,7 @@ export const callsAPI = {
     meaningful_only,
     sort_by,
     sort_dir,
+    column_filters,
   } = {}) =>
     axiosInstance.get(`${BASE}`, {
       params: {
@@ -49,6 +50,8 @@ export const callsAPI = {
         meaningful_only: meaningful_only ? '1' : undefined,
         sort_by: sort_by || undefined,
         sort_dir: sort_dir || undefined,
+        column_filters:
+          column_filters != null && String(column_filters).trim() !== '' ? column_filters : undefined,
       },
     }),
 
@@ -64,6 +67,7 @@ export const callsAPI = {
     started_before,
     today_only,
     meaningful_only,
+    column_filters,
   } = {}) =>
     axiosInstance.get(`${BASE}/ids`, {
       params: {
@@ -78,6 +82,8 @@ export const callsAPI = {
         started_before: started_before || undefined,
         today_only: today_only ? '1' : undefined,
         meaningful_only: meaningful_only ? '1' : undefined,
+        column_filters:
+          column_filters != null && String(column_filters).trim() !== '' ? column_filters : undefined,
       },
     }),
 
@@ -93,6 +99,7 @@ export const callsAPI = {
     started_before,
     today_only,
     meaningful_only,
+    column_filters,
   } = {}) =>
     axiosInstance.get(`${BASE}/metrics`, {
       params: {
@@ -107,6 +114,8 @@ export const callsAPI = {
         started_before: started_before || undefined,
         today_only: today_only ? '1' : undefined,
         meaningful_only: meaningful_only ? '1' : undefined,
+        column_filters:
+          column_filters != null && String(column_filters).trim() !== '' ? column_filters : undefined,
       },
     }),
 
@@ -119,6 +128,13 @@ export const callsAPI = {
       notes: notes ?? null,
       ...(deal_id != null && deal_id !== '' ? { deal_id } : {}),
       ...(stage_id != null && stage_id !== '' ? { stage_id } : {}),
+    }),
+
+  /** Same filter params as list(); body: export_scope, columns, selected_ids. */
+  exportCsvPost: (queryParams, body) =>
+    axiosInstance.post(`${BASE}/export/csv`, body, {
+      params: queryParams || {},
+      responseType: 'blob',
     }),
 };
 

@@ -5,6 +5,189 @@ import { loadDispositionCallApplyMeta } from './dispositionApplyDealHelper.js';
 
 const CALL_ATTEMPT_IDS_CAP = 5000;
 
+/** Joins required when WHERE references c, p, u, d (search + column filters). */
+const CALL_ATTEMPTS_STANDARD_JOINS = `
+  LEFT JOIN contacts c ON c.id = cca.contact_id AND c.tenant_id = cca.tenant_id
+  LEFT JOIN contact_phones p ON p.id = cca.contact_phone_id AND p.tenant_id = cca.tenant_id
+  LEFT JOIN users u ON u.id = cca.agent_user_id AND u.tenant_id = cca.tenant_id
+  LEFT JOIN dispositions d ON d.id = cca.disposition_id AND d.tenant_id = cca.tenant_id AND d.is_deleted = 0
+`;
+
+const CH_COLUMN_FILTER_OPS = new Set([
+  'empty',
+  'not_empty',
+  'contains',
+  'not_contains',
+  'starts_with',
+  'ends_with',
+]);
+
+const CH_FILTER_FIELDS = new Set([
+  'created_at',
+  'id',
+  'contact',
+  'phone',
+  'agent',
+  'dial_session',
+  'direction',
+  'status',
+  'is_connected',
+  'disposition',
+  'notes',
+  'duration_sec',
+  'started_at',
+  'ended_at',
+  'provider',
+]);
+
+/** Dial session linked to this attempt via dialer_session_items.last_attempt_id (newest item wins). */
+const CH_DIAL_SESSION_SORT_EXPR = `(SELECT LPAD(COALESCE(CAST(ds.user_session_no AS UNSIGNED), 0), 12, '0') FROM dialer_session_items dsi INNER JOIN dialer_sessions ds ON ds.id = dsi.session_id AND ds.tenant_id = dsi.tenant_id WHERE dsi.last_attempt_id = cca.id AND dsi.tenant_id = cca.tenant_id ORDER BY dsi.id DESC LIMIT 1)`;
+
+const CH_DIAL_SESSION_FILTER_TEXT_EXPR = `(SELECT CONCAT(COALESCE(CAST(ds.user_session_no AS CHAR), ''), ' ', COALESCE(CAST(ds.id AS CHAR), '')) FROM dialer_session_items dsi INNER JOIN dialer_sessions ds ON ds.id = dsi.session_id AND ds.tenant_id = dsi.tenant_id WHERE dsi.last_attempt_id = cca.id AND dsi.tenant_id = cca.tenant_id ORDER BY dsi.id DESC LIMIT 1)`;
+
+export function normalizeCallHistoryColumnFilters(raw) {
+  if (raw == null || raw === '') return [];
+  let arr;
+  try {
+    arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(arr)) return [];
+  const byField = new Map();
+  for (const item of arr) {
+    if (!item || typeof item !== 'object') continue;
+    const field = String(item.field || '').trim();
+    const op = String(item.op || '').trim();
+    if (!CH_FILTER_FIELDS.has(field)) continue;
+    if (!CH_COLUMN_FILTER_OPS.has(op)) continue;
+    const value = item.value == null ? '' : String(item.value).trim();
+    if (value.length > 200) continue;
+    if (['contains', 'not_contains', 'starts_with', 'ends_with'].includes(op) && value === '') continue;
+    byField.set(field, { field, op, value });
+  }
+  return [...byField.values()].slice(0, 12);
+}
+
+function pushCallHistoryColumnFilter(where, params, rule) {
+  const { field, op, value } = rule;
+  const like = (v) => `%${v}%`;
+  const starts = (v) => `${v}%`;
+  const ends = (v) => `%${v}`;
+
+  if (field === 'dial_session') {
+    if (op === 'empty') {
+      where.push(
+        `NOT EXISTS (SELECT 1 FROM dialer_session_items dsi WHERE dsi.tenant_id = cca.tenant_id AND dsi.last_attempt_id = cca.id)`
+      );
+      return;
+    }
+    if (op === 'not_empty') {
+      where.push(
+        `EXISTS (SELECT 1 FROM dialer_session_items dsi WHERE dsi.tenant_id = cca.tenant_id AND dsi.last_attempt_id = cca.id)`
+      );
+      return;
+    }
+    const e = CH_DIAL_SESSION_FILTER_TEXT_EXPR;
+    if (op === 'contains') {
+      where.push(`(${e} LIKE ?)`);
+      params.push(like(value));
+      return;
+    }
+    if (op === 'not_contains') {
+      where.push(`(NOT (COALESCE(${e}, '') LIKE ?))`);
+      params.push(like(value));
+      return;
+    }
+    if (op === 'starts_with') {
+      where.push(`(${e} LIKE ?)`);
+      params.push(starts(value));
+      return;
+    }
+    if (op === 'ends_with') {
+      where.push(`(${e} LIKE ?)`);
+      params.push(ends(value));
+    }
+    return;
+  }
+
+  const expr = () => {
+    switch (field) {
+      case 'created_at':
+        return 'CAST(cca.created_at AS CHAR)';
+      case 'id':
+        return 'CAST(cca.id AS CHAR)';
+      case 'contact':
+        return 'COALESCE(c.display_name, \'\')';
+      case 'phone':
+        return 'COALESCE(p.phone, \'\')';
+      case 'agent':
+        return 'COALESCE(u.name, \'\')';
+      case 'direction':
+        return 'COALESCE(cca.direction, \'\')';
+      case 'status':
+        return 'COALESCE(cca.status, \'\')';
+      case 'is_connected':
+        return 'CAST(cca.is_connected AS CHAR)';
+      case 'disposition':
+        return 'COALESCE(d.name, \'\')';
+      case 'notes':
+        return 'COALESCE(cca.notes, \'\')';
+      case 'duration_sec':
+        return 'CAST(COALESCE(cca.duration_sec, 0) AS CHAR)';
+      case 'started_at':
+        return 'CAST(cca.started_at AS CHAR)';
+      case 'ended_at':
+        return 'CAST(cca.ended_at AS CHAR)';
+      case 'provider':
+        return 'COALESCE(cca.provider, \'\')';
+      default:
+        return null;
+    }
+  };
+
+  const e = expr();
+  if (!e) return;
+
+  if (op === 'empty') {
+    if (field === 'notes') where.push(`(cca.notes IS NULL OR TRIM(cca.notes) = '')`);
+    else if (field === 'disposition') where.push(`(d.name IS NULL OR TRIM(d.name) = '')`);
+    else if (field === 'contact') where.push(`(c.display_name IS NULL OR TRIM(c.display_name) = '')`);
+    else if (field === 'phone') where.push(`(p.phone IS NULL OR TRIM(p.phone) = '')`);
+    else if (field === 'agent') where.push(`(u.name IS NULL OR TRIM(u.name) = '')`);
+    else where.push(`((${e}) IS NULL OR TRIM(${e}) = '')`);
+    return;
+  }
+  if (op === 'not_empty') {
+    if (field === 'notes') where.push(`(cca.notes IS NOT NULL AND TRIM(cca.notes) <> '')`);
+    else if (field === 'disposition') where.push(`(d.name IS NOT NULL AND TRIM(d.name) <> '')`);
+    else if (field === 'contact') where.push(`(c.display_name IS NOT NULL AND TRIM(c.display_name) <> '')`);
+    else if (field === 'phone') where.push(`(p.phone IS NOT NULL AND TRIM(p.phone) <> '')`);
+    else if (field === 'agent') where.push(`(u.name IS NOT NULL AND TRIM(u.name) <> '')`);
+    else where.push(`((${e}) IS NOT NULL AND TRIM(${e}) <> '')`);
+    return;
+  }
+  if (op === 'contains') {
+    where.push(`(${e} LIKE ?)`);
+    params.push(like(value));
+    return;
+  }
+  if (op === 'not_contains') {
+    where.push(`(NOT (COALESCE(${e}, '') LIKE ?))`);
+    params.push(like(value));
+    return;
+  }
+  if (op === 'starts_with') {
+    where.push(`(${e} LIKE ?)`);
+    params.push(starts(value));
+    return;
+  }
+  if (op === 'ends_with') {
+    where.push(`(${e} LIKE ?)`);
+    params.push(ends(value));
+  }
+}
+
 async function fetchContactBaseForCall(tenantId, user, contactId) {
   const where = ['c.tenant_id = ?', 'c.deleted_at IS NULL', 'c.id = ?'];
   const params = [tenantId, contactId];
@@ -218,200 +401,57 @@ export async function listCallAttempts(
     meaningful_only = false,
     sort_by,
     sort_dir,
+    column_filters,
   } = {}
 ) {
-  const parseMulti = (raw) => {
-    if (raw == null || raw === '') return [];
-    if (Array.isArray(raw)) return raw.map((x) => String(x).trim()).filter(Boolean);
-    const s = String(raw).trim();
-    if (!s) return [];
-    if (s.startsWith('[')) {
-      try {
-        const arr = JSON.parse(s);
-        if (Array.isArray(arr)) return arr.map((x) => String(x).trim()).filter(Boolean);
-      } catch {
-        // ignore
-      }
-    }
-    return s
-      .split(/[,;|]/)
-      .map((x) => String(x).trim())
-      .filter(Boolean);
-  };
-
-  const inClause = (col, values) => {
-    const v = values.filter((x) => x !== '0' && x !== '');
-    if (v.length === 0) return null;
-    const ph = v.map(() => '?').join(', ');
-    return { sql: `${col} IN (${ph})`, params: v };
-  };
-
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
   const offset = (pageNum - 1) * limitNum;
 
-  const where = ['cca.tenant_id = ?'];
-  const params = [tenantId];
+  const { whereSql, params } = buildCallAttemptsWhere(tenantId, user, {
+    q,
+    contact_id,
+    disposition_id,
+    agent_user_id,
+    direction,
+    status,
+    is_connected,
+    started_after,
+    started_before,
+    today_only,
+    meaningful_only,
+    column_filters,
+  });
 
-  if (q != null && String(q).trim()) {
-    const s = String(q).trim();
-    const like = `%${s}%`;
-    const n = Number(s);
-    const parts = [];
-    const p = [];
-    if (Number.isFinite(n) && n > 0) {
-      parts.push('cca.id = ?');
-      p.push(n);
-      parts.push('cca.contact_id = ?');
-      p.push(n);
-      parts.push('cca.agent_user_id = ?');
-      p.push(n);
-    }
-    parts.push('c.display_name LIKE ?');
-    parts.push('p.phone LIKE ?');
-    parts.push('u.name LIKE ?');
-    parts.push('cca.notes LIKE ?');
-    p.push(like, like, like, like);
-    where.push(`(${parts.join(' OR ')})`);
-    params.push(...p);
-  }
-
-  // Scope to contact if provided
-  if (contact_id) {
-    where.push('cca.contact_id = ?');
-    params.push(Number(contact_id));
-  }
-
-  if (disposition_id !== undefined && disposition_id !== null && disposition_id !== '') {
-    const dispList = parseMulti(disposition_id);
-    if (dispList.length <= 1) {
-      const dispKey = String(disposition_id).trim();
-      if (dispKey && dispKey !== '0') {
-        where.push('cca.disposition_id = ?');
-        params.push(dispKey);
-      }
-    } else {
-      const c = inClause('cca.disposition_id', dispList);
-      if (c) {
-        where.push(c.sql);
-        params.push(...c.params);
-      }
-    }
-  }
-
-  if (
-    (user.role === 'manager' || user.role === 'admin') &&
-    agent_user_id !== undefined &&
-    agent_user_id !== null &&
-    agent_user_id !== ''
-  ) {
-    const ids = parseMulti(agent_user_id)
-      .map((x) => Number(x))
-      .filter((n) => Number.isFinite(n) && n > 0)
-      .map(String);
-    if (ids.length === 1) {
-      where.push('cca.agent_user_id = ?');
-      params.push(Number(ids[0]));
-    } else if (ids.length > 1) {
-      const c = inClause('cca.agent_user_id', ids);
-      if (c) {
-        where.push(c.sql);
-        params.push(...c.params.map((x) => Number(x)));
-      }
-    }
-  }
-
-  if (direction) {
-    const dirs = parseMulti(direction).map((d) => d.toLowerCase());
-    const filtered = dirs.filter((d) => d === 'inbound' || d === 'outbound');
-    if (filtered.length === 1) {
-      where.push('cca.direction = ?');
-      params.push(filtered[0]);
-    } else if (filtered.length > 1) {
-      const c = inClause('cca.direction', filtered);
-      if (c) {
-        where.push(c.sql);
-        params.push(...c.params);
-      }
-    }
-  }
-
-  if (status) {
-    const allowed = new Set(['queued', 'ringing', 'connected', 'completed', 'failed', 'cancelled']);
-    const sts = parseMulti(status).map((s) => s.toLowerCase()).filter((s) => allowed.has(s));
-    if (sts.length === 1) {
-      where.push('cca.status = ?');
-      params.push(sts[0]);
-    } else if (sts.length > 1) {
-      const c = inClause('cca.status', sts);
-      if (c) {
-        where.push(c.sql);
-        params.push(...c.params);
-      }
-    }
-  }
-
-  if (is_connected !== undefined) {
-    const v = String(is_connected).trim().toLowerCase();
-    if (v === '1' || v === 'true') where.push('cca.is_connected = 1');
-    else if (v === '0' || v === 'false') where.push('cca.is_connected = 0');
-  }
-
-  if (today_only) {
-    where.push('DATE(cca.created_at) = CURDATE()');
-  }
-
-  if (started_after) {
-    where.push('cca.started_at >= ?');
-    params.push(started_after);
-  }
-  if (started_before) {
-    where.push('cca.started_at <= ?');
-    params.push(started_before);
-  }
-
-  // Role scoping: agents only their attempts; managers only their team attempts.
-  if (user.role === 'agent') {
-    where.push('cca.agent_user_id = ?');
-    params.push(user.id);
-  } else if (user.role === 'manager') {
-    where.push('cca.manager_id = ?');
-    params.push(user.id);
-  }
-
-  if (meaningful_only) {
-    // disposition_id is CHAR(36) UUID — never use `> 0` (MySQL casts UUID to 0 and drops every row).
-    where.push(`(
-      (cca.disposition_id IS NOT NULL AND TRIM(cca.disposition_id) <> '' AND cca.disposition_id <> '0')
-      OR (
-        cca.notes IS NOT NULL
-        AND TRIM(cca.notes) <> ''
-        AND TRIM(cca.notes) NOT REGEXP '^dialer_session:[0-9]+$'
-      )
-    )`);
-  }
-
-  const whereSql = where.join(' AND ');
-  const [countRow] = await query(`SELECT COUNT(*) AS total FROM contact_call_attempts cca WHERE ${whereSql}`, params);
+  const [countRow] = await query(
+    `SELECT COUNT(DISTINCT cca.id) AS total FROM contact_call_attempts cca ${CALL_ATTEMPTS_STANDARD_JOINS} WHERE ${whereSql}`,
+    params
+  );
   const total = countRow?.total ?? 0;
 
   const sortKey = String(sort_by || '').trim();
-  const sortDir = String(sort_dir || 'desc').trim().toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+  const sortDirOrd = String(sort_dir || 'desc').trim().toLowerCase() === 'asc' ? 'ASC' : 'DESC';
   const orderMap = {
     created_at: 'cca.created_at',
     id: 'cca.id',
     contact_id: 'cca.contact_id',
     phone: 'p.phone',
     agent: 'u.name',
+    dial_session: CH_DIAL_SESSION_SORT_EXPR,
     direction: 'cca.direction',
     status: 'cca.status',
     is_connected: 'cca.is_connected',
     disposition: 'd.name',
+    duration_sec: 'cca.duration_sec',
+    started_at: 'cca.started_at',
+    ended_at: 'cca.ended_at',
+    provider: 'cca.provider',
+    notes: 'cca.notes',
   };
   const orderCol = orderMap[sortKey] || 'cca.created_at';
-  const orderSql = `ORDER BY ${orderCol} ${sortDir}, cca.id DESC`;
+  const orderSql = `ORDER BY ${orderCol} ${sortDirOrd}, cca.id DESC`;
 
-   const rows = await query(
+  const rows = await query(
     `SELECT
         cca.id,
         cca.contact_id,
@@ -432,13 +472,11 @@ export async function listCallAttempts(
         c.display_name,
         p.phone AS phone_e164,
         u.name AS agent_name,
-        d.name AS disposition_name
+        d.name AS disposition_name,
+        (SELECT ds.id FROM dialer_session_items dsi INNER JOIN dialer_sessions ds ON ds.id = dsi.session_id AND ds.tenant_id = dsi.tenant_id WHERE dsi.last_attempt_id = cca.id AND dsi.tenant_id = cca.tenant_id ORDER BY dsi.id DESC LIMIT 1) AS dialer_session_id,
+        (SELECT ds.user_session_no FROM dialer_session_items dsi INNER JOIN dialer_sessions ds ON ds.id = dsi.session_id AND ds.tenant_id = dsi.tenant_id WHERE dsi.last_attempt_id = cca.id AND dsi.tenant_id = cca.tenant_id ORDER BY dsi.id DESC LIMIT 1) AS dialer_user_session_no
      FROM contact_call_attempts cca
-     LEFT JOIN contacts c ON c.id = cca.contact_id AND c.tenant_id = cca.tenant_id
-     LEFT JOIN contact_phones p ON p.id = cca.contact_phone_id AND p.tenant_id = cca.tenant_id
-     LEFT JOIN users u ON u.id = cca.agent_user_id AND u.tenant_id = cca.tenant_id
-     LEFT JOIN dispositions d
-       ON d.id = cca.disposition_id AND d.tenant_id = cca.tenant_id AND d.is_deleted = 0
+     ${CALL_ATTEMPTS_STANDARD_JOINS}
      WHERE ${whereSql}
      ${orderSql}
      LIMIT ${limitNum} OFFSET ${offset}`,
@@ -469,6 +507,7 @@ function buildCallAttemptsWhere(tenantId, user, filters = {}) {
     started_before,
     today_only = false,
     meaningful_only = false,
+    column_filters,
   } = filters;
 
   const where = ['cca.tenant_id = ?'];
@@ -636,18 +675,27 @@ function buildCallAttemptsWhere(tenantId, user, filters = {}) {
     )`);
   }
 
+  const columnRules = normalizeCallHistoryColumnFilters(column_filters);
+  for (const rule of columnRules) {
+    pushCallHistoryColumnFilter(where, params, rule);
+  }
+
   return { whereSql: where.join(' AND '), params };
 }
 
 /** All matching call attempt ids for current list filters, capped for bulk selection. */
 export async function listCallAttemptIds(tenantId, user, filters = {}) {
   const { whereSql, params } = buildCallAttemptsWhere(tenantId, user, filters);
-  const [countRow] = await query(`SELECT COUNT(*) AS total FROM contact_call_attempts cca WHERE ${whereSql}`, params);
+  const [countRow] = await query(
+    `SELECT COUNT(DISTINCT cca.id) AS total FROM contact_call_attempts cca ${CALL_ATTEMPTS_STANDARD_JOINS} WHERE ${whereSql}`,
+    params
+  );
   const total = countRow?.total ?? 0;
   const cap = CALL_ATTEMPT_IDS_CAP;
   const rows = await query(
     `SELECT cca.id
      FROM contact_call_attempts cca
+     ${CALL_ATTEMPTS_STANDARD_JOINS}
      WHERE ${whereSql}
      ORDER BY cca.id ASC
      LIMIT ${cap + 1}`,
@@ -663,7 +711,7 @@ export async function getCallAttemptMetrics(tenantId, user, filters = {}) {
 
   const [row] = await query(
     `SELECT
-        COUNT(*) AS total_calls,
+        COUNT(DISTINCT cca.id) AS total_calls,
         SUM(CASE WHEN cca.direction = 'outbound' THEN 1 ELSE 0 END) AS outgoing_calls,
         SUM(CASE WHEN cca.direction = 'inbound' THEN 1 ELSE 0 END) AS incoming_calls,
         SUM(CASE WHEN cca.status IN ('failed','cancelled') AND cca.is_connected = 0 THEN 1 ELSE 0 END) AS missed_calls,
@@ -675,8 +723,7 @@ export async function getCallAttemptMetrics(tenantId, user, filters = {}) {
         SUM(CASE WHEN dt.code = 'callback' THEN 1 ELSE 0 END) AS follow_up_calls,
         SUM(CASE WHEN d.next_action = 'schedule_callback' THEN 1 ELSE 0 END) AS scheduled_calls
      FROM contact_call_attempts cca
-     LEFT JOIN dispositions d
-       ON d.id = cca.disposition_id AND d.tenant_id = cca.tenant_id AND d.is_deleted = 0
+     ${CALL_ATTEMPTS_STANDARD_JOINS}
      LEFT JOIN dispo_types_master dt
        ON dt.id = d.dispo_type_id AND dt.is_deleted = 0
      WHERE ${whereSql}`,
@@ -697,6 +744,143 @@ export async function getCallAttemptMetrics(tenantId, user, filters = {}) {
     followUpCalls: n(row?.follow_up_calls),
     scheduledCalls: n(row?.scheduled_calls),
   };
+}
+
+const CALL_EXPORT_MAX_ROWS = 50000;
+
+const CALL_EXPORT_COL_SQL = {
+  created_at: 'cca.created_at',
+  id: 'cca.id',
+  contact: 'c.display_name',
+  phone: 'p.phone',
+  agent: 'u.name',
+  dial_session: `(SELECT CONCAT('Session ', ds.user_session_no, ' · id ', ds.id) FROM dialer_session_items dsi INNER JOIN dialer_sessions ds ON ds.id = dsi.session_id AND ds.tenant_id = dsi.tenant_id WHERE dsi.last_attempt_id = cca.id AND dsi.tenant_id = cca.tenant_id ORDER BY dsi.id DESC LIMIT 1)`,
+  direction: 'cca.direction',
+  status: 'cca.status',
+  is_connected: 'cca.is_connected',
+  disposition: 'd.name',
+  notes: 'cca.notes',
+  duration_sec: 'cca.duration_sec',
+  started_at: 'cca.started_at',
+  ended_at: 'cca.ended_at',
+  provider: 'cca.provider',
+};
+
+const CALL_EXPORT_HEADERS = {
+  created_at: 'When',
+  id: 'Attempt id',
+  contact: 'Called party',
+  phone: 'Phone',
+  agent: 'Agent',
+  dial_session: 'Dial session',
+  direction: 'Direction',
+  status: 'Status',
+  is_connected: 'Connected',
+  disposition: 'Disposition',
+  notes: 'Notes',
+  duration_sec: 'Duration (sec)',
+  started_at: 'Started',
+  ended_at: 'Ended',
+  provider: 'Provider',
+};
+
+function csvEscapeCallExport(v) {
+  const s = v === null || v === undefined ? '' : String(v);
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function formatCallExportCell(key, raw) {
+  if (raw == null) return '';
+  if (raw instanceof Date) {
+    if (Number.isNaN(raw.getTime())) return '';
+    return raw.toISOString();
+  }
+  if (key === 'is_connected') {
+    if (raw === true || raw === 1 || raw === '1') return 'Yes';
+    if (raw === false || raw === 0 || raw === '0') return 'No';
+  }
+  return String(raw);
+}
+
+/**
+ * CSV export for call history (same filters as list). Column keys match `callHistoryTableConfig` ids.
+ */
+export async function exportCallAttemptsCsv(
+  tenantId,
+  user,
+  {
+    q,
+    contact_id,
+    disposition_id,
+    agent_user_id,
+    direction,
+    status,
+    is_connected,
+    started_after,
+    started_before,
+    today_only = false,
+    meaningful_only = true,
+    column_filters,
+    export_scope = 'filtered',
+    selected_ids = [],
+    columns = [],
+  } = {}
+) {
+  const keys = (Array.isArray(columns) ? columns : [])
+    .map((k) => String(k).trim())
+    .filter((k) => Object.prototype.hasOwnProperty.call(CALL_EXPORT_COL_SQL, k));
+  if (keys.length === 0) {
+    const err = new Error('Choose at least one column to export');
+    err.status = 400;
+    throw err;
+  }
+
+  const filters = {
+    q,
+    contact_id,
+    disposition_id,
+    agent_user_id,
+    direction,
+    status,
+    is_connected,
+    started_after,
+    started_before,
+    today_only,
+    meaningful_only,
+    column_filters,
+  };
+
+  const { whereSql, params: baseParams } = buildCallAttemptsWhere(tenantId, user, filters);
+  const params = [...baseParams];
+  let whereFinal = whereSql;
+
+  const scope = String(export_scope || 'filtered').toLowerCase() === 'selected' ? 'selected' : 'filtered';
+  if (scope === 'selected') {
+    const ids = [...new Set((Array.isArray(selected_ids) ? selected_ids : []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))].slice(
+      0,
+      CALL_ATTEMPT_IDS_CAP
+    );
+    if (ids.length === 0) {
+      return '\uFEFF';
+    }
+    whereFinal += ` AND cca.id IN (${ids.map(() => '?').join(',')})`;
+    params.push(...ids);
+  }
+
+  const selectList = keys.map((k) => `${CALL_EXPORT_COL_SQL[k]} AS \`${k}\``).join(', ');
+  const sql = `SELECT ${selectList} FROM contact_call_attempts cca ${CALL_ATTEMPTS_STANDARD_JOINS} WHERE ${whereFinal} ORDER BY cca.created_at DESC, cca.id DESC LIMIT ${CALL_EXPORT_MAX_ROWS + 1}`;
+
+  const rows = await query(sql, params);
+  const dataRows = rows.length > CALL_EXPORT_MAX_ROWS ? rows.slice(0, CALL_EXPORT_MAX_ROWS) : rows;
+
+  const headerLine = keys.map((k) => csvEscapeCallExport(CALL_EXPORT_HEADERS[k] || k)).join(',');
+  const lines = [`\uFEFF${headerLine}`];
+  for (const row of dataRows) {
+    const cells = keys.map((k) => csvEscapeCallExport(formatCallExportCell(k, row[k])));
+    lines.push(cells.join(','));
+  }
+  return lines.join('\r\n');
 }
 
 /**

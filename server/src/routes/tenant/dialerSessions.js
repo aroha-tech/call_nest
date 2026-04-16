@@ -8,6 +8,7 @@ router.use(tenantAuthMiddleware);
 
 // Dialer sessions: create a queue and call leads one-by-one.
 router.post('/', requirePermission(['dial.execute']), dialerSessionsController.create);
+router.get('/', requirePermission(['dial.execute', 'dial.monitor']), dialerSessionsController.list);
 router.get('/:id', requirePermission(['dial.execute', 'dial.monitor']), dialerSessionsController.getById);
 router.patch(
   '/:id/items/:itemId',

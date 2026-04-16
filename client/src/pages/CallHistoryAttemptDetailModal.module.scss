@@ -1,0 +1,71 @@
+.lead {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) 1fr;
+  gap: 0 16px;
+  margin: 0;
+}
+
+.label {
+  margin: 0;
+  padding: 8px 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.value {
+  margin: 0;
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border-subtle);
+  min-width: 0;
+}
+
+.mono {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.muted {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.dialSessionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.notesPre {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 240px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--color-bg-subtle);
+  border-radius: 8px;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.footer {
+  justify-content: space-between !important;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+}

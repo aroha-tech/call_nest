@@ -1,0 +1,20 @@
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.toolbarFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.toolbarSearch {
+  flex: 1 1 220px;
+  min-width: 200px;
+  max-width: 360px;
+}

@@ -1,35 +1,117 @@
 import React, { useMemo } from 'react';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
+import { IconButton } from '../components/ui/IconButton';
+import { ViewIcon } from '../components/ui/ActionIcons';
+import leadTableStyles from '../features/contacts/LeadDataTable.module.scss';
 import styles from './CallHistoryDataTable.module.scss';
 
-function sortToggle(nextKey, sortBy, sortDir) {
-  if (sortBy !== nextKey) return { sortBy: nextKey, sortDir: 'desc' };
-  if (sortDir === 'desc') return { sortBy: nextKey, sortDir: 'asc' };
-  return { sortBy: '', sortDir: 'desc' };
+function formatDurationSec(sec) {
+  const n = Number(sec ?? 0);
+  if (!Number.isFinite(n) || n <= 0) return '—';
+  const s = Math.floor(n);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${r}s`;
+  return `${r}s`;
+}
+
+function renderCell(col, r, { formatWhen, notesPreview }) {
+  switch (col.id) {
+    case 'created_at':
+      return formatWhen?.(r.created_at) ?? r.created_at ?? '—';
+    case 'id':
+      return `#${r.id}`;
+    case 'contact':
+      return (
+        <button type="button" className={styles.linkBtn} onClick={() => r.__viewAttempt?.()}>
+          {r.display_name || `Party #${r.contact_id}`}
+        </button>
+      );
+    case 'phone':
+      return r.phone_e164 || '—';
+    case 'agent':
+      return r.agent_name || (r.agent_user_id ? `#${r.agent_user_id}` : '—');
+    case 'dial_session': {
+      const sid = r.dialer_session_id;
+      const no = r.dialer_user_session_no;
+      if (!sid && (no == null || no === '')) return '—';
+      const label =
+        no != null && no !== '' ? `Session #${no}` : sid ? `Session id ${sid}` : '—';
+      return (
+        <button
+          type="button"
+          className={styles.linkBtn}
+          disabled={!sid}
+          onClick={() => sid && r.__openDialSession?.()}
+        >
+          {label}
+        </button>
+      );
+    }
+    case 'direction':
+      return (
+        <Badge variant="muted" size="sm">
+          {r.direction || '—'}
+        </Badge>
+      );
+    case 'status':
+      return (
+        <Badge variant="default" size="sm">
+          {r.status || '—'}
+        </Badge>
+      );
+    case 'is_connected':
+      return (
+        <Badge variant={Number(r.is_connected) === 1 ? 'success' : 'warning'} size="sm">
+          {Number(r.is_connected) === 1 ? 'Connected' : 'Not connected'}
+        </Badge>
+      );
+    case 'disposition':
+      return r.disposition_name || '—';
+    case 'notes':
+      return <span className={styles.notesCell}>{notesPreview?.(r) ?? '—'}</span>;
+    case 'duration_sec':
+      return formatDurationSec(r.duration_sec);
+    case 'started_at':
+      return formatWhen?.(r.started_at) ?? '—';
+    case 'ended_at':
+      return formatWhen?.(r.ended_at) ?? '—';
+    case 'provider':
+      return r.provider || '—';
+    default:
+      return '—';
+  }
 }
 
 export function CallHistoryDataTable({
   rows = [],
+  applicableColumns = [],
+  visibleColumnIds = [],
   selectedIds,
   onToggleSelect,
   onToggleSelectAllOnPage,
   allOnPageSelected,
   sortBy,
   sortDir,
-  onSortChange,
-  onOpenContact,
+  onColumnHeaderClick,
+  onOpenCustomizeColumns,
+  onViewAttempt,
+  onOpenDialSession,
   formatWhen,
   notesPreview,
+  columnFilters = [],
 }) {
   const selectedSet = selectedIds || new Set();
 
-  const headerSort = (key) => {
-    const next = sortToggle(key, sortBy, sortDir);
-    onSortChange?.(next);
-  };
+  const hasFilter = (field) => columnFilters.some((f) => f.field === field);
 
-  const sortedFlag = (key) => (sortBy === key ? (sortDir === 'asc' ? 'asc' : 'desc') : undefined);
+  const visibleDefs = useMemo(() => {
+    const map = new Map(applicableColumns.map((c) => [c.id, c]));
+    return visibleColumnIds.map((id) => map.get(id)).filter(Boolean);
+  }, [applicableColumns, visibleColumnIds]);
 
   const hasRows = rows.length > 0;
   const idsOnPage = useMemo(() => rows.map((r) => String(r.id)), [rows]);
@@ -38,13 +120,12 @@ export function CallHistoryDataTable({
   return (
     <Table
       variant="adminList"
-      className={styles.tableOuter}
-      tableClassName={styles.table}
-      flexibleLastColumn
+      className={leadTableStyles.leadTableOuter}
+      tableClassName={leadTableStyles.leadTable}
     >
       <TableHead>
         <TableRow>
-          <TableHeaderCell width="44px" noTruncate>
+          <TableHeaderCell width="44px" align="center" className={leadTableStyles.stickyFirst}>
             <input
               type="checkbox"
               checked={allChecked}
@@ -53,78 +134,90 @@ export function CallHistoryDataTable({
             />
           </TableHeaderCell>
 
-          <TableHeaderCell sortable sorted={sortedFlag('created_at')} onSort={() => headerSort('created_at')}>
-            When
+          {visibleDefs.map((col) => (
+            <TableHeaderCell
+              key={col.id}
+              sortable={false}
+              onClick={
+                col.sortKey || col.columnFilterOnly ? () => onColumnHeaderClick?.(col) : undefined
+              }
+            >
+              <span className={leadTableStyles.headerInner}>
+                <span>{col.label}</span>
+                {col.sortKey && !col.columnFilterOnly && sortBy === col.sortKey ? (
+                  <span className={leadTableStyles.sortMark} aria-hidden>
+                    {sortDir === 'asc' ? '↑' : '↓'}
+                  </span>
+                ) : null}
+                {col.sortKey && hasFilter(col.id) ? (
+                  <span className={leadTableStyles.filterMark} title="Filter active" aria-label="Filter active" />
+                ) : null}
+              </span>
+            </TableHeaderCell>
+          ))}
+
+          <TableHeaderCell width="120px" align="center" className={`${leadTableStyles.stickyLast} ${leadTableStyles.actionsTh}`}>
+            <div className={leadTableStyles.actionsHead}>
+              <span className={leadTableStyles.actionsHeadLabel}>Actions</span>
+              <button
+                type="button"
+                className={leadTableStyles.gearBtn}
+                aria-label="Customize columns"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenCustomizeColumns?.();
+                }}
+              >
+                <span className={leadTableStyles.gearIcon} aria-hidden>
+                  ⚙
+                </span>
+              </button>
+            </div>
           </TableHeaderCell>
-          <TableHeaderCell sortable sorted={sortedFlag('id')} onSort={() => headerSort('id')}>
-            Attempt
-          </TableHeaderCell>
-          <TableHeaderCell sortable sorted={sortedFlag('contact_id')} onSort={() => headerSort('contact_id')}>
-            Contact
-          </TableHeaderCell>
-          <TableHeaderCell sortable sorted={sortedFlag('phone')} onSort={() => headerSort('phone')}>
-            Phone
-          </TableHeaderCell>
-          <TableHeaderCell sortable sorted={sortedFlag('agent')} onSort={() => headerSort('agent')}>
-            Agent
-          </TableHeaderCell>
-          <TableHeaderCell sortable sorted={sortedFlag('direction')} onSort={() => headerSort('direction')}>
-            Direction
-          </TableHeaderCell>
-          <TableHeaderCell sortable sorted={sortedFlag('status')} onSort={() => headerSort('status')}>
-            Status
-          </TableHeaderCell>
-          <TableHeaderCell sortable sorted={sortedFlag('is_connected')} onSort={() => headerSort('is_connected')}>
-            Connectivity
-          </TableHeaderCell>
-          <TableHeaderCell sortable sorted={sortedFlag('disposition')} onSort={() => headerSort('disposition')}>
-            Disposition
-          </TableHeaderCell>
-          <TableHeaderCell>Notes</TableHeaderCell>
         </TableRow>
       </TableHead>
-
       <TableBody>
-        {rows.map((r) => (
-          <TableRow key={r.id}>
-            <TableCell width="44px" noTruncate>
-              <input
-                type="checkbox"
-                checked={selectedSet.has(String(r.id))}
-                onChange={() => onToggleSelect?.(r.id)}
-                aria-label={`Select attempt ${r.id}`}
-              />
-            </TableCell>
-            <TableCell>{formatWhen?.(r.created_at) ?? r.created_at}</TableCell>
-            <TableCell>#{r.id}</TableCell>
-            <TableCell>
-              <button type="button" className={styles.linkBtn} onClick={() => onOpenContact?.(r)}>
-                {r.display_name || `Contact #${r.contact_id}`}
-              </button>
-            </TableCell>
-            <TableCell>{r.phone_e164 || '—'}</TableCell>
-            <TableCell>{r.agent_name || (r.agent_user_id ? `#${r.agent_user_id}` : '—')}</TableCell>
-            <TableCell>
-              <Badge variant="muted" size="sm">
-                {r.direction || '—'}
-              </Badge>
-            </TableCell>
-            <TableCell>
-              <Badge variant="default" size="sm">
-                {r.status || '—'}
-              </Badge>
-            </TableCell>
-            <TableCell>
-              <Badge variant={Number(r.is_connected) === 1 ? 'success' : 'warning'} size="sm">
-                {Number(r.is_connected) === 1 ? 'Connected' : 'Not connected'}
-              </Badge>
-            </TableCell>
-            <TableCell>{r.disposition_name || '—'}</TableCell>
-            <TableCell className={styles.notesCell}>{notesPreview?.(r) ?? '—'}</TableCell>
-          </TableRow>
-        ))}
+        {rows.map((r) => {
+          const rowHelpers = { formatWhen, notesPreview };
+          const rowData = {
+            ...r,
+            __viewAttempt: onViewAttempt ? () => onViewAttempt(r) : undefined,
+            __openDialSession: onOpenDialSession ? () => onOpenDialSession(r) : undefined,
+          };
+          return (
+            <TableRow key={r.id}>
+              <TableCell align="center" className={leadTableStyles.stickyFirst}>
+                <input
+                  type="checkbox"
+                  checked={selectedSet.has(String(r.id))}
+                  onChange={() => onToggleSelect?.(r.id)}
+                  aria-label={`Select attempt ${r.id}`}
+                />
+              </TableCell>
+
+              {visibleDefs.map((col) => (
+                <TableCell key={col.id} noTruncate={col.id === 'notes'}>
+                  {renderCell(col, rowData, rowHelpers)}
+                </TableCell>
+              ))}
+
+              <TableCell align="center" className={`${leadTableStyles.stickyLast} ${leadTableStyles.actionsTd}`}>
+                {onViewAttempt ? (
+                  <IconButton
+                    size="sm"
+                    title="View this call attempt"
+                    onClick={() => onViewAttempt(r)}
+                  >
+                    <ViewIcon />
+                  </IconButton>
+                ) : (
+                  '—'
+                )}
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );
 }
-

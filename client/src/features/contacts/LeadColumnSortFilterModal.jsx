@@ -49,6 +49,36 @@ function getSortCopy(sortKey) {
       descHint: 'Youngest first',
     };
   }
+  if (sortKey === 'contact_id') {
+    return {
+      defaultLabel: 'List default',
+      defaultHint: 'Newest attempts first; contact order is secondary.',
+      ascLabel: 'Contact id: low → high',
+      ascHint: 'Smaller contact / lead ids first',
+      descLabel: 'Contact id: high → low',
+      descHint: 'Larger contact / lead ids first',
+    };
+  }
+  if (sortKey === 'notes') {
+    return {
+      defaultLabel: 'List default',
+      defaultHint: 'Newest attempts first; notes column does not control order.',
+      ascLabel: 'Ascending (notes)',
+      ascHint: 'Lexicographic on raw notes text',
+      descLabel: 'Descending (notes)',
+      descHint: 'Reverse lexicographic on notes',
+    };
+  }
+  if (sortKey === 'dial_session') {
+    return {
+      defaultLabel: 'List default',
+      defaultHint: 'Newest attempts first; dial session # is secondary.',
+      ascLabel: 'Dial session # low → high',
+      ascHint: 'Smaller per-user session numbers first (unlinked last)',
+      descLabel: 'Dial session # high → low',
+      descHint: 'Larger session numbers first',
+    };
+  }
   return {
     defaultLabel: 'List default',
     defaultHint: 'Newest records first; this column does not control order.',
@@ -74,6 +104,20 @@ function filterPlaceholderForColumn(sortKey) {
     state: 'State or region',
     country: 'Country',
     source: 'Source text',
+    contact_id: 'Called party name or part of it',
+    phone: 'Digits or partial phone number',
+    agent: 'Agent display name',
+    disposition: 'Disposition name (e.g. Busy, Interested)',
+    direction: 'inbound or outbound',
+    status: 'queued, ringing, connected, completed, …',
+    is_connected: '0 or 1, or text Connected',
+    notes: 'Words in call notes',
+    id: 'Attempt id digits',
+    duration_sec: 'Seconds (e.g. 120)',
+    started_at: 'Date/time fragment',
+    ended_at: 'Date/time fragment',
+    provider: 'Provider id (e.g. dummy)',
+    dial_session: 'Session # or database id (e.g. 3 or 42)',
   };
   return map[sortKey] || 'Text to match';
 }
@@ -88,6 +132,8 @@ export function LeadColumnSortFilterModal({
   onApply,
   /** When true, only column filter applies (e.g. industry JSON fields — no list sort). */
   filterOnly = false,
+  /** Overrides default “…leads list” subtitle (e.g. call history). */
+  modalSubtitle,
 }) {
   const [sortMode, setSortMode] = useState('default');
   const [filterOp, setFilterOp] = useState('none');
@@ -189,7 +235,9 @@ export function LeadColumnSortFilterModal({
       }
     >
       <p className={styles.modalSubtitle}>
-        {filterOnly ? 'Filter this column for the current list.' : 'Sort and filter this column for the current leads list.'}
+        {filterOnly
+          ? 'Filter this column for the current list.'
+          : modalSubtitle || 'Sort and filter this column for the current leads list.'}
       </p>
 
       {showStatusBanner ? (

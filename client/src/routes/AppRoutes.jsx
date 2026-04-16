@@ -53,6 +53,7 @@ import { CampaignOpenPage } from '../features/campaigns/CampaignOpenPage';
 import { DealsPage } from '../pages/DealsPage';
 import { useEmailModuleEnabled } from '../hooks/useEmailModuleEnabled';
 import { ActivitiesPage } from '../pages/ActivitiesPage';
+import { DialSessionsPage } from '../pages/DialSessionsPage';
 import { DialerPage } from '../pages/DialerPage';
 import { DialerSessionPage } from '../pages/DialerSessionPage';
 import { DialerSessionSetupPage } from '../pages/DialerSessionSetupPage';
@@ -548,6 +549,16 @@ function TenantRoutes() {
           <ProtectedRoute permission={PERMISSIONS.DIAL_EXECUTE}>
             <AppShellLayout>
               <ActivitiesPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/calls/dial-sessions"
+        element={
+          <ProtectedRoute permissions={[PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR]}>
+            <AppShellLayout>
+              <DialSessionsPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

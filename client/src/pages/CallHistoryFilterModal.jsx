@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, ModalFooter } from '../components/ui/Modal';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Checkbox } from '../components/ui/Checkbox';
 import { MultiSelectDropdown } from '../components/ui/MultiSelectDropdown';
+import styles from './CallHistoryFilterModal.module.scss';
 
 function normalizeFilterName(raw) {
   return String(raw ?? '').trim();
@@ -83,156 +85,182 @@ export function CallHistoryFilterModal({
     startedBefore: fields.startedBefore ?? '',
   });
 
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="xl" closeOnEscape>
-      <div style={{ marginBottom: 12 }}>
-        <Input
-          label={isEditingSaved ? 'Filter name' : 'Filter name (for saving)'}
-          value={filterName}
-          onChange={(e) => {
-            setFilterName(e.target.value);
-            setFilterNameError('');
-          }}
-          placeholder="e.g. My outbound calls"
-          error={filterNameError}
-        />
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
-        <Input
-          label="Contact / lead ID"
-          value={fields.contactFilter || ''}
-          onChange={(e) => setDraft((p) => ({ ...p, contactFilter: e.target.value }))}
-          placeholder="e.g. 123"
-          inputMode="numeric"
-        />
-        <MultiSelectDropdown
-          label="Disposition"
-          value={fields.dispositionFilterMulti || ''}
-          onChange={(v) => setDraft((p) => ({ ...p, dispositionFilterMulti: v }))}
-          options={dispositionOptions}
-          placeholder="All dispositions"
-          searchable={false}
-        />
-        <MultiSelectDropdown
-          label="Direction"
-          value={fields.directionFilterMulti || ''}
-          onChange={(v) => setDraft((p) => ({ ...p, directionFilterMulti: v }))}
-          options={directionOptions}
-          placeholder="Any direction"
-          searchable={false}
-        />
+  const handleSaveNamed = () => {
+    const name = normalizeFilterName(filterName);
+    if (!name) return;
+    const dup = duplicateNameMessage(existingSavedFilters, name, savedFilterId);
+    if (dup) {
+      setFilterNameError(dup);
+      return;
+    }
+    setFilterNameError('');
+    const payload = buildFilterPayload();
+    if (savedFilterId != null) {
+      onUpdateNamedFilter?.(savedFilterId, name, payload);
+    } else {
+      onSaveNamedFilter?.(name, payload);
+    }
+    onClose();
+  };
 
-        <MultiSelectDropdown
-          label="Status"
-          value={fields.statusFilterMulti || ''}
-          onChange={(v) => setDraft((p) => ({ ...p, statusFilterMulti: v }))}
-          options={statusOptions}
-          placeholder="All statuses"
-          searchable={false}
-        />
-        <MultiSelectDropdown
-          label="Connectivity"
-          value={fields.connectedFilterMulti || ''}
-          onChange={(v) => setDraft((p) => ({ ...p, connectedFilterMulti: v }))}
-          options={connectedOptions}
-          placeholder="Any"
-          searchable={false}
-        />
-        {canPickAgents ? (
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={modalTitle}
+      size="xl"
+      closeOnEscape
+      footer={
+        <ModalFooter className={styles.footerRow}>
+          <div className={styles.footerCluster}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                resetDraft();
+                onReset?.();
+              }}
+            >
+              Reset
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                resetDraft();
+              }}
+            >
+              Clear (draft)
+            </Button>
+          </div>
+          <div className={styles.footerCluster}>
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Close
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => {
+                onApply?.(buildFilterPayload());
+                onClose();
+              }}
+            >
+              Apply
+            </Button>
+          </div>
+        </ModalFooter>
+      }
+    >
+      <div className={styles.root}>
+        <p className={styles.sectionLabel}>Filter criteria</p>
+        <div className={styles.criteriaGrid}>
+          <Input
+            label="Contact / lead ID"
+            value={fields.contactFilter || ''}
+            onChange={(e) => setDraft((p) => ({ ...p, contactFilter: e.target.value }))}
+            placeholder="e.g. 123"
+            inputMode="numeric"
+          />
           <MultiSelectDropdown
-            label="Agent"
-            value={fields.agentFilterMulti || ''}
-            onChange={(v) => setDraft((p) => ({ ...p, agentFilterMulti: v }))}
-            options={agentOptions}
-            placeholder="All agents"
+            label="Disposition"
+            value={fields.dispositionFilterMulti || ''}
+            onChange={(v) => setDraft((p) => ({ ...p, dispositionFilterMulti: v }))}
+            options={dispositionOptions}
+            placeholder="All dispositions"
             searchable={false}
           />
-        ) : (
-          <div />
-        )}
+          <MultiSelectDropdown
+            label="Direction"
+            value={fields.directionFilterMulti || ''}
+            onChange={(v) => setDraft((p) => ({ ...p, directionFilterMulti: v }))}
+            options={directionOptions}
+            placeholder="Any direction"
+            searchable={false}
+          />
 
-        <Input
-          label="Started after"
-          type="datetime-local"
-          value={fields.startedAfter || ''}
-          onChange={(e) => setDraft((p) => ({ ...p, startedAfter: e.target.value }))}
-        />
-        <Input
-          label="Started before"
-          type="datetime-local"
-          value={fields.startedBefore || ''}
-          onChange={(e) => setDraft((p) => ({ ...p, startedBefore: e.target.value }))}
-        />
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, opacity: 0.9 }}>
-          <input
-            type="checkbox"
+          <MultiSelectDropdown
+            label="Status"
+            value={fields.statusFilterMulti || ''}
+            onChange={(v) => setDraft((p) => ({ ...p, statusFilterMulti: v }))}
+            options={statusOptions}
+            placeholder="All statuses"
+            searchable={false}
+          />
+          <MultiSelectDropdown
+            label="Connectivity"
+            value={fields.connectedFilterMulti || ''}
+            onChange={(v) => setDraft((p) => ({ ...p, connectedFilterMulti: v }))}
+            options={connectedOptions}
+            placeholder="Any"
+            searchable={false}
+          />
+          {canPickAgents ? (
+            <MultiSelectDropdown
+              label="Agent"
+              value={fields.agentFilterMulti || ''}
+              onChange={(v) => setDraft((p) => ({ ...p, agentFilterMulti: v }))}
+              options={agentOptions}
+              placeholder="All agents"
+              searchable={false}
+            />
+          ) : (
+            <div aria-hidden className={styles.gridPad} />
+          )}
+        </div>
+
+        <p className={styles.sectionLabel}>Started time</p>
+        <div className={styles.dateGrid}>
+          <Input
+            label="Started after"
+            type="datetime-local"
+            value={fields.startedAfter || ''}
+            onChange={(e) => setDraft((p) => ({ ...p, startedAfter: e.target.value }))}
+          />
+          <Input
+            label="Started before"
+            type="datetime-local"
+            value={fields.startedBefore || ''}
+            onChange={(e) => setDraft((p) => ({ ...p, startedBefore: e.target.value }))}
+          />
+        </div>
+
+        <div className={styles.todayRow}>
+          <Checkbox
+            id="call-history-today-only"
+            label="Today only (by attempt time)"
             checked={Boolean(fields.todayOnly)}
             onChange={(e) => setDraft((p) => ({ ...p, todayOnly: e.target.checked }))}
           />
-          Today only
-        </label>
-      </div>
+        </div>
 
-      <ModalFooter>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => {
-            resetDraft();
-            onReset?.();
-          }}
-        >
-          Reset
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => {
-            resetDraft();
-          }}
-        >
-          Clear (draft)
-        </Button>
-        <div style={{ flex: 1 }} />
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Close
-        </Button>
-        <Button
-          type="button"
-          variant="primary"
-          onClick={() => {
-            onApply?.(buildFilterPayload());
-            onClose();
-          }}
-        >
-          Apply
-        </Button>
-        <Button
-          type="button"
-          variant="primary"
-          disabled={!normalizeFilterName(filterName)}
-          onClick={() => {
-            const name = normalizeFilterName(filterName);
-            if (!name) return;
-            const dup = duplicateNameMessage(existingSavedFilters, name, savedFilterId);
-            if (dup) {
-              setFilterNameError(dup);
-              return;
-            }
-            setFilterNameError('');
-            const payload = buildFilterPayload();
-            if (savedFilterId != null) {
-              onUpdateNamedFilter?.(savedFilterId, name, payload);
-            } else {
-              onSaveNamedFilter?.(name, payload);
-            }
-            onClose();
-          }}
-        >
-          Save
-        </Button>
-      </ModalFooter>
+        <div className={styles.saveStrip}>
+          <p className={styles.saveStripTitle}>
+            {isEditingSaved ? 'Update saved filter' : 'Save as named filter (optional)'}
+          </p>
+          <div className={styles.saveStripRow}>
+            <div className={styles.saveNameInput}>
+              <Input
+                label={isEditingSaved ? 'Filter name' : 'Name'}
+                value={filterName}
+                onChange={(e) => {
+                  setFilterName(e.target.value);
+                  setFilterNameError('');
+                }}
+                placeholder="e.g. My outbound calls"
+                error={filterNameError}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!normalizeFilterName(filterName)}
+              onClick={handleSaveNamed}
+            >
+              {isEditingSaved ? 'Update' : 'Save'}
+            </Button>
+          </div>
+        </div>
+      </div>
     </Modal>
   );
 }
-
