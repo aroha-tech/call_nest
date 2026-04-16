@@ -1,0 +1,54 @@
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.wrap {
+  margin-top: $space-5;
+}
+
+.headerRow {
+  display: flex;
+  gap: $space-3;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: $space-3;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+}
+
+.sub {
+  margin-top: 2px;
+  font-size: $font-size-sm;
+  color: var(--color-text-secondary);
+}
+
+.headerActions {
+  display: flex;
+  gap: $space-2;
+  align-items: center;
+}
+
+.toolbarRow {
+  display: flex;
+  gap: $space-2;
+  width: 100%;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.toolbarSearch {
+  flex: 1 1 260px;
+  min-width: 220px;
+  max-width: 420px;
+}
+
+.error {
+  margin-bottom: $space-3;
+  color: var(--color-danger-500, #ef4444);
+  font-size: $font-size-sm;
+}
+

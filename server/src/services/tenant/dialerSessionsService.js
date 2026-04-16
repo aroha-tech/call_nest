@@ -176,26 +176,264 @@ function parseMultiDialerStatus(raw) {
 
 const DIAL_SESSION_STATUS = new Set(['ready', 'active', 'paused', 'completed', 'cancelled']);
 
+const DS_COLUMN_FILTER_OPS = new Set([
+  'empty',
+  'not_empty',
+  'contains',
+  'not_contains',
+  'starts_with',
+  'ends_with',
+]);
+
+const DS_FILTER_FIELD_ALIASES = {
+  session_no: 'user_session_no',
+  leads: 'items_count',
+  created: 'created_at',
+  started: 'started_at',
+  ended: 'ended_at',
+  created_by: 'creator_name',
+  called: 'called_count',
+  connected: 'connected_count',
+  failed: 'failed_count',
+  queued_left: 'queued_count',
+  script: 'script_name',
+  session_time: 'duration_sec',
+};
+
+function mapDialSessionsColumnFilterField(raw) {
+  const f = String(raw || '').trim();
+  return DS_FILTER_FIELD_ALIASES[f] || f;
+}
+
+const DS_FILTER_FIELDS = new Set([
+  'user_session_no',
+  'id',
+  'status',
+  'provider',
+  'created_at',
+  'started_at',
+  'ended_at',
+  'creator_name',
+  'items_count',
+  'called_count',
+  'connected_count',
+  'failed_count',
+  'queued_count',
+  'script_name',
+  'duration_sec',
+]);
+
+/** Scalar subquery — same as list ORDER BY items_count */
+const DS_ITEMS_COUNT_SUBQUERY = `(SELECT COUNT(*) FROM dialer_session_items dsi WHERE dsi.tenant_id = ds.tenant_id AND dsi.session_id = ds.id)`;
+
+const DS_SUB_QUEUED = `(SELECT COUNT(*) FROM dialer_session_items dsi WHERE dsi.tenant_id = ds.tenant_id AND dsi.session_id = ds.id AND dsi.state = 'queued')`;
+
+const DS_SUB_CALLED = `(SELECT COUNT(*) FROM dialer_session_items dsi WHERE dsi.tenant_id = ds.tenant_id AND dsi.session_id = ds.id AND dsi.state = 'called')`;
+
+const DS_SUB_FAILED = `(SELECT COUNT(*) FROM dialer_session_items dsi WHERE dsi.tenant_id = ds.tenant_id AND dsi.session_id = ds.id AND dsi.state = 'failed')`;
+
+const DS_SUB_CONNECTED = `(SELECT COUNT(*) FROM dialer_session_items dsi INNER JOIN contact_call_attempts cca ON cca.id = dsi.last_attempt_id AND cca.tenant_id = dsi.tenant_id WHERE dsi.tenant_id = ds.tenant_id AND dsi.session_id = ds.id AND dsi.state = 'called' AND cca.is_connected = 1)`;
+
+const DS_SCRIPT_NAME_SUB = `(SELECT cs.script_name FROM call_scripts cs WHERE cs.tenant_id = ds.tenant_id AND cs.id = ds.call_script_id AND cs.is_deleted = 0 LIMIT 1)`;
+
+/** Wall-clock length minus paused_seconds (ended_at or now). */
+const DS_SESSION_DURATION_SEC = `(CASE WHEN ds.started_at IS NULL THEN 0 ELSE GREATEST(0, TIMESTAMPDIFF(SECOND, ds.started_at, COALESCE(ds.ended_at, UTC_TIMESTAMP())) - COALESCE(ds.paused_seconds, 0)) END)`;
+
+const DIAL_SESSION_IDS_CAP = 5000;
+
+const DS_EXPORT_MAX_ROWS = 50000;
+
+const DS_EXPORT_COL_SQL = {
+  session_no: 'ds.user_session_no',
+  id: 'ds.id',
+  status: 'ds.status',
+  provider: 'ds.provider',
+  leads: DS_ITEMS_COUNT_SUBQUERY,
+  called: DS_SUB_CALLED,
+  connected: DS_SUB_CONNECTED,
+  failed: DS_SUB_FAILED,
+  queued_left: DS_SUB_QUEUED,
+  script: DS_SCRIPT_NAME_SUB,
+  session_time: DS_SESSION_DURATION_SEC,
+  created: 'ds.created_at',
+  started: 'ds.started_at',
+  ended: 'ds.ended_at',
+  created_by: 'u.name',
+};
+
+const DS_EXPORT_HEADERS = {
+  session_no: 'Session #',
+  id: 'ID',
+  status: 'Status',
+  provider: 'Provider',
+  leads: 'Total contacts',
+  called: 'Called',
+  connected: 'Connected',
+  failed: 'Failed',
+  queued_left: 'Queued left',
+  script: 'Script',
+  session_time: 'Session time (sec)',
+  created: 'Created',
+  started: 'Started',
+  ended: 'Ended',
+  created_by: 'Created by',
+};
+
+function normalizeDialSessionsColumnFilters(raw) {
+  if (raw == null || raw === '') return [];
+  let arr;
+  try {
+    arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(arr)) return [];
+  const byField = new Map();
+  for (const item of arr) {
+    if (!item || typeof item !== 'object') continue;
+    const field = mapDialSessionsColumnFilterField(String(item.field || '').trim());
+    const op = String(item.op || '').trim();
+    if (!DS_FILTER_FIELDS.has(field)) continue;
+    if (!DS_COLUMN_FILTER_OPS.has(op)) continue;
+    const value = item.value == null ? '' : String(item.value).trim();
+    if (value.length > 200) continue;
+    if (['contains', 'not_contains', 'starts_with', 'ends_with'].includes(op) && value === '') continue;
+    byField.set(field, { field, op, value });
+  }
+  return [...byField.values()].slice(0, 12);
+}
+
+function pushDialSessionsColumnFilter(where, params, rule) {
+  const { field, op, value } = rule;
+  const like = (v) => `%${v}%`;
+  const starts = (v) => `${v}%`;
+  const ends = (v) => `%${v}`;
+
+  const expr = () => {
+    switch (field) {
+      case 'user_session_no':
+        return 'CAST(ds.user_session_no AS CHAR)';
+      case 'id':
+        return 'CAST(ds.id AS CHAR)';
+      case 'status':
+        return 'COALESCE(ds.status, \'\')';
+      case 'provider':
+        return 'COALESCE(ds.provider, \'\')';
+      case 'created_at':
+        return 'CAST(ds.created_at AS CHAR)';
+      case 'started_at':
+        return 'CAST(ds.started_at AS CHAR)';
+      case 'ended_at':
+        return 'CAST(ds.ended_at AS CHAR)';
+      case 'creator_name':
+        return 'COALESCE(u.name, \'\')';
+      case 'items_count':
+        return `CAST(${DS_ITEMS_COUNT_SUBQUERY} AS CHAR)`;
+      case 'called_count':
+        return `CAST(${DS_SUB_CALLED} AS CHAR)`;
+      case 'connected_count':
+        return `CAST(${DS_SUB_CONNECTED} AS CHAR)`;
+      case 'failed_count':
+        return `CAST(${DS_SUB_FAILED} AS CHAR)`;
+      case 'queued_count':
+        return `CAST(${DS_SUB_QUEUED} AS CHAR)`;
+      case 'script_name':
+        return `COALESCE(${DS_SCRIPT_NAME_SUB}, '')`;
+      case 'duration_sec':
+        return `CAST(${DS_SESSION_DURATION_SEC} AS CHAR)`;
+      default:
+        return null;
+    }
+  };
+
+  const e = expr();
+  if (!e) return;
+
+  if (op === 'empty') {
+    where.push(`((${e}) IS NULL OR TRIM(${e}) = '')`);
+    return;
+  }
+  if (op === 'not_empty') {
+    where.push(`((${e}) IS NOT NULL AND TRIM(${e}) <> '')`);
+    return;
+  }
+  if (op === 'contains') {
+    where.push(`(${e} LIKE ?)`);
+    params.push(like(value));
+    return;
+  }
+  if (op === 'not_contains') {
+    where.push(`(NOT (COALESCE(${e}, '') LIKE ?))`);
+    params.push(like(value));
+    return;
+  }
+  if (op === 'starts_with') {
+    where.push(`(${e} LIKE ?)`);
+    params.push(starts(value));
+    return;
+  }
+  if (op === 'ends_with') {
+    where.push(`(${e} LIKE ?)`);
+    params.push(ends(value));
+  }
+}
+
+const DS_LIST_USER_JOIN = `LEFT JOIN users u ON u.id = ds.created_by_user_id AND u.tenant_id = ds.tenant_id`;
+
+function optNonNegInt(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const n = parseInt(String(v).trim(), 10);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+function pushScalarRange(where, params, exprSql, minRaw, maxRaw) {
+  let min = optNonNegInt(minRaw);
+  let max = optNonNegInt(maxRaw);
+  if (min != null && max != null && min > max) {
+    const t = min;
+    min = max;
+    max = t;
+  }
+  if (min != null) {
+    where.push(`(${exprSql}) >= ?`);
+    params.push(min);
+  }
+  if (max != null) {
+    where.push(`(${exprSql}) <= ?`);
+    params.push(max);
+  }
+}
+
 /**
- * Paginated dial sessions for the tenant. Admin: all; manager: own + direct reports; agent: own only.
+ * Shared WHERE for list, ids, and CSV export (must JOIN users when counting — filters may reference u.name).
  */
-export async function listDialSessions(
+function buildDialSessionsWhere(
   tenantId,
   user,
   {
-    page = 1,
-    limit = 20,
     q,
     status,
     provider,
     created_after,
     created_before,
+    column_filters,
+    created_by_user_id,
+    script_q,
+    items_min,
+    items_max,
+    called_min,
+    called_max,
+    connected_min,
+    connected_max,
+    failed_min,
+    failed_max,
+    queued_min,
+    queued_max,
+    duration_min,
+    duration_max,
   } = {}
 ) {
-  const pageNum = Math.max(1, parseInt(page, 10) || 1);
-  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
-  const offset = (pageNum - 1) * limitNum;
-
   const where = ['ds.tenant_id = ?'];
   const params = [tenantId];
 
@@ -247,13 +485,256 @@ export async function listDialSessions(
     params.push(created_before);
   }
 
-  const whereSql = where.join(' AND ');
+  const creatorFilter = optNonNegInt(created_by_user_id);
+  if (creatorFilter != null) {
+    where.push('ds.created_by_user_id = ?');
+    params.push(creatorFilter);
+  }
 
+  const scriptTrim =
+    script_q != null && String(script_q).trim() ? String(script_q).trim().slice(0, 200) : '';
+  if (scriptTrim) {
+    where.push(`(COALESCE(${DS_SCRIPT_NAME_SUB}, '') LIKE ?)`);
+    params.push(`%${scriptTrim}%`);
+  }
+
+  pushScalarRange(where, params, DS_ITEMS_COUNT_SUBQUERY, items_min, items_max);
+  pushScalarRange(where, params, DS_SUB_CALLED, called_min, called_max);
+  pushScalarRange(where, params, DS_SUB_CONNECTED, connected_min, connected_max);
+  pushScalarRange(where, params, DS_SUB_FAILED, failed_min, failed_max);
+  pushScalarRange(where, params, DS_SUB_QUEUED, queued_min, queued_max);
+  pushScalarRange(where, params, DS_SESSION_DURATION_SEC, duration_min, duration_max);
+
+  const columnRules = normalizeDialSessionsColumnFilters(column_filters);
+  for (const rule of columnRules) {
+    pushDialSessionsColumnFilter(where, params, rule);
+  }
+
+  return { whereSql: where.join(' AND '), params };
+}
+
+/** All matching dial session ids for current list filters, capped for bulk selection. */
+export async function listDialSessionIds(tenantId, user, filters = {}) {
+  const { whereSql, params } = buildDialSessionsWhere(tenantId, user, filters);
   const [countRow] = await query(
-    `SELECT COUNT(*) AS total FROM dialer_sessions ds WHERE ${whereSql}`,
+    `SELECT COUNT(*) AS total FROM dialer_sessions ds ${DS_LIST_USER_JOIN} WHERE ${whereSql}`,
     params
   );
   const total = Number(countRow?.total) || 0;
+  const cap = DIAL_SESSION_IDS_CAP;
+  const rows = await query(
+    `SELECT ds.id FROM dialer_sessions ds
+     ${DS_LIST_USER_JOIN}
+     WHERE ${whereSql}
+     ORDER BY ds.id ASC
+     LIMIT ${cap + 1}`,
+    params
+  );
+  const truncated = rows.length > cap;
+  const ids = (truncated ? rows.slice(0, cap) : rows).map((r) => r.id);
+  return { ids, total, truncated, cap };
+}
+
+function csvEscapeDialSessionExport(v) {
+  const s = v === null || v === undefined ? '' : String(v);
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function formatDialSessionExportCell(key, raw) {
+  if (raw == null) return '';
+  if (raw instanceof Date) {
+    if (Number.isNaN(raw.getTime())) return '';
+    return raw.toISOString();
+  }
+  return String(raw);
+}
+
+/**
+ * CSV export (same filters as list). Column keys match `dialSessionsTableConfig` ids.
+ */
+export async function exportDialSessionsCsv(
+  tenantId,
+  user,
+  {
+    q,
+    status,
+    provider,
+    created_after,
+    created_before,
+    column_filters,
+    created_by_user_id,
+    script_q,
+    items_min,
+    items_max,
+    called_min,
+    called_max,
+    connected_min,
+    connected_max,
+    failed_min,
+    failed_max,
+    queued_min,
+    queued_max,
+    duration_min,
+    duration_max,
+    export_scope = 'filtered',
+    selected_ids = [],
+    columns = [],
+  } = {}
+) {
+  const keys = (Array.isArray(columns) ? columns : [])
+    .map((k) => String(k).trim())
+    .filter((k) => Object.prototype.hasOwnProperty.call(DS_EXPORT_COL_SQL, k));
+  if (keys.length === 0) {
+    const err = new Error('Choose at least one column to export');
+    err.status = 400;
+    throw err;
+  }
+
+  const filters = {
+    q,
+    status,
+    provider,
+    created_after,
+    created_before,
+    column_filters,
+    created_by_user_id,
+    script_q,
+    items_min,
+    items_max,
+    called_min,
+    called_max,
+    connected_min,
+    connected_max,
+    failed_min,
+    failed_max,
+    queued_min,
+    queued_max,
+    duration_min,
+    duration_max,
+  };
+  const { whereSql, params: baseParams } = buildDialSessionsWhere(tenantId, user, filters);
+  const params = [...baseParams];
+  let whereFinal = whereSql;
+
+  const scope = String(export_scope || 'filtered').toLowerCase() === 'selected' ? 'selected' : 'filtered';
+  if (scope === 'selected') {
+    const ids = [
+      ...new Set(
+        (Array.isArray(selected_ids) ? selected_ids : [])
+          .map((x) => Number(x))
+          .filter((n) => Number.isFinite(n) && n > 0)
+      ),
+    ].slice(0, DIAL_SESSION_IDS_CAP);
+    if (ids.length === 0) {
+      return '\uFEFF';
+    }
+    whereFinal += ` AND ds.id IN (${ids.map(() => '?').join(',')})`;
+    params.push(...ids);
+  }
+
+  const selectList = keys.map((k) => `${DS_EXPORT_COL_SQL[k]} AS \`${k}\``).join(', ');
+  const sql = `SELECT ${selectList} FROM dialer_sessions ds ${DS_LIST_USER_JOIN} WHERE ${whereFinal} ORDER BY ds.created_at DESC, ds.id DESC LIMIT ${DS_EXPORT_MAX_ROWS + 1}`;
+
+  const rows = await query(sql, params);
+  const dataRows = rows.length > DS_EXPORT_MAX_ROWS ? rows.slice(0, DS_EXPORT_MAX_ROWS) : rows;
+
+  const headerLine = keys.map((k) => csvEscapeDialSessionExport(DS_EXPORT_HEADERS[k] || k)).join(',');
+  const lines = [`\uFEFF${headerLine}`];
+  for (const row of dataRows) {
+    const cells = keys.map((k) => csvEscapeDialSessionExport(formatDialSessionExportCell(k, row[k])));
+    lines.push(cells.join(','));
+  }
+  return lines.join('\r\n');
+}
+
+/**
+ * Paginated dial sessions for the tenant. Admin: all; manager: own + direct reports; agent: own only.
+ */
+export async function listDialSessions(
+  tenantId,
+  user,
+  {
+    page = 1,
+    limit = 20,
+    q,
+    status,
+    provider,
+    created_after,
+    created_before,
+    sort_by,
+    sort_dir,
+    column_filters,
+    created_by_user_id,
+    script_q,
+    items_min,
+    items_max,
+    called_min,
+    called_max,
+    connected_min,
+    connected_max,
+    failed_min,
+    failed_max,
+    queued_min,
+    queued_max,
+    duration_min,
+    duration_max,
+  } = {}
+) {
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+  const offset = (pageNum - 1) * limitNum;
+
+  const { whereSql, params } = buildDialSessionsWhere(tenantId, user, {
+    q,
+    status,
+    provider,
+    created_after,
+    created_before,
+    column_filters,
+    created_by_user_id,
+    script_q,
+    items_min,
+    items_max,
+    called_min,
+    called_max,
+    connected_min,
+    connected_max,
+    failed_min,
+    failed_max,
+    queued_min,
+    queued_max,
+    duration_min,
+    duration_max,
+  });
+
+  const [countRow] = await query(
+    `SELECT COUNT(*) AS total FROM dialer_sessions ds ${DS_LIST_USER_JOIN} WHERE ${whereSql}`,
+    params
+  );
+  const total = Number(countRow?.total) || 0;
+
+  const sortKey = String(sort_by || '').trim();
+  const sortDirOrd = String(sort_dir || 'desc').trim().toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+  const orderMap = {
+    created_at: 'ds.created_at',
+    id: 'ds.id',
+    user_session_no: 'ds.user_session_no',
+    provider: 'ds.provider',
+    status: 'ds.status',
+    started_at: 'ds.started_at',
+    ended_at: 'ds.ended_at',
+    creator_name: 'u.name',
+    items_count: DS_ITEMS_COUNT_SUBQUERY,
+    called_count: DS_SUB_CALLED,
+    connected_count: DS_SUB_CONNECTED,
+    failed_count: DS_SUB_FAILED,
+    queued_count: DS_SUB_QUEUED,
+    script_name: DS_SCRIPT_NAME_SUB,
+    duration_sec: DS_SESSION_DURATION_SEC,
+  };
+  const orderCol = orderMap[sortKey] || 'ds.created_at';
+  const orderSql = `ORDER BY ${orderCol} ${sortDirOrd}, ds.id DESC`;
 
   const rows = await query(
     `SELECT
@@ -266,11 +747,17 @@ export async function listDialSessions(
         ds.created_at,
         ds.created_by_user_id,
         u.name AS creator_name,
-        (SELECT COUNT(*) FROM dialer_session_items dsi WHERE dsi.tenant_id = ds.tenant_id AND dsi.session_id = ds.id) AS items_count
+        ${DS_ITEMS_COUNT_SUBQUERY} AS items_count,
+        ${DS_SUB_CALLED} AS called_count,
+        ${DS_SUB_CONNECTED} AS connected_count,
+        ${DS_SUB_FAILED} AS failed_count,
+        ${DS_SUB_QUEUED} AS queued_count,
+        ${DS_SCRIPT_NAME_SUB} AS script_name,
+        ${DS_SESSION_DURATION_SEC} AS duration_sec
      FROM dialer_sessions ds
-     LEFT JOIN users u ON u.id = ds.created_by_user_id AND u.tenant_id = ds.tenant_id
+     ${DS_LIST_USER_JOIN}
      WHERE ${whereSql}
-     ORDER BY ds.created_at DESC, ds.id DESC
+     ${orderSql}
      LIMIT ${limitNum} OFFSET ${offset}`,
     params
   );
@@ -380,6 +867,7 @@ async function runCallNextAfterLock(tenantId, user, sid) {
       contact_id: next.contact_id,
       contact_phone_id: next.contact_phone_id != null ? next.contact_phone_id : null,
       provider: session.provider || 'dummy',
+      dialer_session_id: sid,
     });
     await query(
       `UPDATE dialer_session_items

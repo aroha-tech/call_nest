@@ -39,6 +39,7 @@ export async function exportCsv(req, res, next) {
 
     const q = pickMergedBodyQuery(req, 'q');
     const contact_id = pickMergedBodyQuery(req, 'contact_id');
+    const dialer_session_id = pickMergedBodyQuery(req, 'dialer_session_id');
     const disposition_id = pickMergedBodyQuery(req, 'disposition_id');
     const agent_user_id = pickMergedBodyQuery(req, 'agent_user_id');
     const direction = pickMergedBodyQuery(req, 'direction');
@@ -93,6 +94,7 @@ export async function exportCsv(req, res, next) {
     const csv = await callsService.exportCallAttemptsCsv(tenantId, req.user, {
       q: q != null && String(q).trim() ? String(q).trim() : undefined,
       contact_id: contact_id ? Number(contact_id) : undefined,
+      dialer_session_id: dialer_session_id ? Number(dialer_session_id) : undefined,
       disposition_id: disposition_id !== undefined && disposition_id !== null && disposition_id !== '' ? disposition_id : undefined,
       agent_user_id: agent_user_id !== undefined && agent_user_id !== null && agent_user_id !== '' ? agent_user_id : undefined,
       direction: direction ? String(direction).trim() : undefined,
@@ -133,6 +135,7 @@ export async function list(req, res, next) {
       limit = '20',
       q,
       contact_id,
+      dialer_session_id,
       disposition_id,
       agent_user_id,
       direction,
@@ -158,6 +161,7 @@ export async function list(req, res, next) {
       limit: parseInt(limit, 10),
       q: q != null && String(q).trim() ? String(q).trim() : undefined,
       contact_id: contact_id ? Number(contact_id) : undefined,
+      dialer_session_id: dialer_session_id ? Number(dialer_session_id) : undefined,
       disposition_id: disposition_id !== undefined && disposition_id !== '' ? disposition_id : undefined,
       agent_user_id: agent_user_id !== undefined && agent_user_id !== '' ? agent_user_id : undefined,
       direction: direction ? String(direction).trim() : undefined,
@@ -190,6 +194,7 @@ export async function listIds(req, res, next) {
     const {
       q,
       contact_id,
+      dialer_session_id,
       disposition_id,
       agent_user_id,
       direction,
@@ -212,6 +217,7 @@ export async function listIds(req, res, next) {
     const data = await callsService.listCallAttemptIds(tenantId, req.user, {
       q: q != null && String(q).trim() ? String(q).trim() : undefined,
       contact_id: contact_id ? Number(contact_id) : undefined,
+      dialer_session_id: dialer_session_id ? Number(dialer_session_id) : undefined,
       disposition_id: disposition_id !== undefined && disposition_id !== '' ? disposition_id : undefined,
       agent_user_id: agent_user_id !== undefined && agent_user_id !== '' ? agent_user_id : undefined,
       direction: direction ? String(direction).trim() : undefined,
@@ -242,6 +248,7 @@ export async function metrics(req, res, next) {
     const {
       q,
       contact_id,
+      dialer_session_id,
       disposition_id,
       agent_user_id,
       direction,
@@ -263,6 +270,7 @@ export async function metrics(req, res, next) {
     const data = await callsService.getCallAttemptMetrics(tenantId, req.user, {
       q: q != null && String(q).trim() ? String(q).trim() : undefined,
       contact_id: contact_id ? Number(contact_id) : undefined,
+      dialer_session_id: dialer_session_id ? Number(dialer_session_id) : undefined,
       disposition_id: disposition_id !== undefined && disposition_id !== '' ? disposition_id : undefined,
       agent_user_id: agent_user_id !== undefined && agent_user_id !== '' ? agent_user_id : undefined,
       direction: direction ? String(direction).trim() : undefined,

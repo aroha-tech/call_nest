@@ -5,6 +5,7 @@ import { Checkbox } from '../../components/ui/Checkbox';
 import { Alert } from '../../components/ui/Alert';
 import { contactsAPI } from '../../services/contactsAPI';
 import { callsAPI } from '../../services/callsAPI';
+import { dialerSessionsAPI } from '../../services/dialerSessionsAPI';
 import styles from './ExportCsvModal.module.scss';
 
 function buildInitialIncludedOrder(applicableColumns, visibleColumnIds) {
@@ -119,10 +120,14 @@ export function ExportCsvModal({
         body.selected_ids = [...selectedIds];
       }
 
-      const res =
-        exportEntity === 'calls'
-          ? await callsAPI.exportCsvPost(listQueryParams || {}, body)
-          : await contactsAPI.exportCsvPost(listQueryParams || {}, body);
+      let res;
+      if (exportEntity === 'calls') {
+        res = await callsAPI.exportCsvPost(listQueryParams || {}, body);
+      } else if (exportEntity === 'dialer_sessions') {
+        res = await dialerSessionsAPI.exportCsvPost(listQueryParams || {}, body);
+      } else {
+        res = await contactsAPI.exportCsvPost(listQueryParams || {}, body);
+      }
       const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -130,7 +135,9 @@ export function ExportCsvModal({
       a.download =
         exportEntity === 'calls'
           ? 'call_history_export.csv'
-          : `${type === 'lead' ? 'leads' : 'contacts'}_export.csv`;
+          : exportEntity === 'dialer_sessions'
+            ? 'dial_sessions_export.csv'
+            : `${type === 'lead' ? 'leads' : 'contacts'}_export.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -152,7 +159,13 @@ export function ExportCsvModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={exportEntity === 'calls' ? 'Export call history (CSV)' : `Export ${noun} (CSV)`}
+      title={
+        exportEntity === 'calls'
+          ? 'Export call history (CSV)'
+          : exportEntity === 'dialer_sessions'
+            ? 'Export dial sessions (CSV)'
+            : `Export ${noun} (CSV)`
+      }
       size="lg"
       closeOnOverlay
       closeOnEscape

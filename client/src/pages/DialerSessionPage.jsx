@@ -29,6 +29,7 @@ import {
   buildAttemptHistoryEntries,
   sanitizeAttemptNotesForDisplay,
 } from '../utils/callAttemptNotesDisplay';
+import { DialerSessionCallHistoryPanel } from './DialerSessionCallHistoryPanel';
 import styles from './DialerSessionPage.module.scss';
 
 /** Display-only: maps `contact_phones.label` ENUM (and primary) to a short title. */
@@ -950,7 +951,13 @@ export function DialerSessionPage() {
               <Button variant="secondary" onClick={() => navigate('/dialer')}>
                 Back to leads
               </Button>
-              <Button variant="secondary" onClick={() => navigate('/calls/history')}>
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  navigate(`/calls/history?dialer_session_id=${encodeURIComponent(String(id || ''))}`)
+                }
+                disabled={!id}
+              >
                 Call history
               </Button>
             </div>
@@ -1017,6 +1024,8 @@ export function DialerSessionPage() {
               </div>
             </div>
           ) : null}
+
+          <DialerSessionCallHistoryPanel dialerSessionId={id} />
 
           {view === 'preflight' && !sessionEnded ? (
             <div className={styles.preflightCard}>

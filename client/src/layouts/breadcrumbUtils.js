@@ -22,6 +22,8 @@ function humanizeSegment(seg) {
 }
 
 const TENANT_PATH_OVERRIDES = {
+  '/calls/history': 'Call history',
+  '/calls/dial-sessions': 'Dial sessions',
   '/settings': 'Settings',
   '/profile': 'Profile',
   '/leads/import': 'Import leads',

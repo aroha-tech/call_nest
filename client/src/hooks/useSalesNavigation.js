@@ -62,12 +62,12 @@ const TENANT_ADMIN_NAV_ITEMS = [
   { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
   { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
   { key: 'dialer', label: 'Dialer', path: '/dialer', permission: PERMISSIONS.DIAL_EXECUTE },
-  { key: 'call-history', label: 'Call history', path: '/calls/history', permission: PERMISSIONS.DIAL_EXECUTE },
   {
-    key: 'dial-sessions',
-    label: 'Dial sessions',
-    path: '/calls/dial-sessions',
+    key: 'call-history',
+    label: 'Call history',
+    path: '/calls/history',
     permissions: [PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR],
+    activePaths: ['/calls/history', '/calls/dial-sessions'],
   },
   { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
   { key: 'workflow-map', label: 'Workflow', path: '/workflow/map', permission: PERMISSIONS.DASHBOARD_VIEW },
@@ -201,12 +201,12 @@ const MANAGER_NAV_ITEMS = [
   },
   { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
   { key: 'dialer', label: 'Dialer', path: '/dialer', permission: PERMISSIONS.DIAL_EXECUTE },
-  { key: 'call-history', label: 'Call history', path: '/calls/history', permission: PERMISSIONS.DIAL_EXECUTE },
   {
-    key: 'dial-sessions',
-    label: 'Dial sessions',
-    path: '/calls/dial-sessions',
+    key: 'call-history',
+    label: 'Call history',
+    path: '/calls/history',
     permissions: [PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR],
+    activePaths: ['/calls/history', '/calls/dial-sessions'],
   },
   { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
   { key: 'users', label: 'My team', path: '/users', permissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM] },
@@ -316,12 +316,12 @@ const AGENT_NAV_ITEMS = [
   },
   { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
   { key: 'dialer', label: 'Dialer', path: '/dialer', permission: PERMISSIONS.DIAL_EXECUTE },
-  { key: 'call-history', label: 'Call history', path: '/calls/history', permission: PERMISSIONS.DIAL_EXECUTE },
   {
-    key: 'dial-sessions',
-    label: 'Dial sessions',
-    path: '/calls/dial-sessions',
+    key: 'call-history',
+    label: 'Call history',
+    path: '/calls/history',
     permissions: [PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR],
+    activePaths: ['/calls/history', '/calls/dial-sessions'],
   },
   { key: 'workflow-map', label: 'Workflow', path: '/workflow/map', permission: PERMISSIONS.DASHBOARD_VIEW },
   {
@@ -447,6 +447,12 @@ function pathMatches(pathname, navPath) {
   return false;
 }
 
+/** Optional `activePaths` on a nav item marks additional routes as belonging to that item (e.g. call hub tabs). */
+function itemPathMatches(pathname, item) {
+  const candidates = item.activePaths?.length ? item.activePaths : [item.path];
+  return candidates.some((p) => pathMatches(pathname, p));
+}
+
 /**
  * Find active key from nested navigation items.
  * For nested children, the longest matching path wins (e.g. /settings/contact-fields vs /settings).
@@ -454,13 +460,13 @@ function pathMatches(pathname, navPath) {
 function findActiveKey(items, pathname) {
   for (const item of items) {
     if (item.children) {
-      const matches = item.children.filter((child) => pathMatches(pathname, child.path));
+      const matches = item.children.filter((child) => itemPathMatches(pathname, child));
       if (matches.length > 0) {
         matches.sort((a, b) => b.path.length - a.path.length);
         const best = matches[0];
         return { parentKey: item.key, childKey: best.key };
       }
-    } else if (pathMatches(pathname, item.path)) {
+    } else if (itemPathMatches(pathname, item)) {
       return { parentKey: null, childKey: item.key };
     }
   }

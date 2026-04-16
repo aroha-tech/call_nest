@@ -19,6 +19,7 @@ export const callsAPI = {
     limit = 20,
     q,
     contact_id,
+    dialer_session_id,
     disposition_id,
     agent_user_id,
     direction,
@@ -39,6 +40,7 @@ export const callsAPI = {
         limit,
         q: q || undefined,
         contact_id: contact_id || undefined,
+        dialer_session_id: dialer_session_id || undefined,
         disposition_id: disposition_id || undefined,
         agent_user_id: agent_user_id || undefined,
         direction: direction || undefined,
@@ -58,6 +60,7 @@ export const callsAPI = {
   listIds: ({
     q,
     contact_id,
+    dialer_session_id,
     disposition_id,
     agent_user_id,
     direction,
@@ -73,6 +76,7 @@ export const callsAPI = {
       params: {
         q: q || undefined,
         contact_id: contact_id || undefined,
+        dialer_session_id: dialer_session_id || undefined,
         disposition_id: disposition_id || undefined,
         agent_user_id: agent_user_id || undefined,
         direction: direction || undefined,
@@ -90,6 +94,7 @@ export const callsAPI = {
   metrics: ({
     q,
     contact_id,
+    dialer_session_id,
     disposition_id,
     agent_user_id,
     direction,
@@ -105,6 +110,7 @@ export const callsAPI = {
       params: {
         q: q || undefined,
         contact_id: contact_id || undefined,
+        dialer_session_id: dialer_session_id || undefined,
         disposition_id: disposition_id || undefined,
         agent_user_id: agent_user_id || undefined,
         direction: direction || undefined,

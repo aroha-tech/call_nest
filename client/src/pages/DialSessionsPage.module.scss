@@ -18,3 +18,30 @@
   min-width: 200px;
   max-width: 360px;
 }
+
+.toolbarSearchAndBulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.toolbarControlBtn {
+  min-width: 7.25rem;
+  justify-content: center;
+}
+
+.toolbarResetIcon {
+  flex-shrink: 0;
+  display: block;
+}
+
+.toolbarSearchField {
+  width: 100%;
+  flex: 1;
+  min-width: 200px;
+  max-width: 420px;
+}
+

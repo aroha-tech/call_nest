@@ -97,6 +97,7 @@ export function ActivitiesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const contactFilter = (searchParams.get('contact_id') || '').trim();
+  const dialerSessionFilter = (searchParams.get('dialer_session_id') || '').trim();
   const qParam = (searchParams.get('q') || '').trim();
 
   const setContactFilter = useCallback(
@@ -108,6 +109,23 @@ export function ActivitiesPage() {
           const p = new URLSearchParams(prev);
           if (t) p.set('contact_id', t);
           else p.delete('contact_id');
+          return p;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const setDialerSessionFilter = useCallback(
+    (raw) => {
+      setPage(1);
+      const t = String(raw ?? '').trim();
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (t) p.set('dialer_session_id', t);
+          else p.delete('dialer_session_id');
           return p;
         },
         { replace: true }
@@ -216,6 +234,7 @@ export function ActivitiesPage() {
         limit,
         q: searchQuery?.trim() ? searchQuery.trim() : undefined,
         contact_id: contactFilter || undefined,
+        dialer_session_id: dialerSessionFilter || undefined,
         disposition_id: dispositionFilterMulti || undefined,
         direction: directionFilterMulti || undefined,
         status: statusFilterMulti || undefined,
@@ -250,6 +269,7 @@ export function ActivitiesPage() {
     canView,
     searchQuery,
     contactFilter,
+    dialerSessionFilter,
     dispositionFilterMulti,
     directionFilterMulti,
     statusFilterMulti,
@@ -270,6 +290,7 @@ export function ActivitiesPage() {
       const res = await callsAPI.metrics({
         q: searchQuery?.trim() ? searchQuery.trim() : undefined,
         contact_id: contactFilter || undefined,
+        dialer_session_id: dialerSessionFilter || undefined,
         disposition_id: dispositionFilterMulti || undefined,
         direction: directionFilterMulti || undefined,
         status: statusFilterMulti || undefined,
@@ -291,6 +312,7 @@ export function ActivitiesPage() {
   }, [
     canView,
     contactFilter,
+    dialerSessionFilter,
     searchQuery,
     dispositionFilterMulti,
     directionFilterMulti,
@@ -410,6 +432,7 @@ export function ActivitiesPage() {
     () => ({
       q: searchQuery?.trim() ? searchQuery.trim() : undefined,
       contact_id: contactFilter || undefined,
+      dialer_session_id: dialerSessionFilter || undefined,
       disposition_id: dispositionFilterMulti || undefined,
       direction: directionFilterMulti || undefined,
       status: statusFilterMulti || undefined,
@@ -425,6 +448,7 @@ export function ActivitiesPage() {
     [
       searchQuery,
       contactFilter,
+      dialerSessionFilter,
       dispositionFilterMulti,
       directionFilterMulti,
       statusFilterMulti,
@@ -505,6 +529,7 @@ export function ActivitiesPage() {
       const res = await callsAPI.listIds({
         q: searchQuery?.trim() ? searchQuery.trim() : undefined,
         contact_id: contactFilter || undefined,
+        dialer_session_id: dialerSessionFilter || undefined,
         disposition_id: dispositionFilterMulti || undefined,
         direction: directionFilterMulti || undefined,
         status: statusFilterMulti || undefined,
@@ -536,6 +561,7 @@ export function ActivitiesPage() {
     clearSelection,
     searchQuery,
     contactFilter,
+    dialerSessionFilter,
     dispositionFilterMulti,
     directionFilterMulti,
     statusFilterMulti,
@@ -598,6 +624,7 @@ export function ActivitiesPage() {
   const hasActiveFilters = Boolean(
     String(searchQuery || '').trim() ||
       String(contactFilter || '').trim() ||
+      String(dialerSessionFilter || '').trim() ||
       dispositionFilterMulti ||
       directionFilterMulti ||
       statusFilterMulti ||
@@ -616,9 +643,6 @@ export function ActivitiesPage() {
         description="Call attempts only — use a row to narrow the list to that party’s calls (no CRM lead/contact screen from here)."
         actions={
           <div className={styles.headerActions}>
-            <Button type="button" variant="secondary" size="sm" onClick={() => navigate('/calls/dial-sessions')}>
-              Dial sessions
-            </Button>
             <Select
               label="Provider"
               value={provider}
@@ -651,6 +675,21 @@ export function ActivitiesPage() {
           </Button>
         </div>
       ) : null}
+      {dialerSessionFilter ? (
+        <div className={styles.contactScopeBanner} role="status">
+          <span>
+            Showing <strong>call history</strong> for dial session id <strong>{dialerSessionFilter}</strong>.
+          </span>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => setDialerSessionFilter('')}
+          >
+            Show all calls
+          </Button>
+        </div>
+      ) : null}
       <CallHistoryCards data={metrics} loading={metricsLoading} />
 
       <div className={listStyles.tableCard}>
@@ -674,6 +713,7 @@ export function ActivitiesPage() {
                 variant="secondary"
                 onClick={() => {
                   setContactFilter('');
+                  setDialerSessionFilter('');
                   setSearchQuery('');
                   setDispositionFilterMulti('');
                   setDirectionFilterMulti('');
@@ -694,6 +734,7 @@ export function ActivitiesPage() {
                       const p = new URLSearchParams(prev);
                       p.delete('q');
                       p.delete('contact_id');
+                      p.delete('dialer_session_id');
                       return p;
                     },
                     { replace: true }

@@ -275,11 +275,21 @@ async function bumpContactCounters(tenantId, contactId, phoneId) {
 export async function startCallForContact(
   tenantId,
   user,
-  { contact_id, contact_phone_id = null, provider = 'dummy', notes = null } = {}
+  { contact_id, contact_phone_id = null, provider = 'dummy', notes = null, dialer_session_id = null } = {}
 ) {
   const cid = Number(contact_id);
   if (!cid) {
     const err = new Error('contact_id is required');
+    err.status = 400;
+    throw err;
+  }
+
+  const dialerSessionId =
+    dialer_session_id === null || dialer_session_id === undefined || dialer_session_id === ''
+      ? null
+      : Number(dialer_session_id);
+  if (dialerSessionId !== null && (!Number.isFinite(dialerSessionId) || dialerSessionId <= 0)) {
+    const err = new Error('Invalid dialer_session_id');
     err.status = 400;
     throw err;
   }
@@ -314,6 +324,7 @@ export async function startCallForContact(
        contact_phone_id,
        agent_user_id,
        manager_id,
+       dialer_session_id,
        provider,
        provider_call_id,
        direction,
@@ -324,13 +335,14 @@ export async function startCallForContact(
        ended_at,
        duration_sec,
        created_by
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'outbound', ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'outbound', ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
       cid,
       chosenPhoneId,
       user.role === 'agent' ? user.id : row.assigned_user_id ?? null,
       row.manager_id ?? null,
+      dialerSessionId,
       p.code,
       providerRes?.provider_call_id ?? null,
       providerRes?.status || 'completed',
@@ -389,6 +401,7 @@ export async function listCallAttempts(
     limit = 20,
     q,
     contact_id,
+    dialer_session_id,
     disposition_id,
     agent_user_id,
     direction,
@@ -411,6 +424,7 @@ export async function listCallAttempts(
   const { whereSql, params } = buildCallAttemptsWhere(tenantId, user, {
     q,
     contact_id,
+    dialer_session_id,
     disposition_id,
     agent_user_id,
     direction,
@@ -458,6 +472,7 @@ export async function listCallAttempts(
         cca.contact_phone_id,
         cca.agent_user_id,
         cca.manager_id,
+        cca.dialer_session_id,
         cca.provider,
         cca.provider_call_id,
         cca.direction,
@@ -473,10 +488,11 @@ export async function listCallAttempts(
         p.phone AS phone_e164,
         u.name AS agent_name,
         d.name AS disposition_name,
-        (SELECT ds.id FROM dialer_session_items dsi INNER JOIN dialer_sessions ds ON ds.id = dsi.session_id AND ds.tenant_id = dsi.tenant_id WHERE dsi.last_attempt_id = cca.id AND dsi.tenant_id = cca.tenant_id ORDER BY dsi.id DESC LIMIT 1) AS dialer_session_id,
-        (SELECT ds.user_session_no FROM dialer_session_items dsi INNER JOIN dialer_sessions ds ON ds.id = dsi.session_id AND ds.tenant_id = dsi.tenant_id WHERE dsi.last_attempt_id = cca.id AND dsi.tenant_id = cca.tenant_id ORDER BY dsi.id DESC LIMIT 1) AS dialer_user_session_no
+        ds.user_session_no AS dialer_user_session_no
      FROM contact_call_attempts cca
      ${CALL_ATTEMPTS_STANDARD_JOINS}
+     LEFT JOIN dialer_sessions ds
+       ON ds.id = cca.dialer_session_id AND ds.tenant_id = cca.tenant_id
      WHERE ${whereSql}
      ${orderSql}
      LIMIT ${limitNum} OFFSET ${offset}`,
@@ -498,6 +514,7 @@ function buildCallAttemptsWhere(tenantId, user, filters = {}) {
   const {
     q,
     contact_id,
+    dialer_session_id,
     disposition_id,
     agent_user_id,
     direction,
@@ -565,6 +582,11 @@ function buildCallAttemptsWhere(tenantId, user, filters = {}) {
   if (contact_id) {
     where.push('cca.contact_id = ?');
     params.push(Number(contact_id));
+  }
+
+  if (dialer_session_id) {
+    where.push('cca.dialer_session_id = ?');
+    params.push(Number(dialer_session_id));
   }
 
   if (disposition_id !== undefined && disposition_id !== null && disposition_id !== '') {
@@ -812,6 +834,7 @@ export async function exportCallAttemptsCsv(
   {
     q,
     contact_id,
+    dialer_session_id,
     disposition_id,
     agent_user_id,
     direction,
@@ -839,6 +862,7 @@ export async function exportCallAttemptsCsv(
   const filters = {
     q,
     contact_id,
+    dialer_session_id,
     disposition_id,
     agent_user_id,
     direction,

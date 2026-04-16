@@ -20,6 +20,24 @@
   }
 }
 
+/** Single-line metric strip with horizontal scroll (used on call history). */
+.scrollRow {
+  display: grid;
+  gap: $space-3;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(220px, 1fr);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: $space-2;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.scrollRow > * {
+  min-width: 220px;
+}
+
 /** Five metric cards on /contacts */
 .grid5 {
   display: grid;

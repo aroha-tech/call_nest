@@ -54,6 +54,8 @@ import { DealsPage } from '../pages/DealsPage';
 import { useEmailModuleEnabled } from '../hooks/useEmailModuleEnabled';
 import { ActivitiesPage } from '../pages/ActivitiesPage';
 import { DialSessionsPage } from '../pages/DialSessionsPage';
+import { CallsWorkspacePage } from '../pages/CallsWorkspacePage';
+import { usePermissions } from '../hooks/usePermission';
 import { DialerPage } from '../pages/DialerPage';
 import { DialerSessionPage } from '../pages/DialerSessionPage';
 import { DialerSessionSetupPage } from '../pages/DialerSessionSetupPage';
@@ -110,6 +112,15 @@ function PublicOnlyRoute({ children }) {
     return <Navigate to="/" replace />;
   }
   return children;
+}
+
+/** Default /calls landing: history if user can place calls, else dial sessions (e.g. monitor-only). */
+function CallsIndexRedirect() {
+  const { canAny } = usePermissions();
+  if (canAny(['dial.execute'])) {
+    return <Navigate to="/calls/history" replace />;
+  }
+  return <Navigate to="/calls/dial-sessions" replace />;
 }
 
 /** Old URL `/admin/masters/industries/:id/fields` → hub with `?industry=` pre-selected. */
@@ -544,25 +555,33 @@ function TenantRoutes() {
         }
       />
       <Route
-        path="/calls/history"
-        element={
-          <ProtectedRoute permission={PERMISSIONS.DIAL_EXECUTE}>
-            <AppShellLayout>
-              <ActivitiesPage />
-            </AppShellLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/calls/dial-sessions"
+        path="/calls"
         element={
           <ProtectedRoute permissions={[PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR]}>
             <AppShellLayout>
-              <DialSessionsPage />
+              <CallsWorkspacePage />
             </AppShellLayout>
           </ProtectedRoute>
         }
-      />
+      >
+        <Route index element={<CallsIndexRedirect />} />
+        <Route
+          path="history"
+          element={
+            <ProtectedRoute permission={PERMISSIONS.DIAL_EXECUTE}>
+              <ActivitiesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="dial-sessions"
+          element={
+            <ProtectedRoute permissions={[PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR]}>
+              <DialSessionsPage />
+            </ProtectedRoute>
+          }
+        />
+      </Route>
       <Route
         path="/reports"
         element={
