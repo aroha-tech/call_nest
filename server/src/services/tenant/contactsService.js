@@ -35,6 +35,7 @@ import {
 } from '../../utils/leadImportCsvHelpers.js';
 import * as contactTagsService from './contactTagsService.js';
 import * as contactAssignmentHistoryService from './contactAssignmentHistoryService.js';
+import * as contactActivityEventsService from './contactActivityEventsService.js';
 import * as tenantIndustryFieldsService from './tenantIndustryFieldsService.js';
 
 function assertUniquePhoneLabels(phones) {
@@ -1916,7 +1917,7 @@ function assertCanConvertContactType(user, existing, nextType) {
 }
 
 export async function updateContact(id, tenantId, user, payload, options = {}) {
-  const { skipFetch = false, contactSnapshot = null } = options;
+  const { skipFetch = false, contactSnapshot = null, skipActivityLog = false } = options;
   let existing;
   if (
     contactSnapshot &&
@@ -2116,7 +2117,9 @@ export async function updateContact(id, tenantId, user, payload, options = {}) {
       Number(nextAssigned || 0) !== Number(existing.assigned_user_id || 0)) ||
     (payload.campaign_id !== undefined && Number(nextCampaign || 0) !== Number(existing.campaign_id || 0));
 
+  let recordChangeCalled = false;
   if (changed) {
+    recordChangeCalled = true;
     await contactAssignmentHistoryService.recordChange(tenantId, {
       contact_id: Number(id),
       changed_by_user_id: user?.id ?? null,
@@ -2197,6 +2200,78 @@ export async function updateContact(id, tenantId, user, payload, options = {}) {
 
   if (tag_ids !== undefined) {
     await contactTagsService.syncContactTagAssignments(tenantId, user, id, tag_ids);
+  }
+
+  if (!skipActivityLog) {
+    const coreKeys = [];
+    const idishChanged = (a, b) => Number(a || 0) !== Number(b || 0);
+    const strChanged = (a, b) => String(a ?? '') !== String(b ?? '');
+    const trackCore = (key, before, after, mode = 'str') => {
+      if (payload[key] === undefined) return;
+      if (recordChangeCalled && ['manager_id', 'assigned_user_id', 'campaign_id'].includes(key)) return;
+      if (mode === 'id') {
+        if (idishChanged(before, after)) coreKeys.push(key);
+      } else if (strChanged(before, after)) {
+        coreKeys.push(key);
+      }
+    };
+    trackCore('type', existing.type, type, 'str');
+    trackCore('first_name', existing.first_name, first_name);
+    trackCore('last_name', existing.last_name, last_name);
+    trackCore('display_name', existing.display_name, display_name);
+    trackCore('email', existing.email, email);
+    trackCore('source', existing.source, source);
+    trackCore('city', existing.city, city);
+    trackCore('state', existing.state, state);
+    trackCore('country', existing.country, country);
+    trackCore('address', existing.address, address);
+    trackCore('address_line_2', existing.address_line_2, address_line_2);
+    trackCore('pin_code', existing.pin_code, pin_code);
+    trackCore('company', existing.company, company);
+    trackCore('job_title', existing.job_title, job_title);
+    trackCore('website', existing.website, website);
+    trackCore('industry', existing.industry, industry);
+    trackCore('date_of_birth', existing.date_of_birth, date_of_birth);
+    trackCore('tax_id', existing.tax_id, tax_id);
+    trackCore('notes', existing.notes, notes);
+    if (status_id !== undefined) {
+      trackCore('status_id', existing.status_id, status_id, 'str');
+    }
+    if (industry_profile !== undefined) {
+      const prev =
+        existing.industry_profile != null ? JSON.stringify(existing.industry_profile) : null;
+      const next =
+        industry_profile != null ? JSON.stringify(industry_profile) : null;
+      if (String(prev || '') !== String(next || '')) coreKeys.push('industry_profile');
+    }
+    if (!recordChangeCalled) {
+      if (manager_id !== undefined) trackCore('manager_id', existing.manager_id, manager_id, 'id');
+      if (assigned_user_id !== undefined) {
+        trackCore('assigned_user_id', existing.assigned_user_id, assigned_user_id, 'id');
+      }
+      if (campaign_id !== undefined) trackCore('campaign_id', existing.campaign_id, campaign_id, 'id');
+    }
+
+    const touches = [];
+    if (coreKeys.length) touches.push(`fields: ${coreKeys.join(', ')}`);
+    if (Array.isArray(phones)) touches.push('phones');
+    if (
+      Array.isArray(custom_fields) &&
+      custom_fields.filter((f) => f?.field_id).length > 0
+    ) {
+      touches.push('custom_fields');
+    }
+    if (tag_ids !== undefined) touches.push('tags');
+
+    if (touches.length > 0) {
+      await contactActivityEventsService.insertContactActivityEvent(tenantId, {
+        contactId: Number(id),
+        eventType: 'profile_updated',
+        actorUserId: user?.id ?? null,
+        summary: `Record updated (${touches.join('; ')})`,
+        payloadJson: { changed_core_keys: coreKeys, touches },
+      });
+    }
   }
 
   if (skipFetch) return existing ? { id: Number(id) } : null;
@@ -4110,7 +4185,11 @@ export async function importContactsCsv(
           skipped++;
           continue;
         }
-        await updateContact(existingId, tenantId, user, payload, { skipFetch: true, contactSnapshot: snapshot });
+        await updateContact(existingId, tenantId, user, payload, {
+          skipFetch: true,
+          contactSnapshot: snapshot,
+          skipActivityLog: true,
+        });
         if (primaryPhone) sessionPhoneMap.set(primaryPhone, { id: existingId, type });
         if (validatedTagIds.length > 0) {
           pendingTagMergeIds.push(existingId);

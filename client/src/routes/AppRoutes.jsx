@@ -53,6 +53,7 @@ import { CampaignOpenPage } from '../features/campaigns/CampaignOpenPage';
 import { DealsPage } from '../pages/DealsPage';
 import { useEmailModuleEnabled } from '../hooks/useEmailModuleEnabled';
 import { ActivitiesPage } from '../pages/ActivitiesPage';
+import { ContactLeadActivityPage } from '../pages/ContactLeadActivityPage';
 import { DialSessionsPage } from '../pages/DialSessionsPage';
 import { CallsWorkspacePage } from '../pages/CallsWorkspacePage';
 import { usePermissions } from '../hooks/usePermission';
@@ -435,6 +436,16 @@ function TenantRoutes() {
         }
       />
       <Route
+        path="/leads/:id/activity"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.LEADS_READ}>
+            <AppShellLayout>
+              <ContactLeadActivityPage recordType="lead" />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/leads/:id"
         element={
           <ProtectedRoute permission={PERMISSIONS.LEADS_READ}>
@@ -505,6 +516,16 @@ function TenantRoutes() {
         }
       />
       <Route
+        path="/contacts/:id/activity"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.CONTACTS_READ}>
+            <AppShellLayout>
+              <ContactLeadActivityPage recordType="contact" />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/contacts/:id"
         element={
           <ProtectedRoute permission={PERMISSIONS.CONTACTS_READ}>
@@ -568,7 +589,7 @@ function TenantRoutes() {
         <Route
           path="history"
           element={
-            <ProtectedRoute permission={PERMISSIONS.DIAL_EXECUTE}>
+            <ProtectedRoute permissions={[PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR]}>
               <ActivitiesPage />
             </ProtectedRoute>
           }

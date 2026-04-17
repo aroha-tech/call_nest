@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -105,11 +106,21 @@ function buildPreviewText(bodyText, paramValues) {
 
 const PAGE_SIZE = 20;
 
+function parsePositiveId(raw) {
+  if (raw == null || raw === '') return undefined;
+  const n = Number(String(raw).trim());
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return String(Math.trunc(n));
+}
+
 export function WhatsAppMessagesPage() {
   const { can } = usePermissions();
   const canSend = can(PERMISSIONS.WHATSAPP_SEND) || can(PERMISSIONS.SETTINGS_MANAGE);
   const user = useAppSelector(selectUser);
   const showSentByColumn = user?.role === 'manager' || user?.role === 'admin';
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const contactIdFilter = parsePositiveId(searchParams.get('contact_id'));
 
   const { formatDateTime } = useDateTimeDisplay();
   const [appliedStatus, setAppliedStatus] = useState('all');
@@ -124,6 +135,7 @@ export function WhatsAppMessagesPage() {
   const fetchMessages = useCallback(
     () =>
       whatsappMessagesAPI.getAll({
+        contact_id: contactIdFilter,
         status: appliedStatus === 'all' ? undefined : appliedStatus,
         whatsapp_account_id: appliedAccount === '__all__' ? undefined : appliedAccount,
         template_id: appliedTemplate === 'all' ? undefined : appliedTemplate,
@@ -131,15 +143,23 @@ export function WhatsAppMessagesPage() {
         limit,
         offset: (page - 1) * limit,
       }),
-    [appliedStatus, appliedAccount, appliedTemplate, searchQuery, page, limit]
+    [appliedStatus, appliedAccount, appliedTemplate, searchQuery, page, limit, contactIdFilter]
   );
-  const { data: messagesResponse, loading, error, refetch } = useAsyncData(fetchMessages, [appliedStatus, appliedAccount, appliedTemplate, searchQuery, page, limit], {
+  const { data: messagesResponse, loading, error, refetch } = useAsyncData(fetchMessages, [appliedStatus, appliedAccount, appliedTemplate, searchQuery, page, limit, contactIdFilter], {
     transform: (res) => res?.data ?? { data: [], total: 0 },
   });
   const messages = messagesResponse?.data ?? [];
   const total = messagesResponse?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const { hasCompletedInitialFetch } = useTableLoadingState(loading);
+
+  const clearContactQuery = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('contact_id');
+    next.delete('open_whatsapp');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const handleSearch = (value) => {
     setSearchQuery(value || '');
     setPage(1);
@@ -187,6 +207,42 @@ export function WhatsAppMessagesPage() {
   const [loadingTemplateDetail, setLoadingTemplateDetail] = useState(false);
   const [sendError, setSendError] = useState(null);
   const [selectedMessage, setSelectedMessage] = useState(null);
+
+  useEffect(() => {
+    const openWaId = parsePositiveId(searchParams.get('open_whatsapp'));
+    if (!openWaId || loading) return;
+
+    const fromList = messages.find((m) => String(m.id) === String(openWaId));
+    if (fromList) {
+      setSelectedMessage(fromList);
+      const next = new URLSearchParams(searchParams);
+      next.delete('open_whatsapp');
+      setSearchParams(next, { replace: true });
+      return;
+    }
+
+    if (!hasCompletedInitialFetch) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await whatsappMessagesAPI.getById(openWaId);
+        const data = res?.data?.data;
+        if (!cancelled && data) setSelectedMessage(data);
+      } catch {
+        /* message missing or no access */
+      } finally {
+        if (!cancelled) {
+          const next = new URLSearchParams(searchParams);
+          next.delete('open_whatsapp');
+          setSearchParams(next, { replace: true });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, messages, searchParams, setSearchParams, hasCompletedInitialFetch]);
 
   const sendTemplateMutation = useMutation(whatsappSendAPI.sendTemplate);
   const sendTextMutation = useMutation(whatsappSendAPI.sendText);
@@ -353,6 +409,15 @@ export function WhatsAppMessagesPage() {
       />
 
       {error && <Alert variant="error">{error}</Alert>}
+
+      {contactIdFilter ? (
+        <Alert variant="info">
+          Showing WhatsApp messages for contact #{contactIdFilter}.{' '}
+          <Button type="button" size="sm" variant="secondary" onClick={clearContactQuery}>
+            Show all messages
+          </Button>
+        </Alert>
+      ) : null}
 
       <FilterBar
         onApply={() => {

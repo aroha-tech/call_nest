@@ -1,4 +1,5 @@
 import * as contactsService from '../../services/tenant/contactsService.js';
+import * as contactActivityService from '../../services/tenant/contactActivityService.js';
 import * as contactCustomFieldsService from '../../services/tenant/contactCustomFieldsService.js';
 import * as contactImportBatchService from '../../services/tenant/contactImportBatchService.js';
 
@@ -302,6 +303,38 @@ export async function getById(req, res, next) {
     }
 
     res.json({ data: contact });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getActivity(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant context required' });
+    }
+    const mode = String(req.query.mode || 'full').toLowerCase();
+    if (mode === 'summary') {
+      const data = await contactActivityService.getContactActivitySummary(tenantId, req.user, req.params.id);
+      res.json({ data });
+      return;
+    }
+    if (mode === 'timeline') {
+      const limit = req.query.timeline_limit != null ? parseInt(req.query.timeline_limit, 10) : 10;
+      const cursor =
+        req.query.timeline_cursor != null && String(req.query.timeline_cursor).trim() !== ''
+          ? String(req.query.timeline_cursor).trim()
+          : null;
+      const data = await contactActivityService.getContactActivityTimelinePage(tenantId, req.user, req.params.id, {
+        limit: Number.isFinite(limit) ? limit : 10,
+        cursor,
+      });
+      res.json({ data });
+      return;
+    }
+    const data = await contactActivityService.getContactActivity(tenantId, req.user, req.params.id);
+    res.json({ data });
   } catch (err) {
     next(err);
   }

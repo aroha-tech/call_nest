@@ -438,13 +438,13 @@ export function ActivitiesPage() {
       status: statusFilterMulti || undefined,
       is_connected: connectedFilterMulti || undefined,
       agent_user_id: agentFilterMulti || undefined,
-      started_after: startedAfter || undefined,
-      started_before: startedBefore || undefined,
-      today_only: todayOnly,
-      meaningful_only: '1',
-      column_filters:
-        callHistoryColumnFilters.length > 0 ? JSON.stringify(callHistoryColumnFilters) : undefined,
-    }),
+        started_after: startedAfter || undefined,
+        started_before: startedBefore || undefined,
+        today_only: todayOnly,
+        meaningful_only: '1',
+        column_filters:
+          callHistoryColumnFilters.length > 0 ? JSON.stringify(callHistoryColumnFilters) : undefined,
+      }),
     [
       searchQuery,
       contactFilter,
@@ -615,12 +615,13 @@ export function ActivitiesPage() {
   if (!canView) {
     return (
       <div className={listStyles.page}>
-        <PageHeader title="Activities" description="Calls & follow-ups" />
+        <PageHeader title="Call history" description="Calls & follow-ups" />
         <Alert variant="error">You don’t have access to the call module.</Alert>
       </div>
     );
   }
 
+  const canStartCall = canAny(['dial.execute']);
   const hasActiveFilters = Boolean(
     String(searchQuery || '').trim() ||
       String(contactFilter || '').trim() ||
@@ -640,26 +641,28 @@ export function ActivitiesPage() {
     <div className={listStyles.page}>
       <PageHeader
         title="Call history"
-        description="Call attempts only — use a row to narrow the list to that party’s calls (no CRM lead/contact screen from here)."
+        description="Call attempts only — use a row to narrow the list to that party’s calls. Full CRM activity (assignments, all dials, WhatsApp, deals) is on the lead/contact screen under Activity."
         actions={
-          <div className={styles.headerActions}>
-            <Select
-              label="Provider"
-              value={provider}
-              onChange={(e) => setProvider(e.target.value)}
-              options={[{ value: 'dummy', label: 'Dummy (dev)' }]}
-            />
-            <Input
-              label="Contact/Lead ID"
-              value={contactIdDraft}
-              onChange={(e) => setContactIdDraft(e.target.value)}
-              placeholder="e.g. 123"
-              inputMode="numeric"
-            />
-            <Button onClick={startSingle} disabled={starting || loading}>
-              {starting ? 'Calling…' : 'Start call'}
-            </Button>
-          </div>
+          canStartCall ? (
+            <div className={styles.headerActions}>
+              <Select
+                label="Provider"
+                value={provider}
+                onChange={(e) => setProvider(e.target.value)}
+                options={[{ value: 'dummy', label: 'Dummy (dev)' }]}
+              />
+              <Input
+                label="Contact/Lead ID"
+                value={contactIdDraft}
+                onChange={(e) => setContactIdDraft(e.target.value)}
+                placeholder="e.g. 123"
+                inputMode="numeric"
+              />
+              <Button onClick={startSingle} disabled={starting || loading}>
+                {starting ? 'Calling…' : 'Start call'}
+              </Button>
+            </div>
+          ) : undefined
         }
       />
 
@@ -668,7 +671,7 @@ export function ActivitiesPage() {
         <div className={styles.contactScopeBanner} role="status">
           <span>
             Showing <strong>call history</strong> for party id <strong>{contactFilter}</strong> (attempts on this page
-            only — not the CRM record).
+            only — not the CRM Activity screen).
           </span>
           <Button type="button" variant="secondary" size="sm" onClick={() => setContactFilter('')}>
             Show all calls

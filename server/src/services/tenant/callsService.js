@@ -409,6 +409,11 @@ export async function listCallAttempts(
     is_connected,
     started_after,
     started_before,
+    /**
+     * Activity timeline cursor: ISO datetime string + optional attempt id (keyset when id set).
+     * When id is null, matches (started_at < t OR started_at = t) for JS tie-break with other event types.
+     */
+    activity_timeline_cursor,
     today_only = false,
     /** Omit rows that only exist from starting a dial (no disposition and no agent-visible notes). */
     meaningful_only = false,
@@ -432,6 +437,7 @@ export async function listCallAttempts(
     is_connected,
     started_after,
     started_before,
+    activity_timeline_cursor,
     today_only,
     meaningful_only,
     column_filters,
@@ -522,6 +528,7 @@ function buildCallAttemptsWhere(tenantId, user, filters = {}) {
     is_connected,
     started_after,
     started_before,
+    activity_timeline_cursor,
     today_only = false,
     meaningful_only = false,
     column_filters,
@@ -675,6 +682,18 @@ function buildCallAttemptsWhere(tenantId, user, filters = {}) {
   if (started_before) {
     where.push('cca.started_at <= ?');
     params.push(started_before);
+  }
+
+  const atIso = activity_timeline_cursor?.startedAtIso;
+  const attId = activity_timeline_cursor?.attemptId;
+  if (atIso != null && String(atIso).trim() !== '') {
+    if (attId != null && Number.isFinite(Number(attId))) {
+      where.push('(cca.started_at < ? OR (cca.started_at = ? AND cca.id < ?))');
+      params.push(atIso, atIso, Number(attId));
+    } else {
+      where.push('(cca.started_at < ? OR cca.started_at = ?)');
+      params.push(atIso, atIso);
+    }
   }
 
   // Role scoping: agents only their attempts; managers only their team attempts.

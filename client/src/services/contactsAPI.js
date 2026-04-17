@@ -188,6 +188,20 @@ export const contactsAPI = {
 
   getById: (id) => axiosInstance.get(`${BASE}/${id}`),
 
+  /**
+   * Activity for one lead/contact.
+   * @param {string|number} id
+   * @param {{ mode?: 'full'|'summary'|'timeline', timeline_limit?: number, timeline_cursor?: string|null }} [params]
+   */
+  getActivity: (id, params = {}) =>
+    axiosInstance.get(`${BASE}/${id}/activity`, {
+      params: {
+        mode: params.mode,
+        timeline_limit: params.timeline_limit,
+        timeline_cursor: params.timeline_cursor || undefined,
+      },
+    }),
+
   appendPhone: (contactId, payload) => axiosInstance.post(`${BASE}/${contactId}/phones`, payload),
 
   create: (data) => axiosInstance.post(`${BASE}`, data),

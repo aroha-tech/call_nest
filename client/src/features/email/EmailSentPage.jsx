@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
@@ -33,11 +34,21 @@ const PAGE_SIZE = 20;
 const ACCOUNT_ALL_VALUE = '__all__';
 const TEMPLATE_ALL_VALUE = 'all';
 
+function parsePositiveId(raw) {
+  if (raw == null || raw === '') return undefined;
+  const n = Number(String(raw).trim());
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return String(Math.trunc(n));
+}
+
 export function EmailSentPage() {
   const { can } = usePermissions();
   const canSend = can(PERMISSIONS.EMAIL_SEND) || can(PERMISSIONS.SETTINGS_MANAGE);
   const user = useAppSelector(selectUser);
   const showSentByColumn = user?.role === 'manager' || user?.role === 'admin';
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const contactIdFilter = parsePositiveId(searchParams.get('contact_id'));
 
   const { formatDateTime } = useDateTimeDisplay();
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,17 +60,17 @@ export function EmailSentPage() {
   const [limit, setLimit] = useState(PAGE_SIZE);
   const fetchMessages = useCallback(
     () =>
-      
       emailMessagesAPI.getAll({
         folder: 'sent',
+        contact_id: contactIdFilter,
         email_account_id: appliedAccountId === ACCOUNT_ALL_VALUE ? undefined : appliedAccountId,
         search: searchQuery || undefined,
         limit,
         offset: (page - 1) * limit,
       }),
-    [searchQuery, page, limit, appliedAccountId]
+    [searchQuery, page, limit, appliedAccountId, contactIdFilter]
   );
-  const { data: response, loading, error, refetch } = useAsyncData(fetchMessages, [searchQuery, page, limit, appliedAccountId], {
+  const { data: response, loading, error, refetch } = useAsyncData(fetchMessages, [searchQuery, page, limit, appliedAccountId, contactIdFilter], {
     transform: (res) => res?.data ?? { data: [], total: 0 },
   });
   const messages = response?.data ?? [];
@@ -68,6 +79,49 @@ export function EmailSentPage() {
   const { hasCompletedInitialFetch } = useTableLoadingState(loading);
 
   const [selectedMessage, setSelectedMessage] = useState(null);
+
+  const clearContactQuery = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('contact_id');
+    next.delete('open_email');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const openEmailId = parsePositiveId(searchParams.get('open_email'));
+    if (!openEmailId || loading) return;
+
+    const fromList = messages.find((m) => String(m.id) === String(openEmailId));
+    if (fromList) {
+      setSelectedMessage(fromList);
+      const next = new URLSearchParams(searchParams);
+      next.delete('open_email');
+      setSearchParams(next, { replace: true });
+      return;
+    }
+
+    if (!hasCompletedInitialFetch) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await emailMessagesAPI.getById(openEmailId);
+        const data = res?.data?.data;
+        if (!cancelled && data) setSelectedMessage(data);
+      } catch {
+        /* message missing or no access */
+      } finally {
+        if (!cancelled) {
+          const next = new URLSearchParams(searchParams);
+          next.delete('open_email');
+          setSearchParams(next, { replace: true });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, messages, searchParams, setSearchParams, hasCompletedInitialFetch]);
   const [showCompose, setShowCompose] = useState(false);
   const [composeForm, setComposeForm] = useState({ email_account_id: '', to: '', subject: '', body_html: '', template_id: '' });
   const [sendError, setSendError] = useState(null);
@@ -230,6 +284,15 @@ export function EmailSentPage() {
       />
 
       {error && <Alert variant="error">{error}</Alert>}
+
+      {contactIdFilter ? (
+        <Alert variant="info">
+          Showing sent email for contact #{contactIdFilter}.{' '}
+          <Button type="button" size="sm" variant="secondary" onClick={clearContactQuery}>
+            Show all sent
+          </Button>
+        </Alert>
+      ) : null}
 
       <FilterBar
         onApply={() => {

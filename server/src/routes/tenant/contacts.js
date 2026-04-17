@@ -104,6 +104,11 @@ router.get(
   requirePermission(['contacts.read', 'leads.read']),
   contactsController.listContactCustomFields
 );
+router.get(
+  '/:id/activity',
+  requirePermission(['contacts.read', 'leads.read']),
+  contactsController.getActivity
+);
 router.get('/:id', requirePermission(['contacts.read', 'leads.read']), contactsController.getById);
 
 export default router;

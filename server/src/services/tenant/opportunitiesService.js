@@ -19,7 +19,8 @@ function trimStr(v) {
   return t === '' ? null : t;
 }
 
-const OPP_SELECT = `o.id, o.contact_id, o.deal_id, o.stage_id, o.title, o.amount, o.lead_id,
+/** Full shape (migration 055_opportunities_crm_fields). */
+const OPP_SELECT_EXTENDED = `o.id, o.contact_id, o.deal_id, o.stage_id, o.title, o.amount, o.lead_id,
             o.owner_id, o.closing_date, o.probability_percent, o.expected_revenue,
             o.lead_source, o.deal_type, o.next_step, o.description, o.campaign_id,
             o.created_at, o.updated_at,
@@ -30,11 +31,64 @@ const OPP_SELECT = `o.id, o.contact_id, o.deal_id, o.stage_id, o.title, o.amount
             ou.name AS owner_name,
             camp.name AS campaign_name`;
 
-const OPP_JOINS = `
+const OPP_JOINS_EXTENDED = `
      INNER JOIN deals d ON d.id = o.deal_id AND d.tenant_id = o.tenant_id AND d.deleted_at IS NULL
      INNER JOIN deal_stages s ON s.id = o.stage_id AND s.tenant_id = o.tenant_id AND s.deleted_at IS NULL
      LEFT JOIN users ou ON ou.id = o.owner_id
      LEFT JOIN campaigns camp ON camp.id = o.campaign_id AND camp.tenant_id = o.tenant_id AND camp.deleted_at IS NULL`;
+
+/** Same column aliases as EXTENDED when only migration 030 exists (no CRM columns on opportunities). */
+const OPP_SELECT_LEGACY = `o.id, o.contact_id, o.deal_id, o.stage_id, o.title, o.amount, o.lead_id,
+            NULL AS owner_id,
+            NULL AS closing_date,
+            NULL AS probability_percent,
+            NULL AS expected_revenue,
+            NULL AS lead_source,
+            NULL AS deal_type,
+            NULL AS next_step,
+            NULL AS description,
+            NULL AS campaign_id,
+            o.created_at, o.updated_at,
+            d.name AS deal_name,
+            s.name AS stage_name, s.sort_order AS stage_sort_order,
+            s.progression_percent, s.is_closed_won, s.is_closed_lost,
+            s.progression_percent AS effective_probability,
+            NULL AS owner_name,
+            NULL AS campaign_name`;
+
+const OPP_JOINS_LEGACY = `
+     INNER JOIN deals d ON d.id = o.deal_id AND d.tenant_id = o.tenant_id AND d.deleted_at IS NULL
+     INNER JOIN deal_stages s ON s.id = o.stage_id AND s.tenant_id = o.tenant_id AND s.deleted_at IS NULL`;
+
+let opportunitySchemaExtendedCache = null;
+
+/**
+ * Migration 055 adds owner_id, probability_percent, etc. Older DBs only have 030 — avoid ER_BAD_FIELD_ERROR.
+ */
+async function useExtendedOpportunitySchema() {
+  if (opportunitySchemaExtendedCache !== null) return opportunitySchemaExtendedCache;
+  try {
+    const [row] = await query(
+      `SELECT 1 AS ok
+       FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'opportunities'
+         AND COLUMN_NAME = 'owner_id'
+       LIMIT 1`
+    );
+    opportunitySchemaExtendedCache = !!row?.ok;
+  } catch {
+    opportunitySchemaExtendedCache = false;
+  }
+  return opportunitySchemaExtendedCache;
+}
+
+async function getOpportunitySelectParts() {
+  const extended = await useExtendedOpportunitySchema();
+  return extended
+    ? { select: OPP_SELECT_EXTENDED, joins: OPP_JOINS_EXTENDED }
+    : { select: OPP_SELECT_LEGACY, joins: OPP_JOINS_LEGACY };
+}
 
 async function assertTenantUserId(tenantId, userId) {
   if (userId == null) return null;
@@ -114,10 +168,11 @@ export async function listOpportunitiesForContact(tenantId, user, contactId) {
   const contact = await getContactById(contactId, tenantId, user);
   if (!contact) return null;
 
+  const { select, joins } = await getOpportunitySelectParts();
   const rows = await query(
-    `SELECT ${OPP_SELECT}
+    `SELECT ${select}
      FROM opportunities o
-     ${OPP_JOINS}
+     ${joins}
      WHERE o.tenant_id = ? AND o.contact_id = ? AND o.deleted_at IS NULL
      ORDER BY d.name ASC, o.id ASC`,
     [tenantId, contactId]
@@ -280,11 +335,12 @@ export async function createOpportunity(tenantId, user, payload) {
 export async function getOpportunityById(tenantId, user, opportunityId) {
   const { whereSQL, params } = buildOwnershipWhere(user);
   const ctWhere = whereSQL.replace(/\bc\./g, 'ct.');
+  const { select, joins } = await getOpportunitySelectParts();
   const [row] = await query(
-    `SELECT ${OPP_SELECT}
+    `SELECT ${select}
      FROM opportunities o
      INNER JOIN contacts ct ON ct.id = o.contact_id AND ct.tenant_id = o.tenant_id AND ct.deleted_at IS NULL
-     ${OPP_JOINS}
+     ${joins}
      WHERE o.tenant_id = ? AND o.id = ? AND o.deleted_at IS NULL AND (${ctWhere})`,
     [tenantId, opportunityId, ...params]
   );

@@ -148,12 +148,12 @@ export function ContactFormPage({ defaultType }) {
   const authUser = useAppSelector(selectUser);
   const role = authUser?.role ?? 'agent';
   const { canAny } = usePermissions();
-  const canViewCallHistory = canAny(['dial.execute', 'dial.monitor']);
-
   const id = params.id;
+  const isLeadRoute = location.pathname.startsWith('/leads');
+  const canOpenActivity =
+    !!id && (isLeadRoute ? canAny(['leads.read']) : canAny(['contacts.read']));
   const isNew = !id || id === 'new';
   const type = defaultType; // 'lead' or 'contact' from route wrapper
-  const isLeadRoute = location.pathname.startsWith('/leads');
 
   const [customFields, setCustomFields] = useState([]);
   const [industryFieldDefs, setIndustryFieldDefs] = useState([]);
@@ -975,14 +975,20 @@ export function ContactFormPage({ defaultType }) {
                 <Button variant="ghost" onClick={() => navigate(-1)}>
                   Back
                 </Button>
-                {canViewCallHistory && id ? (
+                {canOpenActivity ? (
                   <Button
                     type="button"
                     variant="secondary"
                     size="sm"
-                    onClick={() => navigate(`/calls/history?contact_id=${encodeURIComponent(String(id))}`)}
+                    onClick={() =>
+                      navigate(
+                        isLeadRoute
+                          ? `/leads/${encodeURIComponent(String(id))}/activity`
+                          : `/contacts/${encodeURIComponent(String(id))}/activity`
+                      )
+                    }
                   >
-                    Call attempts and notes
+                    Activity
                   </Button>
                 ) : null}
                 <div className={styles.viewEditToggle} role="group" aria-label="View or edit record">

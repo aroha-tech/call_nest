@@ -33,7 +33,7 @@
   margin-bottom: 4px;
   border-radius: 10px;
   border: 1px solid var(--color-border-subtle, #e2e8f0);
-  background: var(--color-bg-subtle, rgba(248, 250, 252, 0.6));
+   background: var(--color-bg-subtle, rgba(248, 250, 252, 0.6));
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -43,6 +43,25 @@
     background: rgba(100, 116, 139, 0.35);
     border-radius: 999px;
   }
+}
+
+.containerLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 120px;
+  padding: 20px 16px;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.emptyInBox {
+  margin: 0;
+  padding: 20px 16px;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #64748b);
+  line-height: 1.45;
 }
 
 .timeline {
@@ -102,5 +121,30 @@
 }
 
 .footer {
-  margin-top: 16px;
+  margin: 0;
+  padding: 12px 12px 14px 14px;
+  border-top: 1px solid var(--color-border-subtle, #e2e8f0);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #64748b);
+  background: var(--color-bg-subtle, rgba(248, 250, 252, 0.85));
+}
+
+.footerHint {
+  line-height: 1.4;
+}
+
+.footerLoading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scrollSentinel {
+  height: 1px;
+  width: 100%;
+  flex-shrink: 0;
 }
