@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Pagination } from '../components/ui/Pagination';
 import { SearchInput } from '../components/ui/SearchInput';
 import { Button } from '../components/ui/Button';
@@ -32,6 +32,7 @@ function safeDateTime(v) {
 
 export function DialerSessionCallHistoryPanel({ dialerSessionId }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const sid = String(dialerSessionId || '').trim();
 
   const [page, setPage] = useState(1);
@@ -147,7 +148,6 @@ export function DialerSessionCallHistoryPanel({ dialerSessionId }) {
       <div className={styles.headerRow}>
         <div>
           <div className={styles.title}>Call history (this dial session)</div>
-          <div className={styles.sub}>Calls placed as part of dial session id {sid}.</div>
         </div>
         <div className={styles.headerActions}>
           <Button
@@ -219,7 +219,9 @@ export function DialerSessionCallHistoryPanel({ dialerSessionId }) {
                 onOpenCustomizeColumns={() => setCallHistoryCustomizeOpen(true)}
                 onViewAttempt={(r) => setAttemptDetailRow(r)}
                 onOpenDialSession={(r) => {
-                  if (r?.dialer_session_id) navigate(`/dialer/session/${r.dialer_session_id}`);
+                  if (r?.dialer_session_id) {
+                    navigate(`/dialer/session/${r.dialer_session_id}`, { state: location.state });
+                  }
                 }}
                 formatWhen={(v) => safeDateTime(v)}
                 notesPreview={(r) => sanitizeAttemptNotesForDisplay(r.notes || '').slice(0, 120) || '—'}
@@ -273,7 +275,7 @@ export function DialerSessionCallHistoryPanel({ dialerSessionId }) {
         title="Customize columns"
         getDefaults={getDefaultVisibleCallHistoryColumnIds}
         persistVisibleIds={saveCallHistoryVisibleColumnIds}
-        pinnedColumnId="created_at"
+        pinnedColumnId="contact"
         standardColumnTagLabel="Default"
         canAddCustomField={false}
       />

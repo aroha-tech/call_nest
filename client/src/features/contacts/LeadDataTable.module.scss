@@ -104,6 +104,23 @@
   }
 }
 
+.displayNameLink {
+  color: var(--color-primary-400);
+  font-weight: $font-weight-medium;
+  text-decoration: none;
+
+  &:hover {
+    color: var(--color-primary-300);
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 2px;
+    border-radius: $radius-xs;
+  }
+}
+
 /** Last column padding: comfortable when no h-scroll; flush when ⋮ compact mode */
 .leadTableOuter:not(.leadTableCompactActions) .leadTable :global(thead th:last-child),
 .leadTableOuter:not(.leadTableCompactActions) .leadTable :global(tbody td:last-child) {

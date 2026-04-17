@@ -116,7 +116,7 @@ function TimelineRefs({ ev, contactId, navigate, onViewCallAttempt }) {
   const dialSid = refs.dialer_session_id || ev.payload?.dialer_session_id;
   const attemptId = refs.call_attempt_id || ev.payload?.id;
 
-  const showPartyCallHistory =
+  const showCustomerCallHistory =
     Boolean(cid) &&
     (Boolean(refs.call_attempt_id) ||
       Boolean(refs.dialer_session_id) ||
@@ -127,28 +127,15 @@ function TimelineRefs({ ev, contactId, navigate, onViewCallAttempt }) {
   if (attemptId && ev.type === 'call_attempt') {
     parts.push(
       <Button key="att" type="button" size="sm" variant="secondary" onClick={() => onViewCallAttempt?.(ev.payload)}>
-        Open attempt #{attemptId}
+        View call details
       </Button>
-    );
-  } else if (attemptId) {
-    parts.push(
-      <span key="attc" className={styles.refChip}>
-        Call attempt #{attemptId}
-      </span>
     );
   }
   if (dialSid) {
     parts.push(
       <Button key="ds" type="button" size="sm" variant="secondary" onClick={() => navigate(`/dialer/session/${dialSid}`)}>
-        Open dial session #{dialSid}
+        Open dial session
       </Button>
-    );
-  }
-  if (refs.dialer_session_item_id) {
-    parts.push(
-      <span key="dsi" className={styles.refChip}>
-        Queue item #{refs.dialer_session_item_id}
-      </span>
     );
   }
   if (refs.whatsapp_message_id) {
@@ -163,7 +150,7 @@ function TimelineRefs({ ev, contactId, navigate, onViewCallAttempt }) {
         variant="secondary"
         onClick={() => navigate(`/whatsapp/messages?${waQ.toString()}`)}
       >
-        WhatsApp #{refs.whatsapp_message_id}
+        Open WhatsApp message
       </Button>
     );
   }
@@ -179,39 +166,11 @@ function TimelineRefs({ ev, contactId, navigate, onViewCallAttempt }) {
         variant="secondary"
         onClick={() => navigate(`/email/sent?${emQ.toString()}`)}
       >
-        Email #{refs.email_message_id}
+        Open email
       </Button>
     );
   }
-  if (refs.opportunity_id) {
-    parts.push(
-      <span key="opp" className={styles.refChip}>
-        Opportunity #{refs.opportunity_id}
-      </span>
-    );
-  }
-  if (refs.assignment_history_id) {
-    parts.push(
-      <span key="asg" className={styles.refChip}>
-        Assignment #{refs.assignment_history_id}
-      </span>
-    );
-  }
-  if (refs.import_batch_id) {
-    parts.push(
-      <span key="imp" className={styles.refChip}>
-        Import batch #{refs.import_batch_id}
-      </span>
-    );
-  }
-  if (refs.stored_event_id) {
-    parts.push(
-      <span key="sev" className={styles.refChip}>
-        Timeline id #{refs.stored_event_id}
-      </span>
-    );
-  }
-  if (showPartyCallHistory) {
+  if (showCustomerCallHistory) {
     parts.push(
       <Button
         key="chist"
@@ -220,7 +179,7 @@ function TimelineRefs({ ev, contactId, navigate, onViewCallAttempt }) {
         variant="secondary"
         onClick={() => navigate(`/calls/history?contact_id=${encodeURIComponent(String(cid))}`)}
       >
-        Call history (this party)
+        Call history (this customer)
       </Button>
     );
   }
@@ -294,7 +253,7 @@ export function ContactActivityPanel({
   const tags = Array.isArray(contact.tags) ? contact.tags : [];
   const tagLine = tags.length
     ? tags
-        .map((t) => t?.name || t?.label || t?.id)
+        .map((t) => t?.name || t?.label)
         .filter(Boolean)
         .join(', ')
     : '';
@@ -313,7 +272,7 @@ export function ContactActivityPanel({
           <div>
             <div className={styles.titleRow}>
               <h2 id="contact-activity-overview-title" className={styles.name}>
-                {contact.display_name || `Party #${contact.id}`}
+                {contact.display_name || 'Record'}
               </h2>
               <Badge variant={contact.type === 'lead' ? 'warning' : 'info'}>
                 {contact.type === 'lead' ? 'Lead' : 'Contact'}
@@ -496,7 +455,7 @@ export function ContactActivityPanel({
                     <p className={styles.detail}>
                       Likely import file(s) near this creation time:{' '}
                       {ev.payload.import_batches_nearby
-                        .map((b) => `#${b.id} ${b.original_filename || 'file'} (${safeDateTime(b.created_at)})`)
+                        .map((b) => `${b.original_filename || 'Import file'} (${safeDateTime(b.created_at)})`)
                         .join('; ')}
                     </p>
                   ) : null}
@@ -513,26 +472,26 @@ export function ContactActivityPanel({
               ) : null}
               {ev.type === 'tag_applied' ? (
                 <p className={styles.summary}>
-                  Tag <strong>{ev.payload?.tag_name || ev.payload?.tag_id}</strong>
+                  Tag <strong>{ev.payload?.tag_name || '—'}</strong>
                   {ev.payload?.assigned_by_name ? ` · by ${ev.payload.assigned_by_name}` : ''}
                 </p>
               ) : null}
               {ev.type === 'tag_removed' ? (
                 <p className={styles.summary}>
-                  Tag <strong>{ev.payload?.tag_name || ev.payload?.tag_id}</strong> removed
+                  Tag <strong>{ev.payload?.tag_name || '—'}</strong> removed
                   {ev.payload?.removed_by_name ? ` · by ${ev.payload.removed_by_name}` : ''}
                 </p>
               ) : null}
               {ev.type === 'dialer_session_queued' ? (
                 <p className={styles.summary}>
-                  Added to dial session #{ev.payload?.session_id} ({ev.payload?.session_status || '—'})
+                  Added to a dial session ({ev.payload?.session_status || '—'})
                   {ev.payload?.session_started_by_name ? ` · started by ${ev.payload.session_started_by_name}` : ''}
                 </p>
               ) : null}
               {ev.type === 'dialer_session_position_called' ? (
                 <p className={styles.summary}>
-                  Dial session #{ev.payload?.session_id} — position processed ({ev.payload?.state || '—'})
-                  {ev.payload?.last_attempt_id ? ` · attempt #${ev.payload.last_attempt_id}` : ''}
+                  Dial session — position processed ({ev.payload?.state || '—'})
+                  {ev.payload?.last_attempt_id ? ' · call logged' : ''}
                 </p>
               ) : null}
               {ev.type === 'call_attempt' ? (

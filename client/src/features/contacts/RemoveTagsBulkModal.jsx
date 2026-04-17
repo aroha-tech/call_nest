@@ -45,7 +45,7 @@ export function RemoveTagsBulkModal({ isOpen, onClose, selectedIds, recordLabel,
     () =>
       tags.map((t) => ({
         value: String(t.id),
-        label: t.name || `#${t.id}`,
+        label: t.name || '—',
       })),
     [tags]
   );

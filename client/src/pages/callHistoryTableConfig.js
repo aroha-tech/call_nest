@@ -1,4 +1,4 @@
-export const CALL_HISTORY_COLUMNS_STORAGE_KEY = 'callnest.callHistory.visibleColumns.v1';
+export const CALL_HISTORY_COLUMNS_STORAGE_KEY = 'callnest.callHistory.visibleColumns.v2';
 
 /**
  * @typedef {{
@@ -12,9 +12,8 @@ export const CALL_HISTORY_COLUMNS_STORAGE_KEY = 'callnest.callHistory.visibleCol
 
 /** @type {CallHistoryColumnDef[]} */
 export const ALL_CALL_HISTORY_COLUMNS = [
-  { id: 'created_at', label: 'When', sortKey: 'created_at', category: 'default' },
-  { id: 'id', label: 'Attempt', sortKey: 'id', category: 'default' },
-  { id: 'contact', label: 'Called party', sortKey: 'contact_id', category: 'default' },
+  { id: 'created_at', label: 'Call date', sortKey: 'created_at', category: 'default' },
+  { id: 'contact', label: 'Customer', sortKey: 'contact_id', category: 'default' },
   { id: 'phone', label: 'Phone', sortKey: 'phone', category: 'default' },
   { id: 'agent', label: 'Agent', sortKey: 'agent', category: 'default' },
   { id: 'dial_session', label: 'Dial session', sortKey: 'dial_session', category: 'default' },
@@ -43,8 +42,6 @@ export function getApplicableCallHistoryColumns() {
 export function getDefaultVisibleCallHistoryColumnIds(applicable) {
   const ids = new Set(applicable.map((c) => c.id));
   const order = [
-    'created_at',
-    'id',
     'contact',
     'phone',
     'agent',
@@ -53,6 +50,7 @@ export function getDefaultVisibleCallHistoryColumnIds(applicable) {
     'status',
     'is_connected',
     'disposition',
+    'created_at',
     'notes',
   ];
   return order.filter((id) => ids.has(id));
@@ -73,10 +71,6 @@ export function loadCallHistoryVisibleColumnIds(applicableColumns) {
     const parsed = JSON.parse(raw);
     const vis = Array.isArray(parsed.visible) ? parsed.visible : [];
     let cleaned = vis.filter((id) => applicableIds.includes(id));
-
-    if (applicableIds.includes('created_at') && !cleaned.includes('created_at')) {
-      cleaned = ['created_at', ...cleaned];
-    }
 
     cleaned = [...new Set(cleaned)];
 

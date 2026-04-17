@@ -57,7 +57,27 @@ export async function getSession(tenantId, user, sessionId) {
   if (!sid) return null;
 
   const [sess] = await query(
-    `SELECT id, tenant_id, created_by_user_id, user_session_no, provider, status, started_at, ended_at, paused_at, paused_seconds, dialing_set_id, call_script_id, created_at
+    `SELECT
+        id,
+        tenant_id,
+        created_by_user_id,
+        user_session_no,
+        provider,
+        status,
+        started_at,
+        ended_at,
+        paused_at,
+        paused_seconds,
+        dialing_set_id,
+        call_script_id,
+        created_at,
+        (CASE WHEN started_at IS NULL THEN 0
+          ELSE GREATEST(
+            0,
+            TIMESTAMPDIFF(SECOND, started_at, COALESCE(ended_at, UTC_TIMESTAMP()))
+              - COALESCE(paused_seconds, 0)
+          )
+        END) AS duration_sec
      FROM dialer_sessions
      WHERE tenant_id = ? AND id = ?
      LIMIT 1`,

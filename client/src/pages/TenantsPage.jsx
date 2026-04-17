@@ -37,6 +37,7 @@ import { useTableLoadingState } from '../hooks/useTableLoadingState';
 import { TableDataRegion } from '../components/admin/TableDataRegion';
 import { TenantWorkspaceUrlCopy } from '../components/admin/TenantWorkspaceUrlCopy';
 import styles from './TenantsPage.module.scss';
+import { isNoListFilter } from '../utils/listFilterNarrowing';
 
 function emptyThemeFormFields() {
   return {
@@ -143,8 +144,6 @@ const defaultForm = () => ({
 
 const SLUG_DEBOUNCE_MS = 400;
 
-const FILTER_ALL = '__all__';
-
 /** Parsed non-negative int, or undefined if empty/invalid */
 function parseUsersFilterInt(s) {
   if (s == null || String(s).trim() === '') return undefined;
@@ -185,8 +184,8 @@ export function TenantsPage() {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [showDisabled, setShowDisabled] = useState(false);
-  const [draftIndustryFilter, setDraftIndustryFilter] = useState(FILTER_ALL);
-  const [appliedIndustryFilter, setAppliedIndustryFilter] = useState(FILTER_ALL);
+  const [draftIndustryFilter, setDraftIndustryFilter] = useState('');
+  const [appliedIndustryFilter, setAppliedIndustryFilter] = useState('');
   const [draftMinUsers, setDraftMinUsers] = useState('');
   const [draftMaxUsers, setDraftMaxUsers] = useState('');
   const [appliedMinUsers, setAppliedMinUsers] = useState('');
@@ -235,7 +234,7 @@ export function TenantsPage() {
         includeDisabled: showDisabled,
         page: pagination.page,
         limit: pagination.limit,
-        industryId: appliedIndustryFilter,
+        industryId: !isNoListFilter(appliedIndustryFilter) ? appliedIndustryFilter : undefined,
         minUsers: appliedMinUsers,
         maxUsers: appliedMaxUsers,
       });
@@ -492,15 +491,14 @@ export function TenantsPage() {
   };
 
   const industryFilterSelectOptions = [
-    { value: FILTER_ALL, label: 'All industries' },
-    { value: '__none__', label: 'No industry' },
+    { value: '__none__', label: 'Without an industry' },
     ...industryOptions,
   ];
 
   const activeUserSizePresetId = getActiveUserSizePreset(draftMinUsers, draftMaxUsers);
 
   const hasActiveTenantFilters =
-    appliedIndustryFilter !== FILTER_ALL ||
+    !isNoListFilter(appliedIndustryFilter) ||
     String(appliedMinUsers || '').trim() !== '' ||
     String(appliedMaxUsers || '').trim() !== '';
 
@@ -535,8 +533,8 @@ export function TenantsPage() {
             setPagination((p) => ({ ...p, page: 1 }));
           }}
           onReset={() => {
-            setDraftIndustryFilter(FILTER_ALL);
-            setAppliedIndustryFilter(FILTER_ALL);
+            setDraftIndustryFilter('');
+            setAppliedIndustryFilter('');
             setDraftMinUsers('');
             setDraftMaxUsers('');
             setAppliedMinUsers('');
@@ -551,12 +549,13 @@ export function TenantsPage() {
                 Industry
               </span>
               <Select
+                allowEmpty
                 aria-labelledby="tenants-filter-industry-label"
-                value={draftIndustryFilter}
+                value={draftIndustryFilter || ''}
                 onChange={(e) => setDraftIndustryFilter(e.target.value)}
                 options={industryFilterSelectOptions}
                 className={styles.filterSelectWide}
-                placeholder="Choose industry…"
+                placeholder="All industries"
               />
             </div>
             <div className={styles.filterSectionGrow}>

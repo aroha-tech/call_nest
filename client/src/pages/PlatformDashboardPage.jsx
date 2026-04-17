@@ -6,6 +6,8 @@ import { Button } from '../components/ui/Button';
 import { PlatformDataCharts } from '../components/dashboard/DashboardDataCharts';
 import { dashboardAPI, tenantsAPI, usersAPI } from '../services/adminAPI';
 import { useToast } from '../context/ToastContext';
+import { DateRangePresetControl } from '../components/ui/DateRangePresetControl';
+import { TIME_RANGE_PRESET, computeDashboardInclusiveDates } from '../utils/dateRangePresets';
 import styles from './PlatformDashboardPage.module.scss';
 
 const ROLE_LABELS = {
@@ -46,10 +48,28 @@ export function PlatformDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [statsRefreshing, setStatsRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [rangeFrom, setRangeFrom] = useState('');
-  const [rangeTo, setRangeTo] = useState('');
+  const [rangePreset, setRangePreset] = useState(TIME_RANGE_PRESET.ALL_TIME);
+  const [rangeCustomFrom, setRangeCustomFrom] = useState('');
+  const [rangeCustomTo, setRangeCustomTo] = useState('');
   const [activeRange, setActiveRange] = useState(null);
+  const activeRangeRef = useRef(null);
   const initialFetch = useRef(true);
+
+  useEffect(() => {
+    activeRangeRef.current = activeRange;
+  }, [activeRange]);
+
+  useEffect(() => {
+    if (rangePreset === TIME_RANGE_PRESET.ALL_TIME) {
+      setActiveRange(null);
+      return;
+    }
+    if (rangePreset === TIME_RANGE_PRESET.CUSTOM) {
+      return;
+    }
+    const next = computeDashboardInclusiveDates(rangePreset, '', '', new Date());
+    setActiveRange(next);
+  }, [rangePreset]);
 
   useEffect(() => {
     let mounted = true;
@@ -86,26 +106,36 @@ export function PlatformDashboardPage() {
     };
   }, [activeRange]);
 
+  function handleRangePresetChange(v) {
+    if (v === TIME_RANGE_PRESET.CUSTOM) {
+      const ar = activeRangeRef.current;
+      if (ar) {
+        setRangeCustomFrom(ar.from);
+        setRangeCustomTo(ar.to);
+      }
+    }
+    setRangePreset(v);
+  }
+
   function applyDateRange() {
-    const from = rangeFrom.trim();
-    const to = rangeTo.trim();
-    if (!from || !to) {
-      showToast(
-        'Pick a start and end date, then Apply. Or tap Reset for all-time totals.',
-        'warning'
-      );
+    if (rangePreset !== TIME_RANGE_PRESET.CUSTOM) return;
+    const next = computeDashboardInclusiveDates(
+      TIME_RANGE_PRESET.CUSTOM,
+      rangeCustomFrom,
+      rangeCustomTo,
+      new Date()
+    );
+    if (!next) {
+      showToast('Pick a valid start and end date, then Apply.', 'warning');
       return;
     }
-    if (from > to) {
-      showToast('End date must be on or after the start date.', 'warning');
-      return;
-    }
-    setActiveRange({ from, to });
+    setActiveRange(next);
   }
 
   function clearDateRange() {
-    setRangeFrom('');
-    setRangeTo('');
+    setRangePreset(TIME_RANGE_PRESET.ALL_TIME);
+    setRangeCustomFrom('');
+    setRangeCustomTo('');
     setActiveRange(null);
     setError(null);
   }
@@ -148,40 +178,29 @@ export function PlatformDashboardPage() {
             title="Filter KPIs and charts by when tenants and tenant users were created. Recent lists below are not filtered."
           >
             <div className={styles.dateFilterRow}>
-              <span className={styles.dateFieldInline}>
-                <label className={styles.dateLabelCompact} htmlFor="platform-dash-from">
-                  From
-                </label>
-                <input
-                  id="platform-dash-from"
-                  className={styles.dateInputCompact}
-                  type="date"
-                  value={rangeFrom}
-                  onChange={(e) => setRangeFrom(e.target.value)}
+              <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+                <DateRangePresetControl
+                  variant="date"
+                  preset={rangePreset}
+                  onPresetChange={handleRangePresetChange}
+                  customStart={rangeCustomFrom}
+                  customEnd={rangeCustomTo}
+                  onCustomStartChange={setRangeCustomFrom}
+                  onCustomEndChange={setRangeCustomTo}
                 />
-              </span>
-              <span className={styles.dateFieldInline}>
-                <label className={styles.dateLabelCompact} htmlFor="platform-dash-to">
-                  To
-                </label>
-                <input
-                  id="platform-dash-to"
-                  className={styles.dateInputCompact}
-                  type="date"
-                  value={rangeTo}
-                  onChange={(e) => setRangeTo(e.target.value)}
-                />
-              </span>
+              </div>
               <div className={styles.dateFilterActionsCompact}>
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="xs"
-                  onClick={applyDateRange}
-                  loading={statsRefreshing}
-                >
-                  Apply
-                </Button>
+                {rangePreset === TIME_RANGE_PRESET.CUSTOM ? (
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="xs"
+                    onClick={applyDateRange}
+                    loading={statsRefreshing}
+                  >
+                    Apply
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="secondary"

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { IconButton } from '../../components/ui/IconButton';
 import { EditIcon, TrashIcon, ViewIcon, RowActionGroup } from '../../components/ui/ActionIcons';
@@ -207,6 +208,7 @@ export function LeadDataTable({
   tableScrollContainerRef,
   showDialerCall = false,
   onDialerCall,
+  displayNameLinkTo,
 }) {
   const selectionEnabled = showSelection ?? canBulkAssign;
   const visibleDefs = useMemo(() => {
@@ -268,8 +270,21 @@ export function LeadDataTable({
     }
 
     switch (col.id) {
-      case 'display_name':
-        return c.display_name || c.first_name || c.email || '—';
+      case 'display_name': {
+        const text = c.display_name || c.first_name || c.email || '—';
+        if (text === '—' || !displayNameLinkTo) return text;
+        const to = displayNameLinkTo(c);
+        if (!to) return text;
+        return (
+          <Link
+            to={to}
+            className={styles.displayNameLink}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {text}
+          </Link>
+        );
+      }
       case 'primary_phone':
         return c.primary_phone || '—';
       case 'email':
@@ -283,9 +298,9 @@ export function LeadDataTable({
       case 'type':
         return c.type;
       case 'manager_name':
-        return c.manager_name || (c.manager_id != null ? `#${c.manager_id}` : '—');
+        return c.manager_name || '—';
       case 'assigned_user_name':
-        return c.assigned_user_name || (c.assigned_user_id != null ? `#${c.assigned_user_id}` : '—');
+        return c.assigned_user_name || '—';
       case 'source':
         return c.source || '—';
       case 'city':
@@ -407,7 +422,7 @@ export function LeadDataTable({
                   type="checkbox"
                   checked={selectedIds.has(c.id)}
                   onChange={() => onToggleSelect(c.id)}
-                  aria-label={`Select ${c.display_name || c.id}`}
+                  aria-label={`Select ${c.display_name || 'row'}`}
                 />
               </TableCell>
             ) : null}

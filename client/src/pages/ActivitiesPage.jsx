@@ -42,6 +42,11 @@ import {
   IconFilter,
 } from '../features/contacts/ListActionsMenuIcons';
 import { ExportCsvModal } from '../features/contacts/ExportCsvModal';
+import {
+  TIME_RANGE_PRESET,
+  inferCallHistoryTimePresetFromLegacySnapshot,
+  resolveCallHistoryListParams,
+} from '../utils/dateRangePresets';
 
 function safeDateTime(v) {
   if (!v) return '—';
@@ -151,9 +156,9 @@ export function ActivitiesPage() {
   const [statusFilterMulti, setStatusFilterMulti] = useState('');
   const [connectedFilterMulti, setConnectedFilterMulti] = useState('');
   const [agentFilterMulti, setAgentFilterMulti] = useState('');
-  const [todayOnly, setTodayOnly] = useState(false);
-  const [startedAfter, setStartedAfter] = useState('');
-  const [startedBefore, setStartedBefore] = useState('');
+  const [timeRangePreset, setTimeRangePreset] = useState(TIME_RANGE_PRESET.ALL_TIME);
+  const [timeRangeCustomAfter, setTimeRangeCustomAfter] = useState('');
+  const [timeRangeCustomBefore, setTimeRangeCustomBefore] = useState('');
   const [tenantAgents, setTenantAgents] = useState([]);
   const [savedFilters, setSavedFilters] = useState([]);
   const [filterOptionsOpen, setFilterOptionsOpen] = useState(false);
@@ -184,14 +189,14 @@ export function ActivitiesPage() {
   useEffect(() => setSearchQuery(qParam), [qParam]);
 
   const dispositionOptions = useMemo(
-    () => (dispositions || []).map((d) => ({ value: String(d.id), label: d.name || d.code || d.id })),
+    () => (dispositions || []).map((d) => ({ value: String(d.id), label: d.name || d.code || '—' })),
     [dispositions]
   );
 
   const agentOptions = useMemo(
     () =>
       (tenantAgents || [])
-        .map((u) => ({ value: String(u.id), label: u.name || u.email || `#${u.id}` }))
+        .map((u) => ({ value: String(u.id), label: u.name || u.email || '—' }))
         .sort((a, b) => a.label.localeCompare(b.label)),
     [tenantAgents]
   );
@@ -224,6 +229,12 @@ export function ActivitiesPage() {
     []
   );
 
+  const callHistoryTimeParams = useMemo(
+    () =>
+      resolveCallHistoryListParams(timeRangePreset, timeRangeCustomAfter, timeRangeCustomBefore, new Date()),
+    [timeRangePreset, timeRangeCustomAfter, timeRangeCustomBefore]
+  );
+
   async function load() {
     if (!canView) return;
     setLoading(true);
@@ -240,9 +251,9 @@ export function ActivitiesPage() {
         status: statusFilterMulti || undefined,
         is_connected: connectedFilterMulti || undefined,
         agent_user_id: agentFilterMulti || undefined,
-        started_after: startedAfter || undefined,
-        started_before: startedBefore || undefined,
-        today_only: todayOnly,
+        started_after: callHistoryTimeParams.started_after,
+        started_before: callHistoryTimeParams.started_before,
+        today_only: callHistoryTimeParams.today_only,
         meaningful_only: true,
         sort_by: sortBy || undefined,
         sort_dir: sortDir || undefined,
@@ -274,10 +285,10 @@ export function ActivitiesPage() {
     directionFilterMulti,
     statusFilterMulti,
     connectedFilterMulti,
-    todayOnly,
     agentFilterMulti,
-    startedAfter,
-    startedBefore,
+    timeRangePreset,
+    timeRangeCustomAfter,
+    timeRangeCustomBefore,
     sortBy,
     sortDir,
     callHistoryColumnFilters,
@@ -296,9 +307,9 @@ export function ActivitiesPage() {
         status: statusFilterMulti || undefined,
         is_connected: connectedFilterMulti || undefined,
         agent_user_id: agentFilterMulti || undefined,
-        started_after: startedAfter || undefined,
-        started_before: startedBefore || undefined,
-        today_only: todayOnly,
+        started_after: callHistoryTimeParams.started_after,
+        started_before: callHistoryTimeParams.started_before,
+        today_only: callHistoryTimeParams.today_only,
         meaningful_only: true,
         column_filters:
           callHistoryColumnFilters.length > 0 ? JSON.stringify(callHistoryColumnFilters) : undefined,
@@ -319,9 +330,9 @@ export function ActivitiesPage() {
     statusFilterMulti,
     connectedFilterMulti,
     agentFilterMulti,
-    startedAfter,
-    startedBefore,
-    todayOnly,
+    timeRangePreset,
+    timeRangeCustomAfter,
+    timeRangeCustomBefore,
     callHistoryColumnFilters,
   ]);
 
@@ -333,7 +344,7 @@ export function ActivitiesPage() {
     if (!canView) return;
     dispositionsAPI
       .getAll({ includeInactive: true, page: 1, limit: 500 })
-      .then((res) => setDispositions(res?.data?.data?.data ?? []))
+      .then((res) => setDispositions(res?.data?.data ?? []))
       .catch(() => setDispositions([]));
   }, [canView]);
 
@@ -379,10 +390,14 @@ export function ActivitiesPage() {
     setConnectedFilterMulti(snap.connectedFilterMulti ?? '');
     setAgentFilterMulti(snap.agentFilterMulti ?? '');
     setSearchQuery(snap.searchQuery ?? '');
-    setTodayOnly(Boolean(snap.todayOnly));
-    setStartedAfter(snap.startedAfter ?? '');
-    setStartedBefore(snap.startedBefore ?? '');
+    {
+      const t = inferCallHistoryTimePresetFromLegacySnapshot(snap);
+      setTimeRangePreset(t.preset);
+      setTimeRangeCustomAfter(t.customAfter);
+      setTimeRangeCustomBefore(t.customBefore);
+    }
     setContactFilter(snap.contactIdFilter ?? snap.contact_id ?? '');
+    setCallHistoryColumnFilters(Array.isArray(snap.columnFilters) ? snap.columnFilters : []);
     setPage(1);
   };
 
@@ -407,9 +422,10 @@ export function ActivitiesPage() {
     statusFilterMulti: sMulti,
     connectedFilterMulti: cMulti,
     agentFilterMulti: aMulti,
-    todayOnly: tOnly,
-    startedAfter: sAfter,
-    startedBefore: sBefore,
+    timeRangePreset: trPreset,
+    customStartedAfter: cAfter,
+    customStartedBefore: cBefore,
+    columnFilters: colF,
   }) => ({
     version: 1,
     dispositionFilterMulti: dMulti ?? '',
@@ -418,10 +434,11 @@ export function ActivitiesPage() {
     connectedFilterMulti: cMulti ?? '',
     agentFilterMulti: aMulti ?? '',
     searchQuery: searchQuery ?? '',
-    todayOnly: Boolean(tOnly),
-    startedAfter: sAfter ?? '',
-    startedBefore: sBefore ?? '',
+    timeRangePreset: trPreset ?? timeRangePreset ?? TIME_RANGE_PRESET.ALL_TIME,
+    customStartedAfter: cAfter ?? timeRangeCustomAfter ?? '',
+    customStartedBefore: cBefore ?? timeRangeCustomBefore ?? '',
     contactIdFilter: cf ?? contactFilter ?? '',
+    columnFilters: Array.isArray(colF) ? colF : [],
   });
 
   const rows = payload?.data ?? [];
@@ -438,13 +455,13 @@ export function ActivitiesPage() {
       status: statusFilterMulti || undefined,
       is_connected: connectedFilterMulti || undefined,
       agent_user_id: agentFilterMulti || undefined,
-        started_after: startedAfter || undefined,
-        started_before: startedBefore || undefined,
-        today_only: todayOnly,
-        meaningful_only: '1',
-        column_filters:
-          callHistoryColumnFilters.length > 0 ? JSON.stringify(callHistoryColumnFilters) : undefined,
-      }),
+      started_after: callHistoryTimeParams.started_after,
+      started_before: callHistoryTimeParams.started_before,
+      today_only: callHistoryTimeParams.today_only,
+      meaningful_only: '1',
+      column_filters:
+        callHistoryColumnFilters.length > 0 ? JSON.stringify(callHistoryColumnFilters) : undefined,
+    }),
     [
       searchQuery,
       contactFilter,
@@ -454,9 +471,7 @@ export function ActivitiesPage() {
       statusFilterMulti,
       connectedFilterMulti,
       agentFilterMulti,
-      startedAfter,
-      startedBefore,
-      todayOnly,
+      callHistoryTimeParams,
       callHistoryColumnFilters,
     ]
   );
@@ -535,9 +550,9 @@ export function ActivitiesPage() {
         status: statusFilterMulti || undefined,
         is_connected: connectedFilterMulti || undefined,
         agent_user_id: agentFilterMulti || undefined,
-        started_after: startedAfter || undefined,
-        started_before: startedBefore || undefined,
-        today_only: todayOnly,
+        started_after: callHistoryTimeParams.started_after,
+        started_before: callHistoryTimeParams.started_before,
+        today_only: callHistoryTimeParams.today_only,
         meaningful_only: true,
         column_filters:
           callHistoryColumnFilters.length > 0 ? JSON.stringify(callHistoryColumnFilters) : undefined,
@@ -567,9 +582,7 @@ export function ActivitiesPage() {
     statusFilterMulti,
     connectedFilterMulti,
     agentFilterMulti,
-    startedAfter,
-    startedBefore,
-    todayOnly,
+    callHistoryTimeParams,
     callHistoryColumnFilters,
   ]);
 
@@ -631,9 +644,7 @@ export function ActivitiesPage() {
       statusFilterMulti ||
       connectedFilterMulti ||
       agentFilterMulti ||
-      todayOnly ||
-      startedAfter ||
-      startedBefore ||
+      timeRangePreset !== TIME_RANGE_PRESET.ALL_TIME ||
       callHistoryColumnFilters.length > 0
   );
 
@@ -641,7 +652,7 @@ export function ActivitiesPage() {
     <div className={listStyles.page}>
       <PageHeader
         title="Call history"
-        description="Call attempts only — use a row to narrow the list to that party’s calls. Full CRM activity (assignments, all dials, WhatsApp, deals) is on the lead/contact screen under Activity."
+        description="Call attempts only — use a row to narrow the list to that customer’s calls. Full CRM activity (assignments, all dials, WhatsApp, deals) is on the lead/contact screen under Activity."
         actions={
           canStartCall ? (
             <div className={styles.headerActions}>
@@ -652,7 +663,7 @@ export function ActivitiesPage() {
                 options={[{ value: 'dummy', label: 'Dummy (dev)' }]}
               />
               <Input
-                label="Contact/Lead ID"
+                label="Lead or contact (numeric key)"
                 value={contactIdDraft}
                 onChange={(e) => setContactIdDraft(e.target.value)}
                 placeholder="e.g. 123"
@@ -670,8 +681,7 @@ export function ActivitiesPage() {
       {contactFilter ? (
         <div className={styles.contactScopeBanner} role="status">
           <span>
-            Showing <strong>call history</strong> for party id <strong>{contactFilter}</strong> (attempts on this page
-            only — not the CRM Activity screen).
+            Showing <strong>call history</strong> for one contact (this page only — not the full CRM Activity screen).
           </span>
           <Button type="button" variant="secondary" size="sm" onClick={() => setContactFilter('')}>
             Show all calls
@@ -681,7 +691,7 @@ export function ActivitiesPage() {
       {dialerSessionFilter ? (
         <div className={styles.contactScopeBanner} role="status">
           <span>
-            Showing <strong>call history</strong> for dial session id <strong>{dialerSessionFilter}</strong>.
+            Showing <strong>call history</strong> for one dial session.
           </span>
           <Button
             type="button"
@@ -723,9 +733,9 @@ export function ActivitiesPage() {
                   setStatusFilterMulti('');
                   setConnectedFilterMulti('');
                   setAgentFilterMulti('');
-                  setStartedAfter('');
-                  setStartedBefore('');
-                  setTodayOnly(false);
+                  setTimeRangePreset(TIME_RANGE_PRESET.ALL_TIME);
+                  setTimeRangeCustomAfter('');
+                  setTimeRangeCustomBefore('');
                   clearSelection();
                   setEditingSavedFilterId(null);
                   setEditingSavedFilterName('');
@@ -888,7 +898,9 @@ export function ActivitiesPage() {
                 onOpenCustomizeColumns={() => setCallHistoryCustomizeOpen(true)}
                 onViewAttempt={(r) => setAttemptDetailRow(r)}
                 onOpenDialSession={(r) => {
-                  if (r?.dialer_session_id) navigate(`/dialer/session/${r.dialer_session_id}`);
+                  if (r?.dialer_session_id) {
+                    navigate(`/dialer/session/${r.dialer_session_id}`, { state: { fromCallHistory: true } });
+                  }
                 }}
                 formatWhen={(v) => safeDateTime(v)}
                 notesPreview={(r) => sanitizeAttemptNotesForDisplay(r.notes || '').slice(0, 120) || '—'}
@@ -917,7 +929,8 @@ export function ActivitiesPage() {
         onClose={() => setAttemptDetailRow(null)}
         row={attemptDetailRow}
         formatWhen={safeDateTime}
-        onFilterByParty={(id) => {
+        dialSessionNavigateState={{ fromCallHistory: true }}
+        onFilterByCustomer={(id) => {
           clearSelection();
           setContactFilter(id);
         }}
@@ -933,29 +946,17 @@ export function ActivitiesPage() {
           statusFilterMulti,
           connectedFilterMulti,
           agentFilterMulti,
-          todayOnly,
-          startedAfter,
-          startedBefore,
+          timeRangePreset,
+          customStartedAfter: timeRangeCustomAfter,
+          customStartedBefore: timeRangeCustomBefore,
         }}
+        initialColumnRules={callHistoryColumnFilters}
         dispositionOptions={dispositionOptions}
         agentOptions={agentOptions}
         directionOptions={directionOptions}
         statusOptions={statusOptions}
         connectedOptions={connectedOptions}
         canPickAgents={user?.role === 'admin' || user?.role === 'manager'}
-        onReset={() => {
-          setContactFilter('');
-          setDispositionFilterMulti('');
-          setDirectionFilterMulti('');
-          setStatusFilterMulti('');
-          setConnectedFilterMulti('');
-          setAgentFilterMulti('');
-          setTodayOnly(false);
-          setStartedAfter('');
-          setStartedBefore('');
-          setPage(1);
-          clearSelection();
-        }}
         onApply={(next) => {
           setContactFilter(next?.contactFilter ?? '');
           setDispositionFilterMulti(next?.dispositionFilterMulti ?? '');
@@ -963,9 +964,10 @@ export function ActivitiesPage() {
           setStatusFilterMulti(next?.statusFilterMulti ?? '');
           setConnectedFilterMulti(next?.connectedFilterMulti ?? '');
           setAgentFilterMulti(next?.agentFilterMulti ?? '');
-          setTodayOnly(Boolean(next?.todayOnly));
-          setStartedAfter(next?.startedAfter ?? '');
-          setStartedBefore(next?.startedBefore ?? '');
+          setTimeRangePreset(next?.timeRangePreset ?? TIME_RANGE_PRESET.ALL_TIME);
+          setTimeRangeCustomAfter(next?.customStartedAfter ?? '');
+          setTimeRangeCustomBefore(next?.customStartedBefore ?? '');
+          setCallHistoryColumnFilters(Array.isArray(next?.columnFilters) ? next.columnFilters : []);
           setPage(1);
           clearSelection();
           setEditingSavedFilterId(null);
@@ -1062,7 +1064,7 @@ export function ActivitiesPage() {
         title="Customize columns"
         getDefaults={getDefaultVisibleCallHistoryColumnIds}
         persistVisibleIds={saveCallHistoryVisibleColumnIds}
-        pinnedColumnId="created_at"
+        pinnedColumnId="contact"
         standardColumnTagLabel="Default"
         canAddCustomField={false}
       />

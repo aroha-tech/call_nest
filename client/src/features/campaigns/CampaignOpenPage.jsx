@@ -80,7 +80,7 @@ export function CampaignOpenPage() {
   return (
     <div className={listStyles.page}>
       <PageHeader
-        title={`Campaign #${id}`}
+        title="Campaign workspace"
         description="Your assigned records in this campaign (static: by campaign membership; filter: by campaign rules)."
         actions={
           <Button variant="secondary" onClick={() => navigate('/campaigns')}>

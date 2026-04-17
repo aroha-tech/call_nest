@@ -13,7 +13,6 @@ export const DIAL_SESSIONS_COLUMNS_STORAGE_KEY = 'callnest.dialSessions.visibleC
 /** @type {DialSessionsColumnDef[]} */
 export const ALL_DIAL_SESSIONS_COLUMNS = [
   { id: 'session_no', label: 'Session #', sortKey: 'user_session_no', category: 'default' },
-  { id: 'id', label: 'ID', sortKey: 'id', category: 'default' },
   { id: 'status', label: 'Status', sortKey: 'status', category: 'default' },
   { id: 'provider', label: 'Provider', sortKey: 'provider', category: 'default' },
   { id: 'leads', label: 'Total contacts', sortKey: 'items_count', category: 'default' },
@@ -37,7 +36,6 @@ export function getDefaultVisibleDialSessionsColumnIds(applicable) {
   const ids = new Set((applicable || []).map((c) => c.id));
   const order = [
     'session_no',
-    'id',
     'status',
     'provider',
     'leads',

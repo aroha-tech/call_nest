@@ -68,6 +68,7 @@ import {
 import { savedListFiltersAPI } from '../../services/savedListFiltersAPI';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
 import { industryFieldColumnId } from './industryFieldColumnIds';
+import { isNoListFilter, normalizeListFilterAll } from '../../utils/listFilterNarrowing';
 
 const FILTER_ALL = '__all__';
 
@@ -321,7 +322,7 @@ function ListActionsMenu({
                       onUnassign();
                     }}
                   >
-                    Unassign agent
+                    Remove agent
                   </ListActionsMenuItem>
                 </>
               ) : null}
@@ -531,12 +532,12 @@ export function ContactsPage({ type, mode = 'crm' }) {
   const [appliedStatusIdsMulti, setAppliedStatusIdsMulti] = useState('');
   const [contactTags, setContactTags] = useState([]);
   const [contactStatuses, setContactStatuses] = useState([]);
-  const [touchStatusFilter, setTouchStatusFilter] = useState(FILTER_ALL);
+  const [touchStatusFilter, setTouchStatusFilter] = useState('');
   const [minCallCountFilter, setMinCallCountFilter] = useState('');
   const [maxCallCountFilter, setMaxCallCountFilter] = useState('');
-  const [lastCalledPreset, setLastCalledPreset] = useState(FILTER_ALL);
-  const [appliedManagerFilter, setAppliedManagerFilter] = useState(FILTER_ALL);
-  const [appliedAgentFilter, setAppliedAgentFilter] = useState(FILTER_ALL);
+  const [lastCalledPreset, setLastCalledPreset] = useState('');
+  const [appliedManagerFilter, setAppliedManagerFilter] = useState('');
+  const [appliedAgentFilter, setAppliedAgentFilter] = useState('');
   /** Admin: JSON array string for MultiSelectDropdown (manager ids + optional "unassigned"). */
   const [appliedAdminManagersMulti, setAppliedAdminManagersMulti] = useState('');
   const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false);
@@ -736,11 +737,11 @@ export function ContactsPage({ type, mode = 'crm' }) {
   }, [type, contactApplicableColumns]);
 
   const filterParamsForApi = useMemo(() => {
-    const mid = role === 'manager' ? FILTER_ALL : role === 'admin' ? FILTER_ALL : appliedManagerFilter;
+    const mid = role === 'manager' || role === 'admin' ? '' : appliedManagerFilter;
     const aid = appliedAgentFilter;
     const dialerParams = {};
     if (isDialer && type === 'lead') {
-      if (touchStatusFilter && touchStatusFilter !== FILTER_ALL) {
+      if (touchStatusFilter && !isNoListFilter(touchStatusFilter)) {
         dialerParams.touch_status = touchStatusFilter;
       }
       if (minCallCountFilter !== '' && Number.isFinite(Number(minCallCountFilter))) {
@@ -749,7 +750,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
       if (maxCallCountFilter !== '' && Number.isFinite(Number(maxCallCountFilter))) {
         dialerParams.max_call_count = Number(maxCallCountFilter);
       }
-      if (lastCalledPreset && lastCalledPreset !== FILTER_ALL) {
+      if (lastCalledPreset && !isNoListFilter(lastCalledPreset)) {
         const days = Number(lastCalledPreset);
         if (Number.isFinite(days) && days > 0) {
           const d = new Date();
@@ -760,7 +761,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
     }
 
     let filter_manager_id =
-      !mid || mid === FILTER_ALL ? undefined : mid === 'unassigned' ? 'unassigned' : Number(mid);
+      !mid || isNoListFilter(mid) ? undefined : mid === 'unassigned' ? 'unassigned' : Number(mid);
     let filter_manager_ids;
     let filter_unassigned_managers;
     if (role === 'admin' && appliedAdminManagersMulti) {
@@ -834,7 +835,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
       filter_manager_ids,
       filter_unassigned_managers,
       filter_assigned_user_id:
-        !aid || aid === FILTER_ALL ? undefined : aid === 'unassigned' ? 'unassigned' : Number(aid),
+        !aid || isNoListFilter(aid) ? undefined : aid === 'unassigned' ? 'unassigned' : Number(aid),
       campaign_ids,
       filter_tag_ids,
       status_ids,
@@ -873,10 +874,10 @@ export function ContactsPage({ type, mode = 'crm' }) {
       String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' })
     );
     return [
-      { value: 'none', label: 'No campaign' },
+      { value: 'none', label: 'Without a campaign' },
       ...rows.map((c) => ({
         value: String(c.id),
-        label: c.name || `#${c.id}`,
+        label: c.name || '—',
       })),
     ];
   }, [campaigns]);
@@ -888,7 +889,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
         .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }))
         .map((t) => ({
           value: String(t.id),
-          label: t.name || `#${t.id}`,
+          label: t.name || '—',
         })),
     [contactTags]
   );
@@ -899,10 +900,10 @@ export function ContactsPage({ type, mode = 'crm' }) {
       String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' })
     );
     return [
-      { value: 'none', label: 'No status' },
+      { value: 'none', label: 'Without a status' },
       ...rows.map((s) => ({
         value: String(s.id),
-        label: s.name || `#${s.id}`,
+        label: s.name || '—',
       })),
     ];
   }, [contactStatuses]);
@@ -1102,10 +1103,10 @@ export function ContactsPage({ type, mode = 'crm' }) {
       .filter((u) => u.role === 'manager')
       .map((u) => ({
         value: String(u.id),
-        label: u.name || u.email || `#${u.id}`,
+        label: u.name || u.email || '—',
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-    return [{ value: 'unassigned', label: 'Unassigned pool' }, ...managers];
+    return [{ value: 'unassigned', label: 'No manager' }, ...managers];
   }, [tenantUsers]);
 
   const agentFilterOptionsForModal = useMemo(() => {
@@ -1123,7 +1124,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
       }
       if (multiActive) {
         pool = agents;
-      } else if (appliedManagerFilter === FILTER_ALL) {
+      } else if (isNoListFilter(appliedManagerFilter)) {
         pool = agents;
       } else if (appliedManagerFilter === 'unassigned') {
         pool = agents.filter((a) => a.manager_id == null);
@@ -1135,14 +1136,10 @@ export function ContactsPage({ type, mode = 'crm' }) {
     const opts = pool
       .map((u) => ({
         value: String(u.id),
-        label: u.name || u.email || `#${u.id}`,
+        label: u.name || u.email || '—',
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-    return [
-      { value: FILTER_ALL, label: 'All agents' },
-      { value: 'unassigned', label: 'No assigned agent' },
-      ...opts,
-    ];
+    return [{ value: 'unassigned', label: 'No agent' }, ...opts];
   }, [tenantUsers, role, user?.id, appliedManagerFilter, appliedAdminManagersMulti]);
 
   useEffect(() => {
@@ -1169,14 +1166,14 @@ export function ContactsPage({ type, mode = 'crm' }) {
       setAppliedCampaignIdsMulti(campaignMultiFromSnapshot(snap));
       setAppliedTagIdsMulti(snap.appliedTagIdsMulti ?? '');
       setAppliedStatusIdsMulti(snap.appliedStatusIdsMulti ?? '');
-      setAppliedManagerFilter(snap.appliedManagerFilter ?? FILTER_ALL);
+      setAppliedManagerFilter(normalizeListFilterAll(snap.appliedManagerFilter));
       const multi = snap.appliedAdminManagersMulti ?? snap.draftAdminManagersMultiForBar ?? '';
       setAppliedAdminManagersMulti(multi);
-      setAppliedAgentFilter(snap.appliedAgentFilter ?? FILTER_ALL);
-      setTouchStatusFilter(snap.touchStatusFilter ?? FILTER_ALL);
+      setAppliedAgentFilter(normalizeListFilterAll(snap.appliedAgentFilter));
+      setTouchStatusFilter(normalizeListFilterAll(snap.touchStatusFilter));
       setMinCallCountFilter(snap.minCallCountFilter ?? '');
       setMaxCallCountFilter(snap.maxCallCountFilter ?? '');
-      setLastCalledPreset(snap.lastCalledPreset ?? FILTER_ALL);
+      setLastCalledPreset(normalizeListFilterAll(snap.lastCalledPreset));
       setLeadColumnFilters(Array.isArray(snap.leadColumnFilters) ? snap.leadColumnFilters : []);
       setContactColumnFilters(Array.isArray(snap.contactColumnFilters) ? snap.contactColumnFilters : []);
       setLeadSortBy(snap.leadSortBy ?? null);
@@ -1361,13 +1358,13 @@ export function ContactsPage({ type, mode = 'crm' }) {
       else setContactColumnFilters(payload.columnRules ?? []);
       setAppliedCampaignIdsMulti(payload.campaignIdsMulti ?? '');
       setAppliedAdminManagersMulti(payload.adminManagersMulti ?? '');
-      setAppliedAgentFilter(payload.agentFilter ?? FILTER_ALL);
+      setAppliedAgentFilter(normalizeListFilterAll(payload.agentFilter));
       setAppliedTagIdsMulti(payload.tagIdsMulti ?? '');
       setAppliedStatusIdsMulti(payload.statusIdsMulti ?? '');
-      setTouchStatusFilter(payload.touchStatus ?? FILTER_ALL);
+      setTouchStatusFilter(normalizeListFilterAll(payload.touchStatus));
       setMinCallCountFilter(payload.minCallCount ?? '');
       setMaxCallCountFilter(payload.maxCallCount ?? '');
-      setLastCalledPreset(payload.lastCalledPreset ?? FILTER_ALL);
+      setLastCalledPreset(normalizeListFilterAll(payload.lastCalledPreset));
       setPage(1);
       clearSelection();
     },
@@ -1378,7 +1375,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
     (payload) => {
       const base = editingSavedFilterSnapshot;
       const useBase = base != null && base.version === 1;
-      const mgr = useBase ? base.appliedManagerFilter ?? FILTER_ALL : appliedManagerFilter;
+      const mgr = normalizeListFilterAll(useBase ? base.appliedManagerFilter : appliedManagerFilter);
       return {
         version: 1,
         type,
@@ -1390,12 +1387,12 @@ export function ContactsPage({ type, mode = 'crm' }) {
         appliedManagerFilter: mgr,
         appliedAdminManagersMulti: payload.adminManagersMulti ?? '',
         draftAdminManagersMultiForBar: payload.adminManagersMulti ?? '',
-        appliedAgentFilter: payload.agentFilter ?? FILTER_ALL,
-        draftManagerFilter: role === 'admin' ? FILTER_ALL : mgr,
-        touchStatusFilter: payload.touchStatus ?? FILTER_ALL,
+        appliedAgentFilter: normalizeListFilterAll(payload.agentFilter),
+        draftManagerFilter: role === 'admin' ? '' : mgr,
+        touchStatusFilter: normalizeListFilterAll(payload.touchStatus),
         minCallCountFilter: payload.minCallCount ?? '',
         maxCallCountFilter: payload.maxCallCount ?? '',
-        lastCalledPreset: payload.lastCalledPreset ?? FILTER_ALL,
+        lastCalledPreset: normalizeListFilterAll(payload.lastCalledPreset),
         leadColumnFilters:
           type === 'lead'
             ? payload.columnRules ?? []
@@ -1474,13 +1471,13 @@ export function ContactsPage({ type, mode = 'crm' }) {
     setAppliedCampaignIdsMulti('');
     setAppliedTagIdsMulti('');
     setAppliedStatusIdsMulti('');
-    setAppliedManagerFilter(FILTER_ALL);
+    setAppliedManagerFilter('');
     setAppliedAdminManagersMulti('');
-    setAppliedAgentFilter(FILTER_ALL);
-    setTouchStatusFilter(FILTER_ALL);
+    setAppliedAgentFilter('');
+    setTouchStatusFilter('');
     setMinCallCountFilter('');
     setMaxCallCountFilter('');
-    setLastCalledPreset(FILTER_ALL);
+    setLastCalledPreset('');
     setLeadColumnFilters([]);
     setContactColumnFilters([]);
     setLeadSortBy(null);
@@ -1551,7 +1548,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
       refetch();
     } else {
       setUnassignConfirmOpen(false);
-      setUnassignError(result?.error || 'Could not unassign agent.');
+      setUnassignError(result?.error || 'Could not remove the agent assignment.');
     }
   };
 
@@ -1605,17 +1602,17 @@ export function ContactsPage({ type, mode = 'crm' }) {
   const dialerFilterActive =
     isDialer &&
     type === 'lead' &&
-    ((touchStatusFilter && touchStatusFilter !== FILTER_ALL) ||
+    (!isNoListFilter(touchStatusFilter) ||
       (minCallCountFilter !== '' && Number.isFinite(Number(minCallCountFilter))) ||
       (maxCallCountFilter !== '' && Number.isFinite(Number(maxCallCountFilter))) ||
-      (lastCalledPreset && lastCalledPreset !== FILTER_ALL));
+      !isNoListFilter(lastCalledPreset));
 
   const hasActiveFilters =
     (type === 'lead' && leadColumnFilters.length > 0) ||
     (type === 'contact' && contactColumnFilters.length > 0) ||
     (role === 'admin' &&
-      (appliedManagerFilter !== FILTER_ALL || adminManagersFilterActive || appliedAgentFilter !== FILTER_ALL)) ||
-    (role === 'manager' && appliedAgentFilter !== FILTER_ALL) ||
+      (!isNoListFilter(appliedManagerFilter) || adminManagersFilterActive || !isNoListFilter(appliedAgentFilter))) ||
+    (role === 'manager' && !isNoListFilter(appliedAgentFilter)) ||
     (showCampaign && campaignFilterActive) ||
     tagFilterActive ||
     statusFilterActive ||
@@ -1637,13 +1634,13 @@ export function ContactsPage({ type, mode = 'crm' }) {
             : [],
       initialCampaignIdsMulti: campaignMultiFromSnapshot(s),
       initialAdminManagersMulti: s.appliedAdminManagersMulti ?? s.draftAdminManagersMultiForBar ?? '',
-      initialAgentFilter: s.appliedAgentFilter ?? FILTER_ALL,
+      initialAgentFilter: normalizeListFilterAll(s.appliedAgentFilter),
       initialTagIdsMulti: s.appliedTagIdsMulti ?? '',
       initialStatusIdsMulti: s.appliedStatusIdsMulti ?? '',
-      initialTouchStatus: s.touchStatusFilter ?? FILTER_ALL,
+      initialTouchStatus: normalizeListFilterAll(s.touchStatusFilter),
       initialMinCallCount: s.minCallCountFilter ?? '',
       initialMaxCallCount: s.maxCallCountFilter ?? '',
-      initialLastCalledPreset: s.lastCalledPreset ?? FILTER_ALL,
+      initialLastCalledPreset: normalizeListFilterAll(s.lastCalledPreset),
     };
   }, [editingSavedFilterSnapshot, editingSavedFilterId, type]);
 
@@ -1828,11 +1825,12 @@ export function ContactsPage({ type, mode = 'crm' }) {
                 tableScrollContainerRef={leadTableScrollRef}
                 canUpdate={canUpdate}
                 canDelete={canDelete}
-                onView={(c) => navigate(`/leads/${c.id}?mode=view`)}
+                onView={isDialer ? undefined : (c) => navigate(`/leads/${c.id}?mode=view`)}
                 onEdit={(c) => navigate(`/leads/${c.id}?mode=edit`)}
                 onDelete={setDeleteItem}
                 showDialerCall={isDialer}
                 onDialerCall={(c) => openStartModal([c.id])}
+                displayNameLinkTo={isDialer ? (c) => `/leads/${c.id}?mode=view` : undefined}
               />
             ) : (
               <LeadDataTable
@@ -1886,9 +1884,9 @@ export function ContactsPage({ type, mode = 'crm' }) {
           }
         }}
         onConfirm={confirmUnassignAgents}
-        title="Unassign agent"
+        title="Remove agent assignment"
         message={`Remove the assigned agent from ${selectedIds.size} selected record(s)? They will stay with their current manager (if any).`}
-        confirmText="Unassign"
+        confirmText="Remove"
         variant="primary"
         loading={assignMutation.loading}
       />

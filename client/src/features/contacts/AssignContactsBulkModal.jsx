@@ -16,7 +16,7 @@ function agentRowsToOptions(agents) {
   return agents
     .map((u) => ({
       value: String(u.id),
-      label: u.name || u.email || `#${u.id}`,
+      label: u.name || u.email || '—',
     }))
     .sort((a, b) => a.label.localeCompare(b.label));
 }
@@ -25,7 +25,7 @@ function agentRowsToOptions(agents) {
  * Bulk assign / unassign contacts (admin + manager).
  * Uses POST /contacts/assign with explicit null vs omitted fields.
  *
- * Admin: picking "Unassigned pool" forces agent to unassign and hides other agents.
+ * Admin: choosing "Clear manager and agent" forces agent to clear and hides other agents.
  * Picking a manager filters agents to that manager's team; "No change" shows all agents.
  */
 export function AssignContactsBulkModal({
@@ -76,7 +76,7 @@ export function AssignContactsBulkModal({
     loadMeta();
   }, [isOpen, loadMeta]);
 
-  /** Unassigned pool → agent must be unassigned */
+  /** Clear manager → agent must be cleared */
   useEffect(() => {
     if (isAdmin && managerChoice === CLEAR) {
       setAgentChoice(CLEAR);
@@ -110,7 +110,7 @@ export function AssignContactsBulkModal({
   const managerOptions = useMemo(() => {
     return users
       .filter((u) => u.role === 'manager')
-      .map((u) => ({ value: String(u.id), label: u.name || u.email || `#${u.id}` }))
+      .map((u) => ({ value: String(u.id), label: u.name || u.email || '—' }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [users]);
 
@@ -130,7 +130,7 @@ export function AssignContactsBulkModal({
       if (!isMixed && !selectionIncomplete && typeof sharedManagerId === 'number') {
         return users.filter((u) => u.role === 'agent' && Number(u.manager_id) === sharedManagerId);
       }
-      // Same team unknown, mixed teams, or all unassigned pool → show all agents (submit rules still apply)
+      // Same team unknown, mixed teams, or all without manager → show all agents (submit rules still apply)
       return users.filter((u) => u.role === 'agent');
     }
     const mgrId = Number(managerChoice);
@@ -139,11 +139,11 @@ export function AssignContactsBulkModal({
 
   const agentFieldOptions = useMemo(() => {
     if (isAdmin && managerChoice === CLEAR) {
-      return [{ value: CLEAR, label: '— Unassign agent (required with unassigned pool) —' }];
+      return [{ value: CLEAR, label: '— Clear agent (required when there is no manager) —' }];
     }
     return [
       { value: NO_CHANGE, label: '— No change —' },
-      { value: CLEAR, label: '— Unassign agent —' },
+      { value: CLEAR, label: '— Clear agent —' },
       ...agentRowsToOptions(agentsForManagerFilter),
     ];
   }, [isAdmin, managerChoice, agentsForManagerFilter]);
@@ -164,7 +164,7 @@ export function AssignContactsBulkModal({
   const campaignOptions = useMemo(() => {
     return (campaigns || [])
       .filter((c) => c.type === 'static')
-      .map((c) => ({ value: String(c.id), label: c.name || `#${c.id}` }));
+      .map((c) => ({ value: String(c.id), label: c.name || '—' }));
   }, [campaigns]);
 
   const handleSubmit = async () => {
@@ -218,7 +218,7 @@ export function AssignContactsBulkModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Assign / unassign (${selectedIds.length} selected)`}
+      title={`Assign or update (${selectedIds.length} selected)`}
       size="md"
       closeOnEscape
       footer={
@@ -242,9 +242,9 @@ export function AssignContactsBulkModal({
           <p style={{ margin: 0, fontSize: 13, opacity: 0.85 }}>
             <strong>Admin:</strong> choose a manager to filter agents to that team. With &quot;No change&quot;, agents are
             limited to the selected rows&apos; team when all share one manager; otherwise pick an owning manager first.
-            Unassigned pool clears manager and agent together.
+            Clearing the manager also clears the agent.
             <br />
-            <strong>Manager:</strong> assign or unassign agents on your team; optional campaign.
+            <strong>Manager:</strong> assign or remove agents on your team; optional campaign.
           </p>
 
           {isAdmin ? (
@@ -254,7 +254,7 @@ export function AssignContactsBulkModal({
               onChange={handleManagerChange}
               options={[
                 { value: NO_CHANGE, label: '— No change —' },
-                { value: CLEAR, label: '— Unassigned pool (clear manager & agent) —' },
+                { value: CLEAR, label: '— Clear manager and agent —' },
                 ...managerOptions,
               ]}
             />

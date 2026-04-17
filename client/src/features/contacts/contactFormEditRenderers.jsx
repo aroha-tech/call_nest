@@ -309,7 +309,7 @@ export function createContactFormEditSectionRenderers(ctx) {
             placeholder="— None —"
             options={contactStatuses.map((s) => ({
               value: s.id,
-              label: s.name ? `${s.name}${s.code ? ` (${s.code})` : ''}` : s.code || s.id,
+              label: s.name ? `${s.name}${s.code ? ` (${s.code})` : ''}` : s.code || '—',
             }))}
           />
         </div>
@@ -447,7 +447,7 @@ export function createContactFormEditSectionRenderers(ctx) {
         {(formData.tag_ids || []).length === 0 ? <p className={styles.tagEmptyHint}>No tags yet — add one below.</p> : null}
         <div className={styles.tagChips} role="list">
           {(formData.tag_ids || []).map((tid) => {
-            const label = contactTagOptions.find((o) => o.value === String(tid))?.label || tid;
+            const label = contactTagOptions.find((o) => o.value === String(tid))?.label || '—';
             return (
               <span key={tid} className={styles.tagChip} role="listitem">
                 <span className={styles.tagChipLabel}>{label}</span>
@@ -504,7 +504,7 @@ export function createContactFormEditSectionRenderers(ctx) {
             </h2>
             {showFormHints ? (
               <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
-                Optional manager, agent, and campaign; leave empty for unassigned pool.
+                Optional manager, agent, and campaign; leave manager empty if this record has no manager yet.
               </p>
             ) : null}
             <div className={styles.assignGrid}>
@@ -595,16 +595,16 @@ export function createContactFormEditSectionRenderers(ctx) {
                   label="Manager"
                   value={formData.manager_id}
                   onChange={(e) => setFormData((p) => ({ ...p, manager_id: e.target.value }))}
-                  placeholder="— Unassigned pool —"
-                  options={[{ value: '', label: '— Unassigned pool —' }, ...managerSelectOptions]}
+                  placeholder="— No manager —"
+                  options={[{ value: '', label: '— No manager —' }, ...managerSelectOptions]}
                 />
               ) : null}
               <Select
                 label="Assigned agent"
                 value={formData.assigned_user_id}
                 onChange={(e) => setFormData((p) => ({ ...p, assigned_user_id: e.target.value }))}
-                placeholder="— Unassigned —"
-                options={[{ value: '', label: '— Unassigned —' }, ...agentSelectOptions]}
+                placeholder="— No agent —"
+                options={[{ value: '', label: '— No agent —' }, ...agentSelectOptions]}
               />
               <Select
                 label="Campaign"

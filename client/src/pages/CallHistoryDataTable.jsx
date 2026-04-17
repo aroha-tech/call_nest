@@ -22,24 +22,21 @@ function renderCell(col, r, { formatWhen, notesPreview }) {
   switch (col.id) {
     case 'created_at':
       return formatWhen?.(r.created_at) ?? r.created_at ?? '—';
-    case 'id':
-      return `#${r.id}`;
     case 'contact':
       return (
         <button type="button" className={styles.linkBtn} onClick={() => r.__viewAttempt?.()}>
-          {r.display_name || `Party #${r.contact_id}`}
+          {r.display_name || '—'}
         </button>
       );
     case 'phone':
       return r.phone_e164 || '—';
     case 'agent':
-      return r.agent_name || (r.agent_user_id ? `#${r.agent_user_id}` : '—');
+      return r.agent_name || '—';
     case 'dial_session': {
       const sid = r.dialer_session_id;
       const no = r.dialer_user_session_no;
       if (!sid && (no == null || no === '')) return '—';
-      const label =
-        no != null && no !== '' ? `Session #${no}` : sid ? `Session id ${sid}` : '—';
+      const label = no != null && no !== '' ? `Session #${no}` : 'Dial session';
       return (
         <button
           type="button"
@@ -191,7 +188,7 @@ export function CallHistoryDataTable({
                   type="checkbox"
                   checked={selectedSet.has(String(r.id))}
                   onChange={() => onToggleSelect?.(r.id)}
-                  aria-label={`Select attempt ${r.id}`}
+                  aria-label="Select this call row"
                 />
               </TableCell>
 
@@ -205,7 +202,7 @@ export function CallHistoryDataTable({
                 {onViewAttempt ? (
                   <IconButton
                     size="sm"
-                    title="View this call attempt"
+                    title="View call details"
                     onClick={() => onViewAttempt(r)}
                   >
                     <ViewIcon />

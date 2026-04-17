@@ -122,14 +122,14 @@ export function ContactOpportunitiesSection({ contactId, contactType, accountNam
         setUserOptions(
           users.map((u) => ({
             value: String(u.id),
-            label: u.name || u.email || `User #${u.id}`,
+            label: u.name || u.email || '—',
           }))
         );
         const camps = cRes?.data?.data ?? [];
         setCampaignOptions(
           camps.map((c) => ({
             value: String(c.id),
-            label: c.name || `Campaign #${c.id}`,
+            label: c.name || '—',
           }))
         );
       } catch {

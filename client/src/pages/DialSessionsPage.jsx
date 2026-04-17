@@ -30,6 +30,7 @@ import {
   loadDialSessionsVisibleColumnIds,
   saveDialSessionsVisibleColumnIds,
 } from './dialSessionsTableConfig';
+import { TIME_RANGE_PRESET, resolveDialSessionCreatedParams } from '../utils/dateRangePresets';
 
 function safeDateTime(v) {
   if (!v) return '—';
@@ -94,8 +95,9 @@ export function DialSessionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [providerFilter, setProviderFilter] = useState('');
-  const [createdAfter, setCreatedAfter] = useState('');
-  const [createdBefore, setCreatedBefore] = useState('');
+  const [timeRangePreset, setTimeRangePreset] = useState(TIME_RANGE_PRESET.ALL_TIME);
+  const [timeRangeCustomCreatedAfter, setTimeRangeCustomCreatedAfter] = useState('');
+  const [timeRangeCustomCreatedBefore, setTimeRangeCustomCreatedBefore] = useState('');
   const [filterCreatedByUserId, setFilterCreatedByUserId] = useState('');
   const [filterScriptQ, setFilterScriptQ] = useState('');
   const [filterItemsMin, setFilterItemsMin] = useState('');
@@ -140,13 +142,24 @@ export function DialSessionsPage() {
     setSelectionIsAllMatching(false);
   }, []);
 
+  const dialSessionTimeParams = useMemo(
+    () =>
+      resolveDialSessionCreatedParams(
+        timeRangePreset,
+        timeRangeCustomCreatedAfter,
+        timeRangeCustomCreatedBefore,
+        new Date()
+      ),
+    [timeRangePreset, timeRangeCustomCreatedAfter, timeRangeCustomCreatedBefore]
+  );
+
   const listFilterParams = useMemo(
     () => ({
       q: searchQuery?.trim() ? searchQuery.trim() : undefined,
       status: statusFilter || undefined,
       provider: providerFilter?.trim() ? providerFilter.trim() : undefined,
-      created_after: createdAfter || undefined,
-      created_before: createdBefore || undefined,
+      created_after: dialSessionTimeParams.created_after,
+      created_before: dialSessionTimeParams.created_before,
       created_by_user_id: filterCreatedByUserId?.trim() || undefined,
       script_q: filterScriptQ?.trim() || undefined,
       items_min: filterItemsMin?.trim() || undefined,
@@ -167,8 +180,7 @@ export function DialSessionsPage() {
       searchQuery,
       statusFilter,
       providerFilter,
-      createdAfter,
-      createdBefore,
+      dialSessionTimeParams,
       filterCreatedByUserId,
       filterScriptQ,
       filterItemsMin,
@@ -206,7 +218,7 @@ export function DialSessionsPage() {
           const v = String(row.id);
           if (seen.has(v)) continue;
           seen.add(v);
-          base.push({ value: v, label: row.name || row.email || `#${row.id}` });
+          base.push({ value: v, label: row.name || row.email || '—' });
         }
         if (!cancelled) setFilterUserOptions(base);
       } catch {
@@ -357,8 +369,7 @@ export function DialSessionsPage() {
     String(searchQuery || '').trim() ||
       String(statusFilter || '').trim() ||
       String(providerFilter || '').trim() ||
-      createdAfter ||
-      createdBefore ||
+      timeRangePreset !== TIME_RANGE_PRESET.ALL_TIME ||
       String(filterCreatedByUserId || '').trim() ||
       String(filterScriptQ || '').trim() ||
       String(filterItemsMin || '').trim() ||
@@ -603,8 +614,9 @@ export function DialSessionsPage() {
         values={{
           statusFilter,
           providerFilter,
-          createdAfter,
-          createdBefore,
+          timeRangePreset,
+          customCreatedAfter: timeRangeCustomCreatedAfter,
+          customCreatedBefore: timeRangeCustomCreatedBefore,
           createdByUserId: filterCreatedByUserId,
           scriptQ: filterScriptQ,
           itemsMin: filterItemsMin,
@@ -624,8 +636,9 @@ export function DialSessionsPage() {
         onApply={(next) => {
           setStatusFilter(next?.statusFilter ?? '');
           setProviderFilter(next?.providerFilter ?? '');
-          setCreatedAfter(next?.createdAfter ?? '');
-          setCreatedBefore(next?.createdBefore ?? '');
+          setTimeRangePreset(next?.timeRangePreset ?? TIME_RANGE_PRESET.ALL_TIME);
+          setTimeRangeCustomCreatedAfter(next?.customCreatedAfter ?? '');
+          setTimeRangeCustomCreatedBefore(next?.customCreatedBefore ?? '');
           setFilterCreatedByUserId(next?.createdByUserId ?? '');
           setFilterScriptQ(next?.scriptQ ?? '');
           setFilterItemsMin(next?.itemsMin ?? '');

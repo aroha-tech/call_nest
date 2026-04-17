@@ -3,6 +3,8 @@ import { Modal, ModalFooter } from '../components/ui/Modal';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
+import { DateRangePresetControl } from '../components/ui/DateRangePresetControl';
+import { TIME_RANGE_PRESET } from '../utils/dateRangePresets';
 import styles from './CallHistoryFilterModal.module.scss';
 
 const STATUS_OPTIONS = [
@@ -146,20 +148,17 @@ export function DialSessionsFilterModal({
         />
 
         <p className={styles.sectionLabel}>Created</p>
-        <div className={styles.dateGrid}>
-          <Input
-            label="Created after"
-            type="datetime-local"
-            value={fields.createdAfter ?? ''}
-            onChange={(e) => setDraft((d) => ({ ...d, createdAfter: e.target.value }))}
-          />
-          <Input
-            label="Created before"
-            type="datetime-local"
-            value={fields.createdBefore ?? ''}
-            onChange={(e) => setDraft((d) => ({ ...d, createdBefore: e.target.value }))}
-          />
-        </div>
+        <DateRangePresetControl
+          variant="datetime"
+          startLabel="Created after"
+          endLabel="Created before"
+          preset={fields.timeRangePreset ?? TIME_RANGE_PRESET.ALL_TIME}
+          onPresetChange={(v) => setDraft((d) => ({ ...d, timeRangePreset: v }))}
+          customStart={fields.customCreatedAfter ?? ''}
+          customEnd={fields.customCreatedBefore ?? ''}
+          onCustomStartChange={(v) => setDraft((d) => ({ ...d, customCreatedAfter: v }))}
+          onCustomEndChange={(v) => setDraft((d) => ({ ...d, customCreatedBefore: v }))}
+        />
 
         <p className={styles.sectionLabel}>Queue counts (min / max per session)</p>
         <div className={styles.countRangesGrid}>

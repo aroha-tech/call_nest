@@ -194,7 +194,7 @@ export function ContactLeadActivityPage({ recordType }) {
         onClose={() => setAttemptDetailRow(null)}
         row={attemptDetailRow}
         formatWhen={safeDateTime}
-        onFilterByParty={(cid) => {
+        onFilterByCustomer={(cid) => {
           setAttemptDetailRow(null);
           navigate(`/calls/history?contact_id=${encodeURIComponent(cid)}`);
         }}

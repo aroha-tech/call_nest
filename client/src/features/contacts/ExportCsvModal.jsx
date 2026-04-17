@@ -48,7 +48,7 @@ export function ExportCsvModal({
   const idToLabel = useMemo(() => {
     const m = new Map();
     for (const c of applicableColumns || []) {
-      m.set(c.id, c.label || c.id);
+      m.set(c.id, c.label || 'Field');
     }
     return m;
   }, [applicableColumns]);
@@ -244,7 +244,7 @@ export function ExportCsvModal({
               <div key={col.id} className={styles.checkRow}>
                 <Checkbox
                   id={`export-csv-col-${col.id}`}
-                  label={col.label || col.id}
+                  label={col.label || 'Field'}
                   checked={includedOrder.includes(col.id)}
                   onChange={() => toggleColumn(col.id)}
                 />

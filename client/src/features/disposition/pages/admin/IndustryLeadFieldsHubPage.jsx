@@ -25,7 +25,7 @@ export function IndustryLeadFieldsHubPage() {
       { value: '', label: '— Select industry —' },
       ...rows.map((i) => ({
         value: String(i.id),
-        label: `${i.name || i.code || i.id}${i.is_active === 0 || i.is_active === false ? ' (inactive)' : ''}`,
+        label: `${i.name || i.code || '—'}${i.is_active === 0 || i.is_active === false ? ' (inactive)' : ''}`,
       })),
     ];
   }, [industries]);

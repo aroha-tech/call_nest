@@ -142,8 +142,6 @@ function renderCell(col, r, { formatWhen, onOpenSession, onOpenCallHistory }) {
   switch (col.id) {
     case 'session_no':
       return <strong>#{r.user_session_no ?? '—'}</strong>;
-    case 'id':
-      return r.id ?? '—';
     case 'status':
       return (
         <Badge variant="muted" size="sm">

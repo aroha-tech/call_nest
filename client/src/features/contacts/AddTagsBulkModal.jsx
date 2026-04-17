@@ -45,7 +45,7 @@ export function AddTagsBulkModal({ isOpen, onClose, selectedIds, recordLabel, on
     () =>
       tags.map((t) => ({
         value: String(t.id),
-        label: t.name || `#${t.id}`,
+        label: t.name || '—',
       })),
     [tags]
   );

@@ -36,6 +36,7 @@ import { CampaignFilterBuilder } from './CampaignFilterBuilder';
 import { defaultRule, getPropertyMeta, ruleNeedsValue, validateRulesForSave } from './campaignFilterConfig';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import pageStyles from './CampaignsPage.module.scss';
+import { isNoListFilter } from '../../utils/listFilterNarrowing';
 
 function parseFilters(campaign) {
   if (!campaign?.filters_json) return {};
@@ -114,10 +115,7 @@ const emptyForm = {
   filterRules: [defaultRule()],
 };
 
-const FILTER_ALL = '__all__';
-
 const TYPE_FILTER_OPTIONS = [
-  { value: FILTER_ALL, label: 'All types' },
   { value: 'static', label: 'Static' },
   { value: 'filter', label: 'Filter' },
 ];
@@ -149,11 +147,11 @@ export function CampaignsPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
 
-  const [draftManagerFilter, setDraftManagerFilter] = useState(FILTER_ALL);
-  const [draftTypeFilter, setDraftTypeFilter] = useState(FILTER_ALL);
+  const [draftManagerFilter, setDraftManagerFilter] = useState('');
+  const [draftTypeFilter, setDraftTypeFilter] = useState('');
 
-  const [appliedManagerFilter, setAppliedManagerFilter] = useState(FILTER_ALL);
-  const [appliedTypeFilter, setAppliedTypeFilter] = useState(FILTER_ALL);
+  const [appliedManagerFilter, setAppliedManagerFilter] = useState('');
+  const [appliedTypeFilter, setAppliedTypeFilter] = useState('');
 
   /** Toolbar toggles (immediate refetch), same pattern as “Show inactive” on other list pages */
   const [showPaused, setShowPaused] = useState(false);
@@ -184,12 +182,12 @@ export function CampaignsPage() {
       show_paused: showPaused,
       include_archived: isAdmin ? includeArchived : false,
     };
-    if (appliedTypeFilter !== FILTER_ALL) {
+    if (!isNoListFilter(appliedTypeFilter)) {
       params.type = appliedTypeFilter;
     }
     if (appliedManagerFilter === 'unassigned') {
       params.manager_id = 'unassigned';
-    } else if (appliedManagerFilter !== FILTER_ALL) {
+    } else if (!isNoListFilter(appliedManagerFilter)) {
       params.manager_id = appliedManagerFilter;
     }
     return params;
@@ -245,7 +243,7 @@ export function CampaignsPage() {
         }
         setManagerMap(map);
         const st = stRes.data?.data ?? [];
-        setStatusOptions(st.map((s) => ({ value: String(s.id), label: s.name || s.code || s.id })));
+        setStatusOptions(st.map((s) => ({ value: String(s.id), label: s.name || s.code || '—' })));
         const tags = tagRes.data?.data ?? [];
         setTagList(tags);
         setAllCampaigns(cRes.data?.data ?? []);
@@ -274,32 +272,32 @@ export function CampaignsPage() {
 
   const managerOptions = useMemo(() => {
     return Object.entries(managerMap)
-      .map(([id, label]) => ({ value: id, label: `${label} (#${id})` }))
+      .map(([id, label]) => ({ value: id, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [managerMap]);
 
   const agentOptions = useMemo(() => {
     return tenantUsers
       .filter((u) => u.role === 'agent')
-      .map((u) => ({ value: String(u.id), label: u.name || u.email || `#${u.id}` }))
+      .map((u) => ({ value: String(u.id), label: u.name || u.email || '—' }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [tenantUsers]);
 
   const staticCampaignOptions = useMemo(() => {
     return (allCampaigns || [])
       .filter((c) => c.type === 'static')
-      .map((c) => ({ value: String(c.id), label: c.name || `#${c.id}` }))
+      .map((c) => ({ value: String(c.id), label: c.name || '—' }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [allCampaigns]);
 
   const tagOptions = useMemo(() => {
-    return (tagList || []).map((t) => ({ value: String(t.id), label: t.name || `#${t.id}` }));
+    return (tagList || []).map((t) => ({ value: String(t.id), label: t.name || '—' }));
   }, [tagList]);
 
   const campaignTypeSelectOptions = useMemo(
     () => [
       { value: '', label: '— None —' },
-      ...campaignTypeRows.map((r) => ({ value: String(r.id), label: r.name || r.code || r.id })),
+      ...campaignTypeRows.map((r) => ({ value: String(r.id), label: r.name || r.code || '—' })),
     ],
     [campaignTypeRows]
   );
@@ -307,27 +305,22 @@ export function CampaignsPage() {
   const campaignStatusSelectOptions = useMemo(
     () => [
       { value: '', label: '— None —' },
-      ...campaignStatusRows.map((r) => ({ value: String(r.id), label: r.name || r.code || r.id })),
+      ...campaignStatusRows.map((r) => ({ value: String(r.id), label: r.name || r.code || '—' })),
     ],
     [campaignStatusRows]
   );
 
   const campaignManagerFilterOptions = useMemo(() => {
     if (role === 'admin') {
-      return [
-        { value: FILTER_ALL, label: 'All managers' },
-        { value: 'unassigned', label: 'Unassigned pool' },
-        ...managerOptions,
-      ];
+      return [{ value: 'unassigned', label: 'No manager' }, ...managerOptions];
     }
     if (role === 'manager' && user?.id) {
       return [
-        { value: FILTER_ALL, label: 'All visible' },
-        { value: 'unassigned', label: 'Unassigned pool' },
+        { value: 'unassigned', label: 'No manager' },
         { value: String(user.id), label: 'My campaigns' },
       ];
     }
-    return [{ value: FILTER_ALL, label: 'All' }];
+    return [];
   }, [role, user?.id, managerOptions]);
 
   const showCampaignFilters = role === 'admin' || role === 'manager' || role === 'agent';
@@ -339,10 +332,10 @@ export function CampaignsPage() {
   }, [draftManagerFilter, draftTypeFilter]);
 
   const resetFilters = useCallback(() => {
-    setDraftManagerFilter(FILTER_ALL);
-    setDraftTypeFilter(FILTER_ALL);
-    setAppliedManagerFilter(FILTER_ALL);
-    setAppliedTypeFilter(FILTER_ALL);
+    setDraftManagerFilter('');
+    setDraftTypeFilter('');
+    setAppliedManagerFilter('');
+    setAppliedTypeFilter('');
     setPage(1);
     setSearchQuery('');
   }, []);
@@ -354,7 +347,7 @@ export function CampaignsPage() {
 
   const totalPages = Math.max(1, pagination.totalPages || 1);
 
-  const hasActiveFilters = appliedManagerFilter !== FILTER_ALL || appliedTypeFilter !== FILTER_ALL;
+  const hasActiveFilters = !isNoListFilter(appliedManagerFilter) || !isNoListFilter(appliedTypeFilter);
 
   const openCreate = () => {
     setEditing(null);
@@ -515,7 +508,7 @@ export function CampaignsPage() {
         title="Campaigns"
         description={
           role === 'agent'
-            ? 'Campaigns in the tenant pool (no owning manager) and campaigns assigned to your manager. Open a campaign to work contacts assigned to you.'
+            ? 'Campaigns with no specific manager, and campaigns tied to your manager. Open a campaign to work your assigned contacts.'
             : 'Static campaigns tag contacts with campaign_id. Filter campaigns use rules (Tag uses multi-select: is any of). Owning manager: if set, only that manager sees the campaign; if empty, all managers see it. Agents only see assigned records when opening a campaign.'
         }
         actions={
@@ -532,16 +525,20 @@ export function CampaignsPage() {
           {role === 'admin' || role === 'manager' ? (
             role === 'admin' ? (
               <Select
+                allowEmpty
                 label="Owning manager"
-                value={draftManagerFilter}
+                placeholder="All managers"
+                value={draftManagerFilter || ''}
                 onChange={(e) => setDraftManagerFilter(e.target.value)}
                 options={campaignManagerFilterOptions}
                 className={pageStyles.filterSelect}
               />
             ) : (
               <Select
+                allowEmpty
                 label="Scope"
-                value={draftManagerFilter}
+                placeholder="All visible"
+                value={draftManagerFilter || ''}
                 onChange={(e) => setDraftManagerFilter(e.target.value)}
                 options={campaignManagerFilterOptions}
                 className={pageStyles.filterSelect}
@@ -549,8 +546,10 @@ export function CampaignsPage() {
             )
           ) : null}
           <Select
+            allowEmpty
             label="Audience"
-            value={draftTypeFilter}
+            placeholder="All types"
+            value={draftTypeFilter || ''}
             onChange={(e) => setDraftTypeFilter(e.target.value)}
             options={TYPE_FILTER_OPTIONS}
             className={pageStyles.filterSelect}
@@ -669,9 +668,9 @@ export function CampaignsPage() {
                         <TableCell>{c.campaign_status_name || '—'}</TableCell>
                         <TableCell>
                           {c.manager_id
-                            ? managerMap[c.manager_id] || (role === 'agent' ? `Manager #${c.manager_id}` : `#${c.manager_id}`)
+                            ? managerMap[c.manager_id] || '—'
                             : role === 'agent'
-                              ? 'Tenant pool (all managers)'
+                              ? 'All managers'
                               : 'All managers'}
                         </TableCell>
                         <TableCell>

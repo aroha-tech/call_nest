@@ -447,7 +447,7 @@ export function DealsPage() {
                         to={o.contact_type === 'lead' ? `/leads/${o.contact_id}` : `/contacts/${o.contact_id}`}
                         className={styles.oppCard}
                       >
-                        <div className={styles.oppName}>{o.display_name || o.email || `Contact #${o.contact_id}`}</div>
+                        <div className={styles.oppName}>{o.display_name || o.email || '—'}</div>
                         {o.account_name ? <div className={styles.oppMeta}>{o.account_name}</div> : null}
                         {o.title ? <div className={styles.oppMeta}>{o.title}</div> : null}
                         {o.amount != null ? <div className={styles.oppMeta}>₹ {Number(o.amount).toLocaleString()}</div> : null}

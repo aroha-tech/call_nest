@@ -311,7 +311,7 @@ export function WhatsAppAccountsPage() {
           <TableHead>
             <TableRow>
               <TableHeaderCell>Account</TableHeaderCell>
-              <TableHeaderCell>Phone / ID</TableHeaderCell>
+              <TableHeaderCell>Phone / external account</TableHeaderCell>
               <TableHeaderCell>Provider</TableHeaderCell>
               <TableHeaderCell>Status</TableHeaderCell>
               {canManageAccounts ? (

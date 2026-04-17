@@ -220,8 +220,8 @@ export function ProfilePage() {
               </>
             ) : (
               <p className={styles.managerCardBody}>
-                You are not assigned to a single manager right now. You are in the shared lead pool — any
-                manager in your workspace may assign or work leads with you.
+                You do not have one main manager right now. Any manager in your workspace can assign leads to you or
+                work with you on leads.
               </p>
             )}
           </div>

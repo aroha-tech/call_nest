@@ -32,18 +32,12 @@ import { useTableLoadingState } from '../hooks/useTableLoadingState';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import { TableDataRegion } from '../components/admin/TableDataRegion';
 import styles from './TenantUsersPage.module.scss';
-
-const FILTER_ALL = '__all__';
+import { isNoListFilter, normalizeListFilterAll } from '../utils/listFilterNarrowing';
 
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
   { value: 'manager', label: 'Manager' },
   { value: 'agent', label: 'Agent' },
-];
-
-const ROLE_FILTER_OPTIONS = [
-  { value: FILTER_ALL, label: 'All roles' },
-  ...ROLE_OPTIONS,
 ];
 
 const AGENT_ONLY_ROLE_OPTIONS = [{ value: 'agent', label: 'Agent' }];
@@ -61,10 +55,10 @@ export function TenantUsersPage() {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [showDisabled, setShowDisabled] = useState(false);
-  const [draftRoleFilter, setDraftRoleFilter] = useState(FILTER_ALL);
-  const [appliedRoleFilter, setAppliedRoleFilter] = useState(FILTER_ALL);
-  const [draftManagerFilter, setDraftManagerFilter] = useState(FILTER_ALL);
-  const [appliedManagerFilter, setAppliedManagerFilter] = useState(FILTER_ALL);
+  const [draftRoleFilter, setDraftRoleFilter] = useState('');
+  const [appliedRoleFilter, setAppliedRoleFilter] = useState('');
+  const [draftManagerFilter, setDraftManagerFilter] = useState('');
+  const [appliedManagerFilter, setAppliedManagerFilter] = useState('');
   const [managersForFilter, setManagersForFilter] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -93,9 +87,8 @@ export function TenantUsersPage() {
         limit: pagination.limit,
         ...(isFullAccess
           ? {
-              role: appliedRoleFilter !== FILTER_ALL ? appliedRoleFilter : undefined,
-              filterManagerId:
-                appliedManagerFilter !== FILTER_ALL ? appliedManagerFilter : undefined,
+              role: !isNoListFilter(appliedRoleFilter) ? appliedRoleFilter : undefined,
+              filterManagerId: !isNoListFilter(appliedManagerFilter) ? appliedManagerFilter : undefined,
             }
           : {}),
       });
@@ -141,19 +134,17 @@ export function TenantUsersPage() {
 
   const managerFilterOptions = useMemo(
     () => [
-      { value: FILTER_ALL, label: 'All managers' },
-      { value: 'unassigned', label: 'Unassigned pool' },
+      { value: 'unassigned', label: 'No manager' },
       ...managersForFilter.map((m) => ({
         value: String(m.id),
-        label: m.name || m.email || `#${m.id}`,
+        label: m.name || m.email || '—',
       })),
     ],
     [managersForFilter]
   );
 
   const hasActiveUserFilters =
-    isFullAccess &&
-    (appliedRoleFilter !== FILTER_ALL || appliedManagerFilter !== FILTER_ALL);
+    isFullAccess && (!isNoListFilter(appliedRoleFilter) || !isNoListFilter(appliedManagerFilter));
 
   const handleSearch = useCallback((value) => {
     setSearch(value);
@@ -180,7 +171,7 @@ export function TenantUsersPage() {
       if (u.role === 'manager' && !byId.has(u.id)) byId.set(u.id, u);
     }
     return [...byId.values()]
-      .map((m) => ({ value: String(m.id), label: m.name || m.email || `#${m.id}` }))
+      .map((m) => ({ value: String(m.id), label: m.name || m.email || '—' }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [users, managersForFilter]);
 
@@ -312,38 +303,42 @@ export function TenantUsersPage() {
         {isFullAccess ? (
           <FilterBar
             onApply={() => {
-              setAppliedRoleFilter(draftRoleFilter);
+              setAppliedRoleFilter(normalizeListFilterAll(draftRoleFilter));
               setAppliedManagerFilter(
                 draftRoleFilter === 'manager' || draftRoleFilter === 'admin'
-                  ? FILTER_ALL
-                  : draftManagerFilter
+                  ? ''
+                  : normalizeListFilterAll(draftManagerFilter)
               );
               setPagination((p) => ({ ...p, page: 1 }));
             }}
             onReset={() => {
-              setDraftRoleFilter(FILTER_ALL);
-              setAppliedRoleFilter(FILTER_ALL);
-              setDraftManagerFilter(FILTER_ALL);
-              setAppliedManagerFilter(FILTER_ALL);
+              setDraftRoleFilter('');
+              setAppliedRoleFilter('');
+              setDraftManagerFilter('');
+              setAppliedManagerFilter('');
               setPagination((p) => ({ ...p, page: 1 }));
             }}
           >
             <Select
+              allowEmpty
               label="Role"
-              value={draftRoleFilter}
+              placeholder="All roles"
+              value={draftRoleFilter || ''}
               onChange={(e) => {
                 const v = e.target.value;
                 setDraftRoleFilter(v);
                 if (v === 'manager' || v === 'admin') {
-                  setDraftManagerFilter(FILTER_ALL);
+                  setDraftManagerFilter('');
                 }
               }}
-              options={ROLE_FILTER_OPTIONS}
+              options={ROLE_OPTIONS}
               className={styles.filterSelect}
             />
             <Select
+              allowEmpty
               label="Reports to (agents)"
-              value={draftManagerFilter}
+              placeholder="All managers"
+              value={draftManagerFilter || ''}
               onChange={(e) => setDraftManagerFilter(e.target.value)}
               options={managerFilterOptions}
               className={styles.filterSelect}
@@ -417,7 +412,7 @@ export function TenantUsersPage() {
                   <TableCell>{u.role || '—'}</TableCell>
                   <TableCell>
                     {u.role === 'agent'
-                      ? u.manager_name || u.manager_email || (u.manager_id ? `#${u.manager_id}` : '— Unassigned —')
+                      ? u.manager_name || u.manager_email || (u.manager_id ? '—' : '— No manager —')
                       : '—'}
                   </TableCell>
                   <TableCell>
@@ -506,8 +501,8 @@ export function TenantUsersPage() {
                 label="Reporting manager (optional)"
                 value={form.manager_id}
                 onChange={(e) => setForm((f) => ({ ...f, manager_id: e.target.value }))}
-                placeholder="— Unassigned —"
-                options={[{ value: '', label: '— Unassigned —' }, ...managerOptionsForForm]}
+                placeholder="— No manager —"
+                options={[{ value: '', label: '— No manager —' }, ...managerOptionsForForm]}
               />
             ) : null}
             {editing &&
@@ -517,8 +512,8 @@ export function TenantUsersPage() {
                 label="Reporting manager"
                 value={form.manager_id}
                 onChange={(e) => setForm((f) => ({ ...f, manager_id: e.target.value }))}
-                placeholder="— Unassigned —"
-                options={[{ value: '', label: '— Unassigned —' }, ...managerOptionsForForm]}
+                placeholder="— No manager —"
+                options={[{ value: '', label: '— No manager —' }, ...managerOptionsForForm]}
               />
             ) : null}
             {editing &&
@@ -528,8 +523,8 @@ export function TenantUsersPage() {
                 label="Reporting manager"
                 value={
                   editing.manager_id != null
-                    ? editing.manager_name || editing.manager_email || `#${editing.manager_id}`
-                    : '— Unassigned —'
+                    ? editing.manager_name || editing.manager_email || '—'
+                    : '— No manager —'
                 }
                 readOnly
                 hint="Only an administrator can change who this agent reports to."

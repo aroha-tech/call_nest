@@ -169,7 +169,7 @@ async function applyContactListFilters(
       }
     }
     if (filterManagerId === 'unassigned') {
-      const err = new Error('Managers cannot filter by unassigned pool');
+      const err = new Error('Managers cannot filter by records with no manager');
       err.status = 403;
       throw err;
     }
@@ -2616,7 +2616,7 @@ export async function assignContacts(tenantId, user, payload) {
   }
 
   if (midProvided && normalizedMid === null && user.role !== 'admin') {
-    const err = new Error('Only admins can move contacts to the unassigned pool');
+    const err = new Error('Only admins can clear the manager assignment');
     err.status = 403;
     throw err;
   }

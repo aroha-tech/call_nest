@@ -19,9 +19,17 @@ function formatDurationSec(sec) {
 }
 
 /**
- * Read-only detail view for a single call attempt row (same data as the list API).
+ * Read-only detail view for a single call row (same data as the list API).
  */
-export function CallHistoryAttemptDetailModal({ isOpen, onClose, row, formatWhen, onFilterByParty }) {
+export function CallHistoryAttemptDetailModal({
+  isOpen,
+  onClose,
+  row,
+  formatWhen,
+  onFilterByCustomer,
+  /** Passed to `navigate` when opening the dial session (e.g. `{ fromCallHistory: true }`). */
+  dialSessionNavigateState = null,
+}) {
   const navigate = useNavigate();
   if (!row) return null;
 
@@ -33,21 +41,21 @@ export function CallHistoryAttemptDetailModal({ isOpen, onClose, row, formatWhen
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Call attempt #${row.id}`}
+      title="Call details"
       size="lg"
       closeOnEscape
       footer={
         <ModalFooter className={styles.footer}>
-          {row.contact_id != null && onFilterByParty ? (
+          {row.contact_id != null && onFilterByCustomer ? (
             <Button
               type="button"
               variant="secondary"
               onClick={() => {
-                onFilterByParty(String(row.contact_id));
+                onFilterByCustomer(String(row.contact_id));
                 onClose();
               }}
             >
-              Show all calls for this party
+              Show all calls for this customer
             </Button>
           ) : (
             <span />
@@ -59,28 +67,20 @@ export function CallHistoryAttemptDetailModal({ isOpen, onClose, row, formatWhen
       }
     >
       <p className={styles.lead}>
-        Single call attempt — full details below. This is not the CRM lead/contact screen.
+        One call — full details below. This is not the CRM lead/contact screen.
       </p>
       <dl className={styles.grid}>
-        <dt className={styles.label}>When (created)</dt>
+        <dt className={styles.label}>Call date</dt>
         <dd className={styles.value}>{formatWhen?.(row.created_at) ?? row.created_at ?? '—'}</dd>
 
-        <dt className={styles.label}>Attempt id</dt>
-        <dd className={styles.value}>
-          <code className={styles.mono}>#{row.id}</code>
-        </dd>
-
-        <dt className={styles.label}>Called party</dt>
-        <dd className={styles.value}>
-          {row.display_name || '—'}{' '}
-          {row.contact_id != null ? <span className={styles.muted}>(party id {row.contact_id})</span> : null}
-        </dd>
+        <dt className={styles.label}>Customer</dt>
+        <dd className={styles.value}>{row.display_name || '—'}</dd>
 
         <dt className={styles.label}>Phone</dt>
         <dd className={styles.value}>{row.phone_e164 || '—'}</dd>
 
         <dt className={styles.label}>Agent</dt>
-        <dd className={styles.value}>{row.agent_name || (row.agent_user_id ? `#${row.agent_user_id}` : '—')}</dd>
+        <dd className={styles.value}>{row.agent_name || '—'}</dd>
 
         <dt className={styles.label}>Direction</dt>
         <dd className={styles.value}>
@@ -130,10 +130,18 @@ export function CallHistoryAttemptDetailModal({ isOpen, onClose, row, formatWhen
                     Session <strong>#{dialNo}</strong>
                   </>
                 ) : null}
-                {dialSid ? <span className={styles.muted}> · id {dialSid}</span> : null}
               </span>
               {dialSid ? (
-                <Button type="button" size="sm" variant="secondary" onClick={() => navigate(`/dialer/session/${dialSid}`)}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    navigate(`/dialer/session/${dialSid}`, {
+                      state: dialSessionNavigateState || undefined,
+                    })
+                  }
+                >
                   Open dial session
                 </Button>
               ) : null}

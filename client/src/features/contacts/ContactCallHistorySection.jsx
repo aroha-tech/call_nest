@@ -164,7 +164,7 @@ export function ContactCallHistorySection({ contactId }) {
       <p className={styles.desc}>
         This list is <strong>call outcomes only</strong> (dispositions and call notes). Raw dial stubs are hidden. For
         the full CRM story — every attempt, assignments, WhatsApp, deals — use <strong>Activity</strong> on the record
-        header. To filter the global call-history grid by this party, use Open call history.
+        header. To filter the global call-history grid to this customer, use Open call history.
       </p>
 
       {error ? <Alert variant="error">{error}</Alert> : null}
@@ -189,9 +189,7 @@ export function ContactCallHistorySection({ contactId }) {
         <div ref={scrollRootRef} className={styles.timelineScroll}>
           <ol className={styles.timeline}>
             {rows.flatMap((row) => {
-              const agent =
-                row.agent_name?.trim() ||
-                (row.agent_user_id != null ? `User #${row.agent_user_id}` : '—');
+              const agent = row.agent_name?.trim() || '—';
               const phone = row.phone_e164?.trim() || '—';
               const attemptEntries = buildAttemptHistoryEntries(row);
               return attemptEntries.map((entry) => {
@@ -202,8 +200,6 @@ export function ContactCallHistorySection({ contactId }) {
                       — {when} by {agent} — {phone} — {entry.text}
                     </div>
                     <div className={styles.metaRow}>
-                      <span>Attempt #{row.id}</span>
-                      <span className={styles.metaSep}>·</span>
                       <span>{row.status || '—'}</span>
                       {row.provider ? (
                         <>

@@ -527,7 +527,7 @@ export function WhatsAppMessagesPage() {
                     <TableCell>{row.phone || '—'}</TableCell>
                     {showSentByColumn ? (
                       <TableCell>
-                        {row.sender_name || row.sender_email || (row.created_by ? `User #${row.created_by}` : '—')}
+                        {row.sender_name || row.sender_email || '—'}
                       </TableCell>
                     ) : null}
                     <TableCell>{row.template_name ? row.template_name : (row.message_text ? '(Text)' : '—')}</TableCell>
@@ -583,7 +583,7 @@ export function WhatsAppMessagesPage() {
                 <strong>Sent by:</strong>{' '}
                 {selectedMessage.sender_name ||
                   selectedMessage.sender_email ||
-                  (selectedMessage.created_by ? `User #${selectedMessage.created_by}` : '—')}
+                  '—'}
               </div>
             )}
             <div>

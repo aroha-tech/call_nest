@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { useAppSelector } from '../app/hooks';
 import { selectTenant, selectUser } from '../features/auth/authSelectors';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -29,7 +29,6 @@ import {
   buildAttemptHistoryEntries,
   sanitizeAttemptNotesForDisplay,
 } from '../utils/callAttemptNotesDisplay';
-import { DialerSessionCallHistoryPanel } from './DialerSessionCallHistoryPanel';
 import styles from './DialerSessionPage.module.scss';
 
 /** Display-only: maps `contact_phones.label` ENUM (and primary) to a short title. */
@@ -74,9 +73,7 @@ function formatDialerLogWhen(iso) {
 
 function formatDialerHistoryLine(row) {
   const when = formatDialerLogWhen(row.started_at || row.created_at);
-  const agent =
-    row.agent_name?.trim() ||
-    (row.agent_user_id != null ? `User #${row.agent_user_id}` : '—');
+  const agent = row.agent_name?.trim() || '—';
   const phone = row.phone_e164?.trim() || '—';
   const dispo = row.disposition_name?.trim() || null;
   const noteRaw = row.notes != null ? String(row.notes) : '';
@@ -88,9 +85,7 @@ function formatDialerHistoryLine(row) {
 
 function formatDialerHistoryEntryLine(row, entry) {
   const when = formatDialerLogWhen(entry?.whenIso || row.started_at || row.created_at);
-  const agent =
-    row.agent_name?.trim() ||
-    (row.agent_user_id != null ? `User #${row.agent_user_id}` : '—');
+  const agent = row.agent_name?.trim() || '—';
   const phone = row.phone_e164?.trim() || '—';
   const text = entry?.text != null && String(entry.text).trim() ? String(entry.text).trim() : '—';
   return `— ${when} by ${agent} — ${phone} — ${text}`;
@@ -194,6 +189,7 @@ function resolveLastAttemptId(items = []) {
 export function DialerSessionPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAppSelector(selectUser);
   const tenant = useAppSelector(selectTenant);
@@ -242,10 +238,16 @@ export function DialerSessionPage() {
 
   const requestedStep = String(searchParams.get('step') || '').toLowerCase();
   const [view, setView] = useState(requestedStep === 'preflight' ? 'preflight' : 'active');
+  /** Dial workspace (metrics, lead strip, tabs) only after a successful Start session / Call next, or an in-flight session from the server. */
+  const [dialWorkspaceUnlocked, setDialWorkspaceUnlocked] = useState(() => requestedStep !== 'preflight');
 
   useEffect(() => {
     if (requestedStep === 'preflight') setView('preflight');
   }, [requestedStep]);
+
+  useEffect(() => {
+    setDialWorkspaceUnlocked(requestedStep !== 'preflight');
+  }, [id, requestedStep]);
 
   useEffect(() => {
     if (!id) return;
@@ -452,12 +454,7 @@ export function DialerSessionPage() {
     const c = contact;
     if (!row && !c) return null;
     const displayName =
-      c?.display_name ||
-      row?.display_name ||
-      c?.first_name ||
-      c?.email ||
-      (row?.contact_id ? `Contact #${row.contact_id}` : '') ||
-      '';
+      c?.display_name || row?.display_name || c?.first_name || c?.email || '';
     const firstName =
       c?.first_name ||
       (displayName ? String(displayName).trim().split(/\s+/)[0] : '') ||
@@ -491,6 +488,23 @@ export function DialerSessionPage() {
   }, [leadContact]);
 
   const sessionEnded = session?.status === 'completed' || session?.status === 'cancelled';
+
+  useEffect(() => {
+    if (!session || sessionEnded) return;
+    const st = String(session.status || '').toLowerCase();
+    if (st !== 'ready') setDialWorkspaceUnlocked(true);
+  }, [session?.id, session?.status, sessionEnded]);
+
+  const exitToCallHistory = location.state?.fromCallHistory === true;
+  const leaveDialSession = useCallback(() => {
+    if (exitToCallHistory && id) {
+      navigate(`/calls/history?dialer_session_id=${encodeURIComponent(String(id))}`);
+      return;
+    }
+    navigate('/dialer');
+  }, [exitToCallHistory, id, navigate]);
+  const leaveDialSessionBackLabel = exitToCallHistory ? 'Back to call history' : 'Back to leads';
+  const leaveDialSessionDoneLabel = exitToCallHistory ? 'Done — back to call history' : 'Done — back to leads';
 
   useEffect(() => {
     if (!session || sessionEnded) {
@@ -534,13 +548,44 @@ export function DialerSessionPage() {
   }, [uiTimer?.startedAtMs, uiTimer?.pausedAtMs, session?.ended_at]);
 
   const durationMs = useMemo(() => {
-    const startedAtMs = Number(uiTimer?.startedAtMs || 0);
-    if (!startedAtMs) return 0;
-    const endMs = session?.ended_at ? new Date(session.ended_at).getTime() : Date.now();
-    const pausedTotalMs = Number(uiTimer?.pausedTotalMs || 0);
-    const extraPausedMs = uiTimer?.pausedAtMs ? Math.max(0, Date.now() - Number(uiTimer.pausedAtMs)) : 0;
-    return Math.max(0, endMs - startedAtMs - pausedTotalMs - extraPausedMs);
-  }, [uiTimer?.startedAtMs, uiTimer?.pausedTotalMs, uiTimer?.pausedAtMs, session?.ended_at, tick]);
+    const now = Date.now();
+    if (sessionEnded) {
+      const sec = Number(session?.duration_sec);
+      if (Number.isFinite(sec) && sec >= 0) return sec * 1000;
+      const s = session?.started_at ? new Date(session.started_at).getTime() : NaN;
+      const e = session?.ended_at ? new Date(session.ended_at).getTime() : NaN;
+      const pausedMs = Number(session?.paused_seconds || 0) * 1000;
+      if (Number.isFinite(s) && Number.isFinite(e)) return Math.max(0, e - s - pausedMs);
+      return 0;
+    }
+    const uiStart = Number(uiTimer?.startedAtMs || 0);
+    if (uiStart) {
+      const endMs = session?.ended_at ? new Date(session.ended_at).getTime() : now;
+      const pausedTotalMs = Number(uiTimer?.pausedTotalMs || 0);
+      const extraPausedMs = uiTimer?.pausedAtMs ? Math.max(0, now - Number(uiTimer.pausedAtMs)) : 0;
+      return Math.max(0, endMs - uiStart - pausedTotalMs - extraPausedMs);
+    }
+    const serverStart = session?.started_at ? new Date(session.started_at).getTime() : NaN;
+    if (!Number.isFinite(serverStart)) return 0;
+    const endMs = session?.ended_at ? new Date(session.ended_at).getTime() : now;
+    const pausedSec = Number(session?.paused_seconds || 0);
+    let pauseExtraMs = 0;
+    if (session?.paused_at) {
+      pauseExtraMs = Math.max(0, now - new Date(session.paused_at).getTime());
+    }
+    return Math.max(0, endMs - serverStart - pausedSec * 1000 - pauseExtraMs);
+  }, [
+    sessionEnded,
+    session?.duration_sec,
+    session?.started_at,
+    session?.ended_at,
+    session?.paused_seconds,
+    session?.paused_at,
+    uiTimer?.startedAtMs,
+    uiTimer?.pausedTotalMs,
+    uiTimer?.pausedAtMs,
+    tick,
+  ]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -666,6 +711,7 @@ export function DialerSessionPage() {
       } else {
         await load();
       }
+      setDialWorkspaceUnlocked(true);
       if (view !== 'active') setView('active');
       if (requestedStep) setSearchParams({}, { replace: true });
     } catch (e) {
@@ -948,18 +994,20 @@ export function DialerSessionPage() {
           }
           actions={
             <div className={styles.headerActions}>
-              <Button variant="secondary" onClick={() => navigate('/dialer')}>
-                Back to leads
+              <Button variant="secondary" onClick={leaveDialSession}>
+                {leaveDialSessionBackLabel}
               </Button>
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  navigate(`/calls/history?dialer_session_id=${encodeURIComponent(String(id || ''))}`)
-                }
-                disabled={!id}
-              >
-                Call history
-              </Button>
+              {!exitToCallHistory ? (
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    navigate(`/calls/history?dialer_session_id=${encodeURIComponent(String(id || ''))}`)
+                  }
+                  disabled={!id}
+                >
+                  Call history
+                </Button>
+              ) : null}
             </div>
           }
         />
@@ -984,9 +1032,7 @@ export function DialerSessionPage() {
                     {sessionDisplayNo != null ? `Dial session #${sessionDisplayNo}` : 'Dial session'} ·{' '}
                     <span className={styles.summaryStatus}>{session.status}</span>
                   </h2>
-                  <p className={styles.summarySub}>
-                    Here is how this run finished. You can return to leads when you are ready.
-                  </p>
+                  <p className={styles.summarySub}>Here is how this run finished.</p>
                 </div>
                 <div className={styles.summaryHeroAside}>
                   <div className={styles.summaryDurationLabel}>Session time</div>
@@ -1014,18 +1060,12 @@ export function DialerSessionPage() {
                   <div className={styles.summaryLabel}>Queued left</div>
                   <div className={styles.summaryValue}>{queuedCount}</div>
                 </div>
-                <div className={styles.summaryItem}>
-                  <div className={styles.summaryLabel}>Script</div>
-                  <div className={styles.summaryValueSmall}>{session?.script?.script_name || '—'}</div>
-                </div>
               </div>
               <div className={styles.summaryActions}>
-                <Button onClick={() => navigate('/dialer')}>Done — back to leads</Button>
+                <Button onClick={leaveDialSession}>{leaveDialSessionDoneLabel}</Button>
               </div>
             </div>
           ) : null}
-
-          <DialerSessionCallHistoryPanel dialerSessionId={id} />
 
           {view === 'preflight' && !sessionEnded ? (
             <div className={styles.preflightCard}>
@@ -1079,15 +1119,12 @@ export function DialerSessionPage() {
                   >
                     {busy ? 'Working…' : 'Start session'}
                   </Button>
-                  <Button variant="secondary" onClick={() => setView('active')} disabled={busy}>
-                    Skip
-                  </Button>
                 </div>
               </div>
             </div>
           ) : null}
 
-          {sessionEnded ? null : (
+          {sessionEnded || !dialWorkspaceUnlocked ? null : (
           <div className={styles.dialerShell}>
             <header className={styles.dialerChromeBar}>
               <div className={styles.dialerChromeLeft}>
@@ -1449,13 +1486,6 @@ export function DialerSessionPage() {
               </div>
             </div>
 
-            {view === 'preflight' ? (
-              <p className={styles.preflightShellHint}>
-                Use <strong>Start session</strong> in the checklist above for the first call, or <strong>Skip</strong> to open
-                the workspace. Next steps use your disposition buttons (e.g. next contact).
-              </p>
-            ) : null}
-
             {view === 'active' ? (
             <div className={styles.grid}>
             <aside className={styles.left}>
@@ -1805,7 +1835,7 @@ export function DialerSessionPage() {
                           Called at
                         </th>
                         <th className={styles.thAttempt} style={{ width: 100 }}>
-                          Attempt
+                          Logged
                         </th>
                       </tr>
                     </thead>
@@ -1814,9 +1844,8 @@ export function DialerSessionPage() {
                         <tr key={it.id} className={currentItem?.id === it.id ? styles.queueRowActive : undefined}>
                           <td>{it.order_index + 1}</td>
                           <td>
-                            <div className={styles.queueName}>{it.display_name || `#${it.contact_id}`}</div>
+                            <div className={styles.queueName}>{it.display_name || '—'}</div>
                             <div className={styles.queueSub}>
-                              #{it.contact_id} ·{' '}
                               {it.state === 'calling'
                                 ? it.attempt_phone || it.selected_phone || it.primary_phone || '—'
                                 : it.selected_phone || it.primary_phone || '—'}
@@ -1828,7 +1857,7 @@ export function DialerSessionPage() {
                             </span>
                           </td>
                           <td>{safeDateTime(it.called_at)}</td>
-                          <td>{it.last_attempt_id ? `#${it.last_attempt_id}` : '—'}</td>
+                          <td>{it.last_attempt_id ? 'Yes' : '—'}</td>
                         </tr>
                       ))}
                     </tbody>

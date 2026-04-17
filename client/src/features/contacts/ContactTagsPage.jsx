@@ -132,7 +132,7 @@ export function ContactTagsPage() {
                   {tags.map((t) => (
                     <TableRow key={t.id}>
                       <TableCell>{t.name}</TableCell>
-                      <TableCell>{t.created_by_name || (t.created_by ? `#${t.created_by}` : '—')}</TableCell>
+                      <TableCell>{t.created_by_name || '—'}</TableCell>
                       <TableCell align="center">
                         {canEditRow(t) ? (
                           <RowActionGroup>

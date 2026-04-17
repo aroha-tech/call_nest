@@ -245,10 +245,10 @@ export function ContactImportPage({ type }) {
     }
     return [
       ...base,
-      ...mgrs
+           ...mgrs
         .map((u) => ({
           value: String(u.id),
-          label: u.name || u.email || `#${u.id}`,
+          label: u.name || u.email || '—',
         }))
         .sort((a, b) => a.label.localeCompare(b.label)),
     ];
@@ -267,7 +267,7 @@ export function ContactImportPage({ type }) {
       ...agents
         .map((u) => ({
           value: String(u.id),
-          label: u.name || u.email || `#${u.id}`,
+          label: u.name || u.email || '—',
         }))
         .sort((a, b) => a.label.localeCompare(b.label)),
     ];
@@ -326,7 +326,7 @@ export function ContactImportPage({ type }) {
         const v = `custom:${m.customFieldId}`;
         if (!known.has(v) && !seen.has(v)) {
           seen.add(v);
-          orphan.push({ value: v, label: `Custom field #${m.customFieldId}` });
+          orphan.push({ value: v, label: 'Custom field' });
         }
         continue;
       }

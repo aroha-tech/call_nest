@@ -251,7 +251,7 @@ export function DialerSessionSetupPage() {
                 <option value="">Select dialing set…</option>
                 {dialingSets.map((d) => (
                   <option key={d.id} value={String(d.id)}>
-                    {d.name || `Dialing set #${d.id}`}
+                    {d.name || '—'}
                   </option>
                 ))}
               </select>
@@ -270,7 +270,7 @@ export function DialerSessionSetupPage() {
                 <option value="">Select call script…</option>
                 {callScripts.map((s) => (
                   <option key={s.id} value={String(s.id)}>
-                    {s.script_name || `Script #${s.id}`}
+                    {s.script_name || '—'}
                   </option>
                 ))}
               </select>
@@ -315,7 +315,7 @@ export function DialerSessionSetupPage() {
                 <div className={styles.previewCardHead}>
                   <span className={styles.previewCardTitle}>Dialing set</span>
                   <span className={styles.previewCardMeta}>
-                    {selectedDialingSet?.name || (dialingSetId ? `#${dialingSetId}` : '—')}
+                    {selectedDialingSet?.name || '—'}
                   </span>
                 </div>
                 <div className={styles.previewCardBody}>

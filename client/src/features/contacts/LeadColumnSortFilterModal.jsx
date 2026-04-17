@@ -32,11 +32,11 @@ function getSortCopy(sortKey) {
   if (sortKey === 'created_at') {
     return {
       defaultLabel: 'List default',
-      defaultHint: 'Newest by date added (recommended).',
+      defaultHint: 'Newest by call date (recommended).',
       ascLabel: 'Oldest first',
-      ascHint: 'Earliest created_at at the top',
+      ascHint: 'Earliest call date at the top',
       descLabel: 'Newest first',
-      descHint: 'Latest created_at at the top',
+      descHint: 'Latest call date at the top',
     };
   }
   if (sortKey === 'date_of_birth') {
@@ -52,11 +52,11 @@ function getSortCopy(sortKey) {
   if (sortKey === 'contact_id') {
     return {
       defaultLabel: 'List default',
-      defaultHint: 'Newest attempts first; contact order is secondary.',
-      ascLabel: 'Contact id: low → high',
-      ascHint: 'Smaller contact / lead ids first',
-      descLabel: 'Contact id: high → low',
-      descHint: 'Larger contact / lead ids first',
+      defaultHint: 'Newest attempts first; customer order is secondary.',
+      ascLabel: 'Customer order (ascending)',
+      ascHint: 'Follows saved lead/contact record order',
+      descLabel: 'Customer order (descending)',
+      descHint: 'Reverses lead/contact record order',
     };
   }
   if (sortKey === 'notes') {
@@ -104,7 +104,7 @@ function filterPlaceholderForColumn(sortKey) {
     state: 'State or region',
     country: 'Country',
     source: 'Source text',
-    contact_id: 'Called party name or part of it',
+    contact_id: 'Customer name or part of it',
     phone: 'Digits or partial phone number',
     agent: 'Agent display name',
     disposition: 'Disposition name (e.g. Busy, Interested)',
@@ -112,12 +112,12 @@ function filterPlaceholderForColumn(sortKey) {
     status: 'queued, ringing, connected, completed, …',
     is_connected: '0 or 1, or text Connected',
     notes: 'Words in call notes',
-    id: 'Attempt id digits',
+    id: 'Numeric value (advanced)',
     duration_sec: 'Seconds (e.g. 120)',
     started_at: 'Date/time fragment',
     ended_at: 'Date/time fragment',
     provider: 'Provider id (e.g. dummy)',
-    dial_session: 'Session # or database id (e.g. 3 or 42)',
+    dial_session: 'Session number (e.g. 3)',
   };
   return map[sortKey] || 'Text to match';
 }

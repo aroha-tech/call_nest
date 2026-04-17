@@ -30,6 +30,5 @@ export function getManagerDisplayLabel(manager) {
   const n = typeof manager.name === 'string' ? manager.name.trim() : '';
   if (n) return n;
   if (manager.email) return manager.email;
-  if (manager.id != null) return `Manager #${manager.id}`;
   return '';
 }

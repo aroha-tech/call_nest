@@ -795,7 +795,7 @@ const CALL_EXPORT_COL_SQL = {
   contact: 'c.display_name',
   phone: 'p.phone',
   agent: 'u.name',
-  dial_session: `(SELECT CONCAT('Session ', ds.user_session_no, ' · id ', ds.id) FROM dialer_session_items dsi INNER JOIN dialer_sessions ds ON ds.id = dsi.session_id AND ds.tenant_id = dsi.tenant_id WHERE dsi.last_attempt_id = cca.id AND dsi.tenant_id = cca.tenant_id ORDER BY dsi.id DESC LIMIT 1)`,
+  dial_session: `(SELECT CONCAT('Session ', COALESCE(CAST(ds.user_session_no AS CHAR), '')) FROM dialer_session_items dsi INNER JOIN dialer_sessions ds ON ds.id = dsi.session_id AND ds.tenant_id = dsi.tenant_id WHERE dsi.last_attempt_id = cca.id AND dsi.tenant_id = cca.tenant_id ORDER BY dsi.id DESC LIMIT 1)`,
   direction: 'cca.direction',
   status: 'cca.status',
   is_connected: 'cca.is_connected',
@@ -808,9 +808,9 @@ const CALL_EXPORT_COL_SQL = {
 };
 
 const CALL_EXPORT_HEADERS = {
-  created_at: 'When',
+  created_at: 'Call date',
   id: 'Attempt id',
-  contact: 'Called party',
+  contact: 'Customer',
   phone: 'Phone',
   agent: 'Agent',
   dial_session: 'Dial session',

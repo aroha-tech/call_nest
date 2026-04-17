@@ -259,7 +259,7 @@ export function ContactFormPage({ defaultType }) {
         const res = await contactTagsAPI.list();
         if (cancelled) return;
         const rows = res?.data?.data ?? [];
-        setContactTagOptions(rows.map((t) => ({ value: String(t.id), label: t.name || `#${t.id}` })));
+        setContactTagOptions(rows.map((t) => ({ value: String(t.id), label: t.name || '—' })));
       } catch {
         if (!cancelled) setContactTagOptions([]);
       }
@@ -462,7 +462,7 @@ export function ContactFormPage({ defaultType }) {
     () =>
       tenantUsers
         .filter((u) => u.role === 'manager')
-        .map((u) => ({ value: String(u.id), label: u.name || u.email || `#${u.id}` }))
+        .map((u) => ({ value: String(u.id), label: u.name || u.email || '—' }))
         .sort((a, b) => a.label.localeCompare(b.label)),
     [tenantUsers]
   );
@@ -485,7 +485,7 @@ export function ContactFormPage({ defaultType }) {
 
   const agentSelectOptions = useMemo(() => {
     const base = agentsAllowedForManager
-      .map((u) => ({ value: String(u.id), label: u.name || u.email || `#${u.id}` }))
+      .map((u) => ({ value: String(u.id), label: u.name || u.email || '—' }))
       .sort((a, b) => a.label.localeCompare(b.label));
     const aid = formData.assigned_user_id ? String(formData.assigned_user_id) : '';
     if (!aid) return base;
@@ -496,7 +496,7 @@ export function ContactFormPage({ defaultType }) {
       return [
         {
           value: aid,
-          label: `${u.name || u.email || `#${u.id}`} (current — not under selected manager)`,
+          label: `${u.name || u.email || '—'} (current — not under selected manager)`,
         },
         ...base,
       ];
@@ -518,7 +518,7 @@ export function ContactFormPage({ defaultType }) {
     }
   }, [role, formData.manager_id, formData.assigned_user_id, tenantUsers]);
 
-  // Admin: unassigned pool + pick agent → set owning manager from that agent (matches bulk assign / server rules).
+  // Admin: no manager on record + pick agent → set owning manager from that agent (matches bulk assign / server rules).
   useEffect(() => {
     if (role !== 'admin') return;
     if (formData.manager_id) return;
@@ -540,7 +540,7 @@ export function ContactFormPage({ defaultType }) {
     () =>
       (campaignList || []).map((c) => ({
         value: String(c.id),
-        label: c.name || `#${c.id}`,
+        label: c.name || '—',
       })),
     [campaignList]
   );
@@ -785,7 +785,7 @@ export function ContactFormPage({ defaultType }) {
     const id = formData.status_id;
     if (!id) return '—';
     const s = contactStatuses.find((x) => String(x.id) === String(id));
-    if (!s) return String(id);
+    if (!s) return '—';
     const name = s.name || '';
     const code = s.code ? ` (${s.code})` : '';
     return `${name}${code}`.trim() || '—';
@@ -796,7 +796,7 @@ export function ContactFormPage({ defaultType }) {
     return (
       managerSelectOptions.find((o) => o.value === String(formData.manager_id))?.label ??
       tenantUsers.find((u) => String(u.id) === String(formData.manager_id))?.name ??
-      `User #${formData.manager_id}`
+      '—'
     );
   }, [formData.manager_id, managerSelectOptions, tenantUsers]);
 
@@ -805,7 +805,7 @@ export function ContactFormPage({ defaultType }) {
     return (
       agentSelectOptions.find((o) => o.value === String(formData.assigned_user_id))?.label ??
       tenantUsers.find((u) => String(u.id) === String(formData.assigned_user_id))?.name ??
-      `User #${formData.assigned_user_id}`
+      '—'
     );
   }, [formData.assigned_user_id, agentSelectOptions, tenantUsers]);
 
@@ -813,7 +813,7 @@ export function ContactFormPage({ defaultType }) {
     if (!formData.campaign_id) return '—';
     return (
       campaignSelectOptions.find((o) => o.value === String(formData.campaign_id))?.label ??
-      `Campaign #${formData.campaign_id}`
+      '—'
     );
   }, [formData.campaign_id, campaignSelectOptions]);
 

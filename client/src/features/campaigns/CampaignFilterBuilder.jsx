@@ -25,7 +25,7 @@ function MultiIdPicker({ options, value, onChange, placeholder }) {
     <div className={styles.multiWrap}>
       <div className={styles.chips}>
         {arr.map((id) => {
-          const label = options.find((o) => String(o.value) === String(id))?.label || id;
+          const label = options.find((o) => String(o.value) === String(id))?.label || '—';
           return (
             <span key={id} className={styles.chip}>
               {label}
@@ -178,7 +178,7 @@ function RuleValue({
       <Select
         value={rule.value != null && rule.value !== '' ? String(rule.value) : 'none'}
         onChange={(e) => onPatch({ value: e.target.value === 'none' ? null : e.target.value })}
-        options={[{ value: 'none', label: 'Unassigned' }, ...managerOptions]}
+        options={[{ value: 'none', label: 'No manager' }, ...managerOptions]}
         placeholder="Select…"
         className={styles.valueInput}
       />
@@ -190,7 +190,7 @@ function RuleValue({
       <Select
         value={rule.value != null && rule.value !== '' ? String(rule.value) : 'none'}
         onChange={(e) => onPatch({ value: e.target.value === 'none' ? null : e.target.value })}
-        options={[{ value: 'none', label: 'Unassigned' }, ...agentOptions]}
+        options={[{ value: 'none', label: 'No agent' }, ...agentOptions]}
         placeholder="Select…"
         className={styles.valueInput}
       />

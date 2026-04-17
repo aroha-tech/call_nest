@@ -114,3 +114,210 @@
   gap: $space-2;
   align-items: center;
 }
+
+/* Call history filter modal — aligned with ContactAdvancedFilterModal layout */
+.advBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: min(72vh, 680px);
+  overflow-y: auto;
+}
+
+.sectionDivider {
+  height: 1px;
+  margin: $space-4 0;
+  background: var(--color-border-subtle);
+  border: none;
+  flex-shrink: 0;
+}
+
+.nameBlock {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
+.sectionTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: $space-3;
+}
+
+.sectionTitleIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: $radius-md;
+  background: rgba(var(--color-primary-rgb, 99, 102, 241), 0.12);
+  color: var(--color-primary-400, #818cf8);
+  flex-shrink: 0;
+}
+
+.sectionSvg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.sectionTitleText {
+  font-size: $font-size-2xs;
+  font-weight: $font-weight-semibold;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-secondary, rgba(255, 255, 255, 0.65));
+}
+
+.refinePanel {
+  padding: $space-4;
+  border-radius: $radius-lg;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface, rgba(255, 255, 255, 0.02));
+}
+
+.structuredGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-4 $space-5;
+  align-items: end;
+}
+
+@media (max-width: 560px) {
+  .structuredGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.multiSelectNote {
+  margin: $space-3 0 0;
+  font-size: $font-size-2xs;
+  line-height: 1.45;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.45));
+}
+
+.subSectionLabel {
+  margin: $space-5 0 $space-2;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.timeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-3;
+
+  @media (max-width: 520px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.propertyPanel {
+  padding: $space-5 $space-4;
+  border-radius: $radius-lg;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface, rgba(255, 255, 255, 0.02));
+}
+
+.fullWidthSelect {
+  min-width: 0;
+}
+
+.hint {
+  margin: 0 0 $space-4;
+  font-size: $font-size-xs;
+  line-height: 1.55;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.55));
+  max-width: 52rem;
+}
+
+.propertyRows {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+}
+
+.propertyGridHeader {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1.15fr auto;
+  gap: 12px;
+  align-items: end;
+  padding: 0 2px $space-1;
+  font-size: $font-size-2xs;
+  font-weight: $font-weight-semibold;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.5));
+}
+
+.propertyGridHeaderAction {
+  min-width: 72px;
+}
+
+@media (max-width: 640px) {
+  .propertyGridHeader {
+    display: none;
+  }
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1.15fr auto;
+  gap: 12px;
+  align-items: end;
+  padding: $space-3;
+  margin: 0 (-$space-1);
+  border-radius: $radius-md;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated, rgba(0, 0, 0, 0.2));
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: 1fr;
+    gap: $space-3;
+  }
+}
+
+.fieldSel,
+.opSel,
+.valInp {
+  min-width: 0;
+}
+
+.removeRowBtn {
+  justify-self: end;
+  align-self: end;
+  margin-bottom: 2px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: $radius-sm;
+  background: transparent;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  font-family: inherit;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.5));
+  cursor: pointer;
+  transition:
+    color $transition-fast,
+    background $transition-fast;
+
+  &:hover {
+    color: var(--color-danger, #f87171);
+    background: rgba(239, 68, 68, 0.08);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-input-border-focus);
+    outline-offset: 2px;
+  }
+}
+
+.addPropertyBtn {
+  margin-top: $space-4;
+}

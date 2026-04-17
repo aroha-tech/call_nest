@@ -4,9 +4,8 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown';
+import { normalizeListFilterAll } from '../../utils/listFilterNarrowing';
 import styles from './ContactAdvancedFilterModal.module.scss';
-
-const FILTER_ALL = '__all__';
 
 function IconSliders() {
   return (
@@ -144,7 +143,7 @@ export function ContactAdvancedFilterModal({
   initialAdminManagersMulti = '',
   showAgent = false,
   agentOptions = [],
-  initialAgentFilter = FILTER_ALL,
+  initialAgentFilter = '',
   showTags = false,
   tagOptions = [],
   initialTagIdsMulti = '',
@@ -152,10 +151,10 @@ export function ContactAdvancedFilterModal({
   statusOptions = [],
   initialStatusIdsMulti = '',
   showDialerFilters = false,
-  initialTouchStatus = FILTER_ALL,
+  initialTouchStatus = '',
   initialMinCallCount = '',
   initialMaxCallCount = '',
-  initialLastCalledPreset = FILTER_ALL,
+  initialLastCalledPreset = '',
   /** For duplicate-name checks: `{ id, name }[]` */
   existingSavedFilters = [],
   /** `{ value: 'ind:field_key', label }[]` — tenant industry profile fields */
@@ -167,13 +166,13 @@ export function ContactAdvancedFilterModal({
   const [rows, setRows] = useState([{ field: 'display_name', op: 'contains', value: '' }]);
   const [draftCampaignIdsMulti, setDraftCampaignIdsMulti] = useState('');
   const [draftAdminManagersMulti, setDraftAdminManagersMulti] = useState('');
-  const [draftAgentFilter, setDraftAgentFilter] = useState(FILTER_ALL);
+  const [draftAgentFilter, setDraftAgentFilter] = useState('');
   const [draftTagIdsMulti, setDraftTagIdsMulti] = useState('');
   const [draftStatusIdsMulti, setDraftStatusIdsMulti] = useState('');
-  const [draftTouchStatus, setDraftTouchStatus] = useState(FILTER_ALL);
+  const [draftTouchStatus, setDraftTouchStatus] = useState('');
   const [draftMinCallCount, setDraftMinCallCount] = useState('');
   const [draftMaxCallCount, setDraftMaxCallCount] = useState('');
-  const [draftLastCalledPreset, setDraftLastCalledPreset] = useState(FILTER_ALL);
+  const [draftLastCalledPreset, setDraftLastCalledPreset] = useState('');
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveAsName, setSaveAsName] = useState('');
 
@@ -215,13 +214,13 @@ export function ContactAdvancedFilterModal({
     }
     setDraftCampaignIdsMulti(initialCampaignIdsMulti || '');
     setDraftAdminManagersMulti(initialAdminManagersMulti || '');
-    setDraftAgentFilter(initialAgentFilter ?? FILTER_ALL);
+    setDraftAgentFilter(normalizeListFilterAll(initialAgentFilter));
     setDraftTagIdsMulti(initialTagIdsMulti || '');
     setDraftStatusIdsMulti(initialStatusIdsMulti || '');
-    setDraftTouchStatus(initialTouchStatus ?? FILTER_ALL);
+    setDraftTouchStatus(normalizeListFilterAll(initialTouchStatus));
     setDraftMinCallCount(initialMinCallCount ?? '');
     setDraftMaxCallCount(initialMaxCallCount ?? '');
-    setDraftLastCalledPreset(initialLastCalledPreset ?? FILTER_ALL);
+    setDraftLastCalledPreset(normalizeListFilterAll(initialLastCalledPreset));
   }, [
     isOpen,
     savedFilterId,
@@ -255,13 +254,13 @@ export function ContactAdvancedFilterModal({
     columnRules: normalizeRows(rows),
     campaignIdsMulti: draftCampaignIdsMulti,
     adminManagersMulti: draftAdminManagersMulti,
-    agentFilter: draftAgentFilter,
+    agentFilter: normalizeListFilterAll(draftAgentFilter),
     tagIdsMulti: draftTagIdsMulti,
     statusIdsMulti: draftStatusIdsMulti,
-    touchStatus: draftTouchStatus,
+    touchStatus: normalizeListFilterAll(draftTouchStatus),
     minCallCount: draftMinCallCount,
     maxCallCount: draftMaxCallCount,
-    lastCalledPreset: draftLastCalledPreset,
+    lastCalledPreset: normalizeListFilterAll(draftLastCalledPreset),
   });
 
   const addRow = () => {
@@ -391,8 +390,10 @@ export function ContactAdvancedFilterModal({
                 ) : null}
                 {showAgent ? (
                   <Select
+                    allowEmpty
                     label="Assigned agent"
-                    value={draftAgentFilter}
+                    placeholder="All agents"
+                    value={draftAgentFilter || ''}
                     onChange={(e) => setDraftAgentFilter(e.target.value)}
                     options={agentOptions}
                     className={styles.fullWidthSelect}
@@ -411,22 +412,24 @@ export function ContactAdvancedFilterModal({
                 {showDialerFilters ? (
                   <>
                     <Select
+                      allowEmpty
                       label="Call status"
-                      value={draftTouchStatus}
+                      placeholder="All"
+                      value={draftTouchStatus || ''}
                       onChange={(e) => setDraftTouchStatus(e.target.value)}
                       options={[
-                        { value: FILTER_ALL, label: 'All' },
                         { value: 'untouched', label: 'Never called' },
                         { value: 'touched', label: 'Called' },
                       ]}
                       className={styles.fullWidthSelect}
                     />
                     <Select
+                      allowEmpty
                       label="Last called"
-                      value={draftLastCalledPreset}
+                      placeholder="Any time"
+                      value={draftLastCalledPreset || ''}
                       onChange={(e) => setDraftLastCalledPreset(e.target.value)}
                       options={[
-                        { value: FILTER_ALL, label: 'Any time' },
                         { value: '1', label: 'Last 1 day' },
                         { value: '7', label: 'Last 7 days' },
                         { value: '30', label: 'Last 30 days' },
@@ -451,8 +454,8 @@ export function ContactAdvancedFilterModal({
               </div>
               {(showCampaign || showStatuses || showManagersMulti || showTags) && (
                 <p className={styles.multiSelectNote}>
-                  Campaigns, status, owning managers, and tags use multi-select: open the dropdown and choose one or
-                  more options.
+                  Campaigns, status, owning managers, and tags: leave empty to include everything, or pick one or more
+                  values to narrow the list.
                 </p>
               )}
             </div>

@@ -29,18 +29,12 @@ import { useTableLoadingState } from '../hooks/useTableLoadingState';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import { TableDataRegion } from '../components/admin/TableDataRegion';
 import styles from './UsersPage.module.scss';
-
-const FILTER_ALL = '__all__';
+import { isNoListFilter, normalizeListFilterAll } from '../utils/listFilterNarrowing';
 
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
   { value: 'manager', label: 'Manager' },
   { value: 'agent', label: 'Agent' },
-];
-
-const ROLE_FILTER_OPTIONS = [
-  { value: FILTER_ALL, label: 'All roles' },
-  ...ROLE_OPTIONS,
 ];
 
 export function UsersPage() {
@@ -55,10 +49,10 @@ export function UsersPage() {
   const [search, setSearch] = useState('');
   const [tenantFilter, setTenantFilter] = useState(tenantIdFromUrl);
   const [tenantDraft, setTenantDraft] = useState(tenantIdFromUrl);
-  const [draftRoleFilter, setDraftRoleFilter] = useState(FILTER_ALL);
-  const [appliedRoleFilter, setAppliedRoleFilter] = useState(FILTER_ALL);
-  const [draftManagerFilter, setDraftManagerFilter] = useState(FILTER_ALL);
-  const [appliedManagerFilter, setAppliedManagerFilter] = useState(FILTER_ALL);
+  const [draftRoleFilter, setDraftRoleFilter] = useState('');
+  const [appliedRoleFilter, setAppliedRoleFilter] = useState('');
+  const [draftManagerFilter, setDraftManagerFilter] = useState('');
+  const [appliedManagerFilter, setAppliedManagerFilter] = useState('');
   const [managersForFilter, setManagersForFilter] = useState([]);
   const [showDisabled, setShowDisabled] = useState(false);
   const [tenantOptions, setTenantOptions] = useState([]);
@@ -86,8 +80,8 @@ export function UsersPage() {
         includeDisabled: showDisabled,
         page: pagination.page,
         limit: pagination.limit,
-        role: appliedRoleFilter !== FILTER_ALL ? appliedRoleFilter : undefined,
-        filterManagerId: appliedManagerFilter !== FILTER_ALL ? appliedManagerFilter : undefined,
+        role: !isNoListFilter(appliedRoleFilter) ? appliedRoleFilter : undefined,
+        filterManagerId: !isNoListFilter(appliedManagerFilter) ? appliedManagerFilter : undefined,
       });
       setUsers(res.data?.data || []);
       setPagination(res.data?.pagination || { page: 1, limit: 20, total: 0, totalPages: 0 });
@@ -242,16 +236,15 @@ export function UsersPage() {
   const isLocked = (u) => u.account_locked_until && new Date(u.account_locked_until) > new Date();
 
   const managerFilterOptions = [
-    { value: FILTER_ALL, label: 'All managers' },
-    { value: 'unassigned', label: 'Unassigned pool' },
+    { value: 'unassigned', label: 'No manager' },
     ...managersForFilter.map((m) => ({
       value: String(m.id),
-      label: `${m.name || m.email || `#${m.id}`}${m.tenant_name ? ` · ${m.tenant_name}` : ''}`,
+      label: `${m.name || m.email || '—'}${m.tenant_name ? ` · ${m.tenant_name}` : ''}`,
     })),
   ];
 
   const hasActiveUserFilters =
-    appliedRoleFilter !== FILTER_ALL || appliedManagerFilter !== FILTER_ALL;
+    !isNoListFilter(appliedRoleFilter) || !isNoListFilter(appliedManagerFilter);
 
   return (
     <div className={styles.wrapper}>
@@ -271,21 +264,21 @@ export function UsersPage() {
         <FilterBar
           onApply={() => {
             setTenantFilter(tenantDraft);
-            setAppliedRoleFilter(draftRoleFilter);
+            setAppliedRoleFilter(normalizeListFilterAll(draftRoleFilter));
             setAppliedManagerFilter(
               draftRoleFilter === 'manager' || draftRoleFilter === 'admin'
-                ? FILTER_ALL
-                : draftManagerFilter
+                ? ''
+                : normalizeListFilterAll(draftManagerFilter)
             );
             setPagination((p) => ({ ...p, page: 1 }));
           }}
           onReset={() => {
             setTenantDraft('');
             setTenantFilter('');
-            setDraftRoleFilter(FILTER_ALL);
-            setAppliedRoleFilter(FILTER_ALL);
-            setDraftManagerFilter(FILTER_ALL);
-            setAppliedManagerFilter(FILTER_ALL);
+            setDraftRoleFilter('');
+            setAppliedRoleFilter('');
+            setDraftManagerFilter('');
+            setAppliedManagerFilter('');
             setPagination((p) => ({ ...p, page: 1 }));
           }}
         >
@@ -297,21 +290,25 @@ export function UsersPage() {
             className={styles.tenantSelect}
           />
           <Select
+            allowEmpty
             label="Role"
-            value={draftRoleFilter}
+            placeholder="All roles"
+            value={draftRoleFilter || ''}
             onChange={(e) => {
               const v = e.target.value;
               setDraftRoleFilter(v);
               if (v === 'manager' || v === 'admin') {
-                setDraftManagerFilter(FILTER_ALL);
+                setDraftManagerFilter('');
               }
             }}
-            options={ROLE_FILTER_OPTIONS}
+            options={ROLE_OPTIONS}
             className={styles.filterSelect}
           />
           <Select
+            allowEmpty
             label="Reports to (agents)"
-            value={draftManagerFilter}
+            placeholder="All managers"
+            value={draftManagerFilter || ''}
             onChange={(e) => setDraftManagerFilter(e.target.value)}
             options={managerFilterOptions}
             className={styles.filterSelect}

@@ -664,7 +664,7 @@ export function WhatsAppTemplatesPage() {
                     <TableHeaderCell width="160px">Name</TableHeaderCell>
                     <TableHeaderCell width="90px">Language</TableHeaderCell>
                     <TableHeaderCell>Account</TableHeaderCell>
-                    <TableHeaderCell>Provider ID</TableHeaderCell>
+                    <TableHeaderCell>Provider template ref</TableHeaderCell>
                     <TableHeaderCell width="100px" align="center">Action</TableHeaderCell>
                   </TableRow>
                 </TableHead>
