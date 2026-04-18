@@ -11,6 +11,7 @@ import { env } from '../../config/env.js';
 import * as emailAccountService from '../tenant/emailAccountService.js';
 import * as emailMessageService from '../tenant/emailMessageService.js';
 import * as emailTemplateService from '../tenant/emailTemplateService.js';
+import { safeLogTenantActivity } from '../tenant/tenantActivityLogService.js';
 import * as outlookOAuth from './outlookOAuthService.js';
 import * as googleOAuth from './googleOAuthService.js';
 
@@ -356,6 +357,15 @@ export async function sendEmail(tenantId, payload, createdBy) {
     },
     createdBy
   );
+
+  await safeLogTenantActivity(tenantId, createdBy, {
+    event_category: 'message',
+    event_type: 'email.sent',
+    summary: `Email sent: ${String(finalSubject || '').slice(0, 200)}`,
+    entity_type: 'email_message',
+    entity_id: message?.id != null ? Number(message.id) : null,
+    contact_id: contact_id != null ? Number(contact_id) : null,
+  });
 
   return message;
 }

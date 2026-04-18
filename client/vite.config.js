@@ -17,6 +17,14 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:4000',
         changeOrigin: true,
+        timeout: 0,
+        proxyTimeout: 0,
+      },
+      /** Socket.IO (HTTP long-poll + WebSocket upgrade) → same API process as Express */
+      '/socket.io': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+        ws: true,
       },
     },
   },

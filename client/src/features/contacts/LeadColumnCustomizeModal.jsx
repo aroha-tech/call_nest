@@ -35,6 +35,18 @@ function partitionVisible(applicableColumns, visibleOrdered) {
   return { visible, hidden };
 }
 
+/** Single-letter tags; full wording in legend + native title tooltip */
+function categoryTagMeta(col, standardColumnTagLabel) {
+  if (col.category === 'custom') {
+    return { letter: 'C', title: 'Custom field' };
+  }
+  if (col.category === 'extra') {
+    return { letter: 'E', title: 'Extra column' };
+  }
+  const std = String(standardColumnTagLabel || 'Standard').trim() || 'Standard';
+  return { letter: 'D', title: `Standard column (${std})` };
+}
+
 export function LeadColumnCustomizeModal({
   isOpen,
   onClose,
@@ -287,6 +299,17 @@ export function LeadColumnCustomizeModal({
             Drag the handle to reorder. Uncheck to move a field to &quot;Not visible&quot;. {pinnedLabel} always stays
             on.
           </p>
+          <p className={styles.tagLegend}>
+            <span className={styles.tagLegendTitle}>Column tags</span>
+            {' — '}
+            <span className={styles.tagKey}>D</span> standard ({standardColumnTagLabel})
+            {' · '}
+            <span className={styles.tagKey}>E</span> extra
+            {' · '}
+            <span className={styles.tagKey}>A</span> always on
+            {' · '}
+            <span className={styles.tagKey}>C</span> custom
+          </p>
           <ul
             className={styles.list}
             onDragOver={handleDragOver}
@@ -296,6 +319,7 @@ export function LeadColumnCustomizeModal({
             {visibleFiltered.map((col) => {
               const locked = col.id === pinnedColumnId;
               const isDragging = draggingId === col.id;
+              const catTag = categoryTagMeta(col, standardColumnTagLabel);
               return (
                 <li
                   key={col.id}
@@ -333,14 +357,20 @@ export function LeadColumnCustomizeModal({
                     />
                     <span className={styles.rowLabel}>{col.label}</span>
                   </label>
-                  <span className={styles.fieldTag}>
-                    {col.category === 'custom'
-                      ? 'Custom'
-                      : col.category === 'extra'
-                        ? 'Extra'
-                        : standardColumnTagLabel}
-                  </span>
-                  {locked ? <span className={styles.pill}>Always</span> : null}
+                  <div className={styles.rowBadges}>
+                    <span className={styles.fieldTag} title={catTag.title} aria-label={catTag.title}>
+                      {catTag.letter}
+                    </span>
+                    {locked ? (
+                      <span
+                        className={styles.pill}
+                        title="Always on: stays visible and fixed in this position"
+                        aria-label="Always on: stays visible and fixed in this position"
+                      >
+                        A
+                      </span>
+                    ) : null}
+                  </div>
                 </li>
               );
             })}
@@ -351,9 +381,23 @@ export function LeadColumnCustomizeModal({
         <section className={styles.panel}>
           <h3 className={styles.sectionHeading}>Not visible</h3>
           <p className={styles.sectionSub}>Check a field to add it to the table (it appears at the end until you reorder).</p>
+          <p className={styles.tagLegend}>
+            <span className={styles.tagLegendTitle}>Column tags</span>
+            {' — '}
+            <span className={styles.tagKey}>D</span> standard ({standardColumnTagLabel})
+            {' · '}
+            <span className={styles.tagKey}>E</span> extra
+            {' · '}
+            <span className={styles.tagKey}>A</span> always on
+            {' · '}
+            <span className={styles.tagKey}>C</span> custom
+          </p>
           <ul className={styles.list} role="list" aria-label="Hidden columns">
-            {hiddenFiltered.map((col) => (
+            {hiddenFiltered.map((col) => {
+              const catTag = categoryTagMeta(col, standardColumnTagLabel);
+              return (
               <li key={col.id} className={styles.rowHidden} role="listitem">
+                <span className={styles.dragSpacer} aria-hidden />
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
@@ -362,15 +406,14 @@ export function LeadColumnCustomizeModal({
                   />
                   <span className={styles.rowLabel}>{col.label}</span>
                 </label>
-                <span className={styles.fieldTag}>
-                  {col.category === 'custom'
-                    ? 'Custom'
-                    : col.category === 'extra'
-                      ? 'Extra'
-                      : standardColumnTagLabel}
-                </span>
+                <div className={styles.rowBadges}>
+                  <span className={styles.fieldTag} title={catTag.title} aria-label={catTag.title}>
+                    {catTag.letter}
+                  </span>
+                </div>
               </li>
-            ))}
+            );
+            })}
           </ul>
           {hiddenFiltered.length === 0 ? (
             <p className={styles.emptyMuted}>All available fields are visible.</p>

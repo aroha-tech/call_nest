@@ -1,6 +1,7 @@
 import { query, withConnection } from '../../config/db.js';
 import { startCallForContact } from './callsService.js';
 import { enrichDispositionsForDialerSession } from './dispositionApplyDealHelper.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 function normalizeIds(arr, max = 200) {
   if (!Array.isArray(arr)) return [];
@@ -38,6 +39,17 @@ export async function createSession(
     [tenantId, uid, userSessionNo, String(provider || 'dummy'), dialingSetId, callScriptId]
   );
   const sessionId = result.insertId;
+
+  await safeLogTenantActivity(tenantId, uid, {
+    event_category: 'dialer',
+    event_type: 'dialer.session.created',
+    summary: `Dialer session #${userSessionNo} started (${ids.length} contact(s) queued)`,
+    payload_json: {
+      session_id: sessionId,
+      provider: String(provider || 'dummy'),
+      queue_size: ids.length,
+    },
+  });
 
   // Insert queued items in given order
   for (let i = 0; i < ids.length; i++) {
@@ -871,11 +883,19 @@ async function runCallNextAfterLock(tenantId, user, sid) {
 
   const next = await pickNextQueuedItem(tenantId, sid);
   if (!next) {
-    await query(
+    const doneRes = await query(
       `UPDATE dialer_sessions SET status = 'completed', ended_at = NOW()
        WHERE tenant_id = ? AND id = ? AND status IN ('active','ready')`,
       [tenantId, sid]
     );
+    if (Number(doneRes?.affectedRows ?? 0) > 0) {
+      await safeLogTenantActivity(tenantId, user?.id, {
+        event_category: 'dialer',
+        event_type: 'dialer.session.completed',
+        summary: `Dialer session #${Number(session.user_session_no)} completed`,
+        payload_json: { session_id: sid },
+      });
+    }
     return { done: true, attempt: null, session: await getSession(tenantId, user, sid) };
   }
 
@@ -1063,6 +1083,12 @@ export async function cancelSession(tenantId, user, sessionId) {
      WHERE tenant_id = ? AND id = ?`,
     [tenantId, sid]
   );
+  await safeLogTenantActivity(tenantId, user?.id, {
+    event_category: 'dialer',
+    event_type: 'dialer.session.cancelled',
+    summary: `Dialer session #${Number(session.user_session_no)} cancelled`,
+    payload_json: { session_id: sid },
+  });
   return getSession(tenantId, user, sid);
 }
 

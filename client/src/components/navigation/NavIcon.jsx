@@ -345,6 +345,18 @@ function IconPlug() {
   );
 }
 
+/** Queued background work (imports, exports, bulk actions). */
+function IconBackgroundTasks() {
+  return (
+    <Icon>
+      <circle cx="6" cy="7" r="1.35" />
+      <circle cx="6" cy="12" r="1.35" />
+      <circle cx="6" cy="17" r="1.35" />
+      <path d="M10.5 7H21M10.5 12H19M10.5 17H20" />
+    </Icon>
+  );
+}
+
 /** Process / workflow map (sidebar “Workflow”). */
 function IconWorkflowMap() {
   return (
@@ -353,6 +365,16 @@ function IconWorkflowMap() {
       <circle cx="18" cy="6" r="2.25" />
       <circle cx="12" cy="18" r="2.25" />
       <path d="M6 8.25v3l6 4.5M18 8.25v3L12 15.75" />
+    </Icon>
+  );
+}
+
+/** Workspace activity log (sidebar “Activities”). */
+function IconActivityFeed() {
+  return (
+    <Icon>
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
     </Icon>
   );
 }
@@ -381,6 +403,7 @@ const NAV_ICON_MAP = {
   'campaign-types': IconMegaphone,
   'campaign-statuses': IconPulse,
   'workflow-map': IconWorkflowMap,
+  activity: IconActivityFeed,
   dialer: IconDialer,
   'call-history': IconCallHistory,
   'dialer-workflow': IconPhone,
@@ -411,6 +434,7 @@ const NAV_ICON_MAP = {
   'contact-fields': IconBraces,
   'contact-tags': IconTags,
   integrations: IconPlug,
+  'background-jobs': IconBackgroundTasks,
 };
 
 /**

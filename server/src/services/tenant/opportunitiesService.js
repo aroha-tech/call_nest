@@ -1,6 +1,7 @@
 import { query } from '../../config/db.js';
 import { getContactById, buildOwnershipWhere } from './contactsService.js';
 import { getDealById } from './dealsService.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 function assertCanEditOpportunity(user, contact) {
   if (!contact) return;
@@ -329,7 +330,18 @@ export async function createOpportunity(tenantId, user, payload) {
     ]
   );
 
-  return getOpportunityById(tenantId, user, result.insertId);
+  const oppOut = await getOpportunityById(tenantId, user, result.insertId);
+  await safeLogTenantActivity(tenantId, user?.id, {
+    event_category: 'deal',
+    event_type: 'opportunity.created',
+    summary: `Opportunity created: ${oppOut?.title || title || '—'}`,
+    entity_type: 'opportunity',
+    entity_id: result.insertId,
+    contact_id: contactId,
+    payload_json: { deal_id: dealId, stage_id: stageId },
+  });
+
+  return oppOut;
 }
 
 export async function getOpportunityById(tenantId, user, opportunityId) {
@@ -347,7 +359,8 @@ export async function getOpportunityById(tenantId, user, opportunityId) {
   return row ?? null;
 }
 
-export async function updateOpportunity(tenantId, user, opportunityId, payload) {
+export async function updateOpportunity(tenantId, user, opportunityId, payload, options = {}) {
+  const { skipTenantActivityLog = false } = options;
   const existing = await getOpportunityById(tenantId, user, opportunityId);
   if (!existing) return null;
 
@@ -482,7 +495,19 @@ export async function updateOpportunity(tenantId, user, opportunityId, payload) 
     sqlParams
   );
 
-  return getOpportunityById(tenantId, user, opportunityId);
+  const refreshed = await getOpportunityById(tenantId, user, opportunityId);
+  if (!skipTenantActivityLog) {
+    await safeLogTenantActivity(tenantId, user?.id, {
+      event_category: 'deal',
+      event_type: 'opportunity.updated',
+      summary: `Opportunity updated: ${refreshed?.title || existing.title || '—'}`,
+      entity_type: 'opportunity',
+      entity_id: Number(opportunityId),
+      contact_id: existing.contact_id != null ? Number(existing.contact_id) : null,
+      payload_json: { deal_id: existing.deal_id },
+    });
+  }
+  return refreshed;
 }
 
 /**
@@ -514,7 +539,7 @@ export async function applyOpportunityFromDisposition(tenantId, user, contactId,
 
   const dupId = await findDuplicateActive(tenantId, cid, did);
   if (dupId) {
-    await updateOpportunity(tenantId, user, dupId, { stage_id: sid });
+    await updateOpportunity(tenantId, user, dupId, { stage_id: sid }, { skipTenantActivityLog: true });
     return { applied: true, mode: 'updated', opportunity_id: dupId };
   }
 
@@ -541,5 +566,14 @@ export async function softDeleteOpportunity(tenantId, user, opportunityId) {
      WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL`,
     [uid, uid, tenantId, opportunityId]
   );
+  await safeLogTenantActivity(tenantId, user?.id, {
+    event_category: 'deal',
+    event_type: 'opportunity.deleted',
+    summary: `Opportunity removed: ${existing.title || '—'}`,
+    entity_type: 'opportunity',
+    entity_id: Number(opportunityId),
+    contact_id: existing.contact_id != null ? Number(existing.contact_id) : null,
+    payload_json: { deal_id: existing.deal_id },
+  });
   return { id: opportunityId };
 }

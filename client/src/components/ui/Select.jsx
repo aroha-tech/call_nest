@@ -3,7 +3,7 @@ import ReactSelect from 'react-select';
 import styles from './Select.module.scss';
 
 function createSelectStyles({ compact = false } = {}) {
-  const minHeight = compact ? 32 : 34;
+  const minHeight = compact ? 34 : 40;
   const fontSize = compact ? '12px' : undefined;
 
   return {
@@ -72,13 +72,25 @@ function createSelectStyles({ compact = false } = {}) {
       ...base,
       color: 'var(--color-text-primary, #e2e8f0)',
     }),
+    /** Single continuous control — no vertical rule before the chevron. */
+    indicatorSeparator: () => ({
+      display: 'none',
+    }),
+    dropdownIndicator: (base) => ({
+      ...base,
+      padding: compact ? '6px 8px' : '8px 10px',
+      color: 'var(--color-text-muted, rgba(255, 255, 255, 0.45))',
+      '&:hover': {
+        color: 'var(--color-text-primary, #e2e8f0)',
+      },
+    }),
     indicatorsContainer: (base) => ({
       ...base,
-      height: compact ? 30 : 32,
+      height: compact ? 32 : 38,
     }),
     valueContainer: (base) => ({
       ...base,
-      padding: compact ? '0 6px' : base.padding,
+      padding: compact ? '2px 10px' : '6px 4px 6px 12px',
     }),
   };
 }

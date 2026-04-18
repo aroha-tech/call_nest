@@ -21,12 +21,12 @@
 }
 
 .wrapper :global(.cn-select__control) {
-  border-radius: $radius-sm;
+  border-radius: $radius-md;
   font-size: $font-size-sm;
 }
 
 .oncePick :global(.cn-select__control) {
-  border-radius: $radius-sm;
+  border-radius: $radius-md;
   font-size: $font-size-sm;
 }
 

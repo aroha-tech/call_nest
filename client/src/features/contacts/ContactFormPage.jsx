@@ -20,7 +20,8 @@ import { ContactOpportunitiesSection } from './ContactOpportunitiesSection';
 import { ContactCallHistorySection } from './ContactCallHistorySection';
 import { useContactStatusesOptions } from '../disposition/hooks/useMasterData';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
-import { usePermissions } from '../../hooks/usePermission';
+import { usePermission, usePermissions } from '../../hooks/usePermission';
+import { getMe as getMeAPI } from '../auth/authAPI';
 import {
   DEFAULT_PHONE_COUNTRY_CODE,
   PHONE_NATIONAL_MAX_DIGITS,
@@ -154,6 +155,7 @@ export function ContactFormPage({ defaultType }) {
     !!id && (isLeadRoute ? canAny(['leads.read']) : canAny(['contacts.read']));
   const isNew = !id || id === 'new';
   const type = defaultType; // 'lead' or 'contact' from route wrapper
+  const canDeleteRBAC = usePermission(type === 'lead' ? 'leads.delete' : 'contacts.delete');
 
   const [customFields, setCustomFields] = useState([]);
   const [industryFieldDefs, setIndustryFieldDefs] = useState([]);
@@ -167,6 +169,8 @@ export function ContactFormPage({ defaultType }) {
   const [formErrors, setFormErrors] = useState({});
   const [displayNameTouched, setDisplayNameTouched] = useState(false);
   const [convertTypeOpen, setConvertTypeOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [agentDeleteFlags, setAgentDeleteFlags] = useState(null);
   const didApplyNewStatusDefault = useRef(false);
   const editSnapshotRef = useRef(null);
   const [isEditing, setIsEditing] = useState(() => !!isNew);
@@ -219,6 +223,7 @@ export function ContactFormPage({ defaultType }) {
   const createMutation = useMutation((payload) => contactsAPI.create(payload));
   const updateMutation = useMutation((payload) => contactsAPI.update(id, payload));
   const convertTypeMutation = useMutation((nextType) => contactsAPI.update(id, { type: nextType }));
+  const deleteMutation = useMutation((delId) => contactsAPI.remove(delId, { deleted_source: 'manual' }));
 
   const fetchCustomFields = useCallback(async () => {
     setLoadingCustomFields(true);
@@ -298,6 +303,42 @@ export function ContactFormPage({ defaultType }) {
       cancelled = true;
     };
   }, [role, type]);
+
+  useEffect(() => {
+    if (isNew || !id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (role !== 'agent' || canDeleteRBAC || !authUser?.id) {
+          if (!cancelled) setAgentDeleteFlags(null);
+          return;
+        }
+        const res = await getMeAPI();
+        const d = res?.data;
+        if (!cancelled && d) {
+          setAgentDeleteFlags({
+            agent_can_delete_leads: !!d.agent_can_delete_leads,
+            agent_can_delete_contacts: !!d.agent_can_delete_contacts,
+          });
+        } else if (!cancelled) {
+          setAgentDeleteFlags(null);
+        }
+      } catch {
+        if (!cancelled) setAgentDeleteFlags(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNew, id, role, canDeleteRBAC, authUser?.id]);
+
+  const canDelete = useMemo(() => {
+    if (isNew) return false;
+    if (canDeleteRBAC) return true;
+    if (role !== 'agent' || !agentDeleteFlags) return false;
+    if (type === 'lead') return agentDeleteFlags.agent_can_delete_leads;
+    return agentDeleteFlags.agent_can_delete_contacts;
+  }, [isNew, canDeleteRBAC, role, agentDeleteFlags, type]);
 
   useEffect(() => {
     didApplyNewStatusDefault.current = false;
@@ -1013,6 +1054,16 @@ export function ContactFormPage({ defaultType }) {
                     Edit
                   </Button>
                 </div>
+                {canDelete ? (
+                  <Button
+                    type="button"
+                    variant="danger"
+                    size="sm"
+                    onClick={() => setDeleteConfirmOpen(true)}
+                  >
+                    Delete
+                  </Button>
+                ) : null}
                 {isEditing ? (
                   <>
                     <Button type="button" variant="ghost" size="sm" onClick={() => setLayoutEditMode((v) => !v)}>
@@ -1121,6 +1172,27 @@ export function ContactFormPage({ defaultType }) {
         confirmText={type === 'lead' ? 'Convert to contact' : 'Convert to lead'}
         variant="primary"
         loading={convertTypeMutation.loading}
+      />
+
+      <ConfirmModal
+        isOpen={deleteConfirmOpen}
+        onClose={() => {
+          if (!deleteMutation.loading) setDeleteConfirmOpen(false);
+        }}
+        onConfirm={async () => {
+          if (!id || id === 'new') return;
+          const result = await deleteMutation.mutate(id);
+          if (result?.success) {
+            setDeleteConfirmOpen(false);
+            navigate(type === 'lead' ? '/leads' : '/contacts');
+          } else if (result?.error) {
+            setSubmitError(result.error);
+          }
+        }}
+        title={`Delete ${type === 'lead' ? 'Lead' : 'Contact'}`}
+        message={`Are you sure you want to delete "${contact?.display_name || formData?.display_name || formData?.first_name || formData?.email || 'this record'}"? This removes it from your workspace lists.`}
+        confirmText="Delete"
+        loading={deleteMutation.loading}
       />
 
       {!isNew && contact ? (

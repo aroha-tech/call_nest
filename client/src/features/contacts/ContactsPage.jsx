@@ -5,6 +5,11 @@ import { selectUser } from '../../features/auth/authSelectors';
 import { usePermission, useAnyPermission } from '../../hooks/usePermission';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import { contactsAPI } from '../../services/contactsAPI';
+import { backgroundJobsAPI } from '../../services/backgroundJobsAPI';
+import {
+  bulkShouldUseBackgroundJob,
+  listFilterPayloadFromExportParams,
+} from './contactBulkBackground';
 import { tenantIndustryFieldsAPI } from '../../services/tenantIndustryFieldsAPI';
 import { campaignsAPI } from '../../services/campaignsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
@@ -22,6 +27,7 @@ import { useTableLoadingState } from '../../hooks/useTableLoadingState';
 import { AssignContactsBulkModal } from './AssignContactsBulkModal';
 import { AddTagsBulkModal } from './AddTagsBulkModal';
 import { RemoveTagsBulkModal } from './RemoveTagsBulkModal';
+import { BackgroundJobProgressModal } from '../../components/backgroundJobs/BackgroundJobProgressModal';
 import { LeadDataTable } from './LeadDataTable';
 import { LeadColumnCustomizeModal } from './LeadColumnCustomizeModal';
 import { LeadColumnSortFilterModal } from './LeadColumnSortFilterModal';
@@ -428,6 +434,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
   const [limit, setLimit] = useState(20);
   const [deleteItem, setDeleteItem] = useState(null);
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [bulkDeleteQueueing, setBulkDeleteQueueing] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [assignOpen, setAssignOpen] = useState(false);
   const [bulkTagOpen, setBulkTagOpen] = useState(false);
@@ -866,8 +873,42 @@ export function ContactsPage({ type, mode = 'crm' }) {
       ...(type === 'lead' && leadColumnFilters.length > 0 ? { column_filters: leadColumnFilters } : {}),
       ...(type === 'contact' && contactColumnFilters.length > 0 ? { column_filters: contactColumnFilters } : {}),
     }),
-    [searchQuery, type, filterParamsForApi, leadColumnFilters, contactColumnFilters]
+       [searchQuery, type, filterParamsForApi, leadColumnFilters, contactColumnFilters]
   );
+
+  const bulkJobModalContext = useMemo(
+    () => ({
+      selectionIsAllMatching,
+      exportListParams,
+      recordType: type,
+    }),
+    [selectionIsAllMatching, exportListParams, type]
+  );
+
+  const [bulkJobProgress, setBulkJobProgress] = useState(null);
+  /** While set, poll job until terminal so the list refetches even if the progress modal was closed early. */
+  const [bulkJobListRefreshId, setBulkJobListRefreshId] = useState(null);
+
+  const onBulkJobQueued = useCallback((jobId, meta = {}) => {
+    if (jobId == null) return;
+    const kind = type === 'lead' ? 'Leads' : 'Contacts';
+    const titles = {
+      delete: `Deleting ${kind}`,
+      assign: `Assigning ${kind}`,
+      add_tags: `Adding tags · ${kind}`,
+      remove_tags: `Removing tags · ${kind}`,
+    };
+    const id = Number(jobId);
+    setBulkJobProgress({
+      jobId: id,
+      title: meta.title || titles[meta.operation] || 'Background task',
+      description: meta.description,
+    });
+    setBulkJobListRefreshId(id);
+  }, [type]);
+
+  const bulkListPath = type === 'lead' ? '/leads' : '/contacts';
+  const bulkListLabel = type === 'lead' ? 'Back to Leads' : 'Back to Contacts';
 
   const campaignMultiOptions = useMemo(() => {
     const rows = [...campaigns].sort((a, b) =>
@@ -950,6 +991,44 @@ export function ContactsPage({ type, mode = 'crm' }) {
   } = useAsyncData(fetchContacts, [fetchContacts], {
     transform: (res) => res?.data ?? { data: [], pagination: { total: 0, totalPages: 1, page, limit } },
   });
+
+  const refreshListAfterBackgroundJob = useCallback(() => {
+    void refetch();
+    setSummaryRefreshKey((k) => k + 1);
+  }, [refetch]);
+
+  useEffect(() => {
+    if (bulkJobListRefreshId == null) return;
+    const id = bulkJobListRefreshId;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const res = await backgroundJobsAPI.get(id);
+        const st = String(res?.data?.data?.status ?? '');
+        if (['completed', 'failed', 'cancelled'].includes(st)) {
+          if (cancelled) return;
+          setBulkJobListRefreshId(null);
+          refreshListAfterBackgroundJob();
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    const iv = setInterval(tick, 4000);
+    void tick();
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+    };
+  }, [bulkJobListRefreshId, refreshListAfterBackgroundJob]);
+
+  const handleBackgroundJobFinished = useCallback(
+    ({ jobId: finishedJid }) => {
+      setBulkJobListRefreshId((cur) => (cur === finishedJid ? null : cur));
+      refreshListAfterBackgroundJob();
+    },
+    [refreshListAfterBackgroundJob]
+  );
 
   const contacts = contactsResponse?.data ?? [];
   const pagination = contactsResponse?.pagination ?? { total: 0, totalPages: 1, page, limit };
@@ -1928,6 +2007,32 @@ export function ContactsPage({ type, mode = 'crm' }) {
         onConfirm={async () => {
           if (selectedIds.size === 0) return;
           const n = selectedIds.size;
+          const useJob = bulkShouldUseBackgroundJob(selectionIsAllMatching, n);
+          if (useJob) {
+            setBulkDeleteQueueing(true);
+            try {
+              const entity = type === 'lead' ? 'leads' : 'contacts';
+              const body = selectionIsAllMatching
+                ? {
+                    list_filter: listFilterPayloadFromExportParams(exportListParams),
+                    deleted_source: 'bulk_job',
+                  }
+                : { contact_ids: [...selectedIds], deleted_source: 'bulk_job' };
+              const res = await backgroundJobsAPI.enqueueBulkDelete(body, { entity });
+              const jobId = res?.data?.jobId;
+              setBulkDeleteConfirmOpen(false);
+              clearSelection();
+              if (n >= contacts.length && page > 1) setPage(page - 1);
+              refetch();
+              setSummaryRefreshKey((k) => k + 1);
+              onBulkJobQueued(jobId, { operation: 'delete' });
+            } catch (e) {
+              window.alert(e?.response?.data?.error || e?.message || 'Failed to queue delete job');
+            } finally {
+              setBulkDeleteQueueing(false);
+            }
+            return;
+          }
           const result = await bulkDeleteMutation.mutate([...selectedIds]);
           if (result?.success) {
             setBulkDeleteConfirmOpen(false);
@@ -1941,7 +2046,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
         message={`Remove ${selectedIds.size} selected record(s) from this list? They will be soft-deleted for your workspace.`}
         confirmText="Delete all"
         variant="danger"
-        loading={bulkDeleteMutation.loading}
+        loading={bulkDeleteMutation.loading || bulkDeleteQueueing}
       />
 
       <AssignContactsBulkModal
@@ -1950,6 +2055,8 @@ export function ContactsPage({ type, mode = 'crm' }) {
         selectedIds={[...selectedIds]}
         assignContext={bulkAssignContext}
         user={user}
+        bulkJobContext={bulkJobModalContext}
+        onBulkJobQueued={onBulkJobQueued}
         onSuccess={() => {
           clearSelection();
           refetch();
@@ -1961,6 +2068,8 @@ export function ContactsPage({ type, mode = 'crm' }) {
         onClose={() => setBulkTagOpen(false)}
         selectedIds={[...selectedIds]}
         recordLabel={type === 'lead' ? 'leads' : 'contacts'}
+        bulkJobContext={bulkJobModalContext}
+        onBulkJobQueued={onBulkJobQueued}
         onSuccess={() => {
           clearSelection();
           refetch();
@@ -1972,10 +2081,23 @@ export function ContactsPage({ type, mode = 'crm' }) {
         onClose={() => setBulkRemoveTagOpen(false)}
         selectedIds={[...selectedIds]}
         recordLabel={type === 'lead' ? 'leads' : 'contacts'}
+        bulkJobContext={bulkJobModalContext}
+        onBulkJobQueued={onBulkJobQueued}
         onSuccess={() => {
           clearSelection();
           refetch();
         }}
+      />
+
+      <BackgroundJobProgressModal
+        isOpen={bulkJobProgress != null}
+        onClose={() => setBulkJobProgress(null)}
+        jobId={bulkJobProgress?.jobId}
+        title={bulkJobProgress?.title}
+        description={bulkJobProgress?.description}
+        returnToPath={bulkListPath}
+        returnToLabel={bulkListLabel}
+        onJobFinished={handleBackgroundJobFinished}
       />
 
       <ExportCsvModal

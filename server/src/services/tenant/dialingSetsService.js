@@ -1,5 +1,6 @@
 import { query } from '../../config/db.js';
 import { generateUUID } from '../../utils/uuidHelper.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 export async function findAll(tenantId, includeInactive = false) {
   let sql = `
@@ -56,8 +57,16 @@ export async function create(tenantId, data, createdBy) {
      VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
     [id, tenantId, name, description, is_active, is_system_generated, created_from_default_id, createdBy, createdBy]
   );
-  
-  return findById(tenantId, id);
+
+  const row = await findById(tenantId, id);
+  await safeLogTenantActivity(tenantId, createdBy, {
+    event_category: 'dialing_set',
+    event_type: 'dialing_set.created',
+    summary: `Dialing set created: ${name}`,
+    entity_type: 'dialing_set',
+    payload_json: { dialing_set_id: id },
+  });
+  return row;
 }
 
 export async function update(tenantId, id, data, updatedBy) {
@@ -95,8 +104,16 @@ export async function update(tenantId, id, data, updatedBy) {
   params.push(tenantId);
   
   await query(`UPDATE dialing_sets SET ${updates.join(', ')} WHERE id = ? AND tenant_id = ?`, params);
-  
-  return findById(tenantId, id);
+
+  const row = await findById(tenantId, id);
+  await safeLogTenantActivity(tenantId, updatedBy, {
+    event_category: 'dialing_set',
+    event_type: 'dialing_set.updated',
+    summary: `Dialing set updated: ${row?.name || dialingSet.name}`,
+    entity_type: 'dialing_set',
+    payload_json: { dialing_set_id: id },
+  });
+  return row;
 }
 
 /**
@@ -130,5 +147,13 @@ export async function remove(tenantId, id, options = {}) {
     'UPDATE dialing_sets SET is_deleted = 1, deleted_at = NOW() WHERE id = ? AND tenant_id = ?',
     [id, tenantId]
   );
+  const actorId = options?.userId != null ? Number(options.userId) : null;
+  await safeLogTenantActivity(tenantId, actorId, {
+    event_category: 'dialing_set',
+    event_type: 'dialing_set.deleted',
+    summary: `Dialing set deleted: ${dialingSet.name}`,
+    entity_type: 'dialing_set',
+    payload_json: { dialing_set_id: id },
+  });
   return { success: true };
 }

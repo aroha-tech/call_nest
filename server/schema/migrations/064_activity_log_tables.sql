@@ -1,0 +1,61 @@
+-- Central activity log for dashboard timelines (append-only; soft-delete supported for audit pattern).
+-- Run: mysql -u root -p call_nest < server/schema/migrations/064_activity_log_tables.sql
+-- Or: USE call_nest; SOURCE server/schema/migrations/064_activity_log_tables.sql;
+
+CREATE TABLE IF NOT EXISTS tenant_activity_log (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  tenant_id BIGINT UNSIGNED NOT NULL,
+  actor_user_id BIGINT UNSIGNED NULL,
+  event_category VARCHAR(64) NOT NULL,
+  event_type VARCHAR(128) NOT NULL,
+  summary VARCHAR(500) NOT NULL,
+  payload_json JSON NULL,
+  entity_type VARCHAR(32) NULL,
+  entity_id BIGINT UNSIGNED NULL,
+  contact_id BIGINT UNSIGNED NULL,
+  ref_call_attempt_id BIGINT UNSIGNED NULL,
+  created_by BIGINT UNSIGNED NULL,
+  updated_by BIGINT UNSIGNED NULL,
+  deleted_by BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY idx_tal_tenant_created (tenant_id, created_at),
+  KEY idx_tal_tenant_actor_created (tenant_id, actor_user_id, created_at),
+  KEY idx_tal_tenant_deleted (tenant_id, deleted_at),
+  CONSTRAINT fk_tal_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tal_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_tal_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_tal_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_tal_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_tal_contact FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE SET NULL,
+  CONSTRAINT fk_tal_attempt FOREIGN KEY (ref_call_attempt_id) REFERENCES contact_call_attempts(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS platform_activity_log (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  actor_user_id BIGINT UNSIGNED NULL,
+  subject_tenant_id BIGINT UNSIGNED NULL,
+  event_category VARCHAR(64) NOT NULL,
+  event_type VARCHAR(128) NOT NULL,
+  summary VARCHAR(500) NOT NULL,
+  payload_json JSON NULL,
+  entity_type VARCHAR(32) NULL,
+  entity_id BIGINT UNSIGNED NULL,
+  created_by BIGINT UNSIGNED NULL,
+  updated_by BIGINT UNSIGNED NULL,
+  deleted_by BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY idx_pal_created (created_at),
+  KEY idx_pal_subject_tenant (subject_tenant_id, created_at),
+  KEY idx_pal_deleted (deleted_at),
+  CONSTRAINT fk_pal_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_pal_subject_tenant FOREIGN KEY (subject_tenant_id) REFERENCES tenants(id) ON DELETE SET NULL,
+  CONSTRAINT fk_pal_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_pal_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_pal_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

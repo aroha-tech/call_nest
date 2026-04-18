@@ -14,7 +14,7 @@ export async function get(req, res, next) {
 
 export async function update(req, res, next) {
   try {
-    const updated = await tenantCompanyService.updateForTenant(req.tenant.id, req.body ?? {});
+    const updated = await tenantCompanyService.updateForTenant(req.tenant.id, req.body ?? {}, req.user.id);
     if (!updated) {
       return res.status(404).json({ error: 'Workspace not found' });
     }

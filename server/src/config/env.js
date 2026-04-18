@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -120,6 +121,38 @@ export const env = {
     1024 * 1024,
     Number(process.env.CSV_IMPORT_MAX_FILE_BYTES) || 5 * 1024 * 1024
   ),
+
+  /** Safety cap: max contact IDs one background job may load from list filters (default 2M). */
+  backgroundJobMaxContactIds: Math.max(
+    10_000,
+    Number(process.env.BACKGROUND_JOB_MAX_CONTACT_IDS) || 2_000_000
+  ),
+  /** How often the in-process job worker polls for pending work (ms). */
+  backgroundJobPollMs: Math.max(400, Number(process.env.BACKGROUND_JOB_POLL_MS) || 1200),
+  /** Rows per page when streaming CSV export jobs. */
+  backgroundJobExportPageSize: Math.max(200, Number(process.env.BACKGROUND_JOB_EXPORT_PAGE_SIZE) || 1500),
+  /** Max jobs this API process runs in parallel (each polls DB for work). */
+  backgroundJobMaxConcurrent: Math.max(1, Number(process.env.BACKGROUND_JOB_MAX_CONCURRENT) || 4),
+  /**
+   * Global cap across all API instances when Redis is connected (Lua INCR slot).
+   * 0 = do not use Redis for a global cap (only per-process BACKGROUND_JOB_MAX_CONCURRENT applies).
+   * Set e.g. 16 so4 servers × 4 local still max 16 cluster-wide.
+   */
+  backgroundJobRedisMaxConcurrent: Math.max(0, Number(process.env.BACKGROUND_JOB_REDIS_MAX_CONCURRENT) || 0),
+  /**
+   * Root directory for job artifacts (import input / export output).
+   * Override with BACKGROUND_JOB_DATA_DIR. On Windows the default is under os.tmpdir() to avoid EPERM from
+   * Defender/antivirus blocking writes under the repo; Linux/macOS default remains server/data/background-jobs.
+   */
+  backgroundJobDataDir: (() => {
+    if (process.env.BACKGROUND_JOB_DATA_DIR) {
+      return process.env.BACKGROUND_JOB_DATA_DIR;
+    }
+    if (process.platform === 'win32') {
+      return path.join(os.tmpdir(), 'call-nest', 'background-jobs');
+    }
+    return path.join(serverRoot, 'data', 'background-jobs');
+  })(),
 };
 
 /**

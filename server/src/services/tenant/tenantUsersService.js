@@ -3,6 +3,7 @@ import { query } from '../../config/db.js';
 import { registerUser } from '../authService.js';
 import { getRoleByTenantAndName } from '../rbacService.js';
 import { syncContactsManagerForAgent } from './contactsService.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 const USER_SELECT = `u.id, u.tenant_id, u.email, u.name, u.role, u.role_id, u.manager_id,
             u.agent_can_delete_leads, u.agent_can_delete_contacts,
@@ -168,6 +169,14 @@ export async function create(tenantId, actingUser, { email, password, name, role
     }
   }
 
+  await safeLogTenantActivity(tenantId, actingUser?.id, {
+    event_category: 'user',
+    event_type: 'user.created',
+    summary: `User added: ${user.email} (${role})`,
+    entity_type: 'user',
+    entity_id: user.id,
+  });
+
   return findById(user.id, tenantId, actingUser);
 }
 
@@ -280,6 +289,24 @@ export async function update(id, tenantId, actingUser, payload) {
   if (updates.length === 0) return existing;
   params.push(id);
   await query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
+
+  const touched = [];
+  if (name !== undefined) touched.push('name');
+  if (is_enabled !== undefined) touched.push('enabled');
+  if (role !== undefined) touched.push('role');
+  if (manager_id !== undefined) touched.push('manager');
+  if (password && String(password).trim()) touched.push('password');
+  if (agent_can_delete_leads !== undefined) touched.push('lead delete policy');
+  if (agent_can_delete_contacts !== undefined) touched.push('contact delete policy');
+  const summary = `User updated: ${existing.email}${touched.length ? ` (${touched.join(', ')})` : ''}`.slice(0, 500);
+  await safeLogTenantActivity(tenantId, actingUser?.id, {
+    event_category: 'user',
+    event_type: 'user.updated',
+    summary,
+    entity_type: 'user',
+    entity_id: Number(id),
+    payload_json: { target_user_id: Number(id), fields: touched },
+  });
 
   const finalRole = role !== undefined ? role : existing.role;
   if (manager_id !== undefined && finalRole === 'agent') {

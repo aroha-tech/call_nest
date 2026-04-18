@@ -51,6 +51,7 @@ const PLATFORM_NAV_ITEMS = [
  */
 const TENANT_ADMIN_NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW, section: 'Main' },
+  { key: 'activity', label: 'Activities', path: '/activities', permission: PERMISSIONS.DASHBOARD_VIEW },
   { key: 'users', label: 'Users', path: '/users', permissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM] },
   { key: 'leads', label: 'Leads', path: '/leads', permission: PERMISSIONS.LEADS_READ },
   {
@@ -176,6 +177,12 @@ const TENANT_ADMIN_NAV_ITEMS = [
         permissions: [PERMISSIONS.CONTACTS_UPDATE, PERMISSIONS.LEADS_UPDATE],
       },
       { key: 'integrations', label: 'Integrations', path: '/settings/integrations', permission: PERMISSIONS.SETTINGS_MANAGE },
+      {
+        key: 'background-jobs',
+        label: 'Background tasks',
+        path: '/settings/background-jobs',
+        permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
+      },
     ],
   },
 ];
@@ -185,6 +192,7 @@ const TENANT_ADMIN_NAV_ITEMS = [
  */
 const MANAGER_NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW, section: 'Main' },
+  { key: 'activity', label: 'Activities', path: '/activities', permission: PERMISSIONS.DASHBOARD_VIEW },
   { key: 'leads', label: 'Leads', path: '/leads', permission: PERMISSIONS.LEADS_READ },
   {
     key: 'campaigns',
@@ -198,6 +206,12 @@ const MANAGER_NAV_ITEMS = [
     label: 'Contact tags',
     path: '/settings/contact-tags',
     permissions: [PERMISSIONS.CONTACTS_UPDATE, PERMISSIONS.LEADS_UPDATE],
+  },
+  {
+    key: 'background-jobs',
+    label: 'Background tasks',
+    path: '/settings/background-jobs',
+    permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
   },
   { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
   { key: 'dialer', label: 'Dialer', path: '/dialer', permission: PERMISSIONS.DIAL_EXECUTE },
@@ -307,6 +321,7 @@ const MANAGER_NAV_ITEMS = [
  */
 const AGENT_NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', path: '/', permission: PERMISSIONS.DASHBOARD_VIEW, section: 'Main' },
+  { key: 'activity', label: 'Activities', path: '/activities', permission: PERMISSIONS.DASHBOARD_VIEW },
   { key: 'leads', label: 'Leads', path: '/leads', permission: PERMISSIONS.LEADS_READ },
   {
     key: 'campaigns',
@@ -315,6 +330,12 @@ const AGENT_NAV_ITEMS = [
     permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
   },
   { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
+  {
+    key: 'background-jobs',
+    label: 'Background tasks',
+    path: '/settings/background-jobs',
+    permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
+  },
   { key: 'dialer', label: 'Dialer', path: '/dialer', permission: PERMISSIONS.DIAL_EXECUTE },
   {
     key: 'call-history',

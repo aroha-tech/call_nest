@@ -1,5 +1,6 @@
 import { query } from '../../config/db.js';
 import { buildOwnershipWhere } from './contactsService.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 function trimStr(v) {
   if (v === null || v === undefined) return null;
@@ -157,7 +158,16 @@ export async function createDeal(tenantId, user, payload) {
     [tenantId, name, description, isActive, uid, uid]
   );
   const dealId = result.insertId;
-  return getDealById(tenantId, dealId);
+  const out = await getDealById(tenantId, dealId);
+  await safeLogTenantActivity(tenantId, user?.id, {
+    event_category: 'deal',
+    event_type: 'pipeline.created',
+    summary: `Pipeline created: ${out?.name || name}`,
+    entity_type: 'deal',
+    entity_id: dealId,
+    payload_json: { is_active: !!isActive },
+  });
+  return out;
 }
 
 export async function updateDeal(tenantId, user, dealId, payload) {
@@ -191,7 +201,15 @@ export async function updateDeal(tenantId, user, dealId, payload) {
   params.push(tenantId, dealId);
 
   await query(`UPDATE deals SET ${updates.join(', ')} WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL`, params);
-  return getDealById(tenantId, dealId);
+  const out = await getDealById(tenantId, dealId);
+  await safeLogTenantActivity(tenantId, user?.id, {
+    event_category: 'deal',
+    event_type: 'pipeline.updated',
+    summary: `Pipeline updated: ${out?.name || existing.name}`,
+    entity_type: 'deal',
+    entity_id: dealId,
+  });
+  return out;
 }
 
 export async function softDeleteDeal(tenantId, user, dealId) {
@@ -215,6 +233,13 @@ export async function softDeleteDeal(tenantId, user, dealId) {
     `UPDATE deals SET deleted_at = NOW(), deleted_by = ?, updated_by = ? WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL`,
     [uid, uid, tenantId, dealId]
   );
+  await safeLogTenantActivity(tenantId, user?.id, {
+    event_category: 'deal',
+    event_type: 'pipeline.deleted',
+    summary: `Pipeline deleted: ${existing.name}`,
+    entity_type: 'deal',
+    entity_id: dealId,
+  });
   return { id: dealId };
 }
 
@@ -267,7 +292,16 @@ export async function createStage(tenantId, user, dealId, payload) {
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [tenantId, dealId, name, sortOrder, progression, isClosedWon, isClosedLost, uid, uid]
   );
-  return getDealById(tenantId, dealId);
+  const out = await getDealById(tenantId, dealId);
+  await safeLogTenantActivity(tenantId, user?.id, {
+    event_category: 'deal',
+    event_type: 'pipeline.stage_created',
+    summary: `Pipeline stage added: ${name} (${deal.name})`,
+    entity_type: 'deal',
+    entity_id: dealId,
+    payload_json: { stage_name: name },
+  });
+  return out;
 }
 
 export async function updateStage(tenantId, user, dealId, stageId, payload) {
@@ -311,6 +345,7 @@ export async function updateStage(tenantId, user, dealId, stageId, payload) {
     updates.push('is_closed_lost = ?');
     params.push(payload.is_closed_lost ? 1 : 0);
   }
+  let stageSqlUpdated = false;
   if (updates.length) {
     const isWon = payload.is_closed_won !== undefined ? (payload.is_closed_won ? 1 : 0) : undefined;
     const isLost = payload.is_closed_lost !== undefined ? (payload.is_closed_lost ? 1 : 0) : undefined;
@@ -332,9 +367,21 @@ export async function updateStage(tenantId, user, dealId, stageId, payload) {
       `UPDATE deal_stages SET ${updates.join(', ')} WHERE tenant_id = ? AND deal_id = ? AND id = ? AND deleted_at IS NULL`,
       params
     );
+    stageSqlUpdated = true;
   }
 
-  return getDealById(tenantId, dealId);
+  const out = await getDealById(tenantId, dealId);
+  if (stageSqlUpdated) {
+    await safeLogTenantActivity(tenantId, user?.id, {
+      event_category: 'deal',
+      event_type: 'pipeline.stage_updated',
+      summary: `Pipeline stage updated: ${deal.name}`,
+      entity_type: 'deal',
+      entity_id: dealId,
+      payload_json: { stage_id: stageId },
+    });
+  }
+  return out;
 }
 
 export async function reorderStages(tenantId, user, dealId, stageIdsOrdered) {
@@ -365,7 +412,15 @@ export async function reorderStages(tenantId, user, dealId, stageIdsOrdered) {
     );
     order += 1;
   }
-  return getDealById(tenantId, dealId);
+  const out = await getDealById(tenantId, dealId);
+  await safeLogTenantActivity(tenantId, user?.id, {
+    event_category: 'deal',
+    event_type: 'pipeline.stages_reordered',
+    summary: `Pipeline stages reordered: ${deal.name}`,
+    entity_type: 'deal',
+    entity_id: dealId,
+  });
+  return out;
 }
 
 export async function softDeleteStage(tenantId, user, dealId, stageId) {
@@ -373,7 +428,7 @@ export async function softDeleteStage(tenantId, user, dealId, stageId) {
   if (!deal) return null;
 
   const [st] = await query(
-    `SELECT id FROM deal_stages WHERE tenant_id = ? AND deal_id = ? AND id = ? AND deleted_at IS NULL`,
+    `SELECT id, name FROM deal_stages WHERE tenant_id = ? AND deal_id = ? AND id = ? AND deleted_at IS NULL`,
     [tenantId, dealId, stageId]
   );
   if (!st) return null;
@@ -391,5 +446,14 @@ export async function softDeleteStage(tenantId, user, dealId, stageId) {
      WHERE tenant_id = ? AND deal_id = ? AND id = ? AND deleted_at IS NULL`,
     [uid, uid, tenantId, dealId, stageId]
   );
-  return getDealById(tenantId, dealId);
+  const out = await getDealById(tenantId, dealId);
+  await safeLogTenantActivity(tenantId, user?.id, {
+    event_category: 'deal',
+    event_type: 'pipeline.stage_deleted',
+    summary: `Pipeline stage deleted: ${st.name || 'Stage'} (${deal.name})`,
+    entity_type: 'deal',
+    entity_id: dealId,
+    payload_json: { stage_id: stageId },
+  });
+  return out;
 }

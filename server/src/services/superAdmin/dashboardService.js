@@ -1,5 +1,6 @@
 import { query } from '../../config/db.js';
 import { sqlDateBetweenInclusive } from '../../utils/dateRangeQuery.js';
+import { listPlatformActivityFeed } from './platformActivityLogService.js';
 
 /**
  * Stats for super admin dashboard: customer tenant count, tenant user count, users by role.
@@ -34,9 +35,12 @@ export async function getStats(dateRange = null) {
 
   roleSql += ' GROUP BY role ORDER BY role';
 
-  const [tenantsRow] = await query(tenantSql, tenantParams);
-  const [usersRow] = await query(userSql, userParams);
-  const roleRows = await query(roleSql, roleParams);
+  const [[tenantsRow], [usersRow], roleRows, activityFeed] = await Promise.all([
+    query(tenantSql, tenantParams),
+    query(userSql, userParams),
+    query(roleSql, roleParams),
+    listPlatformActivityFeed({ limit: 32 }),
+  ]);
 
   const usersByRole = roleRows.reduce((acc, row) => {
     acc[row.role] = row.count;
@@ -52,5 +56,6 @@ export async function getStats(dateRange = null) {
       manager: usersByRole.manager ?? 0,
       agent: usersByRole.agent ?? 0,
     },
+    activityFeed,
   };
 }

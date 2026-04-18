@@ -1,5 +1,6 @@
 import { query } from '../../config/db.js';
 import { validateTenantSlugFormat } from '../../utils/tenantSlugRules.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 async function findTenantRow(tenantId) {
   const [row] = await query(
@@ -39,7 +40,7 @@ export async function getDetailsForTenant(tenantId) {
 /**
  * Update company name, workspace slug, and industry (no platform flags).
  */
-export async function updateForTenant(tenantId, payload) {
+export async function updateForTenant(tenantId, payload, actingUserId = null) {
   const tid = Number(tenantId);
   if (!tid || tid === 1) {
     const err = new Error('Cannot update this workspace');
@@ -122,6 +123,19 @@ export async function updateForTenant(tenantId, payload) {
 
   params.push(tid);
   await query(`UPDATE tenants SET ${updates.join(', ')} WHERE id = ?`, params);
+
+  const parts = [];
+  if (name !== undefined) parts.push('company name');
+  if (slug !== undefined) parts.push('workspace URL');
+  if (industry_id !== undefined) parts.push('industry');
+  await safeLogTenantActivity(tid, actingUserId, {
+    event_category: 'tenant',
+    event_type: 'tenant.company_updated',
+    summary: `Workspace settings updated (${parts.join(', ')})`,
+    entity_type: 'tenant',
+    entity_id: tid,
+    payload_json: { fields: parts },
+  });
 
   return findTenantRow(tid);
 }

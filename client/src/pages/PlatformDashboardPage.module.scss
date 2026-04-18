@@ -436,6 +436,109 @@
   opacity: 0.6;
 }
 
+// —— Platform activity timeline ——
+.platformActivitySection {
+  margin-bottom: $space-8;
+
+  .sectionTitle {
+    margin-bottom: $space-2;
+  }
+}
+
+.platformActivityHint {
+  margin: 0 0 $space-3;
+  font-size: $font-size-2xs;
+  color: var(--color-text-muted);
+  line-height: $line-height-relaxed;
+}
+
+.platformActivityCard {
+  border-radius: $radius-lg;
+  padding: $space-4;
+  @include premium-panel;
+}
+
+.platformActivityList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.platformActivityRow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: $space-3;
+  padding: $space-3 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  text-decoration: none;
+  color: inherit;
+  align-items: start;
+  transition: color $transition-fast;
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  &:hover .platformActivityTitle {
+    color: var(--color-primary-400);
+  }
+}
+
+.platformActivityRowStatic {
+  cursor: default;
+
+  &:hover .platformActivityTitle {
+    color: inherit;
+  }
+}
+
+.platformActivityTime {
+  font-size: $font-size-2xs;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  min-width: 7.5rem;
+}
+
+.platformActivityBody {
+  min-width: 0;
+}
+
+.platformActivityTitleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: $space-2;
+}
+
+.platformActivityChip {
+  font-size: 9px;
+  font-weight: $font-weight-bold;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: $radius-sm;
+  background: rgba(var(--color-primary-rgb), 0.12);
+  color: var(--color-primary-400);
+  flex-shrink: 0;
+}
+
+.platformActivityTitle {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  transition: color $transition-fast;
+}
+
+.platformActivityDetail {
+  margin: 4px 0 0;
+  font-size: $font-size-2xs;
+  color: var(--color-text-muted);
+  line-height: $line-height-relaxed;
+}
+
 // —— Recent activity ——
 .recentGrid {
   display: grid;

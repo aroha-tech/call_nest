@@ -6,18 +6,32 @@ import { Spinner } from '../../components/ui/Spinner';
 import { SelectOncePick } from '../../components/ui/Select';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
 import { contactsAPI } from '../../services/contactsAPI';
+import { backgroundJobsAPI } from '../../services/backgroundJobsAPI';
 import { useMutation } from '../../hooks/useAsyncData';
+import {
+  bulkShouldUseBackgroundJob,
+  listFilterPayloadFromExportParams,
+} from './contactBulkBackground';
 import styles from './AddTagsBulkModal.module.scss';
 
 /**
  * Remove selected tenant tags from many contacts/leads (only removes links that exist).
  */
-export function RemoveTagsBulkModal({ isOpen, onClose, selectedIds, recordLabel, onSuccess }) {
+export function RemoveTagsBulkModal({
+  isOpen,
+  onClose,
+  selectedIds,
+  recordLabel,
+  onSuccess,
+  bulkJobContext = null,
+  onBulkJobQueued,
+}) {
   const [tags, setTags] = useState([]);
   const [tagsLoading, setTagsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [chosenTagIds, setChosenTagIds] = useState([]);
   const [formError, setFormError] = useState('');
+  const [jobQueueing, setJobQueueing] = useState(false);
 
   const bulkMut = useMutation((body) => contactsAPI.bulkRemoveTags(body));
 
@@ -61,6 +75,32 @@ export function RemoveTagsBulkModal({ isOpen, onClose, selectedIds, recordLabel,
       setFormError('Choose at least one tag to remove.');
       return;
     }
+    const useBgJob =
+      bulkJobContext &&
+      bulkShouldUseBackgroundJob(bulkJobContext.selectionIsAllMatching, selectedIds.length);
+    if (useBgJob) {
+      const entity = bulkJobContext.recordType === 'lead' ? 'leads' : 'contacts';
+      const payload = bulkJobContext.selectionIsAllMatching
+        ? {
+            list_filter: listFilterPayloadFromExportParams(bulkJobContext.exportListParams),
+            tag_ids: chosenTagIds,
+          }
+        : { contact_ids: selectedIds, tag_ids: chosenTagIds };
+      setJobQueueing(true);
+      setFormError('');
+      try {
+        const res = await backgroundJobsAPI.enqueueBulkRemoveTags(payload, { entity });
+        const jobId = res?.data?.jobId;
+        onBulkJobQueued?.(jobId, { operation: 'remove_tags' });
+        onSuccess?.({});
+        onClose();
+      } catch (e) {
+        setFormError(e?.response?.data?.error || e?.message || 'Failed to queue remove-tags job');
+      } finally {
+        setJobQueueing(false);
+      }
+      return;
+    }
     const result = await bulkMut.mutate({
       contact_ids: selectedIds,
       tag_ids: chosenTagIds,
@@ -75,6 +115,18 @@ export function RemoveTagsBulkModal({ isOpen, onClose, selectedIds, recordLabel,
       setFormError('No records were updated. They may no longer be visible to you.');
       return;
     }
+    const removedAssignments = payload?.removedAssignmentCount;
+    if (removedAssignments !== undefined && Number(removedAssignments) === 0) {
+      setFormError(
+        'No tag links were removed. The selected records may not have had those tags, or the assignments may already be cleared.'
+      );
+      return;
+    }
+    if (payload?.requestTruncated && payload?.cap) {
+      window.alert(
+        `Only the first ${payload.cap} selected records were processed in this bulk action. Narrow your selection or run the action again on the remaining records.`
+      );
+    }
     onSuccess?.(payload);
     onClose();
   };
@@ -86,17 +138,21 @@ export function RemoveTagsBulkModal({ isOpen, onClose, selectedIds, recordLabel,
     <Modal
       isOpen={isOpen}
       onClose={() => {
-        if (!bulkMut.loading) onClose();
+        if (!bulkMut.loading && !jobQueueing) onClose();
       }}
       title={title}
-      closeOnEscape={!bulkMut.loading}
+      closeOnEscape={!bulkMut.loading && !jobQueueing}
       footer={
         <ModalFooter>
-          <Button variant="secondary" onClick={onClose} disabled={bulkMut.loading}>
+          <Button variant="secondary" onClick={onClose} disabled={bulkMut.loading || jobQueueing}>
             Cancel
           </Button>
-          <Button variant="danger" onClick={handleApply} disabled={bulkMut.loading || tagsLoading || n === 0}>
-            {bulkMut.loading ? 'Removing…' : 'Remove tags'}
+          <Button
+            variant="danger"
+            onClick={handleApply}
+            disabled={bulkMut.loading || jobQueueing || tagsLoading || n === 0}
+          >
+            {bulkMut.loading || jobQueueing ? 'Removing…' : 'Remove tags'}
           </Button>
         </ModalFooter>
       }

@@ -45,17 +45,11 @@
   }
 }
 
+/* Layout only — control chrome comes from react-select (SelectOncePick). */
 .tagAddSelect {
   margin-top: $space-3;
   width: 100%;
   max-width: 360px;
-  height: 36px;
-  border-radius: $radius-md;
-  border: 1px solid var(--color-border);
-  padding: 0 $space-2;
-  font-size: $font-size-sm;
-  background: var(--color-bg-surface);
-  color: var(--color-text-primary);
 }
 
 .body {

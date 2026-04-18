@@ -1,5 +1,6 @@
 import { query } from '../../config/db.js';
 import { generateUUID } from '../../utils/uuidHelper.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 export async function findAll(tenantId, includeInactive = false) {
   let sql = `
@@ -154,7 +155,15 @@ export async function create(tenantId, data, createdBy) {
     ]
   );
 
-  return findById(tenantId, id);
+  const row = await findById(tenantId, id);
+  await safeLogTenantActivity(tenantId, createdBy, {
+    event_category: 'disposition',
+    event_type: 'disposition.created',
+    summary: `Disposition created: ${name} (${code})`,
+    entity_type: 'disposition',
+    payload_json: { disposition_id: id, code },
+  });
+  return row;
 }
 
 export async function update(tenantId, id, data, updatedBy) {
@@ -205,11 +214,19 @@ export async function update(tenantId, id, data, updatedBy) {
   params.push(tenantId);
   
   await query(`UPDATE dispositions SET ${updates.join(', ')} WHERE id = ? AND tenant_id = ?`, params);
-  
-  return findById(tenantId, id);
+
+  const row = await findById(tenantId, id);
+  await safeLogTenantActivity(tenantId, updatedBy, {
+    event_category: 'disposition',
+    event_type: 'disposition.updated',
+    summary: `Disposition updated: ${row?.name || disposition.name} (${row?.code || disposition.code})`,
+    entity_type: 'disposition',
+    payload_json: { disposition_id: id },
+  });
+  return row;
 }
 
-export async function remove(tenantId, id) {
+export async function remove(tenantId, id, deletedByUserId = null) {
   const disposition = await findById(tenantId, id);
   if (!disposition) {
     const err = new Error('Disposition not found');
@@ -228,9 +245,18 @@ export async function remove(tenantId, id) {
     throw err;
   }
 
+  const dispName = disposition.name;
+  const dispCode = disposition.code;
   await query(
     'UPDATE dispositions SET is_deleted = 1, deleted_at = NOW() WHERE id = ? AND tenant_id = ?',
     [id, tenantId]
   );
+  await safeLogTenantActivity(tenantId, deletedByUserId, {
+    event_category: 'disposition',
+    event_type: 'disposition.deleted',
+    summary: `Disposition deleted: ${dispName} (${dispCode})`,
+    entity_type: 'disposition',
+    payload_json: { disposition_id: id, code: dispCode },
+  });
   return { success: true };
 }

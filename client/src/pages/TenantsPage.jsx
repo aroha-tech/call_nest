@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -178,11 +178,13 @@ function getActiveUserSizePreset(minS, maxS) {
 
 export function TenantsPage() {
   const { formatDateTime } = useDateTimeDisplay();
+  const [searchParams] = useSearchParams();
+  const qParam = searchParams.get('q') ?? '';
   const [tenants, setTenants] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => qParam.trim());
   const [showDisabled, setShowDisabled] = useState(false);
   const [draftIndustryFilter, setDraftIndustryFilter] = useState('');
   const [appliedIndustryFilter, setAppliedIndustryFilter] = useState('');
@@ -261,6 +263,12 @@ export function TenantsPage() {
   useEffect(() => {
     fetchTenants();
   }, [fetchTenants]);
+
+  useEffect(() => {
+    const next = qParam.trim();
+    setSearch(next);
+    setPagination((p) => ({ ...p, page: 1 }));
+  }, [qParam]);
 
   const handleSearch = useCallback((value) => {
     setSearch(value);
@@ -519,6 +527,7 @@ export function TenantsPage() {
         {filterError && <Alert variant="error">{filterError}</Alert>}
 
         <FilterBar
+          fluid
           onApply={() => {
             const minP = parseUsersFilterInt(draftMinUsers);
             const maxP = parseUsersFilterInt(draftMaxUsers);

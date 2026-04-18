@@ -27,7 +27,8 @@ export async function create(req, res, next) {
     
     const mapping = await dialingSetDispositionsService.create(
       tenantId,
-      { dialing_set_id, disposition_id, order_index }
+      { dialing_set_id, disposition_id, order_index },
+      req.user.id
     );
     
     res.status(201).json({ data: mapping });
@@ -39,7 +40,7 @@ export async function create(req, res, next) {
 export async function remove(req, res, next) {
   try {
     const tenantId = req.tenant.id;
-    await dialingSetDispositionsService.remove(tenantId, req.params.id);
+    await dialingSetDispositionsService.remove(tenantId, req.params.id, req.user.id);
     res.json({ message: 'Mapping removed successfully' });
   } catch (err) {
     next(err);
@@ -55,7 +56,7 @@ export async function move(req, res, next) {
       return res.status(400).json({ error: 'direction or position is required' });
     }
     
-    await dialingSetDispositionsService.move(tenantId, req.params.id, direction, position);
+    await dialingSetDispositionsService.move(tenantId, req.params.id, direction, position, req.user.id);
     res.json({ message: 'Item moved successfully' });
   } catch (err) {
     next(err);

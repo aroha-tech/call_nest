@@ -18,15 +18,18 @@ import {
   computeDashboardInclusiveDates,
 } from '../utils/dateRangePresets';
 import { formatDateTimeDisplay } from '../utils/dateTimeDisplay';
+import {
+  ActivityFeedTable,
+  ActivityFullHistoryLink,
+  ROLE_LABELS,
+  activityTabsForRole,
+} from '../features/activity';
 import styles from './TenantDashboardPage.module.scss';
 
-const ROLE_LABELS = {
-  admin: 'Admin',
-  manager: 'Manager',
-  agent: 'Agent',
-};
-
 const ROLE_ORDER = ['admin', 'manager', 'agent'];
+
+/** Recent activity card: show only the newest rows; full list is on /activities. */
+const DASHBOARD_ACTIVITY_PREVIEW_LIMIT = 5;
 
 /** Emoji as code points keeps source files ASCII-clean on Windows editors. */
 const E = {
@@ -103,6 +106,7 @@ export function TenantDashboardPage() {
   const activeRangeRef = useRef(null);
   const initialFetch = useRef(true);
   const [dashSearch, setDashSearch] = useState('');
+  const [activityFeedFilter, setActivityFeedFilter] = useState('all');
   const [rangeMenuOpen, setRangeMenuOpen] = useState(false);
   const rangeWrapRef = useRef(null);
 
@@ -113,6 +117,10 @@ export function TenantDashboardPage() {
   useEffect(() => {
     activeRangeRef.current = activeRange;
   }, [activeRange]);
+
+  useEffect(() => {
+    if (role === 'agent' && activityFeedFilter === 'team') setActivityFeedFilter('all');
+  }, [role, activityFeedFilter]);
 
   useEffect(() => {
     if (!rangeMenuOpen) return;
@@ -231,6 +239,18 @@ export function TenantDashboardPage() {
     const o = TIME_RANGE_PRESET_OPTIONS.find((x) => x.value === rangePreset);
     return o?.label ?? 'Range';
   }, [rangePreset, activeRange]);
+
+  const activityFeedFiltered = useMemo(() => {
+    const rows = data?.activityFeed ?? [];
+    if (activityFeedFilter === 'all') return rows;
+    if (activityFeedFilter === 'calls') return rows.filter((x) => x.kind === 'call' || x.kind === 'dialer');
+    if (activityFeedFilter === 'records')
+      return rows.filter((x) =>
+        ['crm', 'whatsapp', 'email', 'settings', 'workspace'].includes(x.kind)
+      );
+    if (activityFeedFilter === 'team') return rows.filter((x) => x.kind === 'teammate');
+    return rows;
+  }, [data?.activityFeed, activityFeedFilter]);
 
   function onDashboardSearch(q) {
     const term = String(q || '').trim();
@@ -627,28 +647,42 @@ export function TenantDashboardPage() {
           </div>
         </div>
 
-        <section className={styles.panel}>
-          <div className={styles.panelHead}>
-            <h2 className={styles.panelTitle}>Recent activity</h2>
-            <div className={styles.activityTabs} aria-hidden>
-              <span className={`${styles.activityTab} ${styles.activityTabActive}`}>All</span>
-              <span className={styles.activityTab}>Calls</span>
-              <span className={styles.activityTab}>Agents</span>
+        <section className={styles.activityFeedPanel}>
+          <div className={styles.activityFeedHead}>
+            <div>
+              <h2 className={styles.activityFeedTitleMain}>Recent activity</h2>
+              <p className={styles.activityFeedSub}>
+                Live feed from your workspace (role-scoped). Open a row to view the record.
+              </p>
+            </div>
+            <div className={styles.activityTabs} role="tablist" aria-label="Filter activity">
+              {activityTabsForRole(role).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activityFeedFilter === t.id}
+                  className={`${styles.activityTab} ${activityFeedFilter === t.id ? styles.activityTabActive : ''}`.trim()}
+                  onClick={() => setActivityFeedFilter(t.id)}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
           </div>
-          <p className={styles.skeletonNote}>
-            A unified timeline (calls, emails, WhatsApp, and notes) is in progress. Open a contact or lead to see full
-            activity today.
-          </p>
-          <div className={styles.skeletonBlock}>
-            <div className={styles.skeletonLine} style={{ width: '100%' }} />
-            <div className={styles.skeletonLine} style={{ width: '92%' }} />
-            <div className={styles.skeletonLine} style={{ width: '88%' }} />
-            <div className={styles.skeletonLine} style={{ width: '95%' }} />
-          </div>
-          <span className={styles.footerLink} title="Coming soon">
-            See full activity history (soon)
-          </span>
+
+          {activityFeedFiltered.length === 0 ? (
+            <p className={styles.activityFeedEmpty}>No recent items match this filter.</p>
+          ) : (
+            <ActivityFeedTable
+              rows={activityFeedFiltered.slice(0, DASHBOARD_ACTIVITY_PREVIEW_LIMIT)}
+              tableStyles={styles}
+              dtMode={dtMode}
+              navigate={navigate}
+            />
+          )}
+
+          <ActivityFullHistoryLink tab={activityFeedFilter} />
         </section>
 
         <div className={styles.insightsSection}>

@@ -22,6 +22,11 @@ export function setAccessTokenGetter(getter) {
   getAccessToken = getter;
 }
 
+/** For Socket.IO / fetch that cannot use axios interceptors. */
+export function getStoredAccessToken() {
+  return getAccessToken();
+}
+
 export function setRefreshTokenGetter(getter) {
   getRefreshToken = getter;
 }

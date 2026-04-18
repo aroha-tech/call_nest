@@ -8,6 +8,7 @@ import { LoginPage } from '../features/auth/pages/LoginPage';
 import { RegisterPage } from '../features/auth/pages/RegisterPage';
 import { HomePage } from '../pages/HomePage';
 import { TenantDashboardPage } from '../pages/TenantDashboardPage';
+import { ActivityHistoryPage } from '../features/activity';
 import { ProfilePage } from '../pages/ProfilePage';
 import { PlatformDashboardPage } from '../pages/PlatformDashboardPage';
 import { WorkflowMapPage } from '../pages/WorkflowMapPage';
@@ -46,6 +47,7 @@ import { ContactTagsPage } from '../features/contacts/ContactTagsPage';
 import { ContactFormPage } from '../features/contacts/ContactFormPage';
 import { ContactImportPage } from '../features/contacts/ContactImportPage';
 import { ContactImportHistoryPage } from '../features/contacts/ContactImportHistoryPage';
+import { BackgroundJobsPage } from '../pages/BackgroundJobsPage';
 import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
 import { TenantCompanySettingsPage } from '../pages/TenantCompanySettingsPage';
 import { CampaignsPage } from '../features/campaigns/CampaignsPage';
@@ -197,6 +199,16 @@ function TenantRoutes() {
           <ProtectedRoute permission={PERMISSIONS.DASHBOARD_VIEW}>
             <AppShellLayout>
               <TenantDashboardPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activities"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.DASHBOARD_VIEW}>
+            <AppShellLayout>
+              <ActivityHistoryPage />
             </AppShellLayout>
           </ProtectedRoute>
         }
@@ -649,6 +661,16 @@ function TenantRoutes() {
           <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
             <AppShellLayout>
               <IntegrationsPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/background-jobs"
+        element={
+          <ProtectedRoute permissions={[PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ]}>
+            <AppShellLayout>
+              <BackgroundJobsPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

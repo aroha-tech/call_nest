@@ -59,10 +59,32 @@
 }
 
 .sectionSub {
-  margin: 0 0 $space-3;
+  margin: 0 0 $space-2;
   font-size: $font-size-xs;
   color: var(--color-text-muted);
   line-height: 1.45;
+}
+
+.tagLegend {
+  margin: 0 0 $space-2;
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+  background: var(--color-bg-elevated, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-md;
+}
+
+.tagLegendTitle {
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-secondary);
+}
+
+.tagKey {
+  font-weight: $font-weight-bold;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .list {
@@ -70,17 +92,22 @@
   margin: 0;
   padding: 0;
   max-height: min(50vh, 360px);
+  overflow-x: hidden;
   overflow-y: auto;
   border: 1px solid var(--color-border-subtle);
   border-radius: $radius-md;
   background: var(--color-bg-subtle);
 }
 
+/**
+ * Grid: [drag28px] [label grows] [badges auto] — avoids flex shrinking the title to one character wide.
+ */
 .rowVisible,
 .rowHidden {
-  display: flex;
+  display: grid;
+  grid-template-columns: 28px minmax(8rem, 1fr) auto;
   align-items: center;
-  gap: $space-2;
+  column-gap: $space-2;
   padding: $space-2 $space-3;
   border-bottom: 1px solid var(--color-border-subtle);
   font-size: $font-size-sm;
@@ -98,11 +125,10 @@
 
 .dragSpacer {
   width: 28px;
-  flex-shrink: 0;
+  justify-self: center;
 }
 
 .dragHandle {
-  flex-shrink: 0;
   width: 28px;
   height: 32px;
   display: flex;
@@ -136,38 +162,63 @@
   display: flex;
   align-items: center;
   gap: $space-2;
-  flex: 1;
   min-width: 0;
   cursor: pointer;
 }
 
 .rowLabel {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  line-height: 1.35;
+  /* Normal words stay on one line; long tokens wrap without breaking one letter per row */
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+/** Category + “Always” stay grouped; never overlap the column title */
+.rowBadges {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  justify-self: end;
+  max-width: 100%;
 }
 
 .fieldTag {
   flex-shrink: 0;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
-  padding: 2px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  font-weight: $font-weight-bold;
+  line-height: 1;
+  color: var(--color-text-secondary);
   border-radius: $radius-sm;
   border: 1px solid var(--color-border-subtle);
   background: var(--color-bg-surface);
+  cursor: default;
 }
 
 .pill {
   flex-shrink: 0;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  font-weight: $font-weight-bold;
+  line-height: 1;
+  color: var(--color-primary-400, #60a5fa);
   border: 1px solid var(--color-border);
   border-radius: $radius-sm;
-  padding: 2px 6px;
+  background: rgba(59, 130, 246, 0.12);
+  cursor: default;
 }
 
 .empty,

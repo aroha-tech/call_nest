@@ -112,7 +112,7 @@ export async function update(req, res, next) {
 export async function remove(req, res, next) {
   try {
     const tenantId = req.tenant.id;
-    await whatsappAccountService.remove(tenantId, req.params.id);
+    await whatsappAccountService.remove(tenantId, req.params.id, req.user.id);
     res.json({ message: 'WhatsApp account deleted' });
   } catch (err) {
     next(err);

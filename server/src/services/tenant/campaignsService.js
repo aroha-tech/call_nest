@@ -1,6 +1,7 @@
 import { query } from '../../config/db.js';
 import { buildOwnershipWhere } from './contactsService.js';
 import { appendCampaignFilterRules, normalizeFiltersToRules } from '../../utils/campaignFilterSql.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 async function getUserManagerId(tenantId, userId) {
   const [row] = await query(
@@ -383,6 +384,15 @@ export async function createCampaign(tenantId, user, payload) {
     [result.insertId, tenantId]
   );
 
+  await safeLogTenantActivity(tenantId, user?.id, {
+    event_category: 'campaign',
+    event_type: 'campaign.created',
+    summary: `Campaign created: ${String(name).trim()}`,
+    entity_type: 'campaign',
+    entity_id: result.insertId,
+    payload_json: { type, status: statusNorm },
+  });
+
   return campaign;
 }
 
@@ -552,7 +562,19 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
     params.push(existing.filters_json ? existing.filters_json : '{}');
   }
 
+  const touchParts = [];
+  if (name !== undefined) touchParts.push('name');
+  if (description !== undefined) touchParts.push('description');
+  if (campaign_type_master_id !== undefined) touchParts.push('campaign_type');
+  if (campaign_status_master_id !== undefined) touchParts.push('campaign_status');
+  if (manager_id !== undefined) touchParts.push('manager');
+  if (filters_json !== undefined) touchParts.push('filters');
+  if (status !== undefined) touchParts.push('status');
+  if (type === 'static' && filters_json === undefined) touchParts.push('filters');
+  else if (type === 'filter' && filters_json === undefined) touchParts.push('filters');
+
   // Apply update
+  let didUpdate = false;
   if (updates.length > 0) {
     updates.push('updated_by = ?');
     params.push(user.id);
@@ -561,6 +583,7 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
       `UPDATE campaigns SET ${updates.join(', ')} WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
       params
     );
+    didUpdate = true;
   }
 
   // Scenario 10: reassign campaign manager => reassign static campaign leads
@@ -585,6 +608,19 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
        WHERE tenant_id = ? AND campaign_id = ?`,
       [updatedCampaign.manager_id, tenantId, campaignId]
     );
+  }
+
+  if (didUpdate && updatedCampaign) {
+    const touched = [...new Set(touchParts)];
+    const label = updatedCampaign.name || existing.name || '—';
+    await safeLogTenantActivity(tenantId, user?.id, {
+      event_category: 'campaign',
+      event_type: 'campaign.updated',
+      summary: `Campaign updated: ${label}`,
+      entity_type: 'campaign',
+      entity_id: Number(campaignId),
+      payload_json: { touched },
+    });
   }
 
   return updatedCampaign;
@@ -615,6 +651,14 @@ export async function softDeleteCampaign(tenantId, user, campaignId) {
      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
     [user.id, user.id, id, tenantId]
   );
+
+  await safeLogTenantActivity(tenantId, user?.id, {
+    event_category: 'campaign',
+    event_type: 'campaign.archived',
+    summary: `Campaign archived: ${existing.name || '—'}`,
+    entity_type: 'campaign',
+    entity_id: id,
+  });
 
   const [row] = await query(
     `SELECT * FROM campaigns WHERE id = ? AND tenant_id = ? LIMIT 1`,

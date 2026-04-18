@@ -1,3 +1,4 @@
+import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth.js';
@@ -54,6 +55,9 @@ import dialerSessionsRoutes from './routes/tenant/dialerSessions.js';
 import savedListFiltersRoutes from './routes/tenant/savedListFilters.js';
 import meetingsRoutes from './routes/tenant/meetings.js';
 import tenantIndustryFieldsRoutes from './routes/tenant/industryFields.js';
+import backgroundJobsRoutes from './routes/tenant/backgroundJobs.js';
+import { initTenantRealtimeSocket } from './realtime/tenantRealtimeSocket.js';
+import { startTenantBackgroundJobWorker } from './workers/tenantBackgroundJobWorker.js';
 
 const app = express();
 
@@ -166,6 +170,7 @@ app.use('/api/tenant/dialer-sessions', dialerSessionsRoutes);
 app.use('/api/tenant/saved-list-filters', savedListFiltersRoutes);
 app.use('/api/tenant/meetings', meetingsRoutes);
 app.use('/api/tenant/industry-fields', tenantIndustryFieldsRoutes);
+app.use('/api/tenant/background-jobs', backgroundJobsRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);
@@ -180,9 +185,19 @@ async function start() {
     console.error('Failed to connect to Redis. Continuing without cache layer.', err);
   }
 
-  app.listen(port, () => {
+  const httpServer = http.createServer(app);
+
+  try {
+    await initTenantRealtimeSocket(httpServer);
+  } catch (err) {
+    console.error('[tenant-socket] Init failed:', err);
+    process.exit(1);
+  }
+
+  httpServer.listen(port, () => {
     console.log(`Call Nest API listening on port ${port}`);
     console.log(`Environment: ${env.appEnv}`);
+    startTenantBackgroundJobWorker();
   });
 }
 

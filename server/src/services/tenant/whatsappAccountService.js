@@ -1,4 +1,5 @@
 import { query } from '../../config/db.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 const LIST_COLUMNS = 'id, tenant_id, provider, account_type, account_name, phone_number, external_account_id, status, created_at, updated_at';
 
@@ -106,7 +107,16 @@ export async function create(tenantId, data, createdBy) {
       createdBy,
     ]
   );
-  return findById(tenantId, result.insertId);
+  const row = await findById(tenantId, result.insertId);
+  const label = row?.account_name || row?.phone_number || 'WhatsApp account';
+  await safeLogTenantActivity(tenantId, createdBy, {
+    event_category: 'whatsapp_account',
+    event_type: 'whatsapp_account.created',
+    summary: `WhatsApp account added: ${label}`,
+    entity_type: 'whatsapp_account',
+    entity_id: result.insertId,
+  });
+  return row;
 }
 
 export async function update(tenantId, id, data, updatedBy) {
@@ -165,10 +175,19 @@ export async function update(tenantId, id, data, updatedBy) {
     `UPDATE whatsapp_accounts SET ${updates.join(', ')} WHERE id = ? AND tenant_id = ?`,
     params
   );
-  return findById(tenantId, id);
+  const row = await findById(tenantId, id);
+  const label = row?.account_name || row?.phone_number || 'WhatsApp account';
+  await safeLogTenantActivity(tenantId, updatedBy, {
+    event_category: 'whatsapp_account',
+    event_type: 'whatsapp_account.updated',
+    summary: `WhatsApp account updated: ${label}`,
+    entity_type: 'whatsapp_account',
+    entity_id: Number(id),
+  });
+  return row;
 }
 
-export async function remove(tenantId, id) {
+export async function remove(tenantId, id, deletedByUserId = null) {
   const account = await findById(tenantId, id);
   if (!account) {
     const err = new Error('WhatsApp account not found');
@@ -207,6 +226,14 @@ export async function remove(tenantId, id) {
     if (!isDeletedColumnError(err)) throw err;
     await query('DELETE FROM whatsapp_accounts WHERE id = ? AND tenant_id = ?', [id, tenantId]);
   }
+  const label = account.account_name || account.phone_number || 'WhatsApp account';
+  await safeLogTenantActivity(tenantId, deletedByUserId, {
+    event_category: 'whatsapp_account',
+    event_type: 'whatsapp_account.deleted',
+    summary: `WhatsApp account removed: ${label}`,
+    entity_type: 'whatsapp_account',
+    entity_id: Number(id),
+  });
   return { success: true };
 }
 
@@ -221,7 +248,16 @@ export async function activate(tenantId, id, updatedBy) {
     'UPDATE whatsapp_accounts SET status = ?, updated_by = ? WHERE id = ? AND tenant_id = ?',
     ['active', updatedBy, id, tenantId]
   );
-  return findById(tenantId, id);
+  const row = await findById(tenantId, id);
+  const label = row?.account_name || row?.phone_number || 'WhatsApp account';
+  await safeLogTenantActivity(tenantId, updatedBy, {
+    event_category: 'whatsapp_account',
+    event_type: 'whatsapp_account.activated',
+    summary: `WhatsApp account activated: ${label}`,
+    entity_type: 'whatsapp_account',
+    entity_id: Number(id),
+  });
+  return row;
 }
 
 export async function deactivate(tenantId, id, updatedBy) {
@@ -235,5 +271,14 @@ export async function deactivate(tenantId, id, updatedBy) {
     'UPDATE whatsapp_accounts SET status = ?, updated_by = ? WHERE id = ? AND tenant_id = ?',
     ['inactive', updatedBy, id, tenantId]
   );
-  return findById(tenantId, id);
+  const row = await findById(tenantId, id);
+  const label = row?.account_name || row?.phone_number || 'WhatsApp account';
+  await safeLogTenantActivity(tenantId, updatedBy, {
+    event_category: 'whatsapp_account',
+    event_type: 'whatsapp_account.deactivated',
+    summary: `WhatsApp account deactivated: ${label}`,
+    entity_type: 'whatsapp_account',
+    entity_id: Number(id),
+  });
+  return row;
 }

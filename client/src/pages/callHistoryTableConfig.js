@@ -1,4 +1,4 @@
-export const CALL_HISTORY_COLUMNS_STORAGE_KEY = 'callnest.callHistory.visibleColumns.v2';
+export const CALL_HISTORY_COLUMNS_STORAGE_KEY = 'callnest.callHistory.visibleColumns.v4';
 
 /**
  * @typedef {{
@@ -13,6 +13,12 @@ export const CALL_HISTORY_COLUMNS_STORAGE_KEY = 'callnest.callHistory.visibleCol
 /** @type {CallHistoryColumnDef[]} */
 export const ALL_CALL_HISTORY_COLUMNS = [
   { id: 'created_at', label: 'Call date', sortKey: 'created_at', category: 'default' },
+  {
+    id: 'call_notes',
+    label: 'Notes',
+    sortKey: null,
+    category: 'default',
+  },
   { id: 'contact', label: 'Customer', sortKey: 'contact_id', category: 'default' },
   { id: 'phone', label: 'Phone', sortKey: 'phone', category: 'default' },
   { id: 'agent', label: 'Agent', sortKey: 'agent', category: 'default' },
@@ -21,7 +27,6 @@ export const ALL_CALL_HISTORY_COLUMNS = [
   { id: 'status', label: 'Status', sortKey: 'status', category: 'default' },
   { id: 'is_connected', label: 'Connectivity', sortKey: 'is_connected', category: 'default' },
   { id: 'disposition', label: 'Disposition', sortKey: 'disposition', category: 'default' },
-  { id: 'notes', label: 'Notes', sortKey: 'notes', category: 'default', columnFilterOnly: true },
   { id: 'duration_sec', label: 'Duration', sortKey: 'duration_sec', category: 'extra' },
   { id: 'started_at', label: 'Started', sortKey: 'started_at', category: 'extra' },
   { id: 'ended_at', label: 'Ended', sortKey: 'ended_at', category: 'extra' },
@@ -42,6 +47,7 @@ export function getApplicableCallHistoryColumns() {
 export function getDefaultVisibleCallHistoryColumnIds(applicable) {
   const ids = new Set(applicable.map((c) => c.id));
   const order = [
+    'call_notes',
     'contact',
     'phone',
     'agent',
@@ -51,7 +57,6 @@ export function getDefaultVisibleCallHistoryColumnIds(applicable) {
     'is_connected',
     'disposition',
     'created_at',
-    'notes',
   ];
   return order.filter((id) => ids.has(id));
 }

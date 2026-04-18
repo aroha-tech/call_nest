@@ -3,6 +3,8 @@ import { registerTenant, registerUser } from '../authService.js';
 import { cloneDefaultsForTenant } from '../dispositionCloneService.js';
 import { validateTenantSlugFormat } from '../../utils/tenantSlugRules.js';
 import { sanitizeThemePayload } from '../../utils/tenantTheme.js';
+import { safeLogPlatformActivity } from './platformActivityLogService.js';
+import { safeLogTenantActivity } from '../tenant/tenantActivityLogService.js';
 
 const TENANT_USER_COUNT_SQL = `(SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id AND (u.is_platform_admin = 0 OR u.is_platform_admin IS NULL))`;
 
@@ -171,6 +173,35 @@ export async function create(payload, createdBy) {
   if (theme !== undefined) {
     await update(tenant.id, { theme });
   }
+
+  const actorId = createdBy?.id ?? null;
+  await safeLogPlatformActivity({
+    actor_user_id: actorId,
+    subject_tenant_id: tenant.id,
+    event_category: 'tenant',
+    event_type: 'tenant.provisioned',
+    summary: `Organization created: ${tenant.name}`,
+    entity_type: 'tenant',
+    entity_id: tenant.id,
+    payload_json: { slug: tenant.slug },
+  });
+  await safeLogPlatformActivity({
+    actor_user_id: actorId,
+    subject_tenant_id: tenant.id,
+    event_category: 'user',
+    event_type: 'tenant.admin_provisioned',
+    summary: `First admin provisioned: ${admin.email}`,
+    entity_type: 'user',
+    entity_id: admin.id,
+  });
+  await safeLogTenantActivity(tenant.id, admin.id, {
+    event_category: 'tenant',
+    event_type: 'workspace.initialized',
+    summary: `Workspace ready. First admin: ${admin.name || admin.email}`,
+    entity_type: 'user',
+    entity_id: admin.id,
+    payload_json: { provisioned_by_platform: true },
+  });
 
   return findById(tenant.id);
 }

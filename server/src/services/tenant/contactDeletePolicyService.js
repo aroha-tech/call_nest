@@ -1,4 +1,5 @@
 import { query } from '../../config/db.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 export async function getAgentDeletePolicy(tenantId) {
   const tid = Number(tenantId);
@@ -21,7 +22,7 @@ export async function getAgentDeletePolicy(tenantId) {
  * @param {number} tenantId
  * @param {{ agents_can_delete_leads?: boolean, agents_can_delete_contacts?: boolean }} payload
  */
-export async function updateAgentDeletePolicy(tenantId, payload) {
+export async function updateAgentDeletePolicy(tenantId, payload, actingUserId = null) {
   const tid = Number(tenantId);
   if (!tid || tid === 1) {
     const err = new Error('Cannot update this workspace');
@@ -48,5 +49,15 @@ export async function updateAgentDeletePolicy(tenantId, payload) {
 
   params.push(tid);
   await query(`UPDATE tenants SET ${updates.join(', ')} WHERE id = ? AND is_deleted = 0`, params);
+  const parts = [];
+  if (agents_can_delete_leads !== undefined) parts.push('agents can delete leads');
+  if (agents_can_delete_contacts !== undefined) parts.push('agents can delete contacts');
+  await safeLogTenantActivity(tid, actingUserId, {
+    event_category: 'tenant',
+    event_type: 'tenant.delete_policy_updated',
+    summary: `Lead/contact delete policy updated (${parts.join(', ')})`,
+    entity_type: 'tenant',
+    entity_id: tid,
+  });
   return getAgentDeletePolicy(tid);
 }

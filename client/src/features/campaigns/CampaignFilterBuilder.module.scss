@@ -93,12 +93,7 @@
   opacity: 1;
 }
 
+/* Layout only — SelectOncePick wraps react-select. */
 .addSelect {
   width: 100%;
-  padding: 6px 8px;
-  border-radius: 4px;
-  border: 1px solid var(--border-subtle, #444);
-  background: var(--color-bg, #1a1a1a);
-  color: inherit;
-  font-size: 13px;
 }

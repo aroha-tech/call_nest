@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { selectUser } from '../../features/auth/authSelectors';
 import { tenantCompanyAPI } from '../../services/tenantCompanyAPI';
@@ -12,6 +12,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown';
 import { contactsAPI } from '../../services/contactsAPI';
+import { backgroundJobsAPI } from '../../services/backgroundJobsAPI';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
 import {
@@ -21,6 +22,7 @@ import {
 } from '../../utils/phoneInput';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import styles from './ContactImportPage.module.scss';
+import { BackgroundJobProgressModal } from '../../components/backgroundJobs/BackgroundJobProgressModal';
 
 /** Match server default (5 MB); set VITE_CSV_IMPORT_MAX_MB in client .env if server uses CSV_IMPORT_MAX_FILE_BYTES */
 const CSV_IMPORT_MAX_BYTES =
@@ -28,6 +30,13 @@ const CSV_IMPORT_MAX_BYTES =
     ? Number(import.meta.env.VITE_CSV_IMPORT_MAX_MB) * 1024 * 1024
     : 5 * 1024 * 1024;
 const CSV_IMPORT_MAX_MB = Math.round(CSV_IMPORT_MAX_BYTES / 1024 / 1024);
+
+/**
+ * Above this many data rows, the import runs as a background job (same engine as the API worker)
+ * so the page returns immediately and progress appears on Settings → Background tasks.
+ * Sync import stays for smaller files so you get an instant summary without leaving the page.
+ */
+const IMPORT_BACKGROUND_ROW_THRESHOLD = 400;
 
 /** Public folder — `client/public/import-samples/` */
 function importSampleHref(filename) {
@@ -124,6 +133,7 @@ export function ContactImportPage({ type }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
+  const [queuedJobModal, setQueuedJobModal] = useState(null);
 
   const [preview, setPreview] = useState(null);
   const [mapping, setMapping] = useState({});
@@ -551,18 +561,56 @@ export function ContactImportPage({ type }) {
         tag_ids = [];
       }
 
-      const res = await contactsAPI.importCsv({
-        file,
-        type,
-        mode,
-        default_country_code: normalizeCallingCode(defaultCountryCode || DEFAULT_PHONE_COUNTRY_CODE),
-        mapping,
-        tag_ids: tag_ids.length > 0 ? tag_ids : undefined,
-        import_manager_id: canSetImportOwnership && importManagerId ? importManagerId : undefined,
-        import_assigned_user_id:
-          canSetImportOwnership && importAssignedUserId ? importAssignedUserId : undefined,
-      });
-      setResult(res?.data || null);
+      const rowCount = Math.max(0, Number(reviewData.totalRows) || 0);
+      const useBackgroundJob = rowCount > IMPORT_BACKGROUND_ROW_THRESHOLD;
+
+      if (useBackgroundJob) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', type);
+        formData.append('mode', mode);
+        formData.append('created_source', 'import');
+        formData.append(
+          'default_country_code',
+          normalizeCallingCode(defaultCountryCode || DEFAULT_PHONE_COUNTRY_CODE)
+        );
+        formData.append('mapping', JSON.stringify(mapping));
+        if (tag_ids.length > 0) {
+          formData.append('tag_ids', JSON.stringify(tag_ids));
+        }
+        if (canSetImportOwnership && importManagerId) {
+          formData.append('import_manager_id', String(importManagerId));
+        }
+        if (canSetImportOwnership && importAssignedUserId) {
+          formData.append('import_assigned_user_id', String(importAssignedUserId));
+        }
+
+        const res = await backgroundJobsAPI.enqueueImportCsv(formData, {
+          entity: type === 'lead' ? 'leads' : 'contacts',
+        });
+        const jobId = res?.data?.jobId;
+        if (jobId == null) {
+          throw new Error('Background import did not return a job id');
+        }
+        setQueuedJobModal({
+          jobId: Number(jobId),
+          title: type === 'lead' ? 'Importing leads (CSV)' : 'Importing contacts (CSV)',
+          description: `${rowCount.toLocaleString()} rows queued. You can watch live progress here or open Background tasks.`,
+        });
+      } else {
+        const res = await contactsAPI.importCsv({
+          file,
+          type,
+          mode,
+          default_country_code: normalizeCallingCode(defaultCountryCode || DEFAULT_PHONE_COUNTRY_CODE),
+          mapping,
+          tag_ids: tag_ids.length > 0 ? tag_ids : undefined,
+          import_manager_id: canSetImportOwnership && importManagerId ? importManagerId : undefined,
+          import_assigned_user_id:
+            canSetImportOwnership && importAssignedUserId ? importAssignedUserId : undefined,
+        });
+        setResult(res?.data || null);
+      }
     } catch (e) {
       const msg = e?.response?.data?.error || e?.message || 'Import failed';
       setError(String(msg));
@@ -1023,6 +1071,14 @@ export function ContactImportPage({ type }) {
                     state, …) and your own extra fields show as separate columns when filled. <b>Sample</b> is the
                     preview row number; errors use the real file row.
                   </div>
+                  {reviewData && Number(reviewData.totalRows) > IMPORT_BACKGROUND_ROW_THRESHOLD ? (
+                    <Alert variant="info" style={{ marginBottom: 12 }}>
+                      This file has more than {IMPORT_BACKGROUND_ROW_THRESHOLD} rows. <b>Start import</b> will queue a{' '}
+                      <b>background job</b> (this page returns right away). Track progress under{' '}
+                      <Link to="/settings/background-jobs">Settings → Background tasks</Link>; when the job finishes, a
+                      row appears in <Link to={historyPath}>Import history</Link> with created/updated counts.
+                    </Alert>
+                  ) : null}
                   <div className={styles.reviewScroll}>
                     <table className={`${styles.table} ${styles.previewTable}`}>
                       <thead>
@@ -1166,6 +1222,16 @@ export function ContactImportPage({ type }) {
           </div>
         </div>
       </div>
+
+      <BackgroundJobProgressModal
+        isOpen={queuedJobModal != null}
+        onClose={() => setQueuedJobModal(null)}
+        jobId={queuedJobModal?.jobId}
+        title={queuedJobModal?.title}
+        description={queuedJobModal?.description}
+        returnToPath={type === 'lead' ? '/leads' : '/contacts'}
+        returnToLabel={type === 'lead' ? 'Back to Leads' : 'Back to Contacts'}
+      />
     </div>
   );
 }

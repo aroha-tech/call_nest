@@ -36,7 +36,17 @@ const pool = mysql.createPool({
   connectTimeout: connectTimeoutMs,
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000,
+  /** Align TIMESTAMP/DATETIME parsing with UTC so API `at` matches real wall time across machines */
+  timezone: 'Z',
   ...(sslOptions && { ssl: sslOptions }),
+});
+
+pool.on('connection', (conn) => {
+  conn.query("SET time_zone = '+00:00'", (err) => {
+    if (err && process.env.NODE_ENV !== 'production') {
+      console.warn('[db] SET time_zone failed (need MySQL privilege):', err.message || err);
+    }
+  });
 });
 
 /** Transient network / pool issues worth one or two retries */

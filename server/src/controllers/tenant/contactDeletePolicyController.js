@@ -17,10 +17,14 @@ export async function updatePolicy(req, res, next) {
     const tenantId = req.tenant?.id;
     if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
     const { agents_can_delete_leads, agents_can_delete_contacts } = req.body || {};
-    const data = await contactDeletePolicyService.updateAgentDeletePolicy(tenantId, {
-      agents_can_delete_leads,
-      agents_can_delete_contacts,
-    });
+    const data = await contactDeletePolicyService.updateAgentDeletePolicy(
+      tenantId,
+      {
+        agents_can_delete_leads,
+        agents_can_delete_contacts,
+      },
+      req.user.id
+    );
     res.json({ data });
   } catch (err) {
     next(err);

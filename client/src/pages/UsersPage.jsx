@@ -41,12 +41,13 @@ export function UsersPage() {
   const { formatDateTime } = useDateTimeDisplay();
   const [searchParams] = useSearchParams();
   const tenantIdFromUrl = searchParams.get('tenantId') || '';
+  const qParam = searchParams.get('q') ?? '';
 
   const [users, setUsers] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => qParam.trim());
   const [tenantFilter, setTenantFilter] = useState(tenantIdFromUrl);
   const [tenantDraft, setTenantDraft] = useState(tenantIdFromUrl);
   const [draftRoleFilter, setDraftRoleFilter] = useState('');
@@ -114,6 +115,12 @@ export function UsersPage() {
       setPagination((p) => ({ ...p, page: 1 }));
     }
   }, [tenantIdFromUrl]);
+
+  useEffect(() => {
+    const next = qParam.trim();
+    setSearch(next);
+    setPagination((p) => ({ ...p, page: 1 }));
+  }, [qParam]);
 
   const handleSearch = useCallback((value) => {
     setSearch(value);

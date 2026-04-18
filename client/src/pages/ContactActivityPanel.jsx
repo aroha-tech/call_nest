@@ -1,10 +1,16 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAppSelector } from '../app/hooks';
+import { selectUser } from '../features/auth/authSelectors';
+import { usePermissions } from '../hooks/usePermission';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Spinner } from '../components/ui/Spinner';
 import { Alert } from '../components/ui/Alert';
+import { MaterialSymbol } from '../components/ui/MaterialSymbol';
+import { PERMISSIONS } from '../utils/permissionUtils';
 import { sanitizeAttemptNotesForDisplay } from '../utils/callAttemptNotesDisplay';
+import { formatDateTimeDisplay, formatRelativeTimeShort } from '../utils/dateTimeDisplay';
 import styles from './ContactActivityPanel.module.scss';
 
 function safeDateTime(v) {
@@ -25,10 +31,10 @@ function formatMoney(n) {
   return x.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 }
 
-function assignmentSummary(payload) {
+/** Assignment line without trailing “by …” (actor is in the Member column). */
+function assignmentDetailLine(payload) {
   const parts = [];
   const src = payload?.change_source ? String(payload.change_source) : '';
-  const by = payload?.changed_by_name ? ` by ${payload.changed_by_name}` : '';
   if (payload?.from_assigned_name != null || payload?.to_assigned_name != null) {
     parts.push(
       `Agent: ${payload?.from_assigned_name ?? '—'} → ${payload?.to_assigned_name ?? '—'}`
@@ -46,35 +52,279 @@ function assignmentSummary(payload) {
   }
   const head = parts.length ? parts.join(' · ') : 'Assignment / ownership updated';
   const reason = payload?.change_reason ? ` — ${payload.change_reason}` : '';
-  return `${head}${src ? ` (${src})` : ''}${by}${reason}`;
+  return `${head}${src ? ` (${src})` : ''}${reason}`;
 }
 
-function typeBadgeVariant(type) {
-  switch (type) {
-    case 'contact_created':
-      return 'primary';
-    case 'assignment_changed':
-      return 'warning';
+function initialsFromName(name) {
+  if (!name || !String(name).trim()) return '?';
+  const parts = String(name).trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  if (parts.length === 0) return '?';
+  return parts.map((p) => p[0].toUpperCase()).join('');
+}
+
+function avatarHueFromString(s) {
+  let h = 0;
+  const str = String(s || 'x');
+  for (let i = 0; i < str.length; i += 1) h = (h + str.charCodeAt(i) * (i + 1)) % 360;
+  return h;
+}
+
+function formatDurationSecShort(sec) {
+  if (sec == null || Number.isNaN(Number(sec))) return null;
+  const s = Math.round(Number(sec));
+  if (s <= 0) return null;
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r ? `${m}m ${r}s` : `${m}m`;
+}
+
+function truncateText(str, max) {
+  if (str == null || str === '') return null;
+  const t = String(str);
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1)}…`;
+}
+
+function humanizeKey(s) {
+  if (!s) return '—';
+  return String(s)
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function contactTimelineFilterBucket(type) {
+  if (type === 'call_attempt') return 'calls';
+  if (type === 'dialer_session_queued' || type === 'dialer_session_position_called') return 'dialer';
+  if (type === 'whatsapp_message' || type === 'email_message') return 'messages';
+  return 'crm';
+}
+
+function contactTimelineIcon(ev) {
+  switch (ev.type) {
     case 'call_attempt':
-      return 'success';
+      return { name: 'call', wrap: 'caIconCall' };
     case 'whatsapp_message':
-      return 'success';
+      return { name: 'chat', wrap: 'caIconWa' };
     case 'email_message':
-      return 'primary';
-    case 'opportunity_created':
-      return 'primary';
-    case 'opportunity_updated':
-      return 'warning';
-    case 'profile_updated':
-      return 'default';
+      return { name: 'mail', wrap: 'caIconEmail' };
+    case 'assignment_changed':
     case 'tag_applied':
     case 'tag_removed':
-      return 'muted';
+      return { name: 'person', wrap: 'caIconTeam' };
     case 'dialer_session_queued':
     case 'dialer_session_position_called':
-      return 'warning';
+      return { name: 'phone_forwarded', wrap: 'caIconDialer' };
+    case 'opportunity_created':
+    case 'opportunity_updated':
+      return { name: 'trending_up', wrap: 'caIconDeal' };
+    case 'contact_created':
+      return { name: 'person_add', wrap: 'caIconCrm' };
     default:
-      return 'default';
+      return { name: 'edit_note', wrap: 'caIconCrm' };
+  }
+}
+
+function callStatusPresentation(status, isConnected) {
+  const s = String(status || '').toLowerCase();
+  if (s.includes('complete') || isConnected) return { label: 'Completed', variant: 'teal' };
+  if (s.includes('no_answer') || s.includes('busy') || s.includes('fail') || s.includes('cancel'))
+    return { label: 'Unsuccessful', variant: 'rose' };
+  return { label: humanizeKey(status) || 'Call', variant: 'slate' };
+}
+
+function messageStatusPresentation(raw) {
+  const s = String(raw || '').toLowerCase();
+  if (s.includes('fail') || s.includes('error')) return { label: 'Failed', variant: 'rose' };
+  if (s.includes('pending') || s.includes('queue')) return { label: 'Pending', variant: 'slate' };
+  if (s.includes('deliver')) return { label: 'Delivered', variant: 'teal' };
+  if (s.includes('read')) return { label: 'Read', variant: 'teal' };
+  if (s.includes('sent')) return { label: 'Sent', variant: 'blue' };
+  return { label: humanizeKey(raw) || 'Message', variant: 'blue' };
+}
+
+/**
+ * Row model for the activity table: what happened, status, who, info, icon.
+ * @returns {{ title: string, subtitle: string, detail: string|null, info: string, statusLabel: string, statusVariant: string, actorName: string|null, iconName: string, iconWrap: string }}
+ */
+function contactTimelineRowModel(ev) {
+  const p = ev.payload || {};
+  const cat = typeLabel(ev.type);
+  const icon = contactTimelineIcon(ev);
+
+  const base = {
+    title: '',
+    subtitle: cat,
+    detail: null,
+    info: '—',
+    statusLabel: 'Activity',
+    statusVariant: 'slate',
+    actorName: null,
+    iconName: icon.name,
+    iconWrap: icon.wrap,
+  };
+
+  switch (ev.type) {
+    case 'contact_created': {
+      const kind = p.record_type === 'lead' ? 'Lead' : 'Contact';
+      const importLines =
+        Array.isArray(p.import_batches_nearby) && p.import_batches_nearby.length > 0
+          ? p.import_batches_nearby
+              .map((b) => `${b.original_filename || 'Import'} · ${safeDateTime(b.created_at)}`)
+              .join('\n')
+          : null;
+      return {
+        ...base,
+        title: `${kind} added`,
+        subtitle: `Source: ${p.created_source || '—'}`,
+        detail: importLines,
+        info: truncateText(p.import_batches_nearby?.[0]?.original_filename, 36) || '—',
+        statusLabel: 'Created',
+        statusVariant: 'purple',
+        actorName: p.created_by_name || null,
+      };
+    }
+    case 'profile_updated':
+      return {
+        ...base,
+        title: p.summary || 'Record updated',
+        subtitle: cat,
+        detail: null,
+        statusLabel: 'Updated',
+        statusVariant: 'slate',
+        actorName: p.actor_name || null,
+      };
+    case 'assignment_changed': {
+      return {
+        ...base,
+        title: 'Assignment updated',
+        subtitle: assignmentDetailLine(p),
+        detail: null,
+        info: '—',
+        statusLabel: 'Assignment',
+        statusVariant: 'amber',
+        actorName: p.changed_by_name || null,
+      };
+    }
+    case 'tag_applied':
+      return {
+        ...base,
+        title: `Tag: ${p.tag_name || '—'}`,
+        subtitle: cat,
+        info: '—',
+        statusLabel: 'Tag',
+        statusVariant: 'slate',
+        actorName: p.assigned_by_name || null,
+      };
+    case 'tag_removed':
+      return {
+        ...base,
+        title: `Tag removed: ${p.tag_name || '—'}`,
+        subtitle: cat,
+        info: '—',
+        statusLabel: 'Removed',
+        statusVariant: 'rose',
+        actorName: p.removed_by_name || null,
+      };
+    case 'dialer_session_queued':
+      return {
+        ...base,
+        title: 'Added to dial session',
+        subtitle: `Queue · ${p.session_status || '—'}`,
+        detail: null,
+        info: p.order_index != null ? `#${p.order_index}` : '—',
+        statusLabel: humanizeKey(p.session_status) || 'Queued',
+        statusVariant: 'amber',
+        actorName: p.session_started_by_name || null,
+      };
+    case 'dialer_session_position_called':
+      return {
+        ...base,
+        title: 'Dial session — position processed',
+        subtitle: `State: ${p.state || '—'}`,
+        detail: p.last_error ? String(p.last_error) : null,
+        info: p.last_attempt_id ? `Attempt #${p.last_attempt_id}` : '—',
+        statusLabel: 'Dialer',
+        statusVariant: 'teal',
+        actorName: null,
+      };
+    case 'call_attempt': {
+      const st = callStatusPresentation(p.status, p.is_connected);
+      const dur = formatDurationSecShort(p.duration_sec);
+      const dirLabel = p.direction ? humanizeKey(p.direction) : 'Outbound';
+      const titleText = [dirLabel, 'call', p.disposition_name ? `· ${p.disposition_name}` : ''].filter(Boolean).join(' ');
+      return {
+        ...base,
+        title: titleText,
+        subtitle: cat,
+        detail: p.notes ? sanitizeAttemptNotesForDisplay(p.notes) : null,
+        info: dur || truncateText(p.notes, 28) || '—',
+        statusLabel: st.label,
+        statusVariant: st.variant,
+        actorName: p.agent_name || null,
+      };
+    }
+    case 'whatsapp_message': {
+      const st = messageStatusPresentation(p.status);
+      return {
+        ...base,
+        title: p.template_name ? `Template: ${p.template_name}` : 'WhatsApp message',
+        subtitle: [p.status, p.phone].filter(Boolean).join(' · ') || cat,
+        detail: p.message_text ? String(p.message_text) : null,
+        info: truncateText(p.phone, 22) || truncateText(p.message_text, 28) || '—',
+        statusLabel: st.label,
+        statusVariant: st.variant,
+        actorName: p.sender_name || null,
+      };
+    }
+    case 'email_message': {
+      const st = messageStatusPresentation(p.status);
+      const dir = p.direction === 'inbound' ? 'Inbound' : 'Outbound';
+      return {
+        ...base,
+        title: p.subject ? String(p.subject) : `${dir} email`,
+        subtitle: [p.status, dir].filter(Boolean).join(' · '),
+        detail: p.body_text ? String(p.body_text).slice(0, 800) : null,
+        info: truncateText(p.subject, 36) || '—',
+        statusLabel: st.label,
+        statusVariant: st.variant,
+        actorName: p.sender_name || null,
+      };
+    }
+    case 'opportunity_created':
+      return {
+        ...base,
+        title: p.deal_name || 'Pipeline',
+        subtitle: [p.stage_name, p.title].filter(Boolean).join(' · ') || 'New opportunity',
+        info: formatMoney(p.amount ?? p.expected_revenue),
+        statusLabel: 'Deal',
+        statusVariant: 'purple',
+        actorName: null,
+      };
+    case 'opportunity_updated':
+      return {
+        ...base,
+        title: p.deal_name || 'Pipeline',
+        subtitle: [p.stage_name, 'Updated'].filter(Boolean).join(' · '),
+        info: truncateText(p.title, 40) || (p.amount != null || p.expected_revenue != null ? formatMoney(p.amount ?? p.expected_revenue) : '—'),
+        statusLabel: 'Updated',
+        statusVariant: 'purple',
+        actorName: null,
+      };
+    default:
+      return {
+        ...base,
+        title: p.summary || humanizeKey(ev.type),
+        subtitle: cat,
+        detail:
+          p.payload_json && typeof p.payload_json === 'object'
+            ? JSON.stringify(p.payload_json).slice(0, 220)
+            : null,
+        info: '—',
+        statusLabel: 'Activity',
+        statusVariant: 'slate',
+        actorName: p.actor_name || null,
+      };
   }
 }
 
@@ -109,7 +359,7 @@ function typeLabel(type) {
   }
 }
 
-function TimelineRefs({ ev, contactId, navigate, onViewCallAttempt }) {
+function TimelineRefs({ ev, contactId, navigate, onViewCallAttempt, actionBtnClass }) {
   const refs = ev?.refs || {};
   const cid = contactId || refs.contact_id;
 
@@ -124,16 +374,32 @@ function TimelineRefs({ ev, contactId, navigate, onViewCallAttempt }) {
       String(ev.type || '').startsWith('dialer_session'));
 
   const parts = [];
+  const ac = actionBtnClass || '';
+
   if (attemptId && ev.type === 'call_attempt') {
     parts.push(
-      <Button key="att" type="button" size="sm" variant="secondary" onClick={() => onViewCallAttempt?.(ev.payload)}>
+      <Button
+        key="att"
+        type="button"
+        size="xs"
+        variant="ghost"
+        className={ac}
+        onClick={() => onViewCallAttempt?.(ev.payload)}
+      >
         View call details
       </Button>
     );
   }
   if (dialSid) {
     parts.push(
-      <Button key="ds" type="button" size="sm" variant="secondary" onClick={() => navigate(`/dialer/session/${dialSid}`)}>
+      <Button
+        key="ds"
+        type="button"
+        size="xs"
+        variant="ghost"
+        className={ac}
+        onClick={() => navigate(`/dialer/session/${dialSid}`)}
+      >
         Open dial session
       </Button>
     );
@@ -146,8 +412,9 @@ function TimelineRefs({ ev, contactId, navigate, onViewCallAttempt }) {
       <Button
         key="wa"
         type="button"
-        size="sm"
-        variant="secondary"
+        size="xs"
+        variant="ghost"
+        className={ac}
         onClick={() => navigate(`/whatsapp/messages?${waQ.toString()}`)}
       >
         Open WhatsApp message
@@ -162,8 +429,9 @@ function TimelineRefs({ ev, contactId, navigate, onViewCallAttempt }) {
       <Button
         key="em"
         type="button"
-        size="sm"
-        variant="secondary"
+        size="xs"
+        variant="ghost"
+        className={ac}
         onClick={() => navigate(`/email/sent?${emQ.toString()}`)}
       >
         Open email
@@ -175,8 +443,9 @@ function TimelineRefs({ ev, contactId, navigate, onViewCallAttempt }) {
       <Button
         key="chist"
         type="button"
-        size="sm"
-        variant="secondary"
+        size="xs"
+        variant="ghost"
+        className={ac}
         onClick={() => navigate(`/calls/history?contact_id=${encodeURIComponent(String(cid))}`)}
       >
         Call history (this customer)
@@ -186,7 +455,7 @@ function TimelineRefs({ ev, contactId, navigate, onViewCallAttempt }) {
 
   if (parts.length === 0) return null;
   return (
-    <div className={styles.rowActions} aria-label="Cross-links">
+    <div className={styles.caRowActions} aria-label="Related actions">
       {parts}
     </div>
   );
@@ -207,28 +476,92 @@ export function ContactActivityPanel({
 }) {
   const navigate = useNavigate();
   const sentinelRef = useRef(null);
-
+  const tableScrollRef = useRef(null);
+  /** Set true only after user scrolls (page or list); cleared when a fetch is triggered. Prevents auto-chaining pages. */
+  const loadMoreUnlockRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+  const user = useAppSelector(selectUser);
+  const dtMode = user?.datetimeDisplayMode ?? 'ist_fixed';
+  const { canAny } = usePermissions();
+  const canCallHistory = canAny([PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR]);
+  const canBrowseCrm = canAny([PERMISSIONS.LEADS_READ, PERMISSIONS.CONTACTS_READ]);
+  const [activityFilter, setActivityFilter] = useState('all');
+  const [_relTick, setRelTick] = useState(0);
   useEffect(() => {
-    if (!timelineMeta?.loaded || !timelineMeta?.hasMore || timelineMeta?.loadingMore || !onLoadMoreTimeline) {
-      return undefined;
-    }
-    const el = sentinelRef.current;
-    if (!el) return undefined;
-    const obs = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) onLoadMoreTimeline();
-      },
-      { root: null, rootMargin: '180px', threshold: 0 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [timelineMeta?.loaded, timelineMeta?.hasMore, timelineMeta?.loadingMore, onLoadMoreTimeline]);
+    const id = window.setInterval(() => setRelTick((x) => x + 1), 30000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const contact = bundle?.contact;
   const crmPath = useMemo(() => {
     if (!contact?.id) return null;
     return contact.type === 'lead' ? `/leads/${contact.id}` : `/contacts/${contact.id}`;
   }, [contact]);
+
+  const rawTimeline = bundle?.timeline;
+  const filteredTimelineRows = useMemo(() => {
+    const rows = Array.isArray(rawTimeline) ? rawTimeline : [];
+    if (activityFilter === 'all') return rows;
+    return rows.filter((ev) => contactTimelineFilterBucket(ev.type) === activityFilter);
+  }, [rawTimeline, activityFilter]);
+
+  const lazyTimeline = timelineMeta != null;
+
+  useEffect(() => {
+    loadingMoreRef.current = Boolean(timelineMeta?.loadingMore);
+  }, [timelineMeta?.loadingMore]);
+
+  useEffect(() => {
+    loadMoreUnlockRef.current = false;
+  }, [bundle?.contact?.id, activityFilter]);
+
+  useEffect(() => {
+    if (!lazyTimeline || !timelineMeta?.loaded || !timelineMeta?.hasMore) return undefined;
+    const arm = () => {
+      loadMoreUnlockRef.current = true;
+    };
+    window.addEventListener('scroll', arm, { passive: true });
+    const root = tableScrollRef.current;
+    if (root) root.addEventListener('scroll', arm, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', arm);
+      if (root) root.removeEventListener('scroll', arm);
+    };
+  }, [
+    lazyTimeline,
+    timelineMeta?.loaded,
+    timelineMeta?.hasMore,
+    activityFilter,
+    rawTimeline,
+  ]);
+
+  useEffect(() => {
+    if (!lazyTimeline || !timelineMeta?.loaded || !timelineMeta?.hasMore || !onLoadMoreTimeline) {
+      return undefined;
+    }
+    const root = tableScrollRef.current;
+    const target = sentinelRef.current;
+    if (!root || !target) return undefined;
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const e = entries[0];
+        if (!e?.isIntersecting || !loadMoreUnlockRef.current || loadingMoreRef.current) return;
+        loadMoreUnlockRef.current = false;
+        onLoadMoreTimeline();
+      },
+      { root, rootMargin: '0px 0px 32px 0px', threshold: 0 }
+    );
+    obs.observe(target);
+    return () => obs.disconnect();
+  }, [
+    lazyTimeline,
+    timelineMeta?.loaded,
+    timelineMeta?.hasMore,
+    onLoadMoreTimeline,
+    rawTimeline,
+    activityFilter,
+  ]);
 
   if (loading) {
     return (
@@ -261,8 +594,7 @@ export function ContactActivityPanel({
   const callsTotal = bundle?.callsPagination?.total ?? bundle?.calls?.length ?? 0;
   const callsLoaded = bundle?.calls?.length ?? 0;
   const callsTruncated = Boolean(bundle?.callsTruncated) || callsTotal > callsLoaded;
-  const lazyTimeline = timelineMeta != null;
-  const timelineRows = bundle.timeline || [];
+  const timelineRows = Array.isArray(rawTimeline) ? rawTimeline : [];
   const showCallsHint = !lazyTimeline || timelineMeta?.loaded;
 
   return (
@@ -405,11 +737,11 @@ export function ContactActivityPanel({
 
       <section aria-labelledby="contact-activity-timeline">
         <h3 id="contact-activity-timeline" className={styles.sectionTitle}>
-          Timeline (newest first)
+          Activity
         </h3>
         <p className={styles.hint}>
-          Origin, saves, tags, dial sessions, every call attempt (with dial-session links), WhatsApp, email, assignments,
-          and deals — newest first. Use links on each row to open the related call history or dial session.
+          Newest first — each row shows what happened, current status, extra context, who was involved, and how long ago.
+          Use the action buttons to open dial sessions, call details, or messages.
         </p>
 
         {lazyTimeline && !timelineMeta.loaded && !timelineMeta.loading ? (
@@ -437,140 +769,159 @@ export function ContactActivityPanel({
           <p className={styles.hint}>No timeline events for this record yet.</p>
         ) : null}
 
-        <ul className={styles.timeline}>
-          {timelineRows.map((ev, idx) => (
-            <li key={`tl-${idx}-${ev.type}-${ev.at || ''}`} className={styles.timelineItem}>
-              <div className={styles.timelineHead}>
-                <Badge variant={typeBadgeVariant(ev.type)}>{typeLabel(ev.type)}</Badge>
-                <span className={styles.when}>{safeDateTime(ev.at)}</span>
+        {(!lazyTimeline || timelineMeta.loaded) && timelineRows.length > 0 ? (
+          <div className={styles.caFeedPanel}>
+            <div className={styles.caFeedHead}>
+              <div className={styles.caTabs} role="tablist" aria-label="Filter activity timeline">
+                {[
+                  { id: 'all', label: 'All' },
+                  { id: 'calls', label: 'Calls' },
+                  { id: 'dialer', label: 'Dialer' },
+                  { id: 'messages', label: 'Messages' },
+                  { id: 'crm', label: 'CRM' },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={activityFilter === t.id}
+                    className={`${styles.caTab} ${activityFilter === t.id ? styles.caTabActive : ''}`.trim()}
+                    onClick={() => setActivityFilter(t.id)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
               </div>
-              {ev.type === 'contact_created' ? (
-                <>
-                  <p className={styles.summary}>
-                    {ev.payload?.record_type === 'lead' ? 'Lead' : 'Contact'} added — source:{' '}
-                    <strong>{ev.payload?.created_source || '—'}</strong>
-                    {ev.payload?.created_by_name ? ` · by ${ev.payload.created_by_name}` : ''}
-                  </p>
-                  {Array.isArray(ev.payload?.import_batches_nearby) && ev.payload.import_batches_nearby.length > 0 ? (
-                    <p className={styles.detail}>
-                      Likely import file(s) near this creation time:{' '}
-                      {ev.payload.import_batches_nearby
-                        .map((b) => `${b.original_filename || 'Import file'} (${safeDateTime(b.created_at)})`)
-                        .join('; ')}
-                    </p>
-                  ) : null}
-                </>
-              ) : null}
-              {ev.type === 'profile_updated' ? (
-                <p className={styles.summary}>
-                  {ev.payload?.summary || 'Record updated'}
-                  {ev.payload?.actor_name ? ` · ${ev.payload.actor_name}` : ''}
-                </p>
-              ) : null}
-              {ev.type === 'assignment_changed' ? (
-                <p className={styles.summary}>{assignmentSummary(ev.payload)}</p>
-              ) : null}
-              {ev.type === 'tag_applied' ? (
-                <p className={styles.summary}>
-                  Tag <strong>{ev.payload?.tag_name || '—'}</strong>
-                  {ev.payload?.assigned_by_name ? ` · by ${ev.payload.assigned_by_name}` : ''}
-                </p>
-              ) : null}
-              {ev.type === 'tag_removed' ? (
-                <p className={styles.summary}>
-                  Tag <strong>{ev.payload?.tag_name || '—'}</strong> removed
-                  {ev.payload?.removed_by_name ? ` · by ${ev.payload.removed_by_name}` : ''}
-                </p>
-              ) : null}
-              {ev.type === 'dialer_session_queued' ? (
-                <p className={styles.summary}>
-                  Added to a dial session ({ev.payload?.session_status || '—'})
-                  {ev.payload?.session_started_by_name ? ` · started by ${ev.payload.session_started_by_name}` : ''}
-                </p>
-              ) : null}
-              {ev.type === 'dialer_session_position_called' ? (
-                <p className={styles.summary}>
-                  Dial session — position processed ({ev.payload?.state || '—'})
-                  {ev.payload?.last_attempt_id ? ' · call logged' : ''}
-                </p>
-              ) : null}
-              {ev.type === 'call_attempt' ? (
-                <>
-                  <p className={styles.summary}>
-                    {ev.payload?.direction || 'outbound'} · {ev.payload?.status || '—'}
-                    {ev.payload?.is_connected ? ' · connected' : ''}
-                    {ev.payload?.disposition_name ? ` · ${ev.payload.disposition_name}` : ''}
-                    {ev.payload?.agent_name ? ` · ${ev.payload.agent_name}` : ''}
-                  </p>
-                  {ev.payload?.notes ? (
-                    <p className={styles.detail}>{sanitizeAttemptNotesForDisplay(ev.payload.notes)}</p>
-                  ) : null}
-                  <TimelineRefs
-                    ev={ev}
-                    contactId={contact.id}
-                    navigate={navigate}
-                    onViewCallAttempt={onViewCallAttempt}
-                  />
-                </>
-              ) : null}
-              {ev.type === 'whatsapp_message' ? (
-                <p className={styles.summary}>
-                  {ev.payload?.status || 'pending'}
-                  {ev.payload?.template_name ? ` · ${ev.payload.template_name}` : ''}
-                  {ev.payload?.sender_name ? ` · ${ev.payload.sender_name}` : ''}
-                  {ev.payload?.phone ? ` · ${ev.payload.phone}` : ''}
-                </p>
-              ) : null}
-              {ev.type === 'whatsapp_message' && ev.payload?.message_text ? (
-                <p className={styles.detail}>{String(ev.payload.message_text)}</p>
-              ) : null}
-              {ev.type === 'email_message' ? (
-                <>
-                  <p className={styles.summary}>
-                    {ev.payload?.direction === 'inbound' ? 'Inbound' : 'Outbound'} email · {ev.payload?.status || '—'}
-                    {ev.payload?.subject ? ` · ${ev.payload.subject}` : ''}
-                    {ev.payload?.sender_name ? ` · ${ev.payload.sender_name}` : ''}
-                  </p>
-                  {ev.payload?.body_text ? (
-                    <p className={styles.detail}>{String(ev.payload.body_text).slice(0, 500)}</p>
-                  ) : null}
-                </>
-              ) : null}
-              {ev.type === 'opportunity_created' || ev.type === 'opportunity_updated' ? (
-                <p className={styles.summary}>
-                  {ev.payload?.deal_name || 'Pipeline'}
-                  {ev.payload?.stage_name ? ` · ${ev.payload.stage_name}` : ''}
-                  {ev.payload?.title ? ` — ${ev.payload.title}` : ''}
-                </p>
-              ) : null}
-              {ev.type !== 'call_attempt' ? (
-                <TimelineRefs
-                  ev={ev}
-                  contactId={contact.id}
-                  navigate={navigate}
-                  onViewCallAttempt={onViewCallAttempt}
-                />
-              ) : null}
-            </li>
-          ))}
-        </ul>
+            </div>
 
-        {lazyTimeline && timelineMeta.loaded && timelineRows.length > 0 ? (
-          <p className={styles.hint}>
-            Showing {timelineRows.length} loaded
-            {timelineMeta.hasMore ? ' · scroll for more' : ''}
-          </p>
-        ) : null}
+            {filteredTimelineRows.length === 0 ? (
+              <p className={styles.caFeedEmpty}>No events in this category.</p>
+            ) : (
+              <div ref={tableScrollRef} className={styles.caTableScroll}>
+                <table className={styles.caTable}>
+                  <thead>
+                    <tr>
+                      <th className={styles.caTh}>Activity</th>
+                      <th className={styles.caTh}>Status</th>
+                      <th className={styles.caTh}>Member</th>
+                      <th className={`${styles.caTh} ${styles.caThInfo}`.trim()}>Info</th>
+                      <th className={`${styles.caTh} ${styles.caThWhen}`.trim()}>When</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTimelineRows.map((ev, idx) => {
+                      const row = contactTimelineRowModel(ev);
+                      const statusClass =
+                        {
+                          teal: styles.caStatusTeal,
+                          blue: styles.caStatusBlue,
+                          purple: styles.caStatusPurple,
+                          amber: styles.caStatusAmber,
+                          rose: styles.caStatusRose,
+                          slate: styles.caStatusSlate,
+                        }[row.statusVariant] || styles.caStatusSlate;
+                      const memberName = row.actorName?.trim() || '—';
+                      const hue = avatarHueFromString(memberName);
+                      const iconWrapCls = styles[row.iconWrap] || styles.caIconCrm;
+                      return (
+                        <tr key={`tl-${idx}-${ev.type}-${ev.at || ''}`} className={styles.caTr}>
+                          <td className={styles.caTd}>
+                            <div className={styles.caDetailCell}>
+                              <div className={`${styles.caIconWrap} ${iconWrapCls}`.trim()}>
+                                <MaterialSymbol name={row.iconName} size="sm" className={styles.caIconGlyph} />
+                              </div>
+                              <div className={styles.caDetailText}>
+                                <span className={styles.caRowTitle}>{row.title}</span>
+                                <span className={styles.caRowSubtitle}>{row.subtitle}</span>
+                                <span className={styles.caWhenMobile} title={formatDateTimeDisplay(ev.at, dtMode)}>
+                                  {formatRelativeTimeShort(ev.at)}
+                                </span>
+                                {row.detail ? (
+                                  <span className={styles.caRowDetail}>{row.detail}</span>
+                                ) : null}
+                                <TimelineRefs
+                                  ev={ev}
+                                  contactId={contact.id}
+                                  navigate={navigate}
+                                  onViewCallAttempt={onViewCallAttempt}
+                                  actionBtnClass={styles.caGhostBtn}
+                                />
+                              </div>
+                            </div>
+                          </td>
+                          <td className={styles.caTd}>
+                            <span className={`${styles.caStatus} ${statusClass}`.trim()}>{row.statusLabel}</span>
+                          </td>
+                          <td className={styles.caTd}>
+                            <div className={styles.caMember}>
+                              <span
+                                className={styles.caAvatar}
+                                style={{
+                                  background: `linear-gradient(135deg, hsl(${hue}, 58%, 42%) 0%, hsl(${(hue + 40) % 360}, 52%, 32%) 100%)`,
+                                }}
+                                aria-hidden
+                              >
+                                {initialsFromName(memberName === '—' ? '' : memberName)}
+                              </span>
+                              <span className={styles.caMemberName}>{memberName}</span>
+                            </div>
+                          </td>
+                          <td className={`${styles.caTd} ${styles.caTdInfo}`.trim()}>
+                            <span className={styles.caValue}>{row.info}</span>
+                          </td>
+                          <td className={`${styles.caTd} ${styles.caTdWhen}`.trim()}>
+                            <time
+                              className={styles.caWhen}
+                              dateTime={ev.at || undefined}
+                              title={formatDateTimeDisplay(ev.at, dtMode)}
+                            >
+                              {formatRelativeTimeShort(ev.at)}
+                            </time>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {lazyTimeline && timelineMeta?.loaded && timelineMeta.hasMore ? (
+                  <>
+                    <div ref={sentinelRef} className={styles.caInfiniteSentinel} aria-hidden />
+                    {timelineMeta.loadingMore ? (
+                      <div className={styles.caPanelLoadingRow} aria-busy="true">
+                        <Spinner size="sm" /> Loading more…
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+            )}
 
-        {lazyTimeline && timelineMeta.loaded && timelineMeta.hasMore ? (
-          <>
-            <div ref={sentinelRef} className={styles.timelineSentinel} aria-hidden />
-            {timelineMeta.loadingMore ? (
-              <div className={styles.timelineLoadingRow}>
-                <Spinner size="sm" /> Loading more…
+            {timelineRows.length > 0 && (!lazyTimeline || timelineMeta?.loaded) ? (
+              <p className={styles.caPanelMeta}>
+                Showing {filteredTimelineRows.length}
+                {activityFilter !== 'all' ? ' (filtered)' : ''} of {timelineRows.length} loaded
+                {lazyTimeline && timelineMeta?.hasMore ? ' · scroll the list to load more' : ''}
+              </p>
+            ) : null}
+
+            {canCallHistory || canBrowseCrm ? (
+              <div className={styles.caFeedFooter}>
+                {canCallHistory ? (
+                  <Link
+                    to={`/calls/history?contact_id=${encodeURIComponent(String(contact.id))}`}
+                    className={styles.caFooterLink}
+                  >
+                    Call history for this record →
+                  </Link>
+                ) : null}
+                {canBrowseCrm ? (
+                  <Link to="/leads" className={styles.caFooterLink}>
+                    Browse leads →
+                  </Link>
+                ) : null}
               </div>
             ) : null}
-          </>
+          </div>
         ) : null}
       </section>
     </div>

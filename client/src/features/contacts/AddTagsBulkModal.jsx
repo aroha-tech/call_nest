@@ -6,18 +6,32 @@ import { Spinner } from '../../components/ui/Spinner';
 import { SelectOncePick } from '../../components/ui/Select';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
 import { contactsAPI } from '../../services/contactsAPI';
+import { backgroundJobsAPI } from '../../services/backgroundJobsAPI';
 import { useMutation } from '../../hooks/useAsyncData';
+import {
+  bulkShouldUseBackgroundJob,
+  listFilterPayloadFromExportParams,
+} from './contactBulkBackground';
 import styles from './AddTagsBulkModal.module.scss';
 
 /**
  * Add tenant tags to many contacts/leads at once (merges with existing tags on each row).
  */
-export function AddTagsBulkModal({ isOpen, onClose, selectedIds, recordLabel, onSuccess }) {
+export function AddTagsBulkModal({
+  isOpen,
+  onClose,
+  selectedIds,
+  recordLabel,
+  onSuccess,
+  bulkJobContext = null,
+  onBulkJobQueued,
+}) {
   const [tags, setTags] = useState([]);
   const [tagsLoading, setTagsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [chosenTagIds, setChosenTagIds] = useState([]);
   const [formError, setFormError] = useState('');
+  const [jobQueueing, setJobQueueing] = useState(false);
 
   const bulkMut = useMutation((body) => contactsAPI.bulkAddTags(body));
 
@@ -61,6 +75,32 @@ export function AddTagsBulkModal({ isOpen, onClose, selectedIds, recordLabel, on
       setFormError('Choose at least one tag.');
       return;
     }
+    const useBgJob =
+      bulkJobContext &&
+      bulkShouldUseBackgroundJob(bulkJobContext.selectionIsAllMatching, selectedIds.length);
+    if (useBgJob) {
+      const entity = bulkJobContext.recordType === 'lead' ? 'leads' : 'contacts';
+      const payload = bulkJobContext.selectionIsAllMatching
+        ? {
+            list_filter: listFilterPayloadFromExportParams(bulkJobContext.exportListParams),
+            tag_ids: chosenTagIds,
+          }
+        : { contact_ids: selectedIds, tag_ids: chosenTagIds };
+      setJobQueueing(true);
+      setFormError('');
+      try {
+        const res = await backgroundJobsAPI.enqueueBulkAddTags(payload, { entity });
+        const jobId = res?.data?.jobId;
+        onBulkJobQueued?.(jobId, { operation: 'add_tags' });
+        onSuccess?.({});
+        onClose();
+      } catch (e) {
+        setFormError(e?.response?.data?.error || e?.message || 'Failed to queue add-tags job');
+      } finally {
+        setJobQueueing(false);
+      }
+      return;
+    }
     const result = await bulkMut.mutate({
       contact_ids: selectedIds,
       tag_ids: chosenTagIds,
@@ -75,6 +115,11 @@ export function AddTagsBulkModal({ isOpen, onClose, selectedIds, recordLabel, on
       setFormError('No records were updated. They may no longer be visible to you.');
       return;
     }
+    if (payload?.requestTruncated && payload?.cap) {
+      window.alert(
+        `Only the first ${payload.cap} selected records were processed in this bulk action. Narrow your selection or run the action again on the remaining records.`
+      );
+    }
     onSuccess?.(payload);
     onClose();
   };
@@ -86,17 +131,17 @@ export function AddTagsBulkModal({ isOpen, onClose, selectedIds, recordLabel, on
     <Modal
       isOpen={isOpen}
       onClose={() => {
-        if (!bulkMut.loading) onClose();
+        if (!bulkMut.loading && !jobQueueing) onClose();
       }}
       title={title}
-      closeOnEscape={!bulkMut.loading}
+      closeOnEscape={!bulkMut.loading && !jobQueueing}
       footer={
         <ModalFooter>
-          <Button variant="secondary" onClick={onClose} disabled={bulkMut.loading}>
+          <Button variant="secondary" onClick={onClose} disabled={bulkMut.loading || jobQueueing}>
             Cancel
           </Button>
-          <Button onClick={handleApply} disabled={bulkMut.loading || tagsLoading || n === 0}>
-            {bulkMut.loading ? 'Applying…' : 'Apply tags'}
+          <Button onClick={handleApply} disabled={bulkMut.loading || jobQueueing || tagsLoading || n === 0}>
+            {bulkMut.loading || jobQueueing ? 'Applying…' : 'Apply tags'}
           </Button>
         </ModalFooter>
       }

@@ -1,6 +1,11 @@
 import { query } from '../../config/db.js';
 import { sqlDateBetweenInclusive } from '../../utils/dateRangeQuery.js';
 import { getCreatedByUserIdsForScope } from './userMessageScopeService.js';
+import { listTenantActivityFeed } from './tenantActivityLogService.js';
+
+async function buildActivityFeed(tenantId, actingUser) {
+  return listTenantActivityFeed(tenantId, actingUser, { limit: 45 });
+}
 
 /**
  * Tenant dashboard aggregates. Admin: full tenant. Manager: team-scoped. Agent: lightweight.
@@ -10,13 +15,17 @@ import { getCreatedByUserIdsForScope } from './userMessageScopeService.js';
  */
 export async function getDashboardData(tenantId, actingUser, dateRange = null) {
   const role = actingUser?.role;
-  if (role === 'admin') {
-    return getAdminDashboard(tenantId, actingUser, dateRange);
-  }
-  if (role === 'manager') {
-    return getManagerDashboard(tenantId, actingUser, dateRange);
-  }
-  return getAgentDashboard(tenantId, actingUser, dateRange);
+  const dashboardPromise =
+    role === 'admin'
+      ? getAdminDashboard(tenantId, actingUser, dateRange)
+      : role === 'manager'
+        ? getManagerDashboard(tenantId, actingUser, dateRange)
+        : getAgentDashboard(tenantId, actingUser, dateRange);
+  const [data, activityFeed] = await Promise.all([
+    dashboardPromise,
+    buildActivityFeed(tenantId, actingUser),
+  ]);
+  return { ...data, activityFeed };
 }
 
 function drParams(range) {

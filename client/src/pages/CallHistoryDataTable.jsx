@@ -1,8 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
 import { IconButton } from '../components/ui/IconButton';
 import { ViewIcon } from '../components/ui/ActionIcons';
+import { MaterialSymbol } from '../components/ui/MaterialSymbol';
+import { buildAttemptHistoryEntries } from '../utils/callAttemptNotesDisplay';
 import leadTableStyles from '../features/contacts/LeadDataTable.module.scss';
 import styles from './CallHistoryDataTable.module.scss';
 
@@ -18,16 +20,53 @@ function formatDurationSec(sec) {
   return `${r}s`;
 }
 
-function renderCell(col, r, { formatWhen, notesPreview }) {
+/** Timeline label style (reference UI): `-- MM/DD/YYYY @ h:mm AM UTC by Agent -- phone -- text` */
+function formatUtcTimelineWhen(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const dateStr = d.toLocaleDateString('en-US', {
+    timeZone: 'UTC',
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+  });
+  const timeStr = d.toLocaleTimeString('en-US', {
+    timeZone: 'UTC',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+  return `${dateStr} @ ${timeStr} UTC`;
+}
+
+function formatCallHistoryTimelineLine(row, entry) {
+  const whenIso = entry.whenIso || row.ended_at || row.started_at || row.created_at;
+  const datePart = formatUtcTimelineWhen(whenIso);
+  const agent = String(row.agent_name || '—').trim() || '—';
+  const phone = String(row.phone_e164 || '—').trim() || '—';
+  const text = String(entry.text || '—').trim() || '—';
+  return `-- ${datePart} by ${agent} -- ${phone} -- ${text}`;
+}
+
+function renderCell(col, r, { formatWhen, expandedNoteIds, toggleNoteExpand }) {
   switch (col.id) {
     case 'created_at':
       return formatWhen?.(r.created_at) ?? r.created_at ?? '—';
-    case 'contact':
+    case 'contact': {
+      const cid = r.contact_id != null ? Number(r.contact_id) : NaN;
+      const canOpenCustomer = Number.isFinite(cid) && cid > 0 && r.__openCustomer;
+      const onClick = () => {
+        if (canOpenCustomer) r.__openCustomer(r);
+        else r.__viewAttempt?.();
+      };
+      const canClick = Boolean(canOpenCustomer || r.__viewAttempt);
       return (
-        <button type="button" className={styles.linkBtn} onClick={() => r.__viewAttempt?.()}>
+        <button type="button" className={styles.linkBtn} onClick={onClick} disabled={!canClick}>
           {r.display_name || '—'}
         </button>
       );
+    }
     case 'phone':
       return r.phone_e164 || '—';
     case 'agent':
@@ -68,8 +107,28 @@ function renderCell(col, r, { formatWhen, notesPreview }) {
       );
     case 'disposition':
       return r.disposition_name || '—';
-    case 'notes':
-      return <span className={styles.notesCell}>{notesPreview?.(r) ?? '—'}</span>;
+    case 'call_notes': {
+      const entries = buildAttemptHistoryEntries(r);
+      const hasTimeline = entries.length > 0;
+      const rid = String(r.id);
+      const open = expandedNoteIds?.has(rid);
+      return (
+        <div className={styles.callNotesCellInner}>
+          <button
+            type="button"
+            className={`${styles.expandNotesBtn} ${open ? styles.expandNotesBtnOpen : ''}`.trim()}
+            disabled={!hasTimeline}
+            aria-expanded={hasTimeline ? Boolean(open) : undefined}
+            aria-label={
+              !hasTimeline ? 'No notes for this attempt' : open ? 'Hide notes timeline' : 'Show notes timeline'
+            }
+            onClick={() => hasTimeline && toggleNoteExpand?.(r.id)}
+          >
+            <MaterialSymbol name={open ? 'remove' : 'add'} size="sm" className={styles.expandNotesGlyph} />
+          </button>
+        </div>
+      );
+    }
     case 'duration_sec':
       return formatDurationSec(r.duration_sec);
     case 'started_at':
@@ -96,12 +155,29 @@ export function CallHistoryDataTable({
   onColumnHeaderClick,
   onOpenCustomizeColumns,
   onViewAttempt,
+  /** Navigate to CRM contact/lead view (dialer-style); customer name uses this when contact_id is set. */
+  onOpenCustomer,
   onOpenDialSession,
   formatWhen,
-  notesPreview,
   columnFilters = [],
 }) {
   const selectedSet = selectedIds || new Set();
+  const [expandedNoteIds, setExpandedNoteIds] = useState(() => new Set());
+
+  const rowIdsKey = useMemo(() => rows.map((r) => r.id).join(','), [rows]);
+  useEffect(() => {
+    setExpandedNoteIds(new Set());
+  }, [rowIdsKey]);
+
+  const toggleNoteExpand = useCallback((attemptId) => {
+    const k = String(attemptId);
+    setExpandedNoteIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  }, []);
 
   const hasFilter = (field) => columnFilters.some((f) => f.field === field);
 
@@ -118,7 +194,7 @@ export function CallHistoryDataTable({
     <Table
       variant="adminList"
       className={leadTableStyles.leadTableOuter}
-      tableClassName={leadTableStyles.leadTable}
+      tableClassName={`${leadTableStyles.leadTable} ${styles.callHistoryTableGrid}`.trim()}
     >
       <TableHead>
         <TableRow>
@@ -175,43 +251,72 @@ export function CallHistoryDataTable({
       </TableHead>
       <TableBody>
         {rows.map((r) => {
-          const rowHelpers = { formatWhen, notesPreview };
+          const rowHelpers = { formatWhen, expandedNoteIds, toggleNoteExpand };
           const rowData = {
             ...r,
             __viewAttempt: onViewAttempt ? () => onViewAttempt(r) : undefined,
+            __openCustomer: onOpenCustomer ? (row) => onOpenCustomer(row) : undefined,
             __openDialSession: onOpenDialSession ? () => onOpenDialSession(r) : undefined,
           };
+          const timelineEntries = buildAttemptHistoryEntries(r);
+          const notesOpen = expandedNoteIds.has(String(r.id));
+          const showTimeline = notesOpen && timelineEntries.length > 0;
+          const colSpan = 1 + visibleDefs.length + 1;
+
           return (
-            <TableRow key={r.id}>
-              <TableCell align="center" className={leadTableStyles.stickyFirst}>
-                <input
-                  type="checkbox"
-                  checked={selectedSet.has(String(r.id))}
-                  onChange={() => onToggleSelect?.(r.id)}
-                  aria-label="Select this call row"
-                />
-              </TableCell>
-
-              {visibleDefs.map((col) => (
-                <TableCell key={col.id} noTruncate={col.id === 'notes'}>
-                  {renderCell(col, rowData, rowHelpers)}
+            <React.Fragment key={r.id}>
+              <TableRow>
+                <TableCell align="center" className={leadTableStyles.stickyFirst}>
+                  <input
+                    type="checkbox"
+                    checked={selectedSet.has(String(r.id))}
+                    onChange={() => onToggleSelect?.(r.id)}
+                    aria-label="Select this call row"
+                  />
                 </TableCell>
-              ))}
 
-              <TableCell align="center" className={`${leadTableStyles.stickyLast} ${leadTableStyles.actionsTd}`}>
-                {onViewAttempt ? (
-                  <IconButton
-                    size="sm"
-                    title="View call details"
-                    onClick={() => onViewAttempt(r)}
+                {visibleDefs.map((col) => (
+                  <TableCell key={col.id} noTruncate={col.id === 'call_notes'}>
+                    {renderCell(col, rowData, rowHelpers)}
+                  </TableCell>
+                ))}
+
+                <TableCell align="center" className={`${leadTableStyles.stickyLast} ${leadTableStyles.actionsTd}`}>
+                  {onViewAttempt ? (
+                    <IconButton
+                      size="sm"
+                      title="View call details"
+                      onClick={() => onViewAttempt(r)}
+                    >
+                      <ViewIcon />
+                    </IconButton>
+                  ) : (
+                    '—'
+                  )}
+                </TableCell>
+              </TableRow>
+              {showTimeline ? (
+                <TableRow className={styles.notesTimelineRow} aria-label="Notes timeline">
+                  <TableCell
+                    colSpan={colSpan}
+                    align="left"
+                    noTruncate
+                    className={styles.notesTimelineCell}
                   >
-                    <ViewIcon />
-                  </IconButton>
-                ) : (
-                  '—'
-                )}
-              </TableCell>
-            </TableRow>
+                    <div className={styles.notesTimelineInner}>
+                      <p className={styles.notesTimelineTitle}>Notes</p>
+                      <ul className={styles.notesTimelineList}>
+                        {timelineEntries.map((entry) => (
+                          <li key={entry.key}>
+                            <p className={styles.notesTimelineLine}>{formatCallHistoryTimelineLine(r, entry)}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : null}
+            </React.Fragment>
           );
         })}
       </TableBody>

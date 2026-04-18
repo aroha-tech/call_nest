@@ -572,28 +572,394 @@
   line-height: $line-height-relaxed;
 }
 
+// —— Recent activity (rich table) ——
+.activityFeedPanel {
+  box-sizing: border-box;
+  margin-bottom: $space-4;
+  padding: $space-5;
+  border-radius: $radius-lg;
+  @include premium-panel;
+  border-color: rgba(var(--color-primary-rgb), 0.16);
+  background-color: var(--color-bg-elevated);
+  background-image:
+    linear-gradient(165deg, rgba(var(--color-primary-rgb), 0.09) 0%, transparent 46%),
+    linear-gradient(180deg, var(--premium-panel-highlight) 0%, transparent 42%);
+}
+
+.activityFeedHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $space-4;
+  margin-bottom: $space-4;
+}
+
+.activityFeedTitleMain {
+  margin: 0 0 $space-1;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-bold;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.activityFeedSub {
+  margin: 0;
+  max-width: 36rem;
+  font-size: $font-size-2xs;
+  color: var(--color-text-tertiary);
+  line-height: $line-height-relaxed;
+}
+
 .activityTabs {
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .activityTab {
-  font-size: $font-size-2xs;
+  font-size: 10px;
   font-weight: $font-weight-bold;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 4px 10px;
-  border-radius: $radius-sm;
+  letter-spacing: 0.08em;
+  padding: 8px 14px;
+  border-radius: $radius-full;
   border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-subtle);
+  background: rgba(0, 0, 0, 0.12);
   color: var(--color-text-muted);
-  cursor: default;
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    border-color $transition-fast,
+    background $transition-fast,
+    color $transition-fast,
+    box-shadow $transition-fast;
 }
 
 .activityTabActive {
-  border-color: rgba(var(--color-primary-rgb), 0.45);
+  border-color: rgba(var(--color-primary-rgb), 0.55);
+  color: var(--color-text-primary);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--color-primary-rgb), 0.35) 0%,
+    rgba(var(--color-primary-rgb), 0.12) 100%
+  );
+  box-shadow: 0 0 0 1px rgba(var(--color-primary-rgb), 0.25);
+}
+
+.activityTableScroll {
+  margin-top: $space-2;
+  max-height: 440px;
+  overflow: auto;
+  border-radius: $radius-md;
+  border: 1px solid var(--color-border-subtle);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.activityTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: $font-size-xs;
+}
+
+.activityTh {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: $font-weight-bold;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
+  white-space: nowrap;
+}
+
+.activityThInfo,
+.activityThWhen {
+  text-align: right;
+}
+
+.activityTr {
+  border-bottom: 1px solid var(--color-border-subtle);
+  transition: background $transition-fast;
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.activityTrClick {
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(var(--color-primary-rgb), 0.08);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(var(--color-primary-rgb), 0.55);
+    outline-offset: -2px;
+  }
+}
+
+.activityTd {
+  padding: 14px 12px;
+  vertical-align: middle;
+  color: var(--color-text-primary);
+}
+
+.activityTdInfo,
+.activityTdWhen {
+  text-align: right;
+}
+
+.activityDetailCell {
+  display: flex;
+  align-items: flex-start;
+  gap: $space-3;
+  min-width: 0;
+}
+
+.activityIconWrap {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: $radius-full;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.activityIconGlyph {
+  font-size: 20px !important;
+  width: 20px;
+  height: 20px;
+}
+
+.activityIconCall {
+  background: rgba(56, 189, 248, 0.16);
+  color: #7dd3fc;
+}
+
+.activityIconWa {
+  background: rgba(34, 197, 94, 0.16);
+  color: #86efac;
+}
+
+.activityIconEmail {
+  background: rgba(129, 140, 248, 0.18);
+  color: #a5b4fc;
+}
+
+.activityIconTeam {
+  background: rgba(192, 132, 252, 0.18);
+  color: #d8b4fe;
+}
+
+.activityIconWorkspace {
+  background: rgba(45, 212, 191, 0.16);
+  color: #5eead4;
+}
+
+.activityIconCampaign {
+  background: rgba(251, 191, 36, 0.18);
+  color: #fcd34d;
+}
+
+.activityIconCrm {
+  background: rgba(var(--color-primary-rgb), 0.15);
+  color: var(--color-primary-300);
+}
+
+.activityDetailText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.activityRowTitle {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  line-height: $line-height-tight;
+}
+
+.activityTrClick:hover .activityRowTitle {
   color: var(--color-primary-400);
-  background: rgba(var(--color-primary-rgb), 0.1);
+}
+
+.activityRowTitleStatic {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  line-height: $line-height-tight;
+}
+
+.activityRowSubtitle {
+  font-size: $font-size-2xs;
+  color: var(--color-text-muted);
+  line-height: $line-height-relaxed;
+}
+
+.activityStatus {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: $radius-full;
+  font-size: 10px;
+  font-weight: $font-weight-bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.activityStatusTeal {
+  background: rgba(45, 212, 191, 0.12);
+  border-color: rgba(45, 212, 191, 0.35);
+  color: #5eead4;
+}
+
+.activityStatusBlue {
+  background: rgba(96, 165, 250, 0.12);
+  border-color: rgba(96, 165, 250, 0.35);
+  color: #93c5fd;
+}
+
+.activityStatusPurple {
+  background: rgba(192, 132, 252, 0.14);
+  border-color: rgba(192, 132, 252, 0.4);
+  color: #d8b4fe;
+}
+
+.activityStatusAmber {
+  background: rgba(251, 191, 36, 0.14);
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #fcd34d;
+}
+
+.activityStatusRose {
+  background: rgba(251, 113, 133, 0.12);
+  border-color: rgba(251, 113, 133, 0.35);
+  color: #fda4af;
+}
+
+.activityStatusSlate {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.3);
+  color: #cbd5e1;
+}
+
+.activityMember {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  min-width: 0;
+}
+
+.activityAvatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: $radius-full;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: $font-weight-bold;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.activityMemberName {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  color: var(--color-text-primary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activityMemberRole {
+  font-weight: $font-weight-medium;
+  color: var(--color-text-tertiary);
+}
+
+.activityValue {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.activityWhen {
+  font-size: $font-size-2xs;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.activityFeedFooter {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: $space-4;
+  margin-top: $space-4;
+}
+
+.activityHistoryLink {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-primary-400, #38bdf8);
+  text-decoration: none;
+  cursor: pointer;
+  opacity: 0.95;
+
+  &:hover {
+    color: var(--color-primary-300, #7dd3fc);
+    text-decoration: underline;
+  }
+}
+
+.activityHistoryLinkIcon {
+  opacity: 0.9;
+}
+
+.activityFeedEmpty {
+  margin: $space-4 0 0;
+  padding: $space-5;
+  text-align: center;
+  font-size: $font-size-sm;
+  color: var(--color-text-muted);
+  border-radius: $radius-md;
+  border: 1px dashed var(--color-border-subtle);
+  background: rgba(0, 0, 0, 0.08);
+}
+
+@media (max-width: 900px) {
+  .activityThInfo,
+  .activityTdInfo {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .activityThWhen,
+  .activityTdWhen {
+    display: none;
+  }
+
+  .activityMemberRole {
+    display: none;
+  }
 }
 
 .footerLink {
@@ -605,8 +971,12 @@
   font-weight: $font-weight-semibold;
   color: var(--color-text-muted);
   text-decoration: none;
-  cursor: default;
+  cursor: pointer;
   opacity: 0.85;
+
+  &:hover {
+    color: var(--color-primary-400);
+  }
 }
 
 .quickGrid {

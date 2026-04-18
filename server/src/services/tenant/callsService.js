@@ -2,6 +2,7 @@ import { query } from '../../config/db.js';
 import { getTelephonyProvider } from './telephony/telephonyProviderRegistry.js';
 import * as opportunitiesService from './opportunitiesService.js';
 import { loadDispositionCallApplyMeta } from './dispositionApplyDealHelper.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 const CALL_ATTEMPT_IDS_CAP = 5000;
 
@@ -491,6 +492,7 @@ export async function listCallAttempts(
         cca.duration_sec,
         cca.created_at,
         c.display_name,
+        c.type AS contact_type,
         p.phone AS phone_e164,
         u.name AS agent_name,
         d.name AS disposition_name,
@@ -967,6 +969,19 @@ export async function updateAttemptNotesOnly(tenantId, user, attemptId, { notes 
       err.status = 404;
       throw err;
     }
+    const [attemptRow] = await query(
+      `SELECT contact_id FROM contact_call_attempts WHERE tenant_id = ? AND id = ? LIMIT 1`,
+      [tenantId, id]
+    );
+    await safeLogTenantActivity(tenantId, user?.id, {
+      event_category: 'call',
+      event_type: 'call.note_added',
+      summary: 'Call note saved',
+      entity_type: 'call_attempt',
+      entity_id: id,
+      contact_id: attemptRow?.contact_id ?? null,
+      ref_call_attempt_id: id,
+    });
   } else {
     // Verify the attempt exists and is in scope (avoid misleading "saved" toasts).
     const [probe] = await query(
@@ -1091,6 +1106,27 @@ export async function setAttemptDisposition(
     `SELECT id, contact_id, disposition_id, notes FROM contact_call_attempts WHERE tenant_id = ? AND id = ? LIMIT 1`,
     [tenantId, id]
   );
+
+  if (dispForDb && row?.contact_id) {
+    const [dispRow] = await query(
+      `SELECT name FROM dispositions WHERE id = ? AND tenant_id = ? AND is_deleted = 0 LIMIT 1`,
+      [dispForDb, tenantId]
+    );
+    const [cRow] = await query(
+      `SELECT display_name FROM contacts WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1`,
+      [row.contact_id, tenantId]
+    );
+    await safeLogTenantActivity(tenantId, user?.id, {
+      event_category: 'call',
+      event_type: 'call.disposition_set',
+      summary: `Call disposition: ${dispRow?.name || '—'}${cRow?.display_name ? ` · ${cRow.display_name}` : ''}`,
+      entity_type: 'call_attempt',
+      entity_id: id,
+      contact_id: row.contact_id,
+      ref_call_attempt_id: id,
+      payload_json: { disposition_id: dispForDb },
+    });
+  }
 
   // Only advance the dialer queue when a real disposition was chosen. Tenant dispositions
   // use UUID strings (CHAR(36)); do not use Number() here — Number(uuid) is NaN and would

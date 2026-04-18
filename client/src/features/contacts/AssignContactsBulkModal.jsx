@@ -5,9 +5,14 @@ import { Select } from '../../components/ui/Select';
 import { Alert } from '../../components/ui/Alert';
 import { Spinner } from '../../components/ui/Spinner';
 import { contactsAPI } from '../../services/contactsAPI';
+import { backgroundJobsAPI } from '../../services/backgroundJobsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
 import { campaignsAPI } from '../../services/campaignsAPI';
 import { useMutation } from '../../hooks/useAsyncData';
+import {
+  bulkShouldUseBackgroundJob,
+  listFilterPayloadFromExportParams,
+} from './contactBulkBackground';
 
 const NO_CHANGE = '__no_change__';
 const CLEAR = '__clear__';
@@ -35,6 +40,9 @@ export function AssignContactsBulkModal({
   assignContext = {},
   user,
   onSuccess,
+  /** When set, large selections or “all matching” enqueue POST /background-jobs/.../bulk-assign. */
+  bulkJobContext = null,
+  onBulkJobQueued,
 }) {
   const role = user?.role ?? 'agent';
   const isAdmin = role === 'admin';
@@ -45,6 +53,7 @@ export function AssignContactsBulkModal({
   const [agentChoice, setAgentChoice] = useState(NO_CHANGE);
   const [campaignChoice, setCampaignChoice] = useState(NO_CHANGE);
   const [formError, setFormError] = useState('');
+  const [jobQueueing, setJobQueueing] = useState(false);
 
   const assignMut = useMutation((body) => contactsAPI.assign(body));
 
@@ -184,7 +193,7 @@ export function AssignContactsBulkModal({
     if (campaignChoice === CLEAR) body.campaign_id = null;
     else if (campaignChoice !== NO_CHANGE) body.campaign_id = Number(campaignChoice);
 
-    const hasOp =
+       const hasOp =
       body.manager_id !== undefined ||
       body.assigned_user_id !== undefined ||
       body.campaign_id !== undefined;
@@ -203,6 +212,44 @@ export function AssignContactsBulkModal({
         );
         return;
       }
+    }
+
+    const useBgJob =
+      bulkJobContext &&
+      bulkShouldUseBackgroundJob(bulkJobContext.selectionIsAllMatching, selectedIds.length);
+    if (useBgJob) {
+      const entity = bulkJobContext.recordType === 'lead' ? 'leads' : 'contacts';
+      const payload = bulkJobContext.selectionIsAllMatching
+        ? { list_filter: listFilterPayloadFromExportParams(bulkJobContext.exportListParams) }
+        : { contact_ids: [...selectedIds] };
+      if (isAdmin) {
+        if (managerChoice === CLEAR) payload.manager_id = null;
+        else if (managerChoice !== NO_CHANGE) payload.manager_id = Number(managerChoice);
+      }
+      if (isAdmin && managerChoice === CLEAR) {
+        payload.assigned_user_id = null;
+      } else if (agentChoice === CLEAR) {
+        payload.assigned_user_id = null;
+      } else if (agentChoice !== NO_CHANGE) {
+        payload.assigned_user_id = Number(agentChoice);
+      }
+      if (campaignChoice === CLEAR) payload.campaign_id = null;
+      else if (campaignChoice !== NO_CHANGE) payload.campaign_id = Number(campaignChoice);
+
+      setJobQueueing(true);
+      setFormError('');
+      try {
+        const res = await backgroundJobsAPI.enqueueBulkAssign(payload, { entity });
+        const jobId = res?.data?.jobId;
+        onBulkJobQueued?.(jobId, { operation: 'assign' });
+        onSuccess?.();
+        onClose();
+      } catch (e) {
+        setFormError(e?.response?.data?.error || e?.message || 'Failed to queue assign job');
+      } finally {
+        setJobQueueing(false);
+      }
+      return;
     }
 
     const result = await assignMut.mutate(body);
@@ -226,8 +273,8 @@ export function AssignContactsBulkModal({
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={assignMut.loading || loadingMeta}>
-            {assignMut.loading ? 'Applying…' : 'Apply'}
+          <Button onClick={handleSubmit} disabled={assignMut.loading || loadingMeta || jobQueueing}>
+            {assignMut.loading || jobQueueing ? 'Applying…' : 'Apply'}
           </Button>
         </ModalFooter>
       }

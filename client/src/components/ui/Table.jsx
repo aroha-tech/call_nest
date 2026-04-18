@@ -40,11 +40,21 @@ export function TableRow({ children, onClick, className = '' }) {
   );
 }
 
-export function TableCell({ children, align = 'left', width, className = '', noTruncate = false }) {
+export function TableCell({
+  children,
+  align = 'left',
+  width,
+  className = '',
+  noTruncate = false,
+  colSpan,
+  rowSpan,
+}) {
   return (
-    <td 
+    <td
       className={`${styles.cell} ${styles[align]} ${noTruncate ? styles.noTruncate : ''} ${className}`.trim()}
       style={width ? { width } : undefined}
+      colSpan={colSpan}
+      rowSpan={rowSpan}
     >
       {children}
     </td>

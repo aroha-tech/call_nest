@@ -6,5 +6,6 @@ const router = Router();
 
 router.use(tenantAuthMiddleware);
 router.get('/', requirePermission('dashboard.view'), tenantDashboardController.getDashboard);
+router.get('/activity', requirePermission('dashboard.view'), tenantDashboardController.getActivityFeed);
 
 export default router;

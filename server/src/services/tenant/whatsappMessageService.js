@@ -1,4 +1,5 @@
 import { query } from '../../config/db.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 import {
   getCreatedByUserIdsForScope,
   isOutboundRecordVisibleByCreatedBy,
@@ -179,6 +180,7 @@ export async function updateStatus(tenantId, id, status, timestamps = {}) {
     err.status = 404;
     throw err;
   }
+  const prevStatus = String(msg.status || '');
   const updates = ['status = ?'];
   const params = [status];
   if (timestamps.sent_at !== undefined) {
@@ -199,7 +201,23 @@ export async function updateStatus(tenantId, id, status, timestamps = {}) {
   }
   params.push(id, tenantId);
   await query(`UPDATE whatsapp_messages SET ${updates.join(', ')} WHERE id = ? AND tenant_id = ?`, params);
-  return findById(tenantId, id);
+  const out = await findById(tenantId, id);
+  const incoming = String(status || '');
+  const nowSentFamily = ['sent', 'delivered', 'read'].includes(incoming);
+  const wasSentFamily = ['sent', 'delivered', 'read'].includes(prevStatus);
+  if (nowSentFamily && !wasSentFamily && msg.created_by) {
+    const preview = msg.message_text ? String(msg.message_text).replace(/\s+/g, ' ').trim().slice(0, 80) : '';
+    await safeLogTenantActivity(tenantId, msg.created_by, {
+      event_category: 'message',
+      event_type: 'whatsapp.sent',
+      summary: preview ? `WhatsApp sent · ${preview}` : 'WhatsApp sent',
+      entity_type: 'whatsapp_message',
+      entity_id: Number(id),
+      contact_id: msg.contact_id != null ? Number(msg.contact_id) : null,
+      payload_json: { status: incoming },
+    });
+  }
+  return out;
 }
 
 /** Find and update status by provider_message_id (for webhooks). */

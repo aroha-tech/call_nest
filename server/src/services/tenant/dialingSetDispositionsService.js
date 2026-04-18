@@ -1,6 +1,7 @@
 import { query } from '../../config/db.js';
 import { generateUUID } from '../../utils/uuidHelper.js';
 import { moveItemUp, moveItemDown, moveItemTo, getNextOrderValue } from '../../utils/orderHelper.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 const TABLE = 'dialing_set_dispositions';
 
@@ -34,7 +35,7 @@ export async function findByDialingSetAndDisposition(tenantId, dialingSetId, dis
   return row || null;
 }
 
-export async function create(tenantId, data) {
+export async function create(tenantId, data, actorUserId = null) {
   const id = generateUUID();
   const { dialing_set_id, disposition_id, order_index } = data;
   
@@ -52,11 +53,23 @@ export async function create(tenantId, data) {
      VALUES (?, ?, ?, ?, ?)`,
     [id, tenantId, dialing_set_id, disposition_id, orderValue]
   );
-  
-  return findById(tenantId, id);
+
+  const row = await findById(tenantId, id);
+  const [dsn] = await query(`SELECT name FROM dialing_sets WHERE id = ? AND tenant_id = ? LIMIT 1`, [
+    dialing_set_id,
+    tenantId,
+  ]);
+  await safeLogTenantActivity(tenantId, actorUserId, {
+    event_category: 'dialing_set',
+    event_type: 'dialing_set.disposition_added',
+    summary: `Disposition added to set: ${row?.disposition_name || '—'} (${dsn?.name || 'Dialing set'})`,
+    entity_type: 'dialing_set',
+    payload_json: { dialing_set_id, disposition_id, mapping_id: id },
+  });
+  return row;
 }
 
-export async function remove(tenantId, id) {
+export async function remove(tenantId, id, actorUserId = null) {
   const mapping = await findById(tenantId, id);
   if (!mapping) {
     const err = new Error('Dialing set disposition mapping not found');
@@ -64,11 +77,22 @@ export async function remove(tenantId, id) {
     throw err;
   }
   
+  const [dsn] = await query(`SELECT name FROM dialing_sets WHERE id = ? AND tenant_id = ? LIMIT 1`, [
+    mapping.dialing_set_id,
+    tenantId,
+  ]);
   await query(`DELETE FROM ${TABLE} WHERE id = ? AND tenant_id = ?`, [id, tenantId]);
+  await safeLogTenantActivity(tenantId, actorUserId, {
+    event_category: 'dialing_set',
+    event_type: 'dialing_set.disposition_removed',
+    summary: `Disposition removed from set: ${mapping.disposition_name || '—'} (${dsn?.name || 'Dialing set'})`,
+    entity_type: 'dialing_set',
+    payload_json: { dialing_set_id: mapping.dialing_set_id, disposition_id: mapping.disposition_id },
+  });
   return { success: true };
 }
 
-export async function move(tenantId, id, direction, position) {
+export async function move(tenantId, id, direction, position, actorUserId = null) {
   const mapping = await findById(tenantId, id);
   if (!mapping) {
     const err = new Error('Dialing set disposition mapping not found');
@@ -77,15 +101,51 @@ export async function move(tenantId, id, direction, position) {
   }
   
   if (position !== undefined) {
-    return moveItemTo(TABLE, id, position, tenantId, 'dialing_set_id', mapping.dialing_set_id);
+    const r = await moveItemTo(TABLE, id, position, tenantId, 'dialing_set_id', mapping.dialing_set_id);
+    const [dsn] = await query(`SELECT name FROM dialing_sets WHERE id = ? AND tenant_id = ? LIMIT 1`, [
+      mapping.dialing_set_id,
+      tenantId,
+    ]);
+    await safeLogTenantActivity(tenantId, actorUserId, {
+      event_category: 'dialing_set',
+      event_type: 'dialing_set.dispositions_reordered',
+      summary: `Dialing set disposition order changed (${dsn?.name || 'Dialing set'})`,
+      entity_type: 'dialing_set',
+      payload_json: { dialing_set_id: mapping.dialing_set_id },
+    });
+    return r;
   }
-  
+
   if (direction === 'up') {
-    return moveItemUp(TABLE, id, tenantId, 'dialing_set_id', mapping.dialing_set_id);
+    const r = await moveItemUp(TABLE, id, tenantId, 'dialing_set_id', mapping.dialing_set_id);
+    const [dsn] = await query(`SELECT name FROM dialing_sets WHERE id = ? AND tenant_id = ? LIMIT 1`, [
+      mapping.dialing_set_id,
+      tenantId,
+    ]);
+    await safeLogTenantActivity(tenantId, actorUserId, {
+      event_category: 'dialing_set',
+      event_type: 'dialing_set.dispositions_reordered',
+      summary: `Dialing set disposition order changed (${dsn?.name || 'Dialing set'})`,
+      entity_type: 'dialing_set',
+      payload_json: { dialing_set_id: mapping.dialing_set_id },
+    });
+    return r;
   }
-  
+
   if (direction === 'down') {
-    return moveItemDown(TABLE, id, tenantId, 'dialing_set_id', mapping.dialing_set_id);
+    const r = await moveItemDown(TABLE, id, tenantId, 'dialing_set_id', mapping.dialing_set_id);
+    const [dsn] = await query(`SELECT name FROM dialing_sets WHERE id = ? AND tenant_id = ? LIMIT 1`, [
+      mapping.dialing_set_id,
+      tenantId,
+    ]);
+    await safeLogTenantActivity(tenantId, actorUserId, {
+      event_category: 'dialing_set',
+      event_type: 'dialing_set.dispositions_reordered',
+      summary: `Dialing set disposition order changed (${dsn?.name || 'Dialing set'})`,
+      entity_type: 'dialing_set',
+      payload_json: { dialing_set_id: mapping.dialing_set_id },
+    });
+    return r;
   }
   
   const err = new Error('Invalid move direction. Use "up", "down", or specify "position"');

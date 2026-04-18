@@ -18,7 +18,6 @@ import { BrowseSavedFiltersModal } from '../features/contacts/BrowseSavedFilters
 import { FilterOptionsModal } from '../features/contacts/FilterOptionsModal';
 import listStyles from '../components/admin/adminDataList.module.scss';
 import styles from './ActivitiesPage.module.scss';
-import { sanitizeAttemptNotesForDisplay } from '../utils/callAttemptNotesDisplay';
 import { SearchInput } from '../components/ui/SearchInput';
 import { TableDataRegion } from '../components/admin/TableDataRegion';
 import { Badge } from '../components/ui/Badge';
@@ -120,6 +119,17 @@ export function ActivitiesPage() {
       );
     },
     [setSearchParams]
+  );
+
+  const openCallHistoryCustomerRecord = useCallback(
+    (r) => {
+      const id = r?.contact_id;
+      const n = id != null ? Number(id) : NaN;
+      if (!Number.isFinite(n) || n <= 0) return;
+      const t = String(r?.contact_type || '').toLowerCase();
+      navigate(t === 'lead' ? `/leads/${n}?mode=view` : `/contacts/${n}?mode=view`);
+    },
+    [navigate]
   );
 
   const setDialerSessionFilter = useCallback(
@@ -897,13 +907,13 @@ export function ActivitiesPage() {
                 }}
                 onOpenCustomizeColumns={() => setCallHistoryCustomizeOpen(true)}
                 onViewAttempt={(r) => setAttemptDetailRow(r)}
+                onOpenCustomer={openCallHistoryCustomerRecord}
                 onOpenDialSession={(r) => {
                   if (r?.dialer_session_id) {
                     navigate(`/dialer/session/${r.dialer_session_id}`, { state: { fromCallHistory: true } });
                   }
                 }}
                 formatWhen={(v) => safeDateTime(v)}
-                notesPreview={(r) => sanitizeAttemptNotesForDisplay(r.notes || '').slice(0, 120) || '—'}
               />
             </div>
           )}
@@ -1064,7 +1074,7 @@ export function ActivitiesPage() {
         title="Customize columns"
         getDefaults={getDefaultVisibleCallHistoryColumnIds}
         persistVisibleIds={saveCallHistoryVisibleColumnIds}
-        pinnedColumnId="contact"
+        pinnedColumnId="call_notes"
         standardColumnTagLabel="Default"
         canAddCustomField={false}
       />

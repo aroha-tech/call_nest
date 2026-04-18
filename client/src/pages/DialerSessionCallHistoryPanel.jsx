@@ -16,7 +16,6 @@ import {
   loadCallHistoryVisibleColumnIds,
   saveCallHistoryVisibleColumnIds,
 } from './callHistoryTableConfig';
-import { sanitizeAttemptNotesForDisplay } from '../utils/callAttemptNotesDisplay';
 import styles from './DialerSessionCallHistoryPanel.module.scss';
 
 function safeDateTime(v) {
@@ -33,6 +32,14 @@ function safeDateTime(v) {
 export function DialerSessionCallHistoryPanel({ dialerSessionId }) {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const openCallHistoryCustomerRecord = useCallback((r) => {
+    const id = r?.contact_id;
+    const n = id != null ? Number(id) : NaN;
+    if (!Number.isFinite(n) || n <= 0) return;
+    const t = String(r?.contact_type || '').toLowerCase();
+    navigate(t === 'lead' ? `/leads/${n}?mode=view` : `/contacts/${n}?mode=view`);
+  }, [navigate]);
   const sid = String(dialerSessionId || '').trim();
 
   const [page, setPage] = useState(1);
@@ -218,13 +225,13 @@ export function DialerSessionCallHistoryPanel({ dialerSessionId }) {
                 }}
                 onOpenCustomizeColumns={() => setCallHistoryCustomizeOpen(true)}
                 onViewAttempt={(r) => setAttemptDetailRow(r)}
+                onOpenCustomer={openCallHistoryCustomerRecord}
                 onOpenDialSession={(r) => {
                   if (r?.dialer_session_id) {
                     navigate(`/dialer/session/${r.dialer_session_id}`, { state: location.state });
                   }
                 }}
                 formatWhen={(v) => safeDateTime(v)}
-                notesPreview={(r) => sanitizeAttemptNotesForDisplay(r.notes || '').slice(0, 120) || '—'}
               />
             </div>
           )}
@@ -275,7 +282,7 @@ export function DialerSessionCallHistoryPanel({ dialerSessionId }) {
         title="Customize columns"
         getDefaults={getDefaultVisibleCallHistoryColumnIds}
         persistVisibleIds={saveCallHistoryVisibleColumnIds}
-        pinnedColumnId="contact"
+        pinnedColumnId="call_notes"
         standardColumnTagLabel="Default"
         canAddCustomField={false}
       />

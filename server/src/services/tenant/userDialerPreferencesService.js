@@ -1,4 +1,5 @@
 import { query } from '../../config/db.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 export async function getForUser(userId, tenantId) {
   const [row] = await query(
@@ -70,6 +71,17 @@ export async function updateForUser(userId, tenantId, payload) {
 
   params.push(userId, tenantId);
   await query(`UPDATE users SET ${updates.join(', ')} WHERE id = ? AND tenant_id = ?`, params);
+
+  const parts = [];
+  if (default_dialing_set_id !== undefined) parts.push('default dialing set');
+  if (default_call_script_id !== undefined) parts.push('default call script');
+  await safeLogTenantActivity(tenantId, userId, {
+    event_category: 'dialer',
+    event_type: 'dialer.preferences_updated',
+    summary: `Dialer defaults updated (${parts.join(', ')})`,
+    entity_type: 'user',
+    entity_id: Number(userId),
+  });
 
   return getForUser(userId, tenantId);
 }

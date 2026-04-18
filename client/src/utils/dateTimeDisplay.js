@@ -31,3 +31,19 @@ export function formatDateTimeDisplay(value, mode) {
   }
   return new Intl.DateTimeFormat(undefined, opts).format(d);
 }
+
+/** Compact relative time for activity feeds (e.g. "31 seconds ago"). */
+export function formatRelativeTimeShort(iso) {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '—';
+  const diffSec = Math.round((t - Date.now()) / 1000);
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+  const abs = Math.abs(diffSec);
+  if (abs < 60) return rtf.format(diffSec, 'second');
+  const diffMin = Math.round(diffSec / 60);
+  if (Math.abs(diffMin) < 60) return rtf.format(diffMin, 'minute');
+  const diffHr = Math.trunc(diffSec / 3600);
+  if (Math.abs(diffHr) < 48) return rtf.format(diffHr, 'hour');
+  const diffDay = Math.trunc(diffSec / 86400);
+  return rtf.format(diffDay, 'day');
+}

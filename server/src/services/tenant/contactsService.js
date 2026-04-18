@@ -1,4 +1,6 @@
 import { query, withConnection } from '../../config/db.js';
+import fs from 'fs/promises';
+import { env } from '../../config/env.js';
 import { parseImportBufferToRecords } from '../../utils/importSpreadsheetBuffer.js';
 import {
   buildPhonesFromCsvRow,
@@ -36,6 +38,7 @@ import {
 import * as contactTagsService from './contactTagsService.js';
 import * as contactAssignmentHistoryService from './contactAssignmentHistoryService.js';
 import * as contactActivityEventsService from './contactActivityEventsService.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 import * as tenantIndustryFieldsService from './tenantIndustryFieldsService.js';
 
 function assertUniquePhoneLabels(phones) {
@@ -1132,6 +1135,37 @@ export async function listContactIds(tenantId, user, options) {
 }
 
 /**
+ * All matching contact IDs for bulk background jobs (same filters as listContacts / list-ids).
+ * Enforces env.backgroundJobMaxContactIds to protect the server.
+ */
+export async function listAllContactIdsForBulkJob(tenantId, user, options) {
+  const { finalWhere, params } = await prepareContactListFinalWhere(tenantId, user, options);
+  const [countRow] = await query(
+    `SELECT COUNT(DISTINCT c.id) AS total
+     ${CONTACT_LIST_JOIN_FROM}
+     ${finalWhere}`,
+    params
+  );
+  const total = Number(countRow?.total ?? 0);
+  const cap = env.backgroundJobMaxContactIds;
+  if (total > cap) {
+    const err = new Error(
+      `Too many matching records (${total}). Narrow your filters or raise BACKGROUND_JOB_MAX_CONTACT_IDS (current cap ${cap}).`
+    );
+    err.status = 400;
+    throw err;
+  }
+  const rows = await query(
+    `SELECT DISTINCT c.id
+     ${CONTACT_LIST_JOIN_FROM}
+     ${finalWhere}
+     ORDER BY c.id ASC`,
+    params
+  );
+  return rows.map((r) => Number(r.id));
+}
+
+/**
  * Lead counts for pipeline dashboard cards (same tenant + ownership visibility as default list, no extra filters).
  * Buckets use contact_status_master.code: new, contacted, qualified, lost.
  */
@@ -1481,10 +1515,10 @@ async function buildContactInsertRow(
 }
 
 /** Max rows per multi-row INSERT during CSV import (tuned for packet size + round-trips). */
-const IMPORT_BULK_CREATE_CHUNK = 200;
+const IMPORT_BULK_CREATE_CHUNK = 500;
 
 /** Coalesce tag merges on import-updates (avoid one DB round-trip per updated row). */
-const IMPORT_TAG_MERGE_CHUNK = 400;
+const IMPORT_TAG_MERGE_CHUNK = 800;
 
 /**
  * Bulk-insert buffered new contacts (one INSERT for `contacts`), then phones + CF + tags.
@@ -1796,7 +1830,18 @@ export async function createContact(tenantId, user, payload, options = {}) {
   await contactTagsService.syncContactTagAssignments(tenantId, user, contactId, tag_ids);
 
   if (skipFetch) return { id: contactId };
-  return getContactById(contactId, tenantId, user);
+  const createdOut = await getContactById(contactId, tenantId, user);
+  const typeLower = String(type || 'lead').toLowerCase();
+  await safeLogTenantActivity(tenantId, user?.id, {
+    event_category: 'contact',
+    event_type: 'contact.created',
+    summary: `${typeLower === 'contact' ? 'Contact' : 'Lead'} created: ${createdOut?.display_name || '—'}`,
+    entity_type: 'contact',
+    entity_id: contactId,
+    contact_id: contactId,
+    payload_json: { record_type: typeLower },
+  });
+  return createdOut;
 }
 
 function normalizeOptionalUserId(value) {
@@ -2253,6 +2298,7 @@ export async function updateContact(id, tenantId, user, payload, options = {}) {
     }
 
     const touches = [];
+    if (changed) touches.push('assignment');
     if (coreKeys.length) touches.push(`fields: ${coreKeys.join(', ')}`);
     if (Array.isArray(phones)) touches.push('phones');
     if (
@@ -2264,12 +2310,22 @@ export async function updateContact(id, tenantId, user, payload, options = {}) {
     if (tag_ids !== undefined) touches.push('tags');
 
     if (touches.length > 0) {
+      const evSummary = `Record updated (${touches.join('; ')})`;
       await contactActivityEventsService.insertContactActivityEvent(tenantId, {
         contactId: Number(id),
         eventType: 'profile_updated',
         actorUserId: user?.id ?? null,
-        summary: `Record updated (${touches.join('; ')})`,
+        summary: evSummary,
         payloadJson: { changed_core_keys: coreKeys, touches },
+      });
+      await safeLogTenantActivity(tenantId, user?.id, {
+        event_category: 'contact',
+        event_type: 'contact.updated',
+        summary: evSummary.slice(0, 500),
+        entity_type: 'contact',
+        entity_id: Number(id),
+        contact_id: Number(id),
+        payload_json: { changed_core_keys: coreKeys, touches },
       });
     }
   }
@@ -2338,21 +2394,34 @@ export async function softDeleteContact(
     [user.id, deleted_source || 'manual', user.id, id, tenantId]
   );
 
+  await safeLogTenantActivity(tenantId, user?.id, {
+    event_category: 'contact',
+    event_type: 'contact.deleted',
+    summary: `${existing.type === 'contact' ? 'Contact' : 'Lead'} deleted: ${existing.display_name || '—'}`,
+    entity_type: 'contact',
+    entity_id: Number(id),
+    contact_id: Number(id),
+    payload_json: { deleted_source: deleted_source || 'manual' },
+  });
+
   return { id: Number(id), deleted_at: new Date().toISOString() };
 }
 
-/** Aligned with CONTACT_LIST_IDS_CAP — bulk select + delete must not silently cap at 100. */
+/** Default API cap for synchronous bulk delete; jobs use unlimited: true. */
 const BULK_DELETE_MAX = 10000;
 
 const BULK_DELETE_CHUNK = 500;
 
-export async function softDeleteContactsBulk(ids, tenantId, user, { deleted_source = 'manual' } = {}) {
+export async function softDeleteContactsBulk(
+  ids,
+  tenantId,
+  user,
+  { deleted_source = 'manual', unlimited = false } = {}
+) {
   const raw = Array.isArray(ids) ? ids : [];
 
-  const unique = [...new Set(raw.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))].slice(
-    0,
-    BULK_DELETE_MAX
-  );
+  const deduped = [...new Set(raw.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
+  const unique = unlimited ? deduped : deduped.slice(0, BULK_DELETE_MAX);
 
   const deleted = [];
   const skipped = [];
@@ -2404,20 +2473,39 @@ export async function softDeleteContactsBulk(ids, tenantId, user, { deleted_sour
     deleted.push(...toDelete);
   }
 
+  if (deleted.length > 0) {
+    await safeLogTenantActivity(tenantId, user?.id, {
+      event_category: 'contact',
+      event_type: 'contact.bulk_deleted',
+      summary: `Bulk deleted ${deleted.length} record(s)`,
+      payload_json: {
+        count: deleted.length,
+        deleted_source: deleted_source || 'manual',
+      },
+    });
+  }
+
   return { deleted, skipped, deletedCount: deleted.length };
 }
 
-const BULK_ADD_TAGS_MAX = 100;
+/** Default API cap for synchronous bulk tag ops; background jobs pass unlimited: true. */
+const BULK_TAG_OPS_MAX = 10000;
+const BULK_TAG_OPS_CHUNK = 500;
+/** Cap IN (tag_id, …) size per DELETE to stay under driver / packet limits when “remove all catalog tags”. */
+const BULK_TAG_DELETE_TAG_CHUNK = 200;
 
 /**
  * Merge tag_ids onto each visible contact (does not remove existing tags).
- * One visibility query + one bulk INSERT IGNORE (same ownership rules as list/detail via buildOwnershipWhere).
+ * Chunked visibility checks + INSERT IGNORE (same ownership rules as list/detail via buildOwnershipWhere).
  */
-export async function bulkAddTagsToContacts(tenantId, user, { contact_ids, tag_ids } = {}) {
+export async function bulkAddTagsToContacts(tenantId, user, { contact_ids, tag_ids } = {}, options = {}) {
+  const unlimited = Boolean(options.unlimited);
   const rawContacts = Array.isArray(contact_ids) ? contact_ids : [];
-  const contactIds = [
+  const uniqueContactIds = [
     ...new Set(rawContacts.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0)),
-  ].slice(0, BULK_ADD_TAGS_MAX);
+  ];
+  const requestTruncated = !unlimited && uniqueContactIds.length > BULK_TAG_OPS_MAX;
+  const contactIds = unlimited ? uniqueContactIds : uniqueContactIds.slice(0, BULK_TAG_OPS_MAX);
 
   const rawTags = Array.isArray(tag_ids) ? tag_ids : [];
   const tidList = [
@@ -2447,35 +2535,63 @@ export async function bulkAddTagsToContacts(tenantId, user, { contact_ids, tag_i
   }
 
   const { whereSQL, params: ownParams } = buildOwnershipWhere(user);
-  const cPlace = contactIds.map(() => '?').join(',');
-  const visibleRows = await query(
-    `SELECT c.id FROM contacts c WHERE ${whereSQL} AND c.id IN (${cPlace})`,
-    [...ownParams, ...contactIds]
-  );
-  const allowedSet = new Set(visibleRows.map((r) => Number(r.id)));
 
   const updated = [];
   const skipped = [];
-  for (const id of contactIds) {
-    if (allowedSet.has(id)) updated.push(id);
-    else skipped.push({ id, reason: 'not_found_or_no_access' });
+
+  for (let i = 0; i < contactIds.length; i += BULK_TAG_OPS_CHUNK) {
+    const chunk = contactIds.slice(i, i + BULK_TAG_OPS_CHUNK);
+    const cPlace = chunk.map(() => '?').join(',');
+    const visibleRows = await query(
+      `SELECT c.id FROM contacts c WHERE ${whereSQL} AND c.id IN (${cPlace})`,
+      [...ownParams, ...chunk]
+    );
+    const allowedSet = new Set(visibleRows.map((r) => Number(r.id)));
+
+    const chunkUpdated = [];
+    for (const id of chunk) {
+      const nid = Number(id);
+      if (allowedSet.has(nid)) {
+        chunkUpdated.push(nid);
+        updated.push(nid);
+      } else {
+        skipped.push({ id: nid, reason: 'not_found_or_no_access' });
+      }
+    }
+
+    if (chunkUpdated.length > 0) {
+      await contactTagsService.insertTagAssignmentsMerge(tenantId, user, chunkUpdated, tidList);
+    }
   }
 
+  const out = { updated, skipped, updatedCount: updated.length };
+  if (requestTruncated) {
+    out.requestTruncated = true;
+    out.cap = BULK_TAG_OPS_MAX;
+  }
   if (updated.length > 0) {
-    await contactTagsService.insertTagAssignmentsMerge(tenantId, user, updated, tidList);
+    const contactCount = new Set(updated).size;
+    await safeLogTenantActivity(tenantId, user?.id, {
+      event_category: 'contact',
+      event_type: 'contact.tags.bulk_add',
+      summary: `Added ${tidList.length} tag(s) to ${contactCount} record(s)`,
+      payload_json: { tag_ids: tidList, contact_count: contactCount },
+    });
   }
-
-  return { updated, skipped, updatedCount: updated.length };
+  return out;
 }
 
 /**
  * Remove tag links from many visible contacts (only (contact_id, tag_id) pairs that exist are deleted).
  */
-export async function bulkRemoveTagsFromContacts(tenantId, user, { contact_ids, tag_ids } = {}) {
+export async function bulkRemoveTagsFromContacts(tenantId, user, { contact_ids, tag_ids } = {}, options = {}) {
+  const unlimited = Boolean(options.unlimited);
   const rawContacts = Array.isArray(contact_ids) ? contact_ids : [];
-  const contactIds = [
+  const uniqueContactIds = [
     ...new Set(rawContacts.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0)),
-  ].slice(0, BULK_ADD_TAGS_MAX);
+  ];
+  const requestTruncated = !unlimited && uniqueContactIds.length > BULK_TAG_OPS_MAX;
+  const contactIds = unlimited ? uniqueContactIds : uniqueContactIds.slice(0, BULK_TAG_OPS_MAX);
 
   const rawTags = Array.isArray(tag_ids) ? tag_ids : [];
   const tidList = [
@@ -2505,31 +2621,100 @@ export async function bulkRemoveTagsFromContacts(tenantId, user, { contact_ids, 
   }
 
   const { whereSQL, params: ownParams } = buildOwnershipWhere(user);
-  const cPlace = contactIds.map(() => '?').join(',');
-  const visibleRows = await query(
-    `SELECT c.id FROM contacts c WHERE ${whereSQL} AND c.id IN (${cPlace})`,
-    [...ownParams, ...contactIds]
-  );
-  const allowedSet = new Set(visibleRows.map((r) => Number(r.id)));
 
   const updated = [];
   const skipped = [];
-  for (const id of contactIds) {
-    if (allowedSet.has(id)) updated.push(id);
-    else skipped.push({ id, reason: 'not_found_or_no_access' });
-  }
+  let removedAssignmentCount = 0;
 
-  if (updated.length > 0) {
-    const cPh = updated.map(() => '?').join(',');
-    const tPh = tidList.map(() => '?').join(',');
-    await query(
-      `DELETE FROM contact_tag_assignments
-       WHERE tenant_id = ? AND contact_id IN (${cPh}) AND tag_id IN (${tPh})`,
-      [tenantId, ...updated, ...tidList]
+  for (let i = 0; i < contactIds.length; i += BULK_TAG_OPS_CHUNK) {
+    const chunk = contactIds.slice(i, i + BULK_TAG_OPS_CHUNK);
+    const cPlace = chunk.map(() => '?').join(',');
+    const visibleRows = await query(
+      `SELECT c.id FROM contacts c WHERE ${whereSQL} AND c.id IN (${cPlace})`,
+      [...ownParams, ...chunk]
     );
+    const allowedSet = new Set(visibleRows.map((r) => Number(r.id)));
+
+    const chunkUpdated = [];
+    for (const id of chunk) {
+      const nid = Number(id);
+      if (allowedSet.has(nid)) {
+        chunkUpdated.push(nid);
+        updated.push(nid);
+      } else {
+        skipped.push({ id: nid, reason: 'not_found_or_no_access' });
+      }
+    }
+
+    if (chunkUpdated.length > 0) {
+      const cPh = chunkUpdated.map(() => '?').join(',');
+      for (let ti = 0; ti < tidList.length; ti += BULK_TAG_DELETE_TAG_CHUNK) {
+        const tagChunk = tidList.slice(ti, ti + BULK_TAG_DELETE_TAG_CHUNK);
+        const tPh = tagChunk.map(() => '?').join(',');
+        const delResult = await query(
+          `DELETE FROM contact_tag_assignments
+           WHERE tenant_id = ? AND contact_id IN (${cPh}) AND tag_id IN (${tPh})`,
+          [tenantId, ...chunkUpdated, ...tagChunk]
+        );
+        removedAssignmentCount += Number(delResult?.affectedRows ?? 0);
+      }
+    }
   }
 
-  return { updated, skipped, updatedCount: updated.length };
+  const out = {
+    updated,
+    skipped,
+    updatedCount: updated.length,
+    removedAssignmentCount,
+  };
+  if (requestTruncated) {
+    out.requestTruncated = true;
+    out.cap = BULK_TAG_OPS_MAX;
+  }
+  if (updated.length > 0) {
+    const contactCount = new Set(updated).size;
+    await safeLogTenantActivity(tenantId, user?.id, {
+      event_category: 'contact',
+      event_type: 'contact.tags.bulk_remove',
+      summary: `Removed ${tidList.length} tag(s) from ${contactCount} record(s)`,
+      payload_json: { tag_ids: tidList, contact_count: contactCount },
+    });
+  }
+  return out;
+}
+
+const ASSIGN_CONTACTS_FETCH_CHUNK = 1500;
+const ASSIGN_CONTACTS_UPDATE_CHUNK = 2000;
+
+async function fetchAssignContactRowsChunked(tenantId, ids) {
+  const contacts = [];
+  for (let i = 0; i < ids.length; i += ASSIGN_CONTACTS_FETCH_CHUNK) {
+    const chunk = ids.slice(i, i + ASSIGN_CONTACTS_FETCH_CHUNK);
+    const ph = chunk.map(() => '?').join(', ');
+    const rows = await query(
+      `SELECT id, manager_id, assigned_user_id, campaign_id FROM contacts
+       WHERE tenant_id = ? AND id IN (${ph}) AND deleted_at IS NULL`,
+      [tenantId, ...chunk]
+    );
+    contacts.push(...rows);
+  }
+  return contacts;
+}
+
+async function selectContactsAfterAssignChunked(tenantId, ids) {
+  const updated = [];
+  for (let i = 0; i < ids.length; i += ASSIGN_CONTACTS_FETCH_CHUNK) {
+    const chunk = ids.slice(i, i + ASSIGN_CONTACTS_FETCH_CHUNK);
+    const ph = chunk.map(() => '?').join(', ');
+    const rows = await query(
+      `SELECT id, tenant_id, type, first_name, last_name, display_name, email, source, manager_id, assigned_user_id, status_id, campaign_id, created_at
+       FROM contacts
+       WHERE tenant_id = ? AND id IN (${ph}) AND deleted_at IS NULL`,
+      [tenantId, ...chunk]
+    );
+    updated.push(...rows);
+  }
+  return updated;
 }
 
 export async function assignContacts(tenantId, user, payload) {
@@ -2580,12 +2765,7 @@ export async function assignContacts(tenantId, user, payload) {
     throw err;
   }
 
-  const placeholders = ids.map(() => '?').join(', ');
-  const contacts = await query(
-    `SELECT id, manager_id, assigned_user_id, campaign_id FROM contacts
-     WHERE tenant_id = ? AND id IN (${placeholders}) AND deleted_at IS NULL`,
-    [tenantId, ...ids]
-  );
+  const contacts = await fetchAssignContactRowsChunked(tenantId, ids);
 
   if (contacts.length !== ids.length) {
     const err = new Error('One or more contacts were not found');
@@ -2710,26 +2890,24 @@ export async function assignContacts(tenantId, user, payload) {
   setClauses.push('updated_by = ?');
   setParams.push(user.id);
 
-  let whereSql = `tenant_id = ? AND id IN (${placeholders})`;
-  let whereParams = [tenantId, ...ids];
-  if (user.role === 'manager') {
-    whereSql += ' AND (manager_id = ? OR manager_id IS NULL)';
-    whereParams.push(user.id);
+  let affectedRows = 0;
+  for (let o = 0; o < ids.length; o += ASSIGN_CONTACTS_UPDATE_CHUNK) {
+    const sub = ids.slice(o, o + ASSIGN_CONTACTS_UPDATE_CHUNK);
+    const ph = sub.map(() => '?').join(', ');
+    let whereSql = `tenant_id = ? AND id IN (${ph})`;
+    let whereParams = [tenantId, ...sub];
+    if (user.role === 'manager') {
+      whereSql += ' AND (manager_id = ? OR manager_id IS NULL)';
+      whereParams.push(user.id);
+    }
+    const updateResult = await query(
+      `UPDATE contacts SET ${setClauses.join(', ')} WHERE ${whereSql}`,
+      [...setParams, ...whereParams]
+    );
+    affectedRows += Number(updateResult?.affectedRows ?? 0);
   }
 
-  const updateResult = await query(
-    `UPDATE contacts SET ${setClauses.join(', ')} WHERE ${whereSql}`,
-    [...setParams, ...whereParams]
-  );
-
-  const affectedRows = updateResult?.affectedRows ?? 0;
-
-  const updated = await query(
-    `SELECT id, tenant_id, type, first_name, last_name, display_name, email, source, manager_id, assigned_user_id, status_id, campaign_id, created_at
-     FROM contacts
-     WHERE tenant_id = ? AND id IN (${placeholders}) AND deleted_at IS NULL`,
-    [tenantId, ...ids]
-  );
+  const updated = await selectContactsAfterAssignChunked(tenantId, ids);
 
   // Record assignment history for changed rows in one INSERT (bulk assign / unassign).
   const byIdBefore = new Map(contacts.map((c) => [Number(c.id), c]));
@@ -2757,6 +2935,19 @@ export async function assignContacts(tenantId, user, payload) {
   }
   if (historyRows.length > 0) {
     await contactAssignmentHistoryService.recordChangesBulk(tenantId, historyRows);
+    const summaryParts = [];
+    if (midProvided) summaryParts.push('manager');
+    if (aidProvided) summaryParts.push('agent');
+    if (cidProvided) summaryParts.push('campaign');
+    await safeLogTenantActivity(tenantId, user?.id, {
+      event_category: 'contact',
+      event_type: 'contact.bulk_assign',
+      summary: `Updated assignment for ${historyRows.length} record(s) (${summaryParts.join(', ')})`,
+      payload_json: {
+        contacts_touched: historyRows.length,
+        fields: summaryParts,
+      },
+    });
   }
 
   return { updatedCount: affectedRows, data: updated };
@@ -3874,6 +4065,137 @@ export async function exportContactsCsv(
   return lines.join('\r\n');
 }
 
+/** Map export CSV options → list filter shape for listAllContactIdsForBulkJob / prepareContactListFinalWhere. */
+export function exportOptsToListFilterOptions(exportOpts = {}) {
+  return {
+    search: exportOpts.search ?? '',
+    type: exportOpts.type,
+    statusId: exportOpts.statusId,
+    statusIdsFilter: exportOpts.statusIdsFilter,
+    minCallCount: exportOpts.minCallCount,
+    maxCallCount: exportOpts.maxCallCount,
+    lastCalledAfter: exportOpts.lastCalledAfter,
+    lastCalledBefore: exportOpts.lastCalledBefore,
+    filterManagerId: exportOpts.filterManagerId,
+    filterAssignedUserId: exportOpts.filterAssignedUserId,
+    filterManagerIds: exportOpts.filterManagerIds,
+    filterUnassignedManagers: exportOpts.filterUnassignedManagers,
+    campaignIdFilter: exportOpts.campaignIdFilter,
+    campaignIdsFilter: exportOpts.campaignIdsFilter,
+    filterTagIds: exportOpts.filterTagIds,
+    columnFilters: exportOpts.columnFilters,
+    touchStatus: exportOpts.touchStatus,
+  };
+}
+
+/**
+ * Stream a large export to disk by reusing exportContactsCsv in page-sized chunks (selected scope).
+ * For filtered scope, resolves all matching IDs first (bounded by backgroundJobMaxContactIds).
+ */
+export async function exportContactsCsvToJobFile(
+  tenantId,
+  user,
+  exportOpts,
+  outputPath,
+  onProgress,
+  /** @type {null | (() => Promise<boolean>)} */ cancelCheck = null
+) {
+  const pageSize = env.backgroundJobExportPageSize;
+  const scope = exportOpts.exportScope === 'selected' ? 'selected' : 'filtered';
+
+  let idList;
+  if (scope === 'filtered') {
+    idList = await listAllContactIdsForBulkJob(
+      tenantId,
+      user,
+      exportOptsToListFilterOptions(exportOpts)
+    );
+  } else {
+    idList = [
+      ...new Set(
+        (Array.isArray(exportOpts.selectedIds) ? exportOpts.selectedIds : [])
+          .map((x) => Number(x))
+          .filter((n) => Number.isFinite(n) && n > 0)
+      ),
+    ].sort((a, b) => a - b);
+  }
+
+  const total = idList.length;
+  if (total === 0) {
+    const empty = await exportContactsCsv(tenantId, user, {
+      ...exportOpts,
+      exportScope: 'selected',
+      selectedIds: [],
+    });
+    await fs.writeFile(outputPath, empty || '\uFEFF', 'utf8');
+    if (typeof onProgress === 'function') await onProgress({ processed: 0, total: 0, step: 'export' });
+    return { rowCount: 0, path: outputPath };
+  }
+
+  const pick = {
+    search: exportOpts.search ?? '',
+    type: exportOpts.type,
+    statusId: exportOpts.statusId,
+    statusIdsFilter: exportOpts.statusIdsFilter,
+    includeCustomFields: exportOpts.includeCustomFields !== false && exportOpts.includeCustomFields !== 0,
+    filterManagerId: exportOpts.filterManagerId,
+    filterAssignedUserId: exportOpts.filterAssignedUserId,
+    filterManagerIds: exportOpts.filterManagerIds,
+    filterUnassignedManagers: exportOpts.filterUnassignedManagers,
+    campaignIdFilter: exportOpts.campaignIdFilter,
+    campaignIdsFilter: exportOpts.campaignIdsFilter,
+    filterTagIds: exportOpts.filterTagIds,
+    minCallCount: exportOpts.minCallCount,
+    maxCallCount: exportOpts.maxCallCount,
+    lastCalledAfter: exportOpts.lastCalledAfter,
+    lastCalledBefore: exportOpts.lastCalledBefore,
+    touchStatus: exportOpts.touchStatus,
+    columnFilters: exportOpts.columnFilters,
+    columnKeys: exportOpts.columnKeys ?? null,
+  };
+
+  let headerWritten = false;
+  let rowCount = 0;
+
+  for (let i = 0; i < idList.length; i += pageSize) {
+    if (typeof cancelCheck === 'function' && (await cancelCheck())) {
+      const err = new Error('Cancelled by user');
+      err.code = 'JOB_CANCELLED';
+      throw err;
+    }
+    const chunk = idList.slice(i, i + pageSize);
+    const csv = await exportContactsCsv(tenantId, user, {
+      ...pick,
+      exportScope: 'selected',
+      selectedIds: chunk,
+    });
+
+    if (!headerWritten) {
+      await fs.writeFile(outputPath, `${csv}\r\n`, 'utf8');
+      headerWritten = true;
+      const lines = String(csv).split(/\r?\n/).filter((l) => l.length > 0);
+      rowCount += Math.max(0, lines.length - 1);
+    } else {
+      const lines = String(csv).split(/\r?\n/).filter((l) => l.length > 0);
+      const dataOnly = lines.slice(1);
+      rowCount += dataOnly.length;
+      if (dataOnly.length > 0) {
+        await fs.appendFile(outputPath, `${dataOnly.join('\r\n')}\r\n`, 'utf8');
+      }
+    }
+
+    if (typeof onProgress === 'function') {
+      await onProgress({
+        processed: Math.min(i + chunk.length, total),
+        total,
+        step: 'export',
+      });
+    }
+  }
+
+  return { rowCount, path: outputPath };
+}
+
 async function validateImportTagIdsForTenant(tenantId, tagIds) {
   const ids = [
     ...new Set(
@@ -3999,6 +4321,12 @@ export async function importContactsCsv(
     tagIds: tagIdsOpt,
     importManagerId: importManagerIdRaw,
     importAssignedUserId: importAssignedUserIdRaw,
+    /** When true (background jobs), the 2000-row guard is skipped. */
+    skipImportRowLimit = false,
+    /** Optional async ({ processed, total }) => void for background job progress. */
+    onProgress = null,
+    /** Optional async () => boolean — when true, import stops (background job cancelled). */
+    cancelCheck = null,
   } = {}
 ) {
   const { records, headerRowIndex } = parseImportBufferToRecords(buffer, { originalFilename });
@@ -4030,10 +4358,19 @@ export async function importContactsCsv(
   // mapping: { [nk]: { target, customFieldId?, importValueType? } | { target:'new_custom', fieldType, fieldLabel?, selectOptions? } }
   const headerMapping = mapping && typeof mapping === 'object' ? mapping : null;
 
-  // Hard guard to prevent accidental huge imports
-  if (records.length > 2000) {
-    const err = new Error('CSV import supports up to 2000 rows per upload');
+  if (!skipImportRowLimit && records.length > 2000) {
+    const err = new Error('CSV import supports up to 2000 rows per upload (use a background job to import larger files)');
     err.status = 400;
+    throw err;
+  }
+
+  if (typeof onProgress === 'function' && records.length > 0) {
+    await onProgress({ processed: 0, total: records.length, step: 'preparing' });
+  }
+
+  if (typeof cancelCheck === 'function' && (await cancelCheck())) {
+    const err = new Error('Cancelled by user');
+    err.code = 'JOB_CANCELLED';
     throw err;
   }
 
@@ -4061,6 +4398,17 @@ export async function importContactsCsv(
   }
   const prefetchMap = await prefetchImportExistingByPhones(tenantId, peekPhones, type);
   const sessionPhoneMap = new Map(prefetchMap);
+
+  /**
+   * Row-based progress stride: each tick advances processed_count by ~this many rows (see loop `i % stride`).
+   * Larger stride => fewer socket/DB updates and bigger % jumps (e.g. stride 25 on 1000 rows is about +2% per tick).
+   * Stride 5-6 keeps the N/total counter easy to track; >2k rows use a larger stride to limit churn.
+   */
+  const importProgressStride = records.length > 2000 ? 25 : records.length > 500 ? 6 : 5;
+
+  if (typeof onProgress === 'function' && records.length > 0) {
+    await onProgress({ processed: 0, total: records.length, step: 'import_rows' });
+  }
 
   let created = 0;
   let updated = 0;
@@ -4101,6 +4449,18 @@ export async function importContactsCsv(
   for (let i = 0; i < records.length; i++) {
     const rowIndex = headerRowIndex + i + 2; // 1-based sheet row (header + data offset)
     const row = records[i] || {};
+
+    if (
+      typeof cancelCheck === 'function' &&
+      (i % 5 === 0 || i === records.length - 1) &&
+      (await cancelCheck())
+    ) {
+      await flushPendingCreates();
+      await flushPendingTagMerges();
+      const err = new Error('Cancelled by user');
+      err.code = 'JOB_CANCELLED';
+      throw err;
+    }
 
     try {
       const normalized = {};
@@ -4159,10 +4519,7 @@ export async function importContactsCsv(
 
       if (existingId && mode === 'skip') {
         skipped++;
-        continue;
-      }
-
-      if (existingId) {
+      } else if (existingId) {
         await flushPendingCreates();
         const payload = {
           type,
@@ -4183,45 +4540,44 @@ export async function importContactsCsv(
         const snapshot = await fetchContactSnapshotForUpdate(existingId, tenantId, user);
         if (!snapshot) {
           skipped++;
-          continue;
+        } else {
+          await updateContact(existingId, tenantId, user, payload, {
+            skipFetch: true,
+            contactSnapshot: snapshot,
+            skipActivityLog: true,
+          });
+          if (primaryPhone) sessionPhoneMap.set(primaryPhone, { id: existingId, type });
+          if (validatedTagIds.length > 0) {
+            pendingTagMergeIds.push(existingId);
+            if (pendingTagMergeIds.length >= IMPORT_TAG_MERGE_CHUNK) await flushPendingTagMerges();
+          }
+          updated++;
         }
-        await updateContact(existingId, tenantId, user, payload, {
-          skipFetch: true,
-          contactSnapshot: snapshot,
-          skipActivityLog: true,
-        });
-        if (primaryPhone) sessionPhoneMap.set(primaryPhone, { id: existingId, type });
-        if (validatedTagIds.length > 0) {
-          pendingTagMergeIds.push(existingId);
-          if (pendingTagMergeIds.length >= IMPORT_TAG_MERGE_CHUNK) await flushPendingTagMerges();
+      } else {
+        const createPayload = {
+          type,
+          first_name,
+          last_name,
+          display_name,
+          email,
+          source: finalSource,
+          ...coreRowFields,
+          ...(resolvedStatusId ? { status_id: resolvedStatusId } : {}),
+          ...(campaign_id !== undefined ? { campaign_id } : {}),
+          ...(effManagerId !== undefined ? { manager_id: effManagerId } : {}),
+          ...(effAssignedUserId !== undefined ? { assigned_user_id: effAssignedUserId } : {}),
+          phones,
+          custom_fields: custom_fields_deduped,
+          created_source,
+          ...(validatedTagIds.length > 0 ? { tag_ids: validatedTagIds } : {}),
+        };
+
+        pendingImportCreates.push({ primaryPhone, payload: createPayload });
+        if (primaryPhone) pendingPhoneKeys.add(primaryPhone);
+
+        if (pendingImportCreates.length >= IMPORT_BULK_CREATE_CHUNK) {
+          await flushPendingCreates();
         }
-        updated++;
-        continue;
-      }
-
-      const createPayload = {
-        type,
-        first_name,
-        last_name,
-        display_name,
-        email,
-        source: finalSource,
-        ...coreRowFields,
-        ...(resolvedStatusId ? { status_id: resolvedStatusId } : {}),
-        ...(campaign_id !== undefined ? { campaign_id } : {}),
-        ...(effManagerId !== undefined ? { manager_id: effManagerId } : {}),
-        ...(effAssignedUserId !== undefined ? { assigned_user_id: effAssignedUserId } : {}),
-        phones,
-        custom_fields: custom_fields_deduped,
-        created_source,
-        ...(validatedTagIds.length > 0 ? { tag_ids: validatedTagIds } : {}),
-      };
-
-      pendingImportCreates.push({ primaryPhone, payload: createPayload });
-      if (primaryPhone) pendingPhoneKeys.add(primaryPhone);
-
-      if (pendingImportCreates.length >= IMPORT_BULK_CREATE_CHUNK) {
-        await flushPendingCreates();
       }
     } catch (e) {
       await flushPendingCreates();
@@ -4231,10 +4587,45 @@ export async function importContactsCsv(
         error: e?.message || 'Import failed',
       });
     }
+
+    if (
+      typeof onProgress === 'function' &&
+      (i % importProgressStride === 0 ||
+        i === records.length - 1 ||
+        records.length <= 10)
+    ) {
+      await onProgress({ processed: i + 1, total: records.length, step: 'import_rows' });
+    }
   }
 
   await flushPendingCreates();
   await flushPendingTagMerges();
+
+  if (created > 0 || updated > 0) {
+    const fnameRaw = String(originalFilename || '').trim();
+    const fname = fnameRaw ? fnameRaw.split(/[/\\]/).pop().slice(0, 120) : '';
+    const typeLower = String(type || 'lead').toLowerCase();
+    const typeLabel = typeLower === 'contact' ? 'contacts' : 'leads';
+    const parts = [];
+    if (created > 0) parts.push(`${created} created`);
+    if (updated > 0) parts.push(`${updated} updated`);
+    const summaryBase = `CSV import (${typeLabel}): ${parts.join(', ')}`;
+    const summary = (fname ? `${summaryBase} — ${fname}` : summaryBase).slice(0, 500);
+    await safeLogTenantActivity(tenantId, user?.id, {
+      event_category: 'contact',
+      event_type: 'contact.import.csv',
+      summary,
+      payload_json: {
+        record_type: typeLower,
+        created,
+        updated,
+        skipped,
+        failed: errors.length,
+        filename: fname || null,
+        created_source: created_source || 'import',
+      },
+    });
+  }
 
   return {
     rowCount: records.length,

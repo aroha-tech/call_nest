@@ -21,12 +21,17 @@
 .pageSizeToolbar {
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
+  /* Space before the next toolbar control (e.g. checkbox) — Select wrapper defaults to width:100% and can overlap if unconstrained */
+  margin-inline-end: $space-2;
 }
 
 .left {
   display: flex;
   align-items: center;
   gap: $space-4;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .info {
@@ -40,16 +45,23 @@
   display: flex;
   align-items: center;
   gap: $space-2;
-  
+  flex: 0 0 auto;
+  width: max-content;
+  max-width: 100%;
+
   label {
     font-size: $font-size-sm;
     color: var(--color-text-tertiary);
+    flex-shrink: 0;
   }
 }
 
+/* Merged onto Select root with Select.module `.wrapper { width: 100% }` — keep control narrow so checkboxes aren’t covered */
 .limitSelectField {
-  flex: 0 0 auto;
-  min-width: 76px;
+  flex: 0 0 auto !important;
+  width: 92px !important;
+  max-width: 120px !important;
+  min-width: 72px !important;
 }
 
 .select {

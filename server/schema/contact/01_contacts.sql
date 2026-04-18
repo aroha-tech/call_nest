@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS contacts (
   updated_by BIGINT UNSIGNED NULL,
   deleted_by BIGINT UNSIGNED NULL,
   created_source ENUM('manual','import','api','integration') NOT NULL DEFAULT 'manual',
-  deleted_source ENUM('manual','import','api','integration') NULL,
+  deleted_source ENUM('manual','import','api','integration','bulk_job') NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   deleted_at TIMESTAMP NULL DEFAULT NULL,

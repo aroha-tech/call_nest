@@ -9,6 +9,8 @@ import { getUserPermissions, createSystemRolesForTenant, getRoleByTenantAndName 
 import { cloneDefaultsForTenant } from './dispositionCloneService.js';
 import { validateTenantSlugFormat } from '../utils/tenantSlugRules.js';
 import { themeForJwt, defaultTenantThemeJsonString } from '../utils/tenantTheme.js';
+import { safeLogPlatformActivity } from './superAdmin/platformActivityLogService.js';
+import { safeLogTenantActivity } from './tenant/tenantActivityLogService.js';
 
 function ttlFromString(expiresIn) {
   if (typeof expiresIn !== 'string') {
@@ -208,7 +210,36 @@ export async function registerTenantWithAdmin(tenantData, adminData) {
     console.error('Failed to auto-clone defaults for tenant:', cloneErr);
     // Don't fail registration if cloning fails - tenant can manually import later
   }
-  
+
+  await safeLogPlatformActivity({
+    actor_user_id: null,
+    subject_tenant_id: tenant.id,
+    event_category: 'tenant',
+    event_type: 'tenant.self_registered',
+    summary: `Organization registered: ${tenant.name}`,
+    entity_type: 'tenant',
+    entity_id: tenant.id,
+    payload_json: { slug: tenant.slug },
+  });
+  await safeLogPlatformActivity({
+    actor_user_id: null,
+    subject_tenant_id: tenant.id,
+    event_category: 'user',
+    event_type: 'tenant.bootstrap_admin',
+    summary: `First workspace admin: ${admin.email}`,
+    entity_type: 'user',
+    entity_id: admin.id,
+    payload_json: { tenant_id: tenant.id },
+  });
+  await safeLogTenantActivity(tenant.id, admin.id, {
+    event_category: 'tenant',
+    event_type: 'workspace.initialized',
+    summary: `Workspace ready. First admin: ${admin.name || admin.email}`,
+    entity_type: 'user',
+    entity_id: admin.id,
+    payload_json: { bootstrap: true },
+  });
+
   return { tenant, admin };
 }
 
@@ -738,6 +769,23 @@ export async function updateProfile(userId, payload) {
 
   params.push(userId);
   await query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
+
+  const upStr = updates.join(' ');
+  const profileParts = [];
+  if (upStr.includes('name =')) profileParts.push('name');
+  if (upStr.includes('password_hash')) profileParts.push('password');
+  if (upStr.includes('datetime_display_mode')) profileParts.push('time display');
+  const tid = user.tenant_id != null ? Number(user.tenant_id) : null;
+  if (!user.is_platform_admin && tid && tid > 0 && profileParts.length > 0) {
+    await safeLogTenantActivity(tid, userId, {
+      event_category: 'profile',
+      event_type: 'profile.self_updated',
+      summary: `My profile updated (${profileParts.join(', ')})`,
+      entity_type: 'user',
+      entity_id: Number(userId),
+      payload_json: { fields: profileParts },
+    });
+  }
 
   const [updated] = await query(
     `SELECT id, tenant_id, email, name, role, role_id, is_enabled, is_platform_admin, token_version,

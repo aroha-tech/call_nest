@@ -3,6 +3,7 @@
  */
 
 import { query } from '../../config/db.js';
+import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 function parseVariablesUsed(val) {
   if (val == null) return [];
@@ -141,7 +142,15 @@ export async function create(tenantId, data, createdBy) {
     [tenantId, script_name.trim(), script_body, variablesUsedJson, status ? 1 : 0, createdBy, createdBy]
   );
 
-  return findById(tenantId, result.insertId);
+  const row = await findById(tenantId, result.insertId);
+  await safeLogTenantActivity(tenantId, createdBy, {
+    event_category: 'call_script',
+    event_type: 'call_script.created',
+    summary: `Call script created: ${row?.script_name || script_name.trim()}`,
+    entity_type: 'call_script',
+    entity_id: result.insertId,
+  });
+  return row;
 }
 
 export async function update(tenantId, id, data, updatedBy) {
@@ -196,7 +205,15 @@ export async function update(tenantId, id, data, updatedBy) {
     params
   );
 
-  return findById(tenantId, id);
+  const row = await findById(tenantId, id);
+  await safeLogTenantActivity(tenantId, updatedBy, {
+    event_category: 'call_script',
+    event_type: 'call_script.updated',
+    summary: `Call script updated: ${row?.script_name || script.script_name}`,
+    entity_type: 'call_script',
+    entity_id: Number(id),
+  });
+  return row;
 }
 
 /**
@@ -230,5 +247,13 @@ export async function remove(tenantId, id, options = {}) {
     'UPDATE call_scripts SET is_deleted = 1, deleted_at = NOW() WHERE id = ? AND tenant_id = ?',
     [id, tenantId]
   );
+  const actorId = options?.userId != null ? Number(options.userId) : null;
+  await safeLogTenantActivity(tenantId, actorId, {
+    event_category: 'call_script',
+    event_type: 'call_script.deleted',
+    summary: `Call script deleted: ${script.script_name}`,
+    entity_type: 'call_script',
+    entity_id: Number(id),
+  });
   return { success: true };
 }

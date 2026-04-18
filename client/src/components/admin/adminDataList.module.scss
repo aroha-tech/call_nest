@@ -37,7 +37,25 @@
   gap: $space-4 $space-6;
   align-items: flex-end;
   flex: 1;
+  min-width: 0;
+}
+
+/**
+ * Default FilterBar: each direct child (Select, etc.) stays a modest width and sits in a row
+ * instead of stretching full width. Select wrappers use width:100% internally — overridden here.
+ */
+.filterBarFields:not(.filterBarFieldsFluid) > * {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: min(100%, 280px);
+  min-width: min(100%, 180px);
+}
+
+/** Full-width filter region (e.g. Tenants custom panel). */
+.filterBarFieldsFluid > * {
+  flex: 1 1 auto;
   min-width: min(100%, 240px);
+  max-width: none;
 }
 
 .filterBarActions {
@@ -53,7 +71,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: $space-4;
+  row-gap: $space-3;
+  column-gap: $space-6;
+  min-width: 0;
 }
 
 /** Bulk assign slot: same row as search — fixed min-height avoids layout jump when selection changes */
