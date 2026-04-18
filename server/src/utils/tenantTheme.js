@@ -1,6 +1,16 @@
 const HEX6 = /^#[0-9A-Fa-f]{6}$/;
 const ALLOWED_FONTS = new Set(['inter', 'system']);
 
+/**
+ * Default accent for new tenants (stored in `tenants.theme_json`, embedded in JWT as `tenant_theme.primary`).
+ * Client `applyWorkspaceTheme` builds the full primary scale from this hex.
+ */
+export const DEFAULT_TENANT_THEME_PRIMARY = '#3ab0e8';
+
+export function defaultTenantThemeJsonString() {
+  return JSON.stringify({ primary: DEFAULT_TENANT_THEME_PRIMARY });
+}
+
 export function parseThemeFromDb(raw) {
   if (raw == null || raw === '') return null;
   if (typeof raw === 'string') {

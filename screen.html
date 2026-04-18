@@ -1,0 +1,613 @@
+<!DOCTYPE html><html class="dark" lang="en"><head></head><body class="bg-background text-on-background selection:bg-primary selection:text-on-primary min-h-screen">
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Nocturne CRM | Enterprise Dashboard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+    <script id="tailwind-config">
+            tailwind.config = {
+                darkMode: "class",
+                theme: {
+                    extend: {
+                        "colors": {
+                            "secondary-dim": "#9c48ea",
+                            "tertiary-dim": "#f271b5",
+                            "on-primary-fixed-variant": "#003a50",
+                            "on-tertiary-fixed-variant": "#73004b",
+                            "on-secondary": "#33005b",
+                            "inverse-on-surface": "#4d556b",
+                            "surface-container-highest": "#192540",
+                            "primary-fixed-dim": "#05a9e3",
+                            "inverse-surface": "#faf8ff",
+                            "background": "#060e20",
+                            "surface-bright": "#1f2b49",
+                            "surface-variant": "#192540",
+                            "primary-container": "#22b1ec",
+                            "on-tertiary": "#5f003e",
+                            "surface-container-lowest": "#000000",
+                            "surface-container-high": "#141f38",
+                            "on-tertiary-container": "#4a002f",
+                            "on-secondary-container": "#e9cdff",
+                            "error-container": "#9f0519",
+                            "secondary-container": "#6f00be",
+                            "on-primary": "#00374d",
+                            "on-tertiary-fixed": "#360021",
+                            "on-error-container": "#ffa8a3",
+                            "primary-fixed": "#2db7f2",
+                            "on-error": "#490006",
+                            "tertiary-fixed": "#ff8bc5",
+                            "surface-container": "#0f1930",
+                            "primary": "#3bbffa",
+                            "on-primary-container": "#002b3d",
+                            "outline": "#6d758c",
+                            "on-surface": "#dee5ff",
+                            "error-dim": "#d7383b",
+                            "error": "#ff716c",
+                            "tertiary-container": "#f673b7",
+                            "secondary-fixed-dim": "#dbb4ff",
+                            "outline-variant": "#40485d",
+                            "primary-dim": "#05a9e3",
+                            "tertiary-fixed-dim": "#f976ba",
+                            "on-secondary-fixed-variant": "#7511c3",
+                            "surface-tint": "#3bbffa",
+                            "surface-container-low": "#091328",
+                            "tertiary": "#ff86c3",
+                            "secondary": "#c180ff",
+                            "surface-dim": "#060e20",
+                            "on-primary-fixed": "#00121d",
+                            "secondary-fixed": "#e5c6ff",
+                            "inverse-primary": "#00668b",
+                            "on-secondary-fixed": "#4f0089",
+                            "on-surface-variant": "#a3aac4",
+                            "surface": "#060e20",
+                            "on-background": "#dee5ff"
+                        },
+                        "borderRadius": {
+                            "DEFAULT": "0.25rem",
+                            "lg": "0.5rem",
+                            "xl": "0.75rem",
+                            "full": "9999px"
+                        },
+                        "fontFamily": {
+                            "headline": ["Manrope"],
+                            "body": ["Inter"],
+                            "label": ["Inter"]
+                        }
+                    },
+                },
+            }
+        </script>
+    <style>
+            body { font-family: 'Inter', sans-serif; }
+            h1, h2, h3 { font-family: 'Manrope', sans-serif; }
+            .material-symbols-outlined {
+                font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            }
+            .bento-grid {
+                display: grid;
+                grid-template-columns: repeat(12, 1fr);
+                gap: 1.5rem;
+            }
+            .glass-panel {
+                background: rgba(25, 37, 64, 0.6);
+                backdrop-filter: blur(24px);
+                -webkit-backdrop-filter: blur(24px);
+            }
+            .tab-active {
+                background: #3bbffa;
+                color: #002b3d;
+            }
+        </style>
+    <!-- SideNavBar Shell -->
+    <aside class="h-screen w-64 fixed left-0 top-0 bg-[#091328] dark:bg-[#091328] flex flex-col h-full py-6 px-4 z-50 border-r border-outline-variant/10">
+    <div class="mb-8 px-2">
+    <h1 class="text-xl font-bold text-white tracking-tight" style="">Nocturne CRM</h1>
+    <p class="text-on-surface-variant text-xs font-medium uppercase tracking-widest mt-1" style="">Enterprise Tier</p>
+    </div>
+    <nav class="flex-1 space-y-1">
+    <a class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#38bdf8] font-bold border-r-2 border-[#38bdf8] hover:bg-[#1f2b49] transition-all duration-200 scale-101 translate-x-1" href="#" style="">
+    <span class="material-symbols-outlined" style="">dashboard</span>
+    <span class="font-body" style="">Dashboard</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 font-medium hover:text-white hover:bg-[#1f2b49] transition-all duration-200" href="#" style="">
+    <span class="material-symbols-outlined" style="">leaderboard</span>
+    <span class="font-body" style="">Leads</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 font-medium hover:text-white hover:bg-[#1f2b49] transition-all duration-200" href="#" style="">
+    <span class="material-symbols-outlined" style="">campaign</span>
+    <span class="font-body" style="">Campaigns</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 font-medium hover:text-white hover:bg-[#1f2b49] transition-all duration-200" href="#" style="">
+    <span class="material-symbols-outlined" style="">contacts</span>
+    <span class="font-body" style="">Contacts</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 font-medium hover:text-white hover:bg-[#1f2b49] transition-all duration-200" href="#" style="">
+    <span class="material-symbols-outlined" style="">assessment</span>
+    <span class="font-body" style="">Reports</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 font-medium hover:text-white hover:bg-[#1f2b49] transition-all duration-200" href="#" style="">
+    <span class="material-symbols-outlined" style="">group</span>
+    <span class="font-body" style="">My Team</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 font-medium hover:text-white hover:bg-[#1f2b49] transition-all duration-200" href="#" style="">
+    <span class="material-symbols-outlined" style="">account_tree</span>
+    <span class="font-body" style="">Workflow</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 font-medium hover:text-white hover:bg-[#1f2b49] transition-all duration-200" href="#" style="">
+    <span class="material-symbols-outlined" style="">chat</span>
+    <span class="font-body" style="">Messaging</span>
+    </a>
+    </nav>
+    <div class="mt-auto pt-6 border-t border-outline-variant/20 space-y-1">
+    <div class="px-3 mb-4">
+    <button class="w-full bg-primary text-on-primary py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity" style="">
+    <span class="material-symbols-outlined text-sm" style="">add</span>
+                        Quick Actions
+                    </button>
+    </div>
+    <a class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 font-medium hover:text-white hover:bg-[#1f2b49] transition-all duration-200" href="#" style="">
+    <span class="material-symbols-outlined" style="">settings</span>
+    <span class="font-body" style="">Settings</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 font-medium hover:text-white hover:bg-[#1f2b49] transition-all duration-200" href="#" style="">
+    <span class="material-symbols-outlined" style="">help</span>
+    <span class="font-body" style="">Support</span>
+    </a>
+    </div>
+    </aside>
+    <!-- TopNavBar Shell -->
+    <header class="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 z-40 bg-[#060e20]/60 backdrop-blur-xl flex justify-between items-center px-8 shadow-2xl shadow-black/40 border-b border-outline-variant/5">
+    <div class="flex items-center flex-1 max-w-xl">
+    <div class="relative w-full group">
+    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" style="">search</span>
+    <input class="w-full bg-surface-container-highest border-none rounded-full py-2 pl-10 pr-4 text-on-surface focus:ring-2 focus:ring-primary/40 transition-all placeholder:text-on-surface-variant/50" placeholder="Search leads, tasks, or insights..." type="text">
+    </div>
+    </div>
+    <div class="flex items-center gap-6">
+    <div class="flex items-center gap-4 text-slate-400">
+    <button class="hover:text-white transition-colors active:opacity-80 active:scale-95" style=""><span class="material-symbols-outlined" style="">call</span></button>
+    <button class="hover:text-white transition-colors active:opacity-80 active:scale-95" style=""><span class="material-symbols-outlined" style="">history</span></button>
+    <button class="hover:text-white transition-colors active:opacity-80 active:scale-95 relative" style="">
+    <span class="material-symbols-outlined" style="">notifications</span>
+    <span class="absolute -top-1 -right-1 w-2 h-2 bg-error rounded-full"></span>
+    </button>
+    </div>
+    <div class="h-8 w-px bg-outline-variant/30"></div>
+    <div class="flex items-center gap-3">
+    <div class="text-right hidden sm:block">
+    <p class="text-sm font-bold text-white" style="">Alex Vanguard</p>
+    <p class="text-[10px] text-primary uppercase font-bold tracking-tighter" style="">Senior Manager</p>
+    </div>
+    <img alt="Manager profile" class="w-10 h-10 rounded-full border-2 border-primary/20" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBT-ag0aETFY49C6GANr_BEKmQwkQeyMmzcuHKegR2ta15JI0Idv_XOE2sxY_2IPeWaWhGKPfTyTUmwOpujoH6fvCstrX-NLs98IaA1O-q4uqnrF1-r5-F2PditPKsw24puwjEhY9l3mMvnp9aOsYUwTnDZtQgqwFbuxGcq5SB2qINDMOh5QNKxrB8qARMzUdqMWnW0YQoZ6jojguV56-RvoqSn5kj9z3NKP9jLRMpUHMwZmdLMunDSXyeOEJQezzuY0Mj_srbSlCY" style="">
+    </div>
+    </div>
+    </header>
+    <!-- Main Content -->
+    <main class="ml-64 pt-24 p-8 min-h-screen">
+    <!-- Header Section -->
+    <header class="mb-10 flex justify-between items-end">
+    <div>
+    <h2 class="text-4xl font-extrabold text-white tracking-tight" style="">Executive Dashboard</h2>
+    <p class="text-on-surface-variant mt-2 font-medium" style="">Monitoring 248 active signals across 12 campaigns.</p>
+    </div>
+    <div class="flex gap-3">
+    <button class="bg-surface-container-high text-on-surface px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-surface-bright transition-all" style="">
+    <span class="material-symbols-outlined text-sm" style="">calendar_today</span>
+                        Last 30 Days
+                    </button>
+    <button class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-all" style="">
+    <span class="material-symbols-outlined text-sm" style="">download</span>
+                        Export PDF
+                    </button>
+    </div>
+    </header>
+    <!-- Bento Grid Layout -->
+    <div class="bento-grid">
+    <!-- At-a-glance Metrics -->
+    <section class="col-span-12 grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-2">
+    <div class="bg-surface-container-high p-5 rounded-xl relative overflow-hidden group hover:bg-surface-bright transition-all duration-300">
+    <div class="flex justify-between items-start mb-4">
+    <div class="p-2 bg-primary/10 rounded-lg text-primary">
+    <span class="material-symbols-outlined text-xl" style="">leaderboard</span>
+    </div>
+    <span class="text-primary font-bold text-[10px]" style="">+12.5%</span>
+    </div>
+    <p class="text-on-surface-variant text-[11px] font-medium uppercase tracking-wider" style="">New Leads</p>
+    <h3 class="text-2xl font-extrabold text-white mt-1 tracking-tight" style="">1,284</h3>
+    <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-transparent opacity-40"></div>
+    </div>
+    <div class="bg-surface-container-high p-5 rounded-xl relative overflow-hidden group hover:bg-surface-bright transition-all duration-300">
+    <div class="flex justify-between items-start mb-4">
+    <div class="p-2 bg-secondary-dim/10 rounded-lg text-secondary">
+    <span class="material-symbols-outlined text-xl" style="">contacts</span>
+    </div>
+    <span class="text-secondary font-bold text-[10px]" style="">+4.2%</span>
+    </div>
+    <p class="text-on-surface-variant text-[11px] font-medium uppercase tracking-wider" style="">Total Contacts</p>
+    <h3 class="text-2xl font-extrabold text-white mt-1 tracking-tight" style="">8,421</h3>
+    <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-secondary-dim to-transparent opacity-40"></div>
+    </div>
+    <div class="bg-surface-container-high p-5 rounded-xl relative overflow-hidden group hover:bg-surface-bright transition-all duration-300">
+    <div class="flex justify-between items-start mb-4">
+    <div class="p-2 bg-tertiary-dim/10 rounded-lg text-tertiary">
+    <span class="material-symbols-outlined text-xl" style="">campaign</span>
+    </div>
+    <span class="text-tertiary font-bold text-[10px]" style="">Active</span>
+    </div>
+    <p class="text-on-surface-variant text-[11px] font-medium uppercase tracking-wider" style="">Campaigns</p>
+    <h3 class="text-2xl font-extrabold text-white mt-1 tracking-tight" style="">18</h3>
+    <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-tertiary-dim to-transparent opacity-40"></div>
+    </div>
+    <div class="bg-surface-container-high p-5 rounded-xl relative overflow-hidden group hover:bg-surface-bright transition-all duration-300">
+    <div class="flex justify-between items-start mb-4">
+    <div class="p-2 bg-primary-container/10 rounded-lg text-primary-container">
+    <span class="material-symbols-outlined text-xl" style="">event</span>
+    </div>
+    <span class="text-primary font-bold text-[10px]" style="">+2.1%</span>
+    </div>
+    <p class="text-on-surface-variant text-[11px] font-medium uppercase tracking-wider" style="">Total Meetings</p>
+    <h3 class="text-2xl font-extrabold text-white mt-1 tracking-tight" style="">24</h3>
+    <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-primary-container to-transparent opacity-40"></div>
+    </div>
+    <div class="bg-surface-container-high p-5 rounded-xl relative overflow-hidden group hover:bg-surface-bright transition-all duration-300">
+    <div class="flex justify-between items-start mb-4">
+    <div class="p-2 bg-secondary-container/10 rounded-lg text-secondary-container">
+    <span class="material-symbols-outlined text-xl" style="">email</span>
+    </div>
+    <span class="text-secondary-fixed font-bold text-[10px]" style="">+8.5%</span>
+    </div>
+    <p class="text-on-surface-variant text-[11px] font-medium uppercase tracking-wider" style="">Total Emails</p>
+    <h3 class="text-2xl font-extrabold text-white mt-1 tracking-tight" style="">1,420</h3>
+    <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-secondary-container to-transparent opacity-40"></div>
+    </div>
+    <div class="bg-surface-container-high p-5 rounded-xl relative overflow-hidden group hover:bg-surface-bright transition-all duration-300">
+    <div class="flex justify-between items-start mb-4">
+    <div class="p-2 bg-primary-fixed/10 rounded-lg text-primary-fixed">
+    <span class="material-symbols-outlined text-xl" style="">call</span>
+    </div>
+    <span class="text-on-surface-variant font-medium text-[10px]" style=""><br></span>
+    </div>
+    <p class="text-on-surface-variant text-[11px] font-medium uppercase tracking-wider" style="">TotaL CALLS</p>
+    <h3 class="text-2xl font-extrabold text-white mt-1 tracking-tight" style="">42</h3>
+    <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-primary-fixed to-transparent opacity-40"></div>
+    </div>
+    </section>
+    <!-- Widget Section: Meetings & Call Details -->
+    <section class="col-span-12 lg:col-span-8 space-y-6">
+    <!-- Upcoming Meetings -->
+    <div class="bg-surface-container-low rounded-xl p-6 border border-white/5">
+    <div class="flex justify-between items-center mb-6">
+    <h3 class="text-xl font-bold text-white flex items-center gap-2" style="">
+    <span class="material-symbols-outlined text-primary" style="">event_upcoming</span>
+                    Upcoming Meetings
+                </h3>
+    <button class="text-xs font-bold text-primary hover:underline" style="">View Calendar</button>
+    </div>
+    <div class="space-y-3">
+    <div class="flex items-center justify-between p-4 bg-surface-container-high rounded-xl border border-outline-variant/10 group hover:border-primary/40 transition-all">
+    <div class="flex items-center gap-4">
+    <div class="text-center px-3 py-1 bg-surface-variant rounded-lg">
+    <p class="text-[10px] font-bold text-primary uppercase" style="">Today</p>
+    <p class="text-lg font-black text-white leading-tight" style="">14:00</p>
+    </div>
+    <div>
+    <p class="text-sm font-bold text-white" style="">Strategic Partnership Review</p>
+    <p class="text-xs text-on-surface-variant flex items-center gap-1" style="">
+    <span class="material-symbols-outlined text-[14px]" style="">group</span>
+                                Tony Stark, Pepper Potts
+                            </p>
+    </div>
+    </div>
+    <button class="bg-primary text-on-primary px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 hover:opacity-90 transition-all" style="">
+    <span class="material-symbols-outlined text-sm" style="">video_call</span> Join
+                    </button>
+    </div>
+    <div class="flex items-center justify-between p-4 bg-surface-container-high rounded-xl border border-outline-variant/10 group hover:border-primary/40 transition-all">
+    <div class="flex items-center gap-4">
+    <div class="text-center px-3 py-1 bg-surface-variant rounded-lg">
+    <p class="text-[10px] font-bold text-primary uppercase" style="">Today</p>
+    <p class="text-lg font-black text-white leading-tight" style="">16:30</p>
+    </div>
+    <div>
+    <p class="text-sm font-bold text-white" style="">Q4 Budget Planning</p>
+    <p class="text-xs text-on-surface-variant flex items-center gap-1" style="">
+    <span class="material-symbols-outlined text-[14px]" style="">group</span>
+                                Bruce Wayne, Alfred Pennyworth
+                            </p>
+    </div>
+    </div>
+    <button class="bg-surface-variant text-on-surface px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-surface-bright transition-all" style="">
+    <span class="material-symbols-outlined text-sm" style="">video_call</span> Join
+                    </button>
+    </div>
+    </div>
+    </div>
+    <!-- Connected Call Details -->
+    <div class="bg-surface-container-low rounded-xl p-6 border border-white/5">
+    <div class="flex justify-between items-center mb-6">
+    <h3 class="text-xl font-bold text-white flex items-center gap-2" style="">
+    <span class="material-symbols-outlined text-primary" style="">phone_callback</span>
+                    Connected Call Details
+                </h3>
+    <div class="flex gap-4">
+    <div class="text-center">
+    <p class="text-sm font-bold text-white" style="">42</p>
+    <p class="text-[10px] text-on-surface-variant uppercase font-bold" style="">Today</p>
+    </div>
+    <div class="text-center">
+    <p class="text-sm font-bold text-primary" style="">8.4m</p>
+    <p class="text-[10px] text-on-surface-variant uppercase font-bold" style="">Total Duration</p>
+    </div>
+    <div class="text-center">
+    <p class="text-sm font-bold text-secondary" style="">32%</p>
+    <p class="text-[10px] text-on-surface-variant uppercase font-bold" style="">Conversion Rate</p>
+    </div>
+    </div>
+    </div>
+    <div class="overflow-x-auto border border-outline-variant/10 rounded-xl">
+    <table class="w-full text-left">
+    <thead>
+    <tr class="text-on-surface-variant text-[10px] uppercase font-bold tracking-widest bg-surface-container-high/50">
+    <th class="px-4 py-3" style="">Contact Name</th>
+    <th class="px-4 py-3" style="">Duration</th>
+    <th class="px-4 py-3" style="">Disposition Status</th>
+    <th class="px-4 py-3 text-right" style="">Timestamp</th>
+    </tr>
+    </thead>
+    <tbody class="divide-y divide-outline-variant/10">
+    <tr class="hover:bg-surface-bright transition-colors group">
+    <td class="px-4 py-3" style="">
+    <p class="text-sm font-bold text-white" style="">Diana Prince</p>
+    <p class="text-[10px] text-on-surface-variant" style="">Themyscira Exports</p>
+    </td>
+    <td class="px-4 py-3" style="">
+    <span class="text-sm text-on-surface font-medium" style="">12:45</span>
+    </td>
+    <td class="px-4 py-3" style="">
+    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-primary/20 text-primary border border-primary/20" style="">Qualified</span>
+    </td>
+    <td class="px-4 py-3 text-right" style="">
+    <span class="text-xs text-on-surface-variant" style="">09:15 AM</span>
+    </td>
+    </tr>
+    <tr class="hover:bg-surface-bright transition-colors group">
+    <td class="px-4 py-3" style="">
+    <p class="text-sm font-bold text-white" style="">Barry Allen</p>
+    <p class="text-[10px] text-on-surface-variant" style="">Central Lab Tech</p>
+    </td>
+    <td class="px-4 py-3" style="">
+    <span class="text-sm text-on-surface font-medium" style="">04:20</span>
+    </td>
+    <td class="px-4 py-3" style="">
+    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-secondary-container text-on-secondary-container" style="">Interested</span>
+    </td>
+    <td class="px-4 py-3 text-right" style="">
+    <span class="text-xs text-on-surface-variant" style="">10:30 AM</span>
+    </td>
+    </tr>
+    <tr class="hover:bg-surface-bright transition-colors group">
+    <td class="px-4 py-3" style="">
+    <p class="text-sm font-bold text-white" style="">Victor Stone</p>
+    <p class="text-[10px] text-on-surface-variant" style="">Cyber Systems Inc</p>
+    </td>
+    <td class="px-4 py-3" style="">
+    <span class="text-sm text-on-surface font-medium" style="">08:12</span>
+    </td>
+    <td class="px-4 py-3" style="">
+    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-variant text-on-surface-variant" style="">Callback</span>
+    </td>
+    <td class="px-4 py-3 text-right" style="">
+    <span class="text-xs text-on-surface-variant" style="">11:45 AM</span>
+    </td>
+    </tr>
+    </tbody>
+    </table>
+    </div>
+    </div>
+    </section>
+    <!-- Widget Section: Callbacks & Quick Actions -->
+    <section class="col-span-12 lg:col-span-4 space-y-6">
+    <!-- Pending Callbacks -->
+    <div class="bg-surface-container-high rounded-xl p-6 border border-white/5">
+    <div class="flex justify-between items-center mb-6">
+    <h3 class="text-lg font-bold text-white flex items-center gap-2" style="">
+    <span class="material-symbols-outlined text-primary" style="">ring_volume</span>
+                    Pending Callbacks
+                </h3>
+    <span class="bg-primary/20 text-primary px-2 py-0.5 rounded-full text-[10px] font-black uppercase" style="">4 Pending</span>
+    </div>
+    <div class="space-y-4">
+    <div class="flex items-center justify-between group">
+    <div class="flex items-center gap-3">
+    <div class="relative">
+    <img alt="Contact" class="w-10 h-10 rounded-full border border-outline-variant/30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDw2tBWRzN8Lcq_r8Rs1epPwGx96Q2AwkIXCIEwLi77YIK72Q7A-rsZte4awR-C0LWZRAkPrTWrdelemmzF1dH4VPPCjfcoR1cMhSbzwjWujb-jkJN_0tN89jb_Q9WRNiTezN5YBE0mKiL4l4v4H_1EC6Ynq2Idsv6L8aEi-MIJG4NQI10dLDhdy_Q93CeRtfJOyeW2axq2Ej2shmyDm6sSVnHm67ioZWHDUf_YBSY158Il4uiPM511EY2Xjw0XMJ4p-zAw6VA4GII" style="">
+    </div>
+    <div class="max-w-[140px]">
+    <p class="text-sm font-bold text-white truncate" style="">Sarah Connor</p>
+    <p class="text-[10px] text-error font-medium truncate italic" style="">Missed: High Priority</p>
+    </div>
+    </div>
+    <button class="w-8 h-8 flex items-center justify-center bg-surface-bright text-primary rounded-lg hover:bg-primary hover:text-on-primary transition-all" style="">
+    <span class="material-symbols-outlined text-sm" style="">call</span>
+    </button>
+    </div>
+    <div class="flex items-center justify-between group">
+    <div class="flex items-center gap-3">
+    <div class="relative">
+    <img alt="Contact" class="w-10 h-10 rounded-full border border-outline-variant/30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC9ASIiFcpj8E6b5v583bU92wl77REMhdGkJN8aPPfO8yVN3KV0R2JqaEoDSDsTMR7bD1N5HWZfDn1hiX1TsNbFg6GesMoCupXLUbJtYiFUHfoH1HVn8u3R5yoEJsVZfy2-14qUmtxjKw_7-NSUAwg8yj9JjHSj49JwASeb-gesX-zSQd-o6jY-_VYRpdTMPUSB6wfSmgBJHyySXFShT66bXtYOnf0e8AYphz2MIxiXDLKkHgZxXIVpxfMzz7OPK-lOcp72gD3tDJk" style="">
+    </div>
+    <div class="max-w-[140px]">
+    <p class="text-sm font-bold text-white truncate" style="">David Miller</p>
+    <p class="text-[10px] text-on-surface-variant truncate" style="">Follow-up: Requested Info</p>
+    </div>
+    </div>
+    <button class="w-8 h-8 flex items-center justify-center bg-surface-bright text-primary rounded-lg hover:bg-primary hover:text-on-primary transition-all" style="">
+    <span class="material-symbols-outlined text-sm" style="">call</span>
+    </button>
+    </div>
+    </div>
+    <button class="w-full mt-6 py-2 rounded-lg border border-outline-variant/30 text-xs font-bold text-on-surface hover:bg-surface-bright transition-all" style="">View All Callbacks</button>
+    </div>
+    <!-- Quick Action Buttons -->
+    <div class="grid grid-cols-2 gap-3">
+    <button class="p-4 bg-primary text-on-primary rounded-xl flex flex-col items-center justify-center gap-2 hover:opacity-90 transition-all shadow-lg shadow-primary/10" style="">
+    <span class="material-symbols-outlined" style="">person_add</span>
+    <span class="text-xs font-bold" style="">Add Lead</span>
+    </button>
+    <button class="p-4 bg-surface-container-high text-on-surface border border-outline-variant/20 rounded-xl flex flex-col items-center justify-center gap-2 hover:bg-surface-bright transition-all" style="">
+    <span class="material-symbols-outlined text-primary" style="">send</span>
+    <span class="text-xs font-bold" style="">Start Campaign</span>
+    </button>
+    <button class="p-4 bg-surface-container-high text-on-surface border border-outline-variant/20 rounded-xl flex flex-col items-center justify-center gap-2 hover:bg-surface-bright transition-all" style="">
+    <span class="material-symbols-outlined text-secondary" style="">phone_forwarded</span>
+    <span class="text-xs font-bold" style="">Log Call</span>
+    </button>
+    <button class="p-4 bg-surface-container-high text-on-surface border border-outline-variant/20 rounded-xl flex flex-col items-center justify-center gap-2 hover:bg-surface-bright transition-all" style="">
+    <span class="material-symbols-outlined text-tertiary" style="">calendar_month</span>
+    <span class="text-xs font-bold" style="">Meeting</span>
+    </button>
+    </div>
+    </section>
+    <!-- Activity Feed & List -->
+    <section class="col-span-12 lg:col-span-12 bg-surface-container-low rounded-xl overflow-hidden border border-white/5">
+    <div class="px-8 py-6 flex flex-col sm:flex-row justify-between items-center border-b border-outline-variant/10 gap-4">
+    <h3 class="text-xl font-bold text-white" style="">Recent Activity</h3>
+    <div class="flex bg-surface-container-high p-1 rounded-lg">
+    <button class="px-8 py-1.5 tab-active rounded-md text-xs font-bold uppercase transition-all shadow-lg shadow-primary/10" style="">All</button>
+    <button class="px-8 py-1.5 text-on-surface-variant rounded-md text-xs font-bold uppercase hover:text-white transition-all" style="">Calls</button>
+    <button class="px-8 py-1.5 text-on-surface-variant rounded-md text-xs font-bold uppercase hover:text-white transition-all" style="">Agents</button>
+    </div>
+    </div>
+    <!-- Tab Content: ALL (Default) -->
+    <div class="overflow-x-auto">
+    <table class="w-full text-left">
+    <thead>
+    <tr class="text-on-surface-variant text-[10px] uppercase font-bold tracking-widest bg-surface-container-high/50">
+    <th class="px-8 py-4" style="">Activity Details</th>
+    <th class="px-8 py-4" style="">Status / Action</th>
+    <th class="px-8 py-4" style="">Member / Agent</th>
+    <th class="px-8 py-4" style="">Value / Info</th>
+    <th class="px-8 py-4 text-right" style="">Timestamp</th>
+    </tr>
+    </thead>
+    <tbody class="divide-y divide-outline-variant/10">
+    <!-- Call Activity -->
+    <tr class="hover:bg-surface-bright transition-colors group">
+    <td class="px-8 py-4" style="">
+    <div class="flex items-center gap-3">
+    <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+    <span class="material-symbols-outlined text-xl" style="">call</span>
+    </div>
+    <div>
+    <p class="text-sm font-bold text-white" style="">Initial Outreach Call</p>
+    <p class="text-[10px] text-on-surface-variant" style="">Contact: Arthur Curry (Atlantic Corp)</p>
+    </div>
+    </div>
+    </td>
+    <td class="px-8 py-4" style="">
+    <div class="flex items-center gap-2">
+    <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-primary/20 text-primary border border-primary/20" style="">Completed</span>
+    </div>
+    </td>
+    <td class="px-8 py-4" style="">
+    <div class="flex items-center gap-2">
+    <img alt="Team Member" class="w-7 h-7 rounded-full border border-outline-variant/30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDw2tBWRzN8Lcq_r8Rs1epPwGx96Q2AwkIXCIEwLi77YIK72Q7A-rsZte4awR-C0LWZRAkPrTWrdelemmzF1dH4VPPCjfcoR1cMhSbzwjWujb-jkJN_0tN89jb_Q9WRNiTezN5YBE0mKiL4l4v4H_1EC6Ynq2Idsv6L8aEi-MIJG4NQI10dLDhdy_Q93CeRtfJOyeW2axq2Ej2shmyDm6sSVnHm67ioZWHDUf_YBSY158Il4uiPM511EY2Xjw0XMJ4p-zAw6VA4GII" style="">
+    <span class="text-xs font-medium text-on-surface" style="">Sarah Connor</span>
+    </div>
+    </td>
+    <td class="px-8 py-4" style="">
+    <span class="text-sm font-bold text-white" style="">-</span>
+    </td>
+    <td class="px-8 py-4 text-right" style="">
+    <span class="text-xs text-on-surface-variant" style="">5 mins ago</span>
+    </td>
+    </tr>
+    <!-- Lead Activity -->
+    <tr class="hover:bg-surface-bright transition-colors group">
+    <td class="px-8 py-4" style="">
+    <div class="flex items-center gap-3">
+    <div class="w-10 h-10 rounded-full bg-secondary-dim/10 flex items-center justify-center text-secondary">
+    <span class="material-symbols-outlined text-xl" style="">person_add</span>
+    </div>
+    <div>
+    <p class="text-sm font-bold text-white" style="">New Lead Qualified</p>
+    <p class="text-[10px] text-on-surface-variant" style="">Source: Enterprise Webinar</p>
+    </div>
+    </div>
+    </td>
+    <td class="px-8 py-4" style="">
+    <div class="flex items-center gap-2">
+    <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-secondary-container text-on-secondary-container" style="">High Intent</span>
+    </div>
+    </td>
+    <td class="px-8 py-4" style="">
+    <div class="flex items-center gap-2">
+    <img alt="Team Member" class="w-7 h-7 rounded-full border border-outline-variant/30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC9ASIiFcpj8E6b5v583bU92wl77REMhdGkJN8aPPfO8yVN3KV0R2JqaEoDSDsTMR7bD1N5HWZfDn1hiX1TsNbFg6GesMoCupXLUbJtYiFUHfoH1HVn8u3R5yoEJsVZfy2-14qUmtxjKw_7-NSUAwg8yj9JjHSj49JwASeb-gesX-zSQd-o6jY-_VYRpdTMPUSB6wfSmgBJHyySXFShT66bXtYOnf0e8AYphz2MIxiXDLKkHgZxXIVpxfMzz7OPK-lOcp72gD3tDJk" style="">
+    <span class="text-xs font-medium text-on-surface" style="">David Miller</span>
+    </div>
+    </td>
+    <td class="px-8 py-4" style="">
+    <span class="text-sm font-bold text-white" style="">$85,000</span>
+    </td>
+    <td class="px-8 py-4 text-right" style="">
+    <span class="text-xs text-on-surface-variant" style="">22 mins ago</span>
+    </td>
+    </tr>
+    <!-- Agent Status Change -->
+    <tr class="hover:bg-surface-bright transition-colors group">
+    <td class="px-8 py-4" style="">
+    <div class="flex items-center gap-3">
+    <div class="w-10 h-10 rounded-full bg-outline-variant/10 flex items-center justify-center text-outline-variant">
+    <span class="material-symbols-outlined text-xl" style="">sensor_occupancy</span>
+    </div>
+    <div>
+    <p class="text-sm font-bold text-white" style="">Shift Update</p>
+    <p class="text-[10px] text-on-surface-variant" style="">Agent went 'On Break'</p>
+    </div>
+    </div>
+    </td>
+    <td class="px-8 py-4" style="">
+    <div class="flex items-center gap-2">
+    <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-error-container/20 text-error-dim border border-error-container/20" style="">Inactive</span>
+    </div>
+    </td>
+    <td class="px-8 py-4" style="">
+    <div class="flex items-center gap-2">
+    <img alt="Team Member" class="w-7 h-7 rounded-full border border-outline-variant/30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBT-ag0aETFY49C6GANr_BEKmQwkQeyMmzcuHKegR2ta15JI0Idv_XOE2sxY_2IPeWaWhGKPfTyTUmwOpujoH6fvCstrX-NLs98IaA1O-q4uqnrF1-r5-F2PditPKsw24puwjEhY9l3mMvnp9aOsYUwTnDZtQgqwFbuxGcq5SB2qINDMOh5QNKxrB8qARMzUdqMWnW0YQoZ6jojguV56-RvoqSn5kj9z3NKP9jLRMpUHMwZmdLMunDSXyeOEJQezzuY0Mj_srbSlCY" style="">
+    <span class="text-xs font-medium text-on-surface" style="">Alex Vanguard</span>
+    </div>
+    </td>
+    <td class="px-8 py-4" style="">
+    <span class="text-xs text-on-surface-variant" style="">Dur: 15m</span>
+    </td>
+    <td class="px-8 py-4 text-right" style="">
+    <span class="text-xs text-on-surface-variant" style="">38 mins ago</span>
+    </td>
+    </tr>
+    </tbody>
+    </table>
+    </div>
+    <div class="p-6 text-center">
+    <button class="text-sm font-bold text-primary hover:underline flex items-center justify-center gap-2 mx-auto" style="">
+    <span class="material-symbols-outlined text-sm" style="">history</span>
+                See full activity history
+            </button>
+    </div>
+    </section>
+    </div>
+    </main>
+    <script>
+        // Simple tab switching logic for demo purposes (static HTML)
+        const tabs = document.querySelectorAll('.tab-active, button[class*="text-on-surface-variant"]');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => {
+                    t.classList.remove('tab-active', 'shadow-lg', 'shadow-primary/10');
+                    t.classList.add('text-on-surface-variant');
+                });
+                tab.classList.add('tab-active', 'shadow-lg', 'shadow-primary/10');
+                tab.classList.remove('text-on-surface-variant');
+            });
+        });
+    </script>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Select } from '../../components/ui/Select';
+import { Select, SelectOncePick } from '../../components/ui/Select';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import {
@@ -36,23 +36,13 @@ function MultiIdPicker({ options, value, onChange, placeholder }) {
           );
         })}
       </div>
-      <select
+      <SelectOncePick
         className={styles.addSelect}
-        value=""
-        onChange={(e) => {
-          add(e.target.value);
-          e.target.value = '';
-        }}
-      >
-        <option value="">{placeholder || 'Add…'}</option>
-        {options
-          .filter((o) => !arr.includes(String(o.value)))
-          .map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-      </select>
+        options={options}
+        excludeValues={arr}
+        onPick={(e) => add(e.target.value)}
+        placeholder={placeholder || 'Add…'}
+      />
     </div>
   );
 }

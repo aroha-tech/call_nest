@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../app/hooks';
 import { selectTenant, selectUser } from '../features/auth/authSelectors';
+import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { Spinner } from '../components/ui/Spinner';
@@ -41,6 +42,15 @@ export function DialerSessionSetupPage() {
 
   const [dialingSets, setDialingSets] = useState([]);
   const [callScripts, setCallScripts] = useState([]);
+
+  const dialingSetSelectOptions = useMemo(
+    () => dialingSets.map((d) => ({ value: String(d.id), label: d.name || '—' })),
+    [dialingSets]
+  );
+  const callScriptSelectOptions = useMemo(
+    () => callScripts.map((s) => ({ value: String(s.id), label: s.script_name || '—' })),
+    [callScripts]
+  );
 
   const [dialingSetId, setDialingSetId] = useState(incoming.dialingSetId ? String(incoming.dialingSetId) : '');
   const [callScriptId, setCallScriptId] = useState(incoming.callScriptId ? String(incoming.callScriptId) : '');
@@ -239,41 +249,29 @@ export function DialerSessionSetupPage() {
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label} htmlFor="dialingSet">
-                Dialing set
-              </label>
-              <select
+              <Select
                 id="dialingSet"
-                className={styles.select}
+                label="Dialing set"
                 value={dialingSetId}
                 onChange={(e) => setDialingSetId(e.target.value)}
-              >
-                <option value="">Select dialing set…</option>
-                {dialingSets.map((d) => (
-                  <option key={d.id} value={String(d.id)}>
-                    {d.name || '—'}
-                  </option>
-                ))}
-              </select>
+                options={dialingSetSelectOptions}
+                placeholder="Select dialing set…"
+                selectClassName={styles.select}
+                labelClassName={styles.label}
+              />
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label} htmlFor="callScript">
-                Call script
-              </label>
-              <select
+              <Select
                 id="callScript"
-                className={styles.select}
+                label="Call script"
                 value={callScriptId}
                 onChange={(e) => setCallScriptId(e.target.value)}
-              >
-                <option value="">Select call script…</option>
-                {callScripts.map((s) => (
-                  <option key={s.id} value={String(s.id)}>
-                    {s.script_name || '—'}
-                  </option>
-                ))}
-              </select>
+                options={callScriptSelectOptions}
+                placeholder="Select call script…"
+                selectClassName={styles.select}
+                labelClassName={styles.label}
+              />
             </div>
 
             <div className={styles.actions}>

@@ -259,7 +259,6 @@ export function CallHistoryFilterModal({
               onChange={(v) => setDraft((p) => ({ ...p, dispositionFilterMulti: v }))}
               options={dispositionOptions}
               placeholder="All dispositions"
-              searchable={false}
             />
             <MultiSelectDropdown
               label="Direction"
@@ -267,7 +266,6 @@ export function CallHistoryFilterModal({
               onChange={(v) => setDraft((p) => ({ ...p, directionFilterMulti: v }))}
               options={directionOptions}
               placeholder="Any direction"
-              searchable={false}
             />
             <MultiSelectDropdown
               label="Status"
@@ -275,7 +273,6 @@ export function CallHistoryFilterModal({
               onChange={(v) => setDraft((p) => ({ ...p, statusFilterMulti: v }))}
               options={statusOptions}
               placeholder="All statuses"
-              searchable={false}
             />
             <MultiSelectDropdown
               label="Connectivity"
@@ -283,7 +280,6 @@ export function CallHistoryFilterModal({
               onChange={(v) => setDraft((p) => ({ ...p, connectedFilterMulti: v }))}
               options={connectedOptions}
               placeholder="Any"
-              searchable={false}
             />
             {canPickAgents ? (
               <MultiSelectDropdown
@@ -292,7 +288,6 @@ export function CallHistoryFilterModal({
                 onChange={(v) => setDraft((p) => ({ ...p, agentFilterMulti: v }))}
                 options={agentOptions}
                 placeholder="All agents"
-                searchable={false}
               />
             ) : null}
           </div>

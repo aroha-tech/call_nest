@@ -41,7 +41,7 @@ function normalizeOptions(options) {
   };
 }
 
-function getReactSelectStyles() {
+function getReactSelectStyles({ searchable = true } = {}) {
   return {
     control: (base, state) => ({
       ...base,
@@ -92,7 +92,18 @@ function getReactSelectStyles() {
     }),
     input: (base) => ({
       ...base,
+      margin: 0,
+      padding: 0,
+      backgroundColor: 'transparent',
+      boxShadow: 'none',
       color: 'var(--color-text-primary, #e2e8f0)',
+      caretColor: 'var(--color-text-primary, #e2e8f0)',
+      ...(searchable ? { minWidth: '140px' } : {}),
+    }),
+    inputContainer: (base) => ({
+      ...base,
+      margin: 0,
+      padding: 0,
     }),
     singleValue: (base) => ({
       ...base,
@@ -141,7 +152,7 @@ export function MultiSelectDropdown({
     [onChange, optionValues]
   );
 
-  const rsStyles = useMemo(() => getReactSelectStyles(), []);
+  const rsStyles = useMemo(() => getReactSelectStyles({ searchable }), [searchable]);
 
   return (
     <div className={styles.wrapper}>

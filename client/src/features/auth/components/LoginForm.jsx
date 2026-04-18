@@ -9,9 +9,9 @@ import { getTenantWorkspaceHost, getTenantWorkspaceUrl } from '../../../config/t
 import { copyToClipboard } from '../../../utils/copyToClipboard';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
-import { Card } from '../../../components/ui/Card';
 import { Alert } from '../../../components/ui/Alert';
 import { PasswordField } from './PasswordField';
+import authUi from './authFormShared.module.scss';
 import styles from './LoginForm.module.scss';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -101,9 +101,10 @@ export function LoginForm() {
   };
 
   return (
-    <Card className={styles.card}>
+    <div className={authUi.shell}>
       <form onSubmit={handleSubmit} className={styles.form} noValidate>
         <h1 className={styles.title}>Sign in</h1>
+        <p className={styles.lead}>Use your workspace email and password.</p>
         {sessionMessage && (
           <Alert variant="warning" className={styles.alert}>
             {sessionMessage}
@@ -148,6 +149,7 @@ export function LoginForm() {
           error={fieldErrors.email}
           disabled={loading}
           placeholder="you@company.com"
+          inputClassName={authUi.authInput}
         />
         <PasswordField
           label="Password"
@@ -156,8 +158,9 @@ export function LoginForm() {
           error={fieldErrors.password}
           disabled={loading}
           placeholder="••••••••"
+          inputClassName={authUi.authInput}
         />
-        <Button type="submit" fullWidth loading={loading} className={styles.submit}>
+        <Button type="submit" fullWidth loading={loading} className={`${styles.submit} ${authUi.authSubmit}`}>
           Sign in
         </Button>
         <p className={styles.footer}>
@@ -165,6 +168,6 @@ export function LoginForm() {
           <Link to="/register">Register your company</Link>
         </p>
       </form>
-    </Card>
+    </div>
   );
 }

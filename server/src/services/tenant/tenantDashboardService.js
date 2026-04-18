@@ -1,5 +1,6 @@
 import { query } from '../../config/db.js';
 import { sqlDateBetweenInclusive } from '../../utils/dateRangeQuery.js';
+import { getCreatedByUserIdsForScope } from './userMessageScopeService.js';
 
 /**
  * Tenant dashboard aggregates. Admin: full tenant. Manager: team-scoped. Agent: lightweight.
@@ -9,15 +10,13 @@ import { sqlDateBetweenInclusive } from '../../utils/dateRangeQuery.js';
  */
 export async function getDashboardData(tenantId, actingUser, dateRange = null) {
   const role = actingUser?.role;
-  const uid = actingUser?.id;
-
   if (role === 'admin') {
-    return getAdminDashboard(tenantId, dateRange);
+    return getAdminDashboard(tenantId, actingUser, dateRange);
   }
   if (role === 'manager') {
-    return getManagerDashboard(tenantId, uid, dateRange);
+    return getManagerDashboard(tenantId, actingUser, dateRange);
   }
-  return getAgentDashboard(tenantId, uid, dateRange);
+  return getAgentDashboard(tenantId, actingUser, dateRange);
 }
 
 function drParams(range) {
@@ -32,7 +31,119 @@ function drParamsAlias(range, alias) {
   return { clause, params };
 }
 
-async function getAdminDashboard(tenantId, range) {
+function meetingAgentScope(role, userId) {
+  if (role !== 'agent') return { sql: '', params: [] };
+  return { sql: ' AND m.created_by = ?', params: [userId] };
+}
+
+function callAttemptScope(role, userId) {
+  if (role === 'agent') return { sql: ' AND cca.agent_user_id = ?', params: [userId] };
+  if (role === 'manager') return { sql: ' AND cca.manager_id = ?', params: [userId] };
+  return { sql: '', params: [] };
+}
+
+async function meetingsKpiCount(tenantId, actingUser, range) {
+  const ms = meetingAgentScope(actingUser?.role, actingUser?.id);
+  if (range) {
+    const { clause, params } = sqlDateBetweenInclusive('m.start_at', range);
+    const [row] = await query(
+      `SELECT COUNT(*) AS c FROM tenant_meetings m
+       WHERE m.tenant_id = ? AND m.deleted_at IS NULL ${clause}${ms.sql}`,
+      [tenantId, ...params, ...ms.params]
+    );
+    return Number(row?.c ?? 0);
+  }
+  const [row] = await query(
+    `SELECT COUNT(*) AS c FROM tenant_meetings m
+     WHERE m.tenant_id = ? AND m.deleted_at IS NULL
+     AND m.meeting_status IN ('scheduled','rescheduled')
+     AND m.end_at > NOW()${ms.sql}`,
+    [tenantId, ...ms.params]
+  );
+  return Number(row?.c ?? 0);
+}
+
+async function listUpcomingMeetings(tenantId, actingUser, limit = 6) {
+  const ms = meetingAgentScope(actingUser?.role, actingUser?.id);
+  const lim = Math.min(20, Math.max(1, limit));
+  const rows = await query(
+    `SELECT m.id, m.title, m.start_at, m.end_at, m.attendee_email, m.meeting_status, m.location
+     FROM tenant_meetings m
+     WHERE m.tenant_id = ? AND m.deleted_at IS NULL
+     AND m.meeting_status IN ('scheduled','rescheduled')
+     AND m.end_at > NOW()${ms.sql}
+     ORDER BY m.start_at ASC
+     LIMIT ${lim}`,
+    [tenantId, ...ms.params]
+  );
+  return rows.map((m) => ({
+    id: m.id,
+    title: m.title,
+    start_at: m.start_at,
+    end_at: m.end_at,
+    attendee_email: m.attendee_email,
+    meeting_status: m.meeting_status,
+    location: m.location,
+  }));
+}
+
+async function listRecentConnectedCalls(tenantId, actingUser, limit = 8) {
+  const cs = callAttemptScope(actingUser?.role, actingUser?.id);
+  const lim = Math.min(30, Math.max(1, limit));
+  const rows = await query(
+    `SELECT cca.id, cca.contact_id, c.type AS contact_type, c.display_name,
+            cca.duration_sec, d.name AS disposition_name, cca.started_at
+     FROM contact_call_attempts cca
+     LEFT JOIN contacts c ON c.id = cca.contact_id AND c.tenant_id = cca.tenant_id
+     LEFT JOIN dispositions d ON d.id = cca.disposition_id AND d.tenant_id = cca.tenant_id AND d.is_deleted = 0
+     WHERE cca.tenant_id = ? AND cca.is_connected = 1${cs.sql}
+     ORDER BY cca.started_at DESC
+     LIMIT ${lim}`,
+    [tenantId, ...cs.params]
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    contact_id: r.contact_id,
+    contact_type: r.contact_type,
+    display_name: r.display_name,
+    duration_sec: r.duration_sec != null ? Number(r.duration_sec) : null,
+    disposition_name: r.disposition_name,
+    started_at: r.started_at,
+  }));
+}
+
+async function getCallsTodayStats(tenantId, actingUser) {
+  const cs = callAttemptScope(actingUser?.role, actingUser?.id);
+  const [row] = await query(
+    `SELECT COUNT(*) AS cnt, AVG(cca.duration_sec) AS avg_dur
+     FROM contact_call_attempts cca
+     WHERE cca.tenant_id = ?
+     AND DATE(COALESCE(cca.started_at, cca.created_at)) = CURDATE()${cs.sql}`,
+    [tenantId, ...cs.params]
+  );
+  return {
+    count: Number(row?.cnt ?? 0),
+    avgDurationSec: row?.avg_dur != null && !Number.isNaN(Number(row.avg_dur)) ? Number(row.avg_dur) : null,
+  };
+}
+
+async function getOutboundSentEmailCount(tenantId, actingUser, range) {
+  const date = range ? sqlDateBetweenInclusive('em.created_at', range) : { clause: '', params: [] };
+  const params = [tenantId, ...date.params];
+  let sql = `SELECT COUNT(*) AS total FROM email_messages em WHERE em.tenant_id = ? AND em.direction = 'outbound' AND em.status = 'sent'${date.clause}`;
+
+  if (actingUser?.role !== 'admin') {
+    const ids = await getCreatedByUserIdsForScope(tenantId, actingUser);
+    if (!ids?.length) return 0;
+    sql += ` AND em.created_by IN (${ids.map(() => '?').join(',')})`;
+    params.push(...ids);
+  }
+
+  const [row] = await query(sql, params);
+  return Number(row?.total ?? 0);
+}
+
+async function getAdminDashboard(tenantId, actingUser, range) {
   const u = drParams(range);
   const c = drParamsAlias(range, 'c');
 
@@ -73,6 +184,12 @@ async function getAdminDashboard(tenantId, range) {
     [tenantId, ...camp.params]
   );
 
+  const [activeCampaignRow] = await query(
+    `SELECT COUNT(*) AS total FROM campaigns
+     WHERE tenant_id = ? AND deleted_at IS NULL AND status = 'active'`,
+    [tenantId]
+  );
+
   const ru = drParamsAlias(range, 'u');
   const recentUsers = await query(
     `SELECT u.id, u.email, u.name, u.role, u.created_at, u.last_login_at
@@ -82,6 +199,20 @@ async function getAdminDashboard(tenantId, range) {
      LIMIT 5`,
     [tenantId, ...ru.params]
   );
+
+  const [
+    upcomingMeetings,
+    recentConnectedCalls,
+    callsToday,
+    emailsTotal,
+    meetingsMetric,
+  ] = await Promise.all([
+    listUpcomingMeetings(tenantId, actingUser, 6),
+    listRecentConnectedCalls(tenantId, actingUser, 8),
+    getCallsTodayStats(tenantId, actingUser),
+    getOutboundSentEmailCount(tenantId, actingUser, range),
+    meetingsKpiCount(tenantId, actingUser, range),
+  ]);
 
   return {
     scope: 'tenant',
@@ -96,11 +227,18 @@ async function getAdminDashboard(tenantId, range) {
     leadsTotal: Number(leadRow?.total ?? 0),
     contactsTotal: Number(contactRow?.total ?? 0),
     campaignsTotal: Number(campaignRow?.total ?? 0),
+    campaignsActive: Number(activeCampaignRow?.total ?? 0),
+    meetingsMetric,
+    upcomingMeetings,
+    recentConnectedCalls,
+    callsToday,
+    emailsTotal,
     recentUsers: recentUsers.map(mapUserRow),
   };
 }
 
-async function getManagerDashboard(tenantId, managerId, range) {
+async function getManagerDashboard(tenantId, actingUser, range) {
+  const managerId = actingUser?.id;
   const u = drParams(range);
   const [teamAgentsRow] = await query(
     `SELECT COUNT(*) AS total FROM users
@@ -145,6 +283,13 @@ async function getManagerDashboard(tenantId, managerId, range) {
     [tenantId, managerId, ...camp.params]
   );
 
+  const [activeCampaignRow] = await query(
+    `SELECT COUNT(*) AS total FROM campaigns
+     WHERE tenant_id = ? AND deleted_at IS NULL AND status = 'active'
+     AND (manager_id = ? OR manager_id IS NULL)`,
+    [tenantId, managerId]
+  );
+
   const ru = drParamsAlias(range, 'u');
   const recentUsers = await query(
     `SELECT u.id, u.email, u.name, u.role, u.created_at, u.last_login_at
@@ -157,6 +302,20 @@ async function getManagerDashboard(tenantId, managerId, range) {
   );
 
   const agentCount = Number(teamAgentsRow?.total ?? 0);
+
+  const [
+    upcomingMeetings,
+    recentConnectedCalls,
+    callsToday,
+    emailsTotal,
+    meetingsMetric,
+  ] = await Promise.all([
+    listUpcomingMeetings(tenantId, actingUser, 6),
+    listRecentConnectedCalls(tenantId, actingUser, 8),
+    getCallsTodayStats(tenantId, actingUser),
+    getOutboundSentEmailCount(tenantId, actingUser, range),
+    meetingsKpiCount(tenantId, actingUser, range),
+  ]);
 
   return {
     scope: 'team',
@@ -171,11 +330,18 @@ async function getManagerDashboard(tenantId, managerId, range) {
     leadsTotal: Number(leadsRow?.total ?? 0),
     contactsTotal: Number(contactsRow?.total ?? 0),
     campaignsTotal: Number(campaignsRow?.total ?? 0),
+    campaignsActive: Number(activeCampaignRow?.total ?? 0),
+    meetingsMetric,
+    upcomingMeetings,
+    recentConnectedCalls,
+    callsToday,
+    emailsTotal,
     recentUsers: recentUsers.map(mapUserRow),
   };
 }
 
-async function getAgentDashboard(tenantId, agentId, range) {
+async function getAgentDashboard(tenantId, actingUser, range) {
+  const agentId = actingUser?.id;
   const c = drParamsAlias(range, 'c');
   const [myLeadsRow] = await query(
     `SELECT COUNT(*) AS total FROM contacts c
@@ -191,6 +357,20 @@ async function getAgentDashboard(tenantId, agentId, range) {
     [tenantId, agentId, agentId, ...c.params]
   );
 
+  const [
+    upcomingMeetings,
+    recentConnectedCalls,
+    callsToday,
+    emailsTotal,
+    meetingsMetric,
+  ] = await Promise.all([
+    listUpcomingMeetings(tenantId, actingUser, 6),
+    listRecentConnectedCalls(tenantId, actingUser, 8),
+    getCallsTodayStats(tenantId, actingUser),
+    getOutboundSentEmailCount(tenantId, actingUser, range),
+    meetingsKpiCount(tenantId, actingUser, range),
+  ]);
+
   return {
     scope: 'self',
     headline: 'Your workspace',
@@ -200,6 +380,12 @@ async function getAgentDashboard(tenantId, agentId, range) {
     leadsTotal: Number(myLeadsRow?.total ?? 0),
     contactsTotal: Number(myContactsRow?.total ?? 0),
     campaignsTotal: null,
+    campaignsActive: null,
+    meetingsMetric,
+    upcomingMeetings,
+    recentConnectedCalls,
+    callsToday,
+    emailsTotal,
     recentUsers: [],
   };
 }

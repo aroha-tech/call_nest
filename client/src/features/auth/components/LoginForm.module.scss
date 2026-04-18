@@ -1,9 +1,5 @@
 @use '../../../styles/variables' as *;
 
-.card {
-  width: 100%;
-}
-
 .form {
   display: flex;
   flex-direction: column;
@@ -12,10 +8,20 @@
 
 .title {
   margin: 0 0 $space-1;
-  font-size: $font-size-xl;
-  font-weight: $font-weight-semibold;
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-bold;
   color: var(--color-text-primary);
-  text-align: center;
+  text-align: left;
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 18px rgba(0, 0, 0, 0.25);
+}
+
+.lead {
+  margin: 0 0 $space-2;
+  font-size: $font-size-sm;
+  line-height: $line-height-relaxed;
+  color: var(--color-text-secondary);
+  text-align: left;
 }
 
 .alert {
@@ -23,11 +29,12 @@
 }
 
 .workspaceBanner {
-  padding: $space-3;
-  border-radius: $radius-md;
-  background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.35);
+  padding: $space-4;
+  border-radius: $radius-full;
+  background: rgba(34, 197, 94, 0.09);
+  border: 1px solid rgba(34, 197, 94, 0.22);
   margin: 0 0 $space-2;
+  backdrop-filter: blur(12px);
 }
 
 .workspaceBannerTitle {
@@ -63,6 +70,7 @@
 
 .workspaceCopyBtn {
   flex-shrink: 0;
+  border-radius: $radius-full !important;
 }
 
 .workspaceBannerHint {
@@ -83,11 +91,13 @@
   text-align: center;
 
   a {
-    font-weight: $font-weight-medium;
-    color: var(--color-primary-400);
-    
+    font-weight: $font-weight-semibold;
+    color: var(--color-primary-500);
+    text-decoration: none;
+
     &:hover {
-      color: var(--color-primary-300);
+      color: var(--color-primary-400);
+      text-decoration: underline;
     }
   }
 }

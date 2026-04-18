@@ -3,6 +3,7 @@ import { Modal, ModalFooter } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { Alert } from '../../components/ui/Alert';
 import { Spinner } from '../../components/ui/Spinner';
+import { SelectOncePick } from '../../components/ui/Select';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
 import { contactsAPI } from '../../services/contactsAPI';
 import { useMutation } from '../../hooks/useAsyncData';
@@ -138,29 +139,21 @@ export function AddTagsBulkModal({ isOpen, onClose, selectedIds, recordLabel, on
                 );
               })}
             </div>
-            <select
+            <SelectOncePick
               className={styles.tagAddSelect}
-              aria-label="Add tag to batch"
-              value=""
+              ariaLabel="Add tag to batch"
               disabled={tagOptions.length === 0}
-              onChange={(e) => {
+              options={tagOptions}
+              excludeValues={chosenTagIds.map(String)}
+              onPick={(e) => {
                 const v = e.target.value;
                 if (!v) return;
                 const num = Number(v);
                 if (!Number.isFinite(num)) return;
                 setChosenTagIds((prev) => (prev.includes(num) ? prev : [...prev, num]));
-                e.target.value = '';
               }}
-            >
-              <option value="">Add tag…</option>
-              {tagOptions
-                .filter((o) => !chosenTagIds.map(String).includes(o.value))
-                .map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-            </select>
+              placeholder="Add tag…"
+            />
           </>
         )}
       </div>

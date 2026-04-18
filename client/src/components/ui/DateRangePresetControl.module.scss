@@ -6,6 +6,35 @@
   gap: $space-3;
 }
 
+.rootPanel {
+  gap: $space-2;
+}
+
+.panelSelectLabel {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  color: var(--color-text-primary);
+  margin-bottom: 0;
+  letter-spacing: 0.01em;
+}
+
+/* className is on react-select root; control is nested (see ui/Select.jsx). */
+.panelSelect :global(.cn-select__control) {
+  min-height: 40px;
+  height: auto;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-bold;
+  color: var(--color-text-primary);
+  background-color: var(--color-time-range-select-bg);
+  border-color: var(--color-time-range-select-border);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+}
+
+.panelSelect :global(.cn-select__single-value) {
+  color: var(--color-text-primary);
+  font-weight: $font-weight-bold;
+}
+
 .customRow {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -14,4 +43,8 @@
   @media (max-width: 520px) {
     grid-template-columns: 1fr;
   }
+}
+
+.customRowPanel {
+  padding-top: 2px;
 }

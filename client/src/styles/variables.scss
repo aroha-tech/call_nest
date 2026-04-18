@@ -70,32 +70,40 @@ $bp-2xl: 1536px;
 // ============================================
 
 :root {
-  // Typography
-  --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  // Typography — Inter-first matches executive dashboard reference
+  --font-sans: 'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
 
-  // Primary brand colors
-  --color-primary-50: #eef2ff;
-  --color-primary-100: #e0e7ff;
-  --color-primary-200: #c7d2fe;
-  --color-primary-300: #a5b4fc;
-  --color-primary-400: #818cf8;
-  --color-primary-500: #6366f1;
-  --color-primary-600: #4f46e5;
-  --color-primary-700: #4338ca;
-  --color-primary-800: #3730a3;
-  --color-primary-900: #312e81;
-  // Comma-separated for `rgba(var(--color-primary-rgb), a)` (JS may override from tenant theme)
-  --color-primary-rgb: 99, 102, 241;
+  // Primary brand — electric cyan #50C8FF (executive dashboard)
+  --color-primary-50: #eff9ff;
+  --color-primary-100: #dff2ff;
+  --color-primary-200: #b8e8ff;
+  --color-primary-300: #7dd4ff;
+  --color-primary-400: #5ccfff;
+  --color-primary-500: #50c8ff;
+  --color-primary-600: #3ab0e8;
+  --color-primary-700: #2894c7;
+  --color-primary-800: #1e76a3;
+  --color-primary-900: #1a5f85;
+  --color-primary-rgb: 80, 200, 255;
 
-  // Surfaces (dark theme)
-  --color-bg-body: #060608;
-  --color-bg-surface: #0c0c0f;
-  --color-bg-elevated: #18181b;
-  --color-bg-subtle: #1c1c1f;
-  --color-bg-muted: #27272a;
-  --color-bg-hover: rgba(255, 255, 255, 0.04);
-  --color-bg-active: rgba(255, 255, 255, 0.06);
+  // Secondary accent — aligns with official brand #3AB0E8 via primary-600 (tenant theme updates primary scale)
+  --color-accent-brand: var(--color-primary-600);
+  --color-accent-brand-subtle: color-mix(in srgb, var(--color-primary-600) 18%, transparent);
+
+  // Surfaces (dark theme — #0b0e14 family)
+  --color-bg-body: #0b0e14;
+  --color-bg-surface: #121826;
+  --color-bg-elevated: #161d2a;
+  --color-bg-subtle: #1a1f2c;
+  --color-bg-muted: #252b3a;
+  --color-bg-hover: rgba(255, 255, 255, 0.05);
+  --color-bg-active: rgba(255, 255, 255, 0.08);
+
+  // Time range filter card (dashboard)
+  --color-time-range-panel-bg: #1a1f2c;
+  --color-time-range-select-bg: #252b3a;
+  --color-time-range-select-border: rgba(255, 255, 255, 0.1);
 
   // Borders
   --color-border: rgba(255, 255, 255, 0.08);
@@ -103,26 +111,26 @@ $bp-2xl: 1536px;
   --color-border-strong: rgba(255, 255, 255, 0.12);
   --color-border-focus: var(--color-primary-500);
 
-  // Text (slightly brighter mid-tones for dark UI legibility)
-  --color-text-primary: #fafafa;
-  --color-text-secondary: #c4c4d0;
-  --color-text-tertiary: #9b9ba8;
-  --color-text-muted: #7a7a88;
-  --color-text-placeholder: #adadb8;
+  // Text
+  --color-text-primary: #f4f7fb;
+  --color-text-secondary: #b8c2d4;
+  --color-text-tertiary: #8b96ab;
+  --color-text-muted: #6b7689;
+  --color-text-placeholder: #8b96ab;
   --color-text-inverse: #09090b;
 
   // Status colors
-  --color-success: #22c55e;
-  --color-success-subtle: rgba(34, 197, 94, 0.15);
+  --color-success: #12b886;
+  --color-success-subtle: rgba(18, 184, 134, 0.15);
   --color-warning: #f59e0b;
   --color-warning-subtle: rgba(245, 158, 11, 0.15);
   --color-danger: #ef4444;
   --color-danger-subtle: rgba(239, 68, 68, 0.15);
-  --color-info: #3b82f6;
-  --color-info-subtle: rgba(59, 130, 246, 0.15);
+  --color-info: #50c8ff;
+  --color-info-subtle: rgba(80, 200, 255, 0.15);
 
   // Focus
-  --color-focus-ring: rgba(99, 102, 241, 0.4);
+  --color-focus-ring: rgba(80, 200, 255, 0.4);
 
   // Inputs
   --color-input-bg: var(--color-bg-subtle);
@@ -135,16 +143,19 @@ $bp-2xl: 1536px;
   --scrollbar-thumb: rgba(255, 255, 255, 0.1);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.15);
 
+  // Shell sidebar (aligns with body; gradient uses tokens)
+  --color-shell-sidebar-base: #0b0e14;
+
   // Tenant white-label (overridden in JS when `tenant.theme` is set)
   --tenant-shell-radius: #{$radius-sm};
   --tenant-gradient-start: transparent;
   --tenant-gradient-end: transparent;
 
   // Panel / glass (theme-aware; used by mixins)
-  --glass-bg: rgba(15, 15, 18, 0.8);
-  --premium-panel-highlight: rgba(255, 255, 255, 0.045);
-  --premium-panel-inset-line: rgba(255, 255, 255, 0.05);
-  --premium-panel-shadow: rgba(0, 0, 0, 0.32);
+  --glass-bg: rgba(15, 18, 26, 0.88);
+  --premium-panel-highlight: rgba(255, 255, 255, 0.04);
+  --premium-panel-inset-line: rgba(255, 255, 255, 0.06);
+  --premium-panel-shadow: rgba(0, 0, 0, 0.35);
 }
 
 // Light appearance — semantic surfaces & text (tenant primary scale still set by `applyWorkspaceTheme`)
@@ -156,6 +167,10 @@ $bp-2xl: 1536px;
   --color-bg-muted: #e2e8f0;
   --color-bg-hover: rgba(15, 23, 42, 0.05);
   --color-bg-active: rgba(15, 23, 42, 0.08);
+
+  --color-time-range-panel-bg: #f1f5f9;
+  --color-time-range-select-bg: #ffffff;
+  --color-time-range-select-border: rgba(15, 23, 42, 0.12);
 
   --color-border: rgba(15, 23, 42, 0.1);
   --color-border-subtle: rgba(15, 23, 42, 0.06);
@@ -169,10 +184,11 @@ $bp-2xl: 1536px;
   --color-text-placeholder: #64748b;
   --color-text-inverse: #f8fafc;
 
-  --color-success-subtle: rgba(34, 197, 94, 0.12);
+  --color-success-subtle: rgba(18, 184, 134, 0.12);
   --color-warning-subtle: rgba(245, 158, 11, 0.12);
   --color-danger-subtle: rgba(239, 68, 68, 0.1);
-  --color-info-subtle: rgba(59, 130, 246, 0.12);
+  --color-info-subtle: rgba(80, 200, 255, 0.12);
+  --color-accent-brand-subtle: color-mix(in srgb, var(--color-primary-600) 12%, transparent);
 
   --color-focus-ring: rgba(var(--color-primary-rgb), 0.35);
 

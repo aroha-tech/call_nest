@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Select } from '../../components/ui/Select';
+import { Select, SelectOncePick } from '../../components/ui/Select';
 import { Checkbox } from '../../components/ui/Checkbox';
 import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown';
 import {
@@ -468,11 +468,12 @@ export function createContactFormEditSectionRenderers(ctx) {
             );
           })}
         </div>
-        <select
+        <SelectOncePick
           className={styles.tagAddSelect}
-          aria-label="Add tag"
-          value=""
-          onChange={(e) => {
+          ariaLabel="Add tag"
+          options={contactTagOptions}
+          excludeValues={formData.tag_ids || []}
+          onPick={(e) => {
             const v = e.target.value;
             if (!v) return;
             setFormData((p) => {
@@ -480,18 +481,9 @@ export function createContactFormEditSectionRenderers(ctx) {
               if (cur.map(String).includes(v)) return p;
               return { ...p, tag_ids: [...cur, v] };
             });
-            e.target.value = '';
           }}
-        >
-          <option value="">Add tag…</option>
-          {contactTagOptions
-            .filter((o) => !(formData.tag_ids || []).map(String).includes(o.value))
-            .map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-        </select>
+          placeholder="Add tag…"
+        />
       </section>
     ),
 
@@ -714,7 +706,6 @@ export function createContactFormEditSectionRenderers(ctx) {
                     options={options}
                     value={value}
                     placeholder="Select…"
-                    searchable={options.length > 12}
                     onChange={(next) => setIndustryMap(f.field_key, next)}
                     error={indFieldErr}
                   />
@@ -856,7 +847,6 @@ export function createContactFormEditSectionRenderers(ctx) {
                     options={options}
                     value={value}
                     placeholder="Select…"
-                    searchable={options.length > 12}
                     onChange={(next) => {
                       clearDynamicFieldError('custom', f.field_id);
                       const nextMap = { ...(formData.customValuesMap || {}) };

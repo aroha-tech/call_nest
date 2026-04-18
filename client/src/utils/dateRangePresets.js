@@ -17,9 +17,9 @@ const VALID_PRESETS = new Set(Object.values(TIME_RANGE_PRESET));
 /** Labels describe rolling windows ending now (not fixed calendar periods), except All time / Custom. */
 export const TIME_RANGE_PRESET_OPTIONS = [
   { value: TIME_RANGE_PRESET.ALL_TIME, label: 'All time' },
-  { value: TIME_RANGE_PRESET.ONE_DAY, label: 'Last 24 hours' },
+  { value: TIME_RANGE_PRESET.ONE_MONTH, label: 'Last 30 days' },
   { value: TIME_RANGE_PRESET.ONE_WEEK, label: 'Last 7 days' },
-  { value: TIME_RANGE_PRESET.ONE_MONTH, label: 'Last month' },
+  { value: TIME_RANGE_PRESET.ONE_DAY, label: 'Last 24 hours' },
   { value: TIME_RANGE_PRESET.SIX_MONTHS, label: 'Last 6 months' },
   { value: TIME_RANGE_PRESET.ONE_YEAR, label: 'Last 12 months' },
   { value: TIME_RANGE_PRESET.CUSTOM, label: 'Custom range' },
@@ -45,7 +45,7 @@ function rollingStartForPreset(preset, now) {
       d.setDate(d.getDate() - 7);
       return d;
     case TIME_RANGE_PRESET.ONE_MONTH:
-      d.setMonth(d.getMonth() - 1);
+      d.setDate(d.getDate() - 30);
       return d;
     case TIME_RANGE_PRESET.SIX_MONTHS:
       d.setMonth(d.getMonth() - 6);

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1600" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="base" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#050308"/>
+      <stop offset="45%" stop-color="#12081c"/>
+      <stop offset="100%" stop-color="#03040a"/>
+    </linearGradient>
+    <radialGradient id="v1" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#2a1538" stop-opacity="0.95"/>
+      <stop offset="45%" stop-color="#140a1c" stop-opacity="0.55"/>
+      <stop offset="100%" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="v2" cx="18%" cy="72%" r="55%">
+      <stop offset="0%" stop-color="#1a0d28" stop-opacity="0.9"/>
+      <stop offset="100%" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="cyan" cx="78%" cy="22%" r="42%">
+      <stop offset="0%" stop-color="#3ab0e8" stop-opacity="0.22"/>
+      <stop offset="100%" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="swirl" cx="40%" cy="35%" r="50%">
+      <stop offset="0%" stop-color="#3d2060" stop-opacity="0.45"/>
+      <stop offset="70%" stop-color="#12081a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="1600" fill="url(#base)"/>
+  <rect width="1200" height="1600" fill="url(#v1)"/>
+  <rect width="1200" height="1600" fill="url(#v2)"/>
+  <path
+    fill="url(#swirl)"
+    d="M600 80 C820 40 980 200 1040 420 C1120 720 980 1040 720 1180 C480 1320 200 1240 80 980 C-40 720 120 360 360 200 C440 140 520 100 600 80Z"
+    opacity="0.85"
+  />
+  <ellipse cx="320" cy="520" rx="380" ry="520" fill="url(#cyan)" transform="rotate(-12 320 520)" opacity="0.9"/>
+  <path
+    fill="none"
+    stroke="#2a1f3a"
+    stroke-width="120"
+    stroke-linecap="round"
+    d="M-40 900 Q400 400 900 700 T1240 200"
+    opacity="0.35"
+  />
+</svg>

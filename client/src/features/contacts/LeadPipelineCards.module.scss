@@ -156,7 +156,11 @@
 }
 
 .card_contacted {
-  @include card-accent(#a78bfa, rgba(167, 139, 250, 0.45), #a78bfa);
+  @include card-accent(
+    var(--color-primary-600),
+    color-mix(in srgb, var(--color-primary-600) 45%, transparent),
+    var(--color-primary-600)
+  );
 }
 
 .card_qualified {
@@ -186,8 +190,8 @@
 }
 
 .iconWrap_contacted {
-  background: color-mix(in srgb, #a78bfa 22%, transparent);
-  color: #c4b5fd;
+  background: color-mix(in srgb, var(--color-primary-600) 22%, transparent);
+  color: var(--color-primary-400);
 }
 
 .iconWrap_qualified {

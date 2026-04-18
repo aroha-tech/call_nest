@@ -17,6 +17,15 @@
   border-color: var(--color-danger);
 }
 
+.wrapper :global(.cn-multiselect__input) {
+  background-color: transparent !important;
+  box-shadow: 0 0 0 1000px transparent inset !important;
+}
+
+.wrapper :global(.cn-multiselect__input-container) {
+  background: transparent;
+}
+
 .label {
   font-size: $font-size-xs;
   font-weight: $font-weight-medium;

@@ -16,12 +16,12 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   top: 0;
   bottom: 0;
   width: 240px;
-  background-color: #020202;
+  background-color: var(--color-shell-sidebar-base);
   background-image:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.5) 0%, transparent 52%),
-    radial-gradient(ellipse 95% 52% at 50% -6%, rgba(var(--color-primary-rgb), 0.09) 0%, transparent 52%),
-    radial-gradient(ellipse 125% 72% at 50% 112%, rgba(0, 0, 0, 0.58) 0%, transparent 44%),
-    linear-gradient(180deg, #050506 0%, #020203 45%, #010101 100%);
+    linear-gradient(90deg, rgba(0, 0, 0, 0.42) 0%, transparent 52%),
+    radial-gradient(ellipse 95% 52% at 50% -6%, rgba(var(--color-primary-rgb), 0.12) 0%, transparent 52%),
+    radial-gradient(ellipse 125% 72% at 50% 112%, rgba(0, 0, 0, 0.55) 0%, transparent 44%),
+    linear-gradient(180deg, var(--color-bg-elevated) 0%, var(--color-shell-sidebar-base) 48%, #06080f 100%);
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
@@ -360,13 +360,12 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   flex-direction: column;
   min-width: 0;
   width: 100%;
-  // Near-black canvas + layered shading (edge vignette, top wash, bottom weight) for a premium admin feel
-  background-color: #010101;
+  background-color: var(--color-bg-body);
   background-image:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.35) 0%, transparent 14%, transparent 86%, rgba(0, 0, 0, 0.35) 100%),
-    radial-gradient(ellipse 125% 70% at 50% 108%, rgba(0, 0, 0, 0.65) 0%, transparent 46%),
-    radial-gradient(ellipse 100% 56% at 50% -6%, rgba(var(--color-primary-rgb), 0.11) 0%, transparent 52%),
-    linear-gradient(172deg, #010101 0%, #060608 46%, #030304 100%);
+    linear-gradient(90deg, rgba(0, 0, 0, 0.28) 0%, transparent 14%, transparent 86%, rgba(0, 0, 0, 0.28) 100%),
+    radial-gradient(ellipse 125% 70% at 50% 108%, rgba(0, 0, 0, 0.5) 0%, transparent 46%),
+    radial-gradient(ellipse 100% 56% at 50% -6%, rgba(var(--color-primary-rgb), 0.12) 0%, transparent 52%),
+    linear-gradient(172deg, var(--color-bg-body) 0%, var(--color-bg-surface) 46%, #080b12 100%);
 
   transition: margin-left $shell-sidebar-duration $shell-sidebar-ease;
 
@@ -391,7 +390,11 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   gap: $space-4;
   min-height: 52px;
   padding: $space-2 $space-4;
-  background: linear-gradient(180deg, rgba(8, 8, 10, 0.97) 0%, rgba(5, 5, 7, 0.98) 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-bg-elevated) 94%, transparent) 0%,
+    color-mix(in srgb, var(--color-bg-body) 96%, transparent) 100%
+  );
   border-bottom: 1px solid var(--color-border);
   backdrop-filter: blur(14px);
 

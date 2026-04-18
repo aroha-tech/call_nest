@@ -174,44 +174,42 @@ export function PlatformDashboardPage() {
         actionsAlign="center"
         actions={
           <div
-            className={styles.dateFilterBox}
+            className={styles.timeRangePanel}
             title="Filter KPIs and charts by when tenants and tenant users were created. Recent lists below are not filtered."
           >
-            <div className={styles.dateFilterRow}>
-              <div style={{ flex: '1 1 240px', minWidth: 0 }}>
-                <DateRangePresetControl
-                  variant="date"
-                  preset={rangePreset}
-                  onPresetChange={handleRangePresetChange}
-                  customStart={rangeCustomFrom}
-                  customEnd={rangeCustomTo}
-                  onCustomStartChange={setRangeCustomFrom}
-                  onCustomEndChange={setRangeCustomTo}
-                />
-              </div>
-              <div className={styles.dateFilterActionsCompact}>
-                {rangePreset === TIME_RANGE_PRESET.CUSTOM ? (
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="xs"
-                    onClick={applyDateRange}
-                    loading={statsRefreshing}
-                  >
-                    Apply
-                  </Button>
-                ) : null}
+            <DateRangePresetControl
+              tone="panel"
+              variant="date"
+              preset={rangePreset}
+              onPresetChange={handleRangePresetChange}
+              customStart={rangeCustomFrom}
+              customEnd={rangeCustomTo}
+              onCustomStartChange={setRangeCustomFrom}
+              onCustomEndChange={setRangeCustomTo}
+              selectLabel="Time range"
+            />
+            <div className={styles.timeRangePanelFooter}>
+              {rangePreset === TIME_RANGE_PRESET.CUSTOM ? (
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="primary"
                   size="xs"
-                  title="Clear dates and show all-time totals"
-                  onClick={clearDateRange}
-                  disabled={statsRefreshing}
+                  onClick={applyDateRange}
+                  loading={statsRefreshing}
                 >
-                  Reset
+                  Apply
                 </Button>
-              </div>
+              ) : null}
+              <Button
+                type="button"
+                variant="secondary"
+                size="xs"
+                title="Clear dates and show all-time totals"
+                onClick={clearDateRange}
+                disabled={statsRefreshing}
+              >
+                Reset
+              </Button>
             </div>
           </div>
         }

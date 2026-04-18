@@ -47,6 +47,11 @@
   }
 }
 
+.limitSelectField {
+  flex: 0 0 auto;
+  min-width: 76px;
+}
+
 .select {
   min-height: 34px;
   padding: $space-1 $space-8 $space-1 $space-2;

@@ -1,0 +1,78 @@
+@use '../../../styles/variables' as *;
+
+/** Fluid shell — no card box; sits on auth atmosphere background */
+.shell {
+  width: 100%;
+}
+
+.authInput {
+  height: 44px !important;
+  border-radius: $radius-full !important;
+  padding-left: $space-4 !important;
+  /* padding-right: let Input handle (e.g. password “Show” suffix) */
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset !important;
+
+  &:hover:not(:disabled):not(:focus) {
+    border-color: rgba(255, 255, 255, 0.16) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+  }
+
+  &:focus {
+    border-color: rgba(var(--color-primary-rgb), 0.55) !important;
+    box-shadow:
+      0 0 0 3px rgba(var(--color-primary-rgb), 0.2),
+      0 1px 0 rgba(255, 255, 255, 0.06) inset !important;
+  }
+}
+
+:global(html[data-color-scheme='light']) {
+  .authInput {
+    background: rgba(255, 255, 255, 0.92) !important;
+    border: 1px solid rgba(15, 23, 42, 0.1) !important;
+
+    &:hover:not(:disabled):not(:focus) {
+      border-color: rgba(15, 23, 42, 0.16) !important;
+    }
+  }
+
+  .authSelect :global(.cn-select__control) {
+    background-color: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(15, 23, 42, 0.1) !important;
+
+    &:hover {
+      background-color: #fff;
+    }
+  }
+}
+
+.authSelect :global(.cn-select__control) {
+  min-height: 44px !important;
+  height: 44px !important;
+  border-radius: $radius-full !important;
+  padding-left: $space-4 !important;
+  padding-right: $space-8 !important;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.16) !important;
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.authSelect :global(.cn-select__control--is-focused) {
+  border-color: rgba(var(--color-primary-rgb), 0.55) !important;
+  box-shadow:
+    0 0 0 3px rgba(var(--color-primary-rgb), 0.2),
+    0 1px 0 rgba(255, 255, 255, 0.06) inset;
+}
+
+.authSubmit {
+  border-radius: $radius-full !important;
+  min-height: 48px !important;
+  font-weight: $font-weight-semibold !important;
+  box-shadow: 0 8px 28px rgba(var(--color-primary-rgb), 0.28) !important;
+}

@@ -2,12 +2,19 @@
   background: transparent;
   border: none;
   padding: 0;
-  color: rgba(165, 180, 252, 0.95);
+  font: inherit;
+  color: var(--color-primary-600);
   cursor: pointer;
   text-align: left;
 
-  &:hover {
+  &:hover:not(:disabled) {
+    color: var(--color-primary-500);
     text-decoration: underline;
+  }
+
+  &:disabled {
+    color: var(--color-text-muted);
+    cursor: default;
   }
 }
 

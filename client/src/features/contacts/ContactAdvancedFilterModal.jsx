@@ -365,7 +365,6 @@ export function ContactAdvancedFilterModal({
                     onChange={setDraftCampaignIdsMulti}
                     options={campaignOptions}
                     placeholder="All campaigns"
-                    searchable={false}
                   />
                 ) : null}
                 {showStatuses ? (
@@ -375,7 +374,6 @@ export function ContactAdvancedFilterModal({
                     onChange={setDraftStatusIdsMulti}
                     options={statusOptions}
                     placeholder="All statuses"
-                    searchable={false}
                   />
                 ) : null}
                 {showManagersMulti ? (
@@ -385,7 +383,6 @@ export function ContactAdvancedFilterModal({
                     onChange={setDraftAdminManagersMulti}
                     options={adminManagerOptions}
                     placeholder="All managers"
-                    searchable={false}
                   />
                 ) : null}
                 {showAgent ? (
@@ -406,7 +403,6 @@ export function ContactAdvancedFilterModal({
                     onChange={setDraftTagIdsMulti}
                     options={tagOptions}
                     placeholder="Any tags"
-                    searchable={false}
                   />
                 ) : null}
                 {showDialerFilters ? (

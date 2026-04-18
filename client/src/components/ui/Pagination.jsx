@@ -1,27 +1,26 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { Button } from './Button';
+import { Select } from './Select';
 import styles from './Pagination.module.scss';
 
 export const LIMIT_OPTIONS = [10, 20, 50, 100, 500];
 
 /** Rows-per-page control — use above the table with search */
 export function PaginationPageSize({ limit = 10, onLimitChange, className = '' }) {
+  const limitFieldId = useId();
   if (!onLimitChange) return null;
   return (
     <div className={`${styles.pageSizeToolbar} ${className}`}>
       <div className={styles.limitSelect}>
-        <label>Rows:</label>
-        <select
-          value={limit}
+        <label htmlFor={limitFieldId}>Rows:</label>
+        <Select
+          id={limitFieldId}
+          compact
+          className={styles.limitSelectField}
+          value={String(limit)}
           onChange={(e) => onLimitChange(Number(e.target.value))}
-          className={styles.select}
-        >
-          {LIMIT_OPTIONS.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
+          options={LIMIT_OPTIONS.map((opt) => ({ value: String(opt), label: String(opt) }))}
+        />
       </div>
     </div>
   );
@@ -37,6 +36,7 @@ export function Pagination({
   hidePageSize = false,
   className = '',
 }) {
+  const limitFieldId = useId();
   const start = total === 0 ? 0 : (page - 1) * limit + 1;
   const end = Math.min(page * limit, total);
 
@@ -48,18 +48,15 @@ export function Pagination({
         </span>
         {!hidePageSize && onLimitChange && (
           <div className={styles.limitSelect}>
-            <label>Rows:</label>
-            <select
-              value={limit}
+            <label htmlFor={limitFieldId}>Rows:</label>
+            <Select
+              id={limitFieldId}
+              compact
+              className={styles.limitSelectField}
+              value={String(limit)}
               onChange={(e) => onLimitChange(Number(e.target.value))}
-              className={styles.select}
-            >
-              {LIMIT_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
+              options={LIMIT_OPTIONS.map((opt) => ({ value: String(opt), label: String(opt) }))}
+            />
           </div>
         )}
       </div>

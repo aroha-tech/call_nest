@@ -849,24 +849,21 @@ export function ContactImportPage({ type }) {
                               : 'ignore';
                             return (
                               <td key={col.normalized} className={styles.excelMapCell}>
-                                <select
+                                <Select
+                                  compact
+                                  className={styles.selectExcelWrap}
                                   value={selectValue}
                                   onChange={(e) => setColumnMapping(col, e.target.value)}
-                                  className={styles.selectExcel}
+                                  options={fieldOptions}
                                   aria-label={`Save column ${col.header} as`}
-                                >
-                                  {fieldOptions.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                      {opt.label}
-                                    </option>
-                                  ))}
-                                </select>
+                                />
                                 {isCustomFieldValueTypeMapping(current) ? (
                                   <div className={styles.newCustomExtras}>
                                     <span className={styles.subLabel}>Data type</span>
                                     {current.target === 'new_custom' ? (
-                                      <select
-                                        className={styles.selectExcel}
+                                      <Select
+                                        compact
+                                        className={styles.selectExcelWrap}
                                         value={current.fieldType || col.suggestedFieldType || 'text'}
                                         onChange={(e) => {
                                           const v = e.target.value;
@@ -884,14 +881,9 @@ export function ContactImportPage({ type }) {
                                             };
                                           });
                                         }}
+                                        options={VALUE_TYPES_NEW_CUSTOM_FIELD}
                                         aria-label={`Data type for new field ${col.header}`}
-                                      >
-                                        {VALUE_TYPES_NEW_CUSTOM_FIELD.map((opt) => (
-                                          <option key={opt.value} value={opt.value}>
-                                            {opt.label}
-                                          </option>
-                                        ))}
-                                      </select>
+                                      />
                                     ) : (
                                       (() => {
                                         const cf = preview?.customFields?.find(
@@ -899,8 +891,9 @@ export function ContactImportPage({ type }) {
                                         );
                                         const selectVal = effectiveCustomImportValueType(current, cf);
                                         return (
-                                          <select
-                                            className={styles.selectExcel}
+                                          <Select
+                                            compact
+                                            className={styles.selectExcelWrap}
                                             value={selectVal}
                                             onChange={(e) => {
                                               const v = e.target.value;
@@ -921,14 +914,9 @@ export function ContactImportPage({ type }) {
                                                 };
                                               });
                                             }}
+                                            options={VALUE_TYPES_CUSTOM_IMPORT}
                                             aria-label={`Data type for ${col.header}`}
-                                          >
-                                            {VALUE_TYPES_CUSTOM_IMPORT.map((opt) => (
-                                              <option key={opt.value} value={opt.value}>
-                                                {opt.label}
-                                              </option>
-                                            ))}
-                                          </select>
+                                          />
                                         );
                                       })()
                                     )}

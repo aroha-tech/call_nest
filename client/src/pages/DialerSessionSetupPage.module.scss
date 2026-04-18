@@ -130,15 +130,21 @@
   opacity: 0.85;
 }
 
-.select {
+/* selectClassName is react-select root — target inner control */
+.select :global(.cn-select__control) {
   width: 100%;
+  min-height: 44px;
   height: 44px;
   border-radius: 12px;
   border: 1px solid var(--color-border-subtle);
   background: var(--color-bg-surface);
   color: var(--color-text-primary);
-  padding: 0 12px;
+  padding: 0 4px 0 12px;
   font-size: 14px;
+}
+
+.select :global(.cn-select__single-value) {
+  color: var(--color-text-primary);
 }
 
 .actions {

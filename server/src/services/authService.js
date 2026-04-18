@@ -8,7 +8,7 @@ import { redis, isRedisAvailable, refreshTokenKey, userSessionsKey } from '../co
 import { getUserPermissions, createSystemRolesForTenant, getRoleByTenantAndName } from './rbacService.js';
 import { cloneDefaultsForTenant } from './dispositionCloneService.js';
 import { validateTenantSlugFormat } from '../utils/tenantSlugRules.js';
-import { themeForJwt } from '../utils/tenantTheme.js';
+import { themeForJwt, defaultTenantThemeJsonString } from '../utils/tenantTheme.js';
 
 function ttlFromString(expiresIn) {
   if (typeof expiresIn !== 'string') {
@@ -122,8 +122,8 @@ export async function registerTenant(name, slug, industryId = null) {
   }
   
   const result = await query(
-    'INSERT INTO tenants (name, slug, industry_id) VALUES (?, ?, ?)',
-    [name, slug, industryId]
+    'INSERT INTO tenants (name, slug, industry_id, theme_json) VALUES (?, ?, ?, ?)',
+    [name, slug, industryId, defaultTenantThemeJsonString()]
   );
   
   const [tenant] = await query('SELECT id, name, slug, industry_id, is_enabled FROM tenants WHERE id = ?', [result.insertId]);

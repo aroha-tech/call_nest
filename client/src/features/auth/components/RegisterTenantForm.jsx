@@ -11,9 +11,9 @@ import {
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
-import { Card } from '../../../components/ui/Card';
 import { Alert } from '../../../components/ui/Alert';
 import { PasswordField } from './PasswordField';
+import authUi from './authFormShared.module.scss';
 import {
   slugFromCompanyName,
   validateSlug,
@@ -261,10 +261,12 @@ export function RegisterTenantForm() {
     Array.isArray(slugRemote.suggestions) && slugRemote.suggestions.length > 0 && !slugRemote.loading;
 
   return (
-    <Card className={styles.card}>
+    <div className={authUi.shell}>
       <form onSubmit={handleSubmit} className={styles.form} noValidate>
         <h1 className={styles.title}>Register your company</h1>
-        <p className={styles.subtitle}>Get started with Call Nest CRM</p>
+        <p className={styles.subtitle}>
+          One workspace URL for your company, tenant-isolated data, and an admin account to invite your team.
+        </p>
 
         {error && (
           <Alert variant="error" className={styles.alert}>
@@ -274,15 +276,32 @@ export function RegisterTenantForm() {
 
         <div className={styles.section}>
           <p className={styles.sectionTitle}>Company Details</p>
-          <Input
-            label="Company Name"
-            value={tenantName}
-            onChange={handleCompanyChange}
-            error={fieldErrors.tenantName}
-            disabled={loading}
-            placeholder="Acme Inc"
-            autoComplete="organization"
-          />
+          <div className={styles.fieldGrid}>
+            <Input
+              label="Company Name"
+              value={tenantName}
+              onChange={handleCompanyChange}
+              error={fieldErrors.tenantName}
+              disabled={loading}
+              placeholder="Acme Inc"
+              autoComplete="organization"
+              inputClassName={authUi.authInput}
+            />
+            <Select
+              label="Industry"
+              value={industryId}
+              onChange={(e) => {
+                setIndustryId(e.target.value);
+                clearFieldError('industryId');
+                dispatch(clearError());
+              }}
+              options={industryOptions}
+              error={fieldErrors.industryId}
+              disabled={loading || industriesLoading}
+              placeholder={industriesLoading ? 'Loading...' : 'Select industry'}
+              selectClassName={authUi.authSelect}
+            />
+          </div>
           <div className={styles.slugBlock}>
             <Input
               label="Workspace address (slug)"
@@ -293,11 +312,12 @@ export function RegisterTenantForm() {
               hint={
                 slugHintParts.length > 0
                   ? slugHintParts.join(' ')
-                  : 'Lowercase letters and hyphens only — used in your sign-in URL (for example acme-corp). No numbers.'
+                  : 'Lowercase letters & hyphens only — used in your sign-in URL (e.g. acme-corp).'
               }
               disabled={loading}
               placeholder="acme-corp"
               autoComplete="off"
+              inputClassName={authUi.authInput}
             />
             {showSuggestions && (
               <div className={styles.suggestions}>
@@ -317,50 +337,41 @@ export function RegisterTenantForm() {
               </div>
             )}
           </div>
-          <Select
-            label="Industry"
-            value={industryId}
-            onChange={(e) => {
-              setIndustryId(e.target.value);
-              clearFieldError('industryId');
-              dispatch(clearError());
-            }}
-            options={industryOptions}
-            error={fieldErrors.industryId}
-            disabled={loading || industriesLoading}
-            placeholder={industriesLoading ? 'Loading...' : 'Select your industry'}
-          />
         </div>
 
         <div className={styles.section}>
           <p className={styles.sectionTitle}>Admin Account</p>
-          <Input
-            label="Admin Name"
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              clearFieldError('name');
-              dispatch(clearError());
-            }}
-            error={fieldErrors.name}
-            disabled={loading}
-            placeholder="Jane Doe"
-            autoComplete="name"
-          />
-          <Input
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              clearFieldError('email');
-              dispatch(clearError());
-            }}
-            error={fieldErrors.email}
-            disabled={loading}
-            placeholder="admin@acme.com"
-            autoComplete="email"
-          />
+          <div className={styles.fieldGrid}>
+            <Input
+              label="Admin Name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                clearFieldError('name');
+                dispatch(clearError());
+              }}
+              error={fieldErrors.name}
+              disabled={loading}
+              placeholder="Jane Doe"
+              autoComplete="name"
+              inputClassName={authUi.authInput}
+            />
+            <Input
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                clearFieldError('email');
+                dispatch(clearError());
+              }}
+              error={fieldErrors.email}
+              disabled={loading}
+              placeholder="admin@acme.com"
+              autoComplete="email"
+              inputClassName={authUi.authInput}
+            />
+          </div>
           <div className={styles.passwordBlock}>
             <PasswordField
               label="Password"
@@ -374,6 +385,7 @@ export function RegisterTenantForm() {
               disabled={loading}
               placeholder="••••••••"
               autoComplete="new-password"
+              inputClassName={authUi.authInput}
             />
             {password.length > 0 && (
               <div className={styles.strength} aria-live="polite">
@@ -394,16 +406,17 @@ export function RegisterTenantForm() {
             disabled={loading}
             placeholder="••••••••"
             autoComplete="new-password"
+            inputClassName={authUi.authInput}
           />
         </div>
 
-        <Button type="submit" fullWidth loading={loading} className={styles.submit}>
+        <Button type="submit" fullWidth loading={loading} className={`${styles.submit} ${authUi.authSubmit}`}>
           Create account
         </Button>
         <p className={styles.footer}>
           Already have an account? <Link to="/login">Sign in</Link>
         </p>
       </form>
-    </Card>
+    </div>
   );
 }

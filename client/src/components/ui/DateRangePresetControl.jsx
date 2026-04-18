@@ -25,6 +25,8 @@ export function DateRangePresetControl({
   className,
   includeLegacyTodayOption = false,
   selectLabel = 'Time range',
+  /** 'default' | 'panel' — panel: high-contrast label + select for dark filter cards (dashboard). */
+  tone = 'default',
 }) {
   const options = useMemo(() => {
     const base = [...TIME_RANGE_PRESET_OPTIONS];
@@ -38,11 +40,20 @@ export function DateRangePresetControl({
   const el = endLabel || (variant === 'date' ? 'To' : 'Started before');
   const inputType = variant === 'date' ? 'date' : 'datetime-local';
 
+  const isPanel = tone === 'panel';
+
   return (
-    <div className={`${styles.root} ${className || ''}`.trim()}>
-      <Select label={selectLabel} value={preset} onChange={(e) => onPresetChange(e.target.value)} options={options} />
+    <div className={`${styles.root} ${isPanel ? styles.rootPanel : ''} ${className || ''}`.trim()}>
+      <Select
+        label={selectLabel}
+        value={preset}
+        onChange={(e) => onPresetChange(e.target.value)}
+        options={options}
+        labelClassName={isPanel ? styles.panelSelectLabel : ''}
+        selectClassName={isPanel ? styles.panelSelect : ''}
+      />
       {preset === TIME_RANGE_PRESET.CUSTOM ? (
-        <div className={styles.customRow}>
+        <div className={`${styles.customRow} ${isPanel ? styles.customRowPanel : ''}`}>
           <Input label={sl} type={inputType} value={customStart} onChange={(e) => onCustomStartChange(e.target.value)} />
           <Input label={el} type={inputType} value={customEnd} onChange={(e) => onCustomEndChange(e.target.value)} />
         </div>
