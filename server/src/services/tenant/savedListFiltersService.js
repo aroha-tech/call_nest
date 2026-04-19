@@ -1,6 +1,6 @@
 import { query } from '../../config/db.js';
 
-const ENTITY_TYPES = new Set(['lead', 'contact', 'call_history']);
+const ENTITY_TYPES = new Set(['lead', 'contact', 'call_history', 'schedule_hub']);
 
 function assertEntityType(entityType) {
   const t = String(entityType || '').trim().toLowerCase();

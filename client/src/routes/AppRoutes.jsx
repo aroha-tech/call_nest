@@ -63,6 +63,8 @@ import { DialerPage } from '../pages/DialerPage';
 import { DialerSessionPage } from '../pages/DialerSessionPage';
 import { DialerSessionSetupPage } from '../pages/DialerSessionSetupPage';
 import { StandalonePageLayout } from '../layouts/StandalonePageLayout';
+import { ScheduleMeetingsPage } from '../pages/ScheduleMeetingsPage';
+import { ScheduleCallbacksPage } from '../pages/ScheduleCallbacksPage';
 
 /**
  * Renders children only when email module is enabled for the tenant; otherwise redirects to dashboard.
@@ -357,7 +359,7 @@ function TenantRoutes() {
             <ProtectedRoute permissions={[PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE]}>
               <AppShellLayout>
                 <EmailLayout>
-                  <MeetingsPage />
+                  <Navigate to="/schedule/meetings" replace />
                 </EmailLayout>
               </AppShellLayout>
             </ProtectedRoute>
@@ -584,6 +586,36 @@ function TenantRoutes() {
             <StandalonePageLayout>
               <DialerSessionPage />
             </StandalonePageLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/schedule"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.SCHEDULE_VIEW}>
+            <AppShellLayout>
+              <Navigate to="/schedule/meetings" replace />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/schedule/meetings"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.SCHEDULE_VIEW}>
+            <AppShellLayout>
+              <ScheduleMeetingsPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/schedule/callbacks"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.SCHEDULE_VIEW}>
+            <AppShellLayout>
+              <ScheduleCallbacksPage />
+            </AppShellLayout>
           </ProtectedRoute>
         }
       />

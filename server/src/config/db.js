@@ -115,14 +115,62 @@ export async function query(sql, params = []) {
 
 /**
  * Run work with one pooled connection (e.g. GET_LOCK / RELEASE_LOCK on the same session).
+ * Retries on transient errors (same as `query`) — important after sleep/Wi‑Fi blips when pooled TCP sockets are dead.
  */
 export async function withConnection(fn) {
-  const conn = await pool.getConnection();
-  try {
-    return await fn(conn);
-  } finally {
-    conn.release();
+  let lastErr;
+  for (let attempt = 1; attempt <= MAX_QUERY_ATTEMPTS; attempt++) {
+    let conn;
+    try {
+      conn = await pool.getConnection();
+    } catch (err) {
+      lastErr = err;
+      if (isTransientDbError(err) && attempt < MAX_QUERY_ATTEMPTS) {
+        const delay = BASE_RETRY_MS * 2 ** (attempt - 1);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            `[db] getConnection transient (${err.code || err.errno}), retry ${attempt}/${MAX_QUERY_ATTEMPTS} in ${delay}ms`
+          );
+        }
+        await sleep(delay);
+        continue;
+      }
+      throw err;
+    }
+    let destroyed = false;
+    try {
+      return await fn(conn);
+    } catch (err) {
+      lastErr = err;
+      const retry = isTransientDbError(err) && attempt < MAX_QUERY_ATTEMPTS;
+      if (retry) {
+        try {
+          conn.destroy();
+        } catch (_) {
+          /* ignore */
+        }
+        destroyed = true;
+        const delay = BASE_RETRY_MS * 2 ** (attempt - 1);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            `[db] withConnection transient (${err.code || err.errno}), retry ${attempt}/${MAX_QUERY_ATTEMPTS} in ${delay}ms`
+          );
+        }
+        await sleep(delay);
+        continue;
+      }
+      throw err;
+    } finally {
+      if (!destroyed) {
+        try {
+          conn.release();
+        } catch (_) {
+          /* ignore */
+        }
+      }
+    }
   }
+  throw lastErr;
 }
 
 export { pool };

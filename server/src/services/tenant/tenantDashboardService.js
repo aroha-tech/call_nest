@@ -42,7 +42,10 @@ function drParamsAlias(range, alias) {
 
 function meetingAgentScope(role, userId) {
   if (role !== 'agent') return { sql: '', params: [] };
-  return { sql: ' AND m.created_by = ?', params: [userId] };
+  return {
+    sql: ' AND (m.assigned_user_id = ? OR (m.assigned_user_id IS NULL AND m.created_by = ?)) ',
+    params: [userId, userId],
+  };
 }
 
 function callAttemptScope(role, userId) {

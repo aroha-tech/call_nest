@@ -172,6 +172,117 @@
   text-align: center;
 }
 
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+
+  @media (min-width: 820px) {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 16px;
+  }
+
+  @media (min-width: 1100px) {
+    grid-template-columns: 1.2fr 1fr 1fr;
+  }
+}
+
+.formRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.formRowFull {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  grid-column: 1 / -1;
+}
+
+.entityCard {
+  border: 1px solid var(--color-input-border, rgba(255, 255, 255, 0.12));
+  background: color-mix(in srgb, var(--color-bg-elevated, #252536) 72%, transparent);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.entityCardTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-primary, #e2e8f0);
+  margin-bottom: 8px;
+}
+
+.entityCardGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+
+  @media (min-width: 820px) {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+.entityFieldLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.55));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.entityFieldValue {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary, #e2e8f0);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.formLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.input {
+  width: 100%;
+  height: 38px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #111);
+  font-size: 13px;
+
+  &:focus {
+    outline: 2px solid var(--color-primary-muted, #c7d2fe);
+    outline-offset: 0;
+  }
+}
+
+.textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 10px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #111);
+  font-size: 13px;
+  line-height: 1.45;
+  resize: vertical;
+
+  &:focus {
+    outline: 2px solid var(--color-primary-muted, #c7d2fe);
+    outline-offset: 0;
+  }
+}
+
 .calendarWrap {
   position: relative;
   border: 1px solid var(--color-border, #e5e7eb);
@@ -300,6 +411,46 @@
     filter: brightness(1.08);
     box-shadow: 0 1px 0 color-mix(in srgb, var(--color-primary-400, #818cf8) 40%, transparent);
   }
+}
+
+.meetingChip_missed {
+  background: color-mix(in srgb, var(--color-danger, #ef4444) 22%, transparent);
+  &:hover {
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--color-danger, #ef4444) 45%, transparent);
+  }
+}
+
+.meetingChip_near {
+  background: color-mix(in srgb, #f59e0b 24%, transparent);
+  &:hover {
+    box-shadow: 0 1px 0 color-mix(in srgb, #f59e0b 50%, transparent);
+  }
+}
+
+.meetingChip_upcoming {
+  background: color-mix(in srgb, #3b82f6 22%, transparent);
+  &:hover {
+    box-shadow: 0 1px 0 color-mix(in srgb, #60a5fa 55%, transparent);
+  }
+}
+
+.meetingChip_completed {
+  background: color-mix(in srgb, #22c55e 22%, transparent);
+  &:hover {
+    box-shadow: 0 1px 0 color-mix(in srgb, #22c55e 55%, transparent);
+  }
+}
+
+.meetingChip_cancelled {
+  background: color-mix(in srgb, rgba(148, 163, 184, 1) 20%, transparent);
+  &:hover {
+    box-shadow: 0 1px 0 color-mix(in srgb, rgba(148, 163, 184, 1) 55%, transparent);
+  }
+}
+
+.meetingChip_today {
+  outline: 1px solid color-mix(in srgb, var(--color-primary-400, #818cf8) 60%, transparent);
+  outline-offset: -1px;
 }
 
 .meetingChipMuted {

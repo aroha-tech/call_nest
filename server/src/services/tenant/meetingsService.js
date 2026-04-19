@@ -28,6 +28,38 @@ async function assertEmailAccount(tenantId, emailAccountId) {
   return id;
 }
 
+async function assertContactOptional(tenantId, contactId) {
+  if (contactId == null || contactId === '') return null;
+  const cid = Number(contactId);
+  if (!Number.isFinite(cid)) return null;
+  const [row] = await query(
+    `SELECT id FROM contacts WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL LIMIT 1`,
+    [tenantId, cid]
+  );
+  if (!row) {
+    const err = new Error('Contact not found');
+    err.status = 400;
+    throw err;
+  }
+  return cid;
+}
+
+async function assertUserOptional(tenantId, userId) {
+  if (userId == null || userId === '') return null;
+  const uid = Number(userId);
+  if (!Number.isFinite(uid)) return null;
+  const [row] = await query(
+    `SELECT id FROM users WHERE tenant_id = ? AND id = ? AND is_deleted = 0 AND role = 'agent' LIMIT 1`,
+    [tenantId, uid]
+  );
+  if (!row) {
+    const err = new Error('User not found');
+    err.status = 400;
+    throw err;
+  }
+  return uid;
+}
+
 /**
  * @param {number} tenantId
  * @param {{ email_account_id?: number|string|null, from?: string, to?: string }} filters
@@ -40,6 +72,8 @@ export async function listInRange(tenantId, { email_account_id = null, from = nu
     SELECT
       m.id,
       m.tenant_id,
+      m.contact_id,
+      m.assigned_user_id,
       m.email_account_id,
       m.title,
       m.description,
@@ -48,6 +82,7 @@ export async function listInRange(tenantId, { email_account_id = null, from = nu
       m.start_at,
       m.end_at,
       m.meeting_status,
+      m.attendance_status,
       m.created_at,
       m.updated_at,
       ea.email_address AS account_email,
@@ -84,6 +119,8 @@ const LIST_SELECT = `
     SELECT
       m.id,
       m.tenant_id,
+      m.contact_id,
+      m.assigned_user_id,
       m.email_account_id,
       m.title,
       m.description,
@@ -92,6 +129,7 @@ const LIST_SELECT = `
       m.start_at,
       m.end_at,
       m.meeting_status,
+      m.attendance_status,
       m.created_at,
       m.updated_at,
       ea.email_address AS account_email,
@@ -171,7 +209,7 @@ export async function getMetrics(tenantId, { email_account_id = null } = {}) {
   const [row] = await query(
     `SELECT
         COUNT(*) AS total,
-        SUM(CASE WHEN m.meeting_status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled,
+        SUM(CASE WHEN m.meeting_status = 'scheduled' AND m.start_at >= NOW() THEN 1 ELSE 0 END) AS scheduled,
         SUM(CASE
               WHEN m.meeting_status IN ('scheduled', 'rescheduled') AND m.start_at > NOW()
               THEN 1 ELSE 0
@@ -243,13 +281,25 @@ export async function create(tenantId, userId, payload) {
     throw err;
   }
 
+  const contact_id = await assertContactOptional(tenantId, payload.contact_id);
+  const assigned_user_id = await assertUserOptional(tenantId, payload.assigned_user_id);
+  const attendanceRaw = trimStr(payload.attendance_status) || 'unknown';
+  const attAllowed = ['unknown', 'attended', 'no_show', 'cancelled'];
+  if (!attAllowed.includes(attendanceRaw)) {
+    const err = new Error('Invalid attendance_status');
+    err.status = 400;
+    throw err;
+  }
+
   const result = await query(
     `INSERT INTO tenant_meetings
-      (tenant_id, email_account_id, title, description, location, attendee_email,
-       start_at, end_at, meeting_status, created_by, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (tenant_id, contact_id, assigned_user_id, email_account_id, title, description, location, attendee_email,
+       start_at, end_at, meeting_status, attendance_status, created_by, updated_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
+      contact_id,
+      assigned_user_id,
       email_account_id,
       title,
       trimStr(payload.description),
@@ -258,6 +308,7 @@ export async function create(tenantId, userId, payload) {
       start_at,
       end_at,
       status,
+      attendanceRaw,
       userId ?? null,
       userId ?? null,
     ]
@@ -324,6 +375,27 @@ export async function update(tenantId, userId, id, payload) {
     }
     updates.push('meeting_status = ?');
     params.push(s);
+  }
+  if (payload.contact_id !== undefined) {
+    const cid = await assertContactOptional(tenantId, payload.contact_id);
+    updates.push('contact_id = ?');
+    params.push(cid);
+  }
+  if (payload.assigned_user_id !== undefined) {
+    const aid = await assertUserOptional(tenantId, payload.assigned_user_id);
+    updates.push('assigned_user_id = ?');
+    params.push(aid);
+  }
+  if (payload.attendance_status !== undefined) {
+    const a = trimStr(payload.attendance_status);
+    const attAllowed = ['unknown', 'attended', 'no_show', 'cancelled'];
+    if (!a || !attAllowed.includes(a)) {
+      const err = new Error('Invalid attendance_status');
+      err.status = 400;
+      throw err;
+    }
+    updates.push('attendance_status = ?');
+    params.push(a);
   }
   updates.push('email_account_id = ?');
   params.push(email_account_id);

@@ -1,0 +1,212 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.section {
+  margin-bottom: $space-5;
+  width: 100%;
+}
+
+.grid7 {
+  display: grid;
+  gap: $space-3;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  @media (min-width: 720px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  @media (min-width: 1100px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  @media (min-width: 1400px) {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+.card {
+  position: relative;
+  border-radius: $radius-lg;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface, rgba(255, 255, 255, 0.02));
+  min-height: 104px;
+  padding: $space-4 $space-4 $space-4 calc(#{$space-4} + 2px);
+  overflow: hidden;
+  transition:
+    border-color $transition-fast,
+    box-shadow $transition-fast,
+    transform $transition-fast;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 3px;
+    border-radius: $radius-lg 0 0 $radius-lg;
+    opacity: 0.95;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: -28%;
+    top: -40%;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0.12;
+    filter: blur(2px);
+  }
+
+  &:hover {
+    border-color: var(--color-border);
+    box-shadow:
+      0 8px 28px rgba(0, 0, 0, 0.14),
+      0 0 0 1px color-mix(in srgb, var(--color-border) 40%, transparent);
+    transform: translateY(-1px);
+  }
+}
+
+.cardInner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: $space-3;
+}
+
+.iconWrap {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: $radius-md;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+}
+
+.iconGlyph {
+  flex-shrink: 0;
+}
+
+.cardText {
+  display: flex;
+  flex-direction: column;
+  gap: $space-1;
+  min-width: 0;
+  flex: 1;
+}
+
+@mixin card-accent($bar, $glow, $soft) {
+  border-color: color-mix(in srgb, $soft 32%, transparent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, $soft 11%, var(--color-bg-elevated, rgba(255, 255, 255, 0.03))) 0%,
+    var(--color-bg-surface, rgba(255, 255, 255, 0.02)) 100%
+  );
+
+  &::before {
+    background: linear-gradient(180deg, $bar, color-mix(in srgb, $bar 40%, transparent));
+  }
+
+  &::after {
+    background: radial-gradient(circle at center, $glow 0%, transparent 70%);
+  }
+}
+
+.card_total {
+  @include card-accent(#3b82f6, rgba(59, 130, 246, 0.7), rgba(59, 130, 246, 0.35));
+}
+.card_pending {
+  @include card-accent(#38bdf8, rgba(56, 189, 248, 0.7), rgba(56, 189, 248, 0.32));
+}
+.card_upcoming {
+  @include card-accent(#60a5fa, rgba(96, 165, 250, 0.7), rgba(96, 165, 250, 0.32));
+}
+.card_completed {
+  @include card-accent(#22c55e, rgba(34, 197, 94, 0.7), rgba(34, 197, 94, 0.3));
+}
+.card_cancelled {
+  @include card-accent(#ef4444, rgba(239, 68, 68, 0.65), rgba(239, 68, 68, 0.28));
+}
+.card_missed {
+  @include card-accent(#f97316, rgba(249, 115, 22, 0.65), rgba(249, 115, 22, 0.28));
+}
+.card_today {
+  @include card-accent(#f59e0b, rgba(245, 158, 11, 0.65), rgba(245, 158, 11, 0.28));
+}
+
+.iconWrap_total {
+  background: rgba(59, 130, 246, 0.12);
+  color: rgba(148, 197, 255, 1);
+  border: 1px solid rgba(59, 130, 246, 0.18);
+}
+.iconWrap_pending {
+  background: rgba(56, 189, 248, 0.12);
+  color: rgba(149, 230, 255, 1);
+  border: 1px solid rgba(56, 189, 248, 0.18);
+}
+.iconWrap_upcoming {
+  background: rgba(96, 165, 250, 0.12);
+  color: rgba(171, 211, 255, 1);
+  border: 1px solid rgba(96, 165, 250, 0.18);
+}
+.iconWrap_completed {
+  background: rgba(34, 197, 94, 0.12);
+  color: rgba(143, 255, 188, 1);
+  border: 1px solid rgba(34, 197, 94, 0.18);
+}
+.iconWrap_cancelled {
+  background: rgba(239, 68, 68, 0.12);
+  color: rgba(255, 163, 163, 1);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+}
+.iconWrap_missed {
+  background: rgba(249, 115, 22, 0.12);
+  color: rgba(255, 197, 151, 1);
+  border: 1px solid rgba(249, 115, 22, 0.18);
+}
+.iconWrap_today {
+  background: rgba(245, 158, 11, 0.12);
+  color: rgba(255, 216, 143, 1);
+  border: 1px solid rgba(245, 158, 11, 0.18);
+}
+
+.value {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+  line-height: 1.05;
+  color: var(--color-text-primary);
+}
+
+.label {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.skeletonIcon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.skeletonValue {
+  width: 44px;
+  height: 16px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.skeletonLabel {
+  width: 92px;
+  height: 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+}
+

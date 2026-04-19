@@ -1,5 +1,4 @@
 import { Server } from 'socket.io';
-import { createAdapter } from '@socket.io/redis-adapter';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { redis, isRedisAvailable } from '../config/redis.js';
@@ -70,6 +69,7 @@ export async function initTenantRealtimeSocket(httpServer) {
 
   if (isRedisAvailable()) {
     try {
+      const { createAdapter } = await import('@socket.io/redis-adapter');
       const pubClient = redis.duplicate();
       const subClient = redis.duplicate();
       if (!pubClient.isOpen) await pubClient.connect();
@@ -77,7 +77,8 @@ export async function initTenantRealtimeSocket(httpServer) {
       io.adapter(createAdapter(pubClient, subClient));
       console.info(LOG, 'Redis adapter enabled for multi-node fan-out');
     } catch (e) {
-      console.warn(LOG, 'Redis adapter failed (single-node sockets only):', e?.message || e);
+      const msg = e?.code === 'ERR_MODULE_NOT_FOUND' ? 'Run `npm install` in server/ (missing @socket.io/redis-adapter).' : e?.message || e;
+      console.warn(LOG, 'Redis adapter not used (single-node Socket.IO):', msg);
     }
   }
 

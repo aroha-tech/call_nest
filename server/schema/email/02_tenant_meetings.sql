@@ -1,5 +1,6 @@
 -- Tenant meetings (calendar; linked to email_accounts)
 -- Apply via migrations/058_tenant_meetings.sql (includes permissions).
+-- CRM columns (contact, assignee, attendance): migrations/067_schedule_hub_callbacks.sql
 
 CREATE TABLE IF NOT EXISTS tenant_meetings (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

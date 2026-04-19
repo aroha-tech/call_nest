@@ -1,0 +1,97 @@
+.page {
+  padding: 18px 18px 28px;
+}
+
+.toolbarRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.toolbarFilters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.toolbarActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.viewToggle {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 14px 0 10px;
+  color: var(--text-strong, #e8eef7);
+}
+
+.muted {
+  color: var(--text-muted, rgba(255, 255, 255, 0.7));
+}
+
+.cardsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.twoCol {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+@media (min-width: 1100px) {
+  .twoCol {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.tableCard {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.tableCardHeader {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tableCardHeaderTitle {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.tableCardBody {
+  padding: 0;
+}
+
+.tableCardFooter {
+  padding: 10px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.empty {
+  padding: 18px 14px;
+  color: var(--text-muted, rgba(255, 255, 255, 0.7));
+}
+

@@ -56,6 +56,7 @@ import savedListFiltersRoutes from './routes/tenant/savedListFilters.js';
 import meetingsRoutes from './routes/tenant/meetings.js';
 import tenantIndustryFieldsRoutes from './routes/tenant/industryFields.js';
 import backgroundJobsRoutes from './routes/tenant/backgroundJobs.js';
+import scheduleHubRoutes from './routes/tenant/scheduleHub.js';
 import { initTenantRealtimeSocket } from './realtime/tenantRealtimeSocket.js';
 import { startTenantBackgroundJobWorker } from './workers/tenantBackgroundJobWorker.js';
 
@@ -171,6 +172,7 @@ app.use('/api/tenant/saved-list-filters', savedListFiltersRoutes);
 app.use('/api/tenant/meetings', meetingsRoutes);
 app.use('/api/tenant/industry-fields', tenantIndustryFieldsRoutes);
 app.use('/api/tenant/background-jobs', backgroundJobsRoutes);
+app.use('/api/tenant/schedule-hub', scheduleHubRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);

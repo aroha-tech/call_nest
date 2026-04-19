@@ -1,0 +1,96 @@
+@use '../styles/variables' as *;
+
+.advBody {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+}
+
+.nameBlock {
+  max-width: 720px;
+}
+
+.sectionDivider {
+  border: 0;
+  border-top: 1px solid var(--color-border-subtle);
+  margin: 0;
+}
+
+.refinePanel {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-lg;
+  padding: $space-4;
+}
+
+.sectionTitleRow {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  margin-bottom: $space-3;
+}
+
+.sectionTitleIcon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.12);
+  color: rgba(148, 197, 255, 1);
+  border: 1px solid rgba(59, 130, 246, 0.18);
+}
+
+.sectionSvg {
+  width: 18px;
+  height: 18px;
+}
+
+.sectionTitleText {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.criteriaGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: $space-3;
+
+  @media (max-width: 860px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.footerRow {
+  justify-content: space-between !important;
+  flex-wrap: wrap;
+  width: 100%;
+  align-items: center;
+  gap: $space-3;
+}
+
+.footerCluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2;
+  align-items: center;
+}
+
+.saveStrip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: $space-3;
+  padding-top: $space-3;
+  border-top: 1px solid var(--color-border-subtle);
+  margin-top: $space-3;
+}
+
+.saveNameInput {
+  flex: 1 1 260px;
+  min-width: 220px;
+}
+

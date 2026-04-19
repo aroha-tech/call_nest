@@ -105,6 +105,11 @@ export const PERMISSIONS = {
   MEETINGS_VIEW: 'meetings.view',
   MEETINGS_MANAGE: 'meetings.manage',
 
+  /** Schedule hub: callbacks + meetings summary (team-scoped by role). */
+  SCHEDULE_VIEW: 'schedule.view',
+  /** Assign scheduled callbacks to team members. */
+  SCHEDULE_MANAGE: 'schedule.manage',
+
   // Dispositions
   DISPOSITIONS_MANAGE: 'dispositions.manage',
   /** View dispositions & dialing sets (read-only); agents */

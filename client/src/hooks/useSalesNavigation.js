@@ -70,6 +70,17 @@ const TENANT_ADMIN_NAV_ITEMS = [
     permissions: [PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR],
     activePaths: ['/calls/history', '/calls/dial-sessions'],
   },
+  {
+    key: 'schedule-hub',
+    label: 'Schedule hub',
+    path: '/schedule/meetings',
+    permission: PERMISSIONS.SCHEDULE_VIEW,
+    activePaths: ['/schedule/meetings', '/schedule/callbacks'],
+    children: [
+      { key: 'schedule-meetings', label: 'Meetings', path: '/schedule/meetings', permission: PERMISSIONS.SCHEDULE_VIEW },
+      { key: 'schedule-callbacks', label: 'Callbacks', path: '/schedule/callbacks', permission: PERMISSIONS.SCHEDULE_VIEW },
+    ],
+  },
   { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
   { key: 'workflow-map', label: 'Workflow', path: '/workflow/map', permission: PERMISSIONS.DASHBOARD_VIEW },
   {
@@ -136,12 +147,6 @@ const TENANT_ADMIN_NAV_ITEMS = [
         label: 'Sent',
         path: '/email/sent',
         permissions: [PERMISSIONS.EMAIL_VIEW, PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.DIAL_EXECUTE],
-      },
-      {
-        key: 'meetings',
-        label: 'Meetings',
-        path: '/email/meetings',
-        permissions: [PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE],
       },
       {
         key: 'email-templates',
@@ -221,6 +226,17 @@ const MANAGER_NAV_ITEMS = [
     path: '/calls/history',
     permissions: [PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR],
     activePaths: ['/calls/history', '/calls/dial-sessions'],
+  },
+  {
+    key: 'schedule-hub',
+    label: 'Schedule hub',
+    path: '/schedule/meetings',
+    permission: PERMISSIONS.SCHEDULE_VIEW,
+    activePaths: ['/schedule/meetings', '/schedule/callbacks'],
+    children: [
+      { key: 'schedule-meetings', label: 'Meetings', path: '/schedule/meetings', permission: PERMISSIONS.SCHEDULE_VIEW },
+      { key: 'schedule-callbacks', label: 'Callbacks', path: '/schedule/callbacks', permission: PERMISSIONS.SCHEDULE_VIEW },
+    ],
   },
   { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
   { key: 'users', label: 'My team', path: '/users', permissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM] },
@@ -343,6 +359,17 @@ const AGENT_NAV_ITEMS = [
     path: '/calls/history',
     permissions: [PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR],
     activePaths: ['/calls/history', '/calls/dial-sessions'],
+  },
+  {
+    key: 'schedule-hub',
+    label: 'Schedule hub',
+    path: '/schedule/meetings',
+    permission: PERMISSIONS.SCHEDULE_VIEW,
+    activePaths: ['/schedule/meetings', '/schedule/callbacks'],
+    children: [
+      { key: 'schedule-meetings', label: 'Meetings', path: '/schedule/meetings', permission: PERMISSIONS.SCHEDULE_VIEW },
+      { key: 'schedule-callbacks', label: 'Callbacks', path: '/schedule/callbacks', permission: PERMISSIONS.SCHEDULE_VIEW },
+    ],
   },
   { key: 'workflow-map', label: 'Workflow', path: '/workflow/map', permission: PERMISSIONS.DASHBOARD_VIEW },
   {

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
@@ -7,6 +8,9 @@ import { Modal, ModalFooter, ConfirmModal } from '../components/ui/Modal';
 import { Alert } from '../components/ui/Alert';
 import { meetingsAPI } from '../services/meetingsAPI';
 import { emailAccountsAPI } from '../services/emailAPI';
+import { scheduleHubAPI } from '../services/scheduleHubAPI';
+import { Textarea } from '../components/ui/Textarea';
+import { contactsAPI } from '../services/contactsAPI';
 import { usePermissions } from '../hooks/usePermission';
 import { PERMISSIONS } from '../utils/permissionUtils';
 import { MeetingMetricCards } from '../features/meetings/MeetingMetricCards';
@@ -142,7 +146,23 @@ function meetingStatusBadgeVariant(status) {
   }
 }
 
+function meetingChipStatusClass(meeting) {
+  const status = String(meeting?.meeting_status || '').toLowerCase();
+  if (status === 'completed') return 'meetingChip_completed';
+  if (status === 'cancelled') return 'meetingChip_cancelled';
+
+  // For open meetings, derive state from scheduled start time.
+  const start = new Date(String(meeting?.start_at || '').replace(' ', 'T'));
+  if (Number.isNaN(start.getTime())) return 'meetingChip_upcoming';
+  const now = new Date();
+  if (start < now) return 'meetingChip_missed';
+  const msToStart = start.getTime() - now.getTime();
+  if (msToStart <= 2 * 60 * 60 * 1000) return 'meetingChip_near';
+  return 'meetingChip_upcoming';
+}
+
 export function MeetingsPage() {
+  const navigate = useNavigate();
   const { canAny } = usePermissions();
   const canManage = canAny([PERMISSIONS.MEETINGS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]);
 
@@ -168,6 +188,18 @@ export function MeetingsPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [meetingFormErrors, setMeetingFormErrors] = useState({});
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerType, setPickerType] = useState('contact'); // contact | lead
+  const [pickerSearch, setPickerSearch] = useState('');
+  const [pickerPage, setPickerPage] = useState(1);
+  const [pickerLimit, setPickerLimit] = useState(10);
+  const [pickerRows, setPickerRows] = useState([]);
+  const [pickerPagination, setPickerPagination] = useState({ total: 0, page: 1, limit: 10, totalPages: 1 });
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [selectedEntityId, setSelectedEntityId] = useState('');
+  const [selectedEntityDetail, setSelectedEntityDetail] = useState(null);
   const [form, setForm] = useState({
     email_account_id: '',
     title: '',
@@ -177,6 +209,7 @@ export function MeetingsPage() {
     start_at: '',
     end_at: '',
     meeting_status: 'scheduled',
+    assigned_user_id: '',
   });
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -214,6 +247,95 @@ export function MeetingsPage() {
       c = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    scheduleHubAPI
+      .meta()
+      .then((res) => {
+        if (!cancelled) setTeamMembers(res?.data?.data?.teamMembers ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setTeamMembers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const agentOptions = useMemo(() => {
+    const agents = (teamMembers || [])
+      .filter((u) => String(u.role || '').toLowerCase() === 'agent')
+      .map((u) => ({ value: String(u.id), label: u.name || u.email || `User ${u.id}` }));
+    return [{ value: '', label: 'Select agent' }, ...agents];
+  }, [teamMembers]);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setPickerLoading(true);
+      try {
+        const res = await contactsAPI.getAll({
+          search: pickerSearch || undefined,
+          type: pickerType,
+          page: pickerPage,
+          limit: pickerLimit,
+        });
+        if (cancelled) return;
+        setPickerRows(res?.data?.data ?? []);
+        setPickerPagination(res?.data?.pagination ?? { total: 0, page: pickerPage, limit: pickerLimit, totalPages: 1 });
+      } catch {
+        if (cancelled) return;
+        setPickerRows([]);
+        setPickerPagination({ total: 0, page: pickerPage, limit: pickerLimit, totalPages: 1 });
+      } finally {
+        if (!cancelled) setPickerLoading(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [pickerOpen, pickerType, pickerSearch, pickerPage, pickerLimit]);
+
+  useEffect(() => {
+    if (!modalOpen) return;
+    if (!selectedEntityId) {
+      setSelectedEntityDetail(null);
+      return;
+    }
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const res = await contactsAPI.getById(selectedEntityId);
+        const data = res?.data?.data ?? null;
+        if (!cancelled) {
+          setSelectedEntityDetail(data);
+          const email = data?.email ? String(data.email).trim() : '';
+          if (email && !String(form.attendee_email || '').trim()) {
+            setForm((f) => ({ ...f, attendee_email: email }));
+            setMeetingFormErrors((e) => ({ ...e, attendee_email: undefined }));
+          }
+        }
+      } catch {
+        if (!cancelled) setSelectedEntityDetail(null);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [modalOpen, selectedEntityId, form.attendee_email]);
+
+  const selectedMobile = useMemo(() => {
+    const d = selectedEntityDetail;
+    if (!d) return '';
+    if (d.primary_phone) return String(d.primary_phone);
+    const phones = Array.isArray(d.phones) ? d.phones : [];
+    const primary = phones.find((p) => p && p.is_primary) || phones[0];
+    return primary?.phone ? String(primary.phone) : '';
+  }, [selectedEntityDetail]);
 
   const { from, to } = useMemo(() => monthRange(year, month0), [year, month0]);
 
@@ -336,6 +458,8 @@ export function MeetingsPage() {
     [accounts]
   );
 
+  const hasEmailAccounts = (accounts?.length || 0) > 0;
+
   /** Default new meeting block on a chosen calendar day (local 9:00–10:00). */
   function dayDefaultsForCreate(dayDate) {
     const start = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 9, 0, 0, 0);
@@ -346,12 +470,12 @@ export function MeetingsPage() {
   }
 
   function openCreate() {
-    if (!formAccountOptions.length) {
-      setError('Connect an email account under Email → Accounts before scheduling meetings.');
-      return;
-    }
+    if (!formAccountOptions.length) return navigate('/email/accounts');
     const first = formAccountOptions[0]?.value || '';
     setEditing(null);
+    setMeetingFormErrors({});
+    setSelectedEntityId('');
+    setSelectedEntityDetail(null);
     setForm({
       email_account_id: first,
       title: '',
@@ -361,19 +485,20 @@ export function MeetingsPage() {
       start_at: '',
       end_at: '',
       meeting_status: 'scheduled',
+      assigned_user_id: '',
     });
     setModalOpen(true);
   }
 
   function openCreateForDay(dayDate) {
     if (!canManage) return;
-    if (!formAccountOptions.length) {
-      setError('Connect an email account under Email → Accounts before scheduling meetings.');
-      return;
-    }
+    if (!formAccountOptions.length) return navigate('/email/accounts');
     const first = formAccountOptions[0]?.value || '';
     const { start_at, end_at } = dayDefaultsForCreate(dayDate);
     setEditing(null);
+    setMeetingFormErrors({});
+    setSelectedEntityId('');
+    setSelectedEntityDetail(null);
     setForm({
       email_account_id: first,
       title: '',
@@ -383,12 +508,16 @@ export function MeetingsPage() {
       start_at,
       end_at,
       meeting_status: 'scheduled',
+      assigned_user_id: '',
     });
     setModalOpen(true);
   }
 
   function openEdit(m) {
     setEditing(m);
+    setMeetingFormErrors({});
+    setSelectedEntityId(m.contact_id != null ? String(m.contact_id) : '');
+    setSelectedEntityDetail(null);
     setForm({
       email_account_id: String(m.email_account_id),
       title: m.title || '',
@@ -398,13 +527,29 @@ export function MeetingsPage() {
       start_at: mysqlToDatetimeLocal(m.start_at),
       end_at: mysqlToDatetimeLocal(m.end_at),
       meeting_status: m.meeting_status || 'scheduled',
+      assigned_user_id: m.assigned_user_id != null ? String(m.assigned_user_id) : '',
     });
     setModalOpen(true);
   }
 
+  const canSaveMeeting = useMemo(() => {
+    const hasEntity = Boolean(selectedEntityId);
+    const hasAssigned = Boolean(form.assigned_user_id);
+    const hasTitle = Boolean(form.title?.trim());
+    const hasAcc = Boolean(form.email_account_id);
+    const hasTimes = Boolean(form.start_at && form.end_at);
+    return hasEntity && hasAssigned && hasTitle && hasAcc && hasTimes && !saving;
+  }, [selectedEntityId, form.assigned_user_id, form.title, form.email_account_id, form.start_at, form.end_at, saving]);
+
   async function handleSave(e) {
     e.preventDefault();
-    if (!form.title?.trim() || !form.email_account_id) return;
+    const nextErrors = {};
+    if (!selectedEntityId) nextErrors.entity = 'Select a contact or lead';
+    if (!form.assigned_user_id) nextErrors.assigned_user_id = 'Assigned agent is required';
+    if (!form.title?.trim()) nextErrors.title = 'Title is required';
+    if (!form.email_account_id) nextErrors.email_account_id = 'Email account is required';
+    setMeetingFormErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
     const start_at = localDatetimeToMysql(form.start_at);
     const end_at = localDatetimeToMysql(form.end_at);
     if (!start_at || !end_at) return;
@@ -420,6 +565,8 @@ export function MeetingsPage() {
         start_at,
         end_at,
         meeting_status: form.meeting_status,
+        contact_id: Number(selectedEntityId),
+        assigned_user_id: Number(form.assigned_user_id),
       };
       if (editing) {
         await meetingsAPI.update(editing.id, payload);
@@ -610,12 +757,23 @@ export function MeetingsPage() {
         description="Calendar across your connected email accounts. Add attendee email and track status."
         actions={
           canManage ? (
-            <Button type="button" onClick={openCreate}>
+            <Button type="button" onClick={openCreate} disabled={!hasEmailAccounts}>
               + Add meeting
             </Button>
           ) : undefined
         }
       />
+
+      {!hasEmailAccounts ? (
+        <Alert variant="info" style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span>Connect an email account under Email → Accounts before scheduling meetings.</span>
+            <Button type="button" variant="secondary" size="sm" onClick={() => navigate('/email/accounts')}>
+              Connect email account
+            </Button>
+          </div>
+        </Alert>
+      ) : null}
 
       {error && (
         <Alert variant="error" style={{ marginBottom: 12 }}>
@@ -716,7 +874,7 @@ export function MeetingsPage() {
                     <button
                       key={m.id}
                       type="button"
-                      className={styles.meetingChip}
+                      className={`${styles.meetingChip} ${styles[meetingChipStatusClass(m)]} ${isToday ? styles.meetingChip_today : ''}`}
                       title={`${m.title} (${m.meeting_status})`}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -847,7 +1005,7 @@ export function MeetingsPage() {
                   {canManage ? 'Cancel' : 'Close'}
                 </Button>
                 {canManage ? (
-                  <Button type="submit" form="meeting-form" loading={saving}>
+                  <Button type="submit" form="meeting-form" loading={saving} disabled={!canSaveMeeting}>
                     Save
                   </Button>
                 ) : null}
@@ -858,6 +1016,69 @@ export function MeetingsPage() {
       >
         <form id="meeting-form" onSubmit={handleSave}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <div className={styles.listHint} style={{ fontWeight: 700, marginBottom: 6 }}>
+                Link to CRM
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', alignItems: 'center' }}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={!canManage}
+                  onClick={() => {
+                    setPickerType('contact');
+                    setPickerSearch('');
+                    setPickerPage(1);
+                    setPickerOpen(true);
+                    setMeetingFormErrors((e2) => ({ ...e2, entity: undefined }));
+                  }}
+                >
+                  Pick contact
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={!canManage}
+                  onClick={() => {
+                    setPickerType('lead');
+                    setPickerSearch('');
+                    setPickerPage(1);
+                    setPickerOpen(true);
+                    setMeetingFormErrors((e2) => ({ ...e2, entity: undefined }));
+                  }}
+                >
+                  Pick lead
+                </Button>
+              </div>
+              {selectedEntityId ? (
+                <div className={styles.entityCard} style={{ marginTop: 10 }}>
+                  <div className={styles.entityCardTitle}>
+                    Selected {String(selectedEntityDetail?.type || 'contact') === 'lead' ? 'lead' : 'contact'} details
+                  </div>
+                  <div className={styles.entityCardGrid}>
+                    <div>
+                      <div className={styles.entityFieldLabel}>Name</div>
+                      <div className={styles.entityFieldValue}>{selectedEntityDetail?.display_name || '—'}</div>
+                    </div>
+                    <div>
+                      <div className={styles.entityFieldLabel}>Email</div>
+                      <div className={styles.entityFieldValue}>{selectedEntityDetail?.email || '—'}</div>
+                    </div>
+                    <div>
+                      <div className={styles.entityFieldLabel}>Mobile</div>
+                      <div className={styles.entityFieldValue}>{selectedMobile || '—'}</div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              {meetingFormErrors.entity ? (
+                <div className={styles.listHint} style={{ marginTop: 6, color: 'var(--color-danger, #ef4444)', fontWeight: 700 }}>
+                  {meetingFormErrors.entity}
+                </div>
+              ) : null}
+            </div>
             <Select
               label="Email account"
               value={form.email_account_id}
@@ -866,12 +1087,23 @@ export function MeetingsPage() {
               required
               disabled={!canManage}
             />
+            <Select
+              label="Assigned to"
+              value={form.assigned_user_id}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, assigned_user_id: e.target.value }));
+                setMeetingFormErrors((e2) => ({ ...e2, assigned_user_id: undefined }));
+              }}
+              options={agentOptions}
+              disabled={!canManage}
+            />
             <Input
               label="Title"
               value={form.title}
               onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               required
               disabled={!canManage}
+              error={meetingFormErrors.title}
             />
             <Input
               label="Attendee email"
@@ -916,15 +1148,97 @@ export function MeetingsPage() {
             like <code>{'{{title}}'}</code>, and save it as your tenant default for this notification type (new / update /
             cancelled).
           </p>
-          <Input
-            label="Description"
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            placeholder="Optional notes"
-            style={{ marginTop: 12 }}
-            disabled={!canManage}
-          />
+          <div style={{ marginTop: 12 }}>
+            <Textarea
+              label="Description"
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              placeholder="Optional notes"
+              disabled={!canManage}
+              rows={3}
+            />
+          </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title={pickerType === 'lead' ? 'Select lead' : 'Select contact'}
+        size="lg"
+        footer={
+          <ModalFooter>
+            <Button type="button" variant="secondary" onClick={() => setPickerOpen(false)}>
+              Close
+            </Button>
+          </ModalFooter>
+        }
+      >
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 12 }}>
+          <div style={{ flex: '1 1 260px', minWidth: 220 }}>
+            <Input
+              label="Search"
+              value={pickerSearch}
+              onChange={(e) => {
+                setPickerSearch(e.target.value);
+                setPickerPage(1);
+              }}
+              placeholder={pickerType === 'lead' ? 'Search leads…' : 'Search contacts…'}
+            />
+          </div>
+          <PaginationPageSize
+            limit={pickerLimit}
+            onLimitChange={(n) => {
+              setPickerLimit(n);
+              setPickerPage(1);
+            }}
+          />
+        </div>
+
+        <TableDataRegion loading={pickerLoading} hasCompletedInitialFetch>
+          {pickerRows.length === 0 && !pickerLoading ? (
+            <div className={listStyles.tableCardEmpty}>No results.</div>
+          ) : (
+            <div className={listStyles.tableCardBody} style={{ padding: 0 }}>
+              <Table variant="adminList" flexibleLastColumn>
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell>Name</TableHeaderCell>
+                    <TableHeaderCell width="180px">Phone</TableHeaderCell>
+                    <TableHeaderCell width="260px">Email</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {pickerRows.map((c) => (
+                    <TableRow
+                      key={c.id}
+                      onClick={() => {
+                        setSelectedEntityId(String(c.id));
+                        setPickerOpen(false);
+                      }}
+                      style={{ cursor: 'pointer' }}
+                      title="Click to select"
+                    >
+                      <TableCell noTruncate>{c.display_name || [c.first_name, c.last_name].filter(Boolean).join(' ') || '—'}</TableCell>
+                      <TableCell noTruncate>{c.primary_phone || '—'}</TableCell>
+                      <TableCell noTruncate>{c.email || '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TableDataRegion>
+        <div className={listStyles.tableCardFooterPagination}>
+          <Pagination
+            page={pickerPagination.page ?? pickerPage}
+            totalPages={Math.max(1, pickerPagination.totalPages || 1)}
+            total={pickerPagination.total ?? 0}
+            limit={pickerPagination.limit ?? pickerLimit}
+            onPageChange={setPickerPage}
+            hidePageSize
+          />
+        </div>
       </Modal>
 
       <Modal

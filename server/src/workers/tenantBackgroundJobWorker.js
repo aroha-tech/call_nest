@@ -37,7 +37,14 @@ export function startTenantBackgroundJobWorker() {
           redisAcquired = true;
         }
 
-        const job = await claimNextPendingJob();
+        let job;
+        try {
+          job = await claimNextPendingJob();
+        } catch (e) {
+          console.warn('[background-jobs] claim failed (DB may have been idle during sleep):', e?.code || e?.message || e);
+          if (redisAcquired) await releaseBackgroundJobSlot();
+          break;
+        }
         if (!job) {
           if (redisAcquired) await releaseBackgroundJobSlot();
           break;

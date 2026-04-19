@@ -406,6 +406,7 @@ const NAV_ICON_MAP = {
   activity: IconActivityFeed,
   dialer: IconDialer,
   'call-history': IconCallHistory,
+  'schedule-hub': IconCalendar,
   'dialer-workflow': IconPhone,
   'default-dispositions': IconListTree,
   'default-dialing-sets': IconGitBranch,

@@ -1,0 +1,48 @@
+# 🔁 Redirect HTTP → HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name arohva.com *.arohva.com;
+
+    return 301 https://$host$request_uri;
+}
+
+# 🔐 HTTPS Server
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    server_name arohva.com *.arohva.com;
+
+    # SSL (Cloudflare Origin Certificate)
+    ssl_certificate /etc/nginx/ssl/cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/key.pem;
+
+    # Security (recommended)
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+
+    root /home/yash/call-nest/client/dist;
+    index index.html;
+
+    # 🔗 API Proxy
+    location /api {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;   # IMPORTANT for tenant detection
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+    # ❤️ Health check
+    location /health {
+        proxy_pass http://127.0.0.1:4000/health;
+    }
+
+    # 🌐 Frontend (React SPA)
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
