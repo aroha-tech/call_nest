@@ -82,6 +82,12 @@ const TENANT_ADMIN_NAV_ITEMS = [
     ],
   },
   { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
+  {
+    key: 'task-manager',
+    label: 'Task Manager',
+    path: '/task-manager',
+    permissions: [PERMISSIONS.TASKS_VIEW, PERMISSIONS.TASKS_MANAGE, PERMISSIONS.SETTINGS_MANAGE],
+  },
   { key: 'workflow-map', label: 'Workflow', path: '/workflow/map', permission: PERMISSIONS.DASHBOARD_VIEW },
   {
     key: 'dialer-workflow',
@@ -239,6 +245,12 @@ const MANAGER_NAV_ITEMS = [
     ],
   },
   { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
+  {
+    key: 'task-manager',
+    label: 'Task Manager',
+    path: '/task-manager',
+    permissions: [PERMISSIONS.TASKS_VIEW, PERMISSIONS.TASKS_MANAGE, PERMISSIONS.SETTINGS_MANAGE],
+  },
   { key: 'users', label: 'My team', path: '/users', permissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM] },
   { key: 'workflow-map', label: 'Workflow', path: '/workflow/map', permission: PERMISSIONS.DASHBOARD_VIEW },
   {
@@ -365,6 +377,7 @@ const AGENT_NAV_ITEMS = [
       { key: 'schedule-callbacks', label: 'Callbacks', path: '/schedule/callbacks', permission: PERMISSIONS.SCHEDULE_VIEW },
     ],
   },
+  { key: 'task-manager', label: 'Task Manager', path: '/task-manager', permission: PERMISSIONS.TASKS_VIEW },
   { key: 'workflow-map', label: 'Workflow', path: '/workflow/map', permission: PERMISSIONS.DASHBOARD_VIEW },
   {
     key: 'dialer-workflow',

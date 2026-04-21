@@ -39,7 +39,12 @@ WHERE r.name = 'admin'
     'email.templates.manage',
     'email.accounts.manage',
     'meetings.view',
-    'meetings.manage'
+    'meetings.manage',
+    'tasks.view',
+    'tasks.manage',
+    'tasks.notes.manage',
+    'reports.performance.view',
+    'reports.performance.export'
   );
 
 -- MANAGER ROLE: Monitoring and reporting
@@ -70,7 +75,12 @@ WHERE r.name = 'manager'
     'email.send',
     'email.templates.manage',
     'meetings.view',
-    'meetings.manage'
+    'meetings.manage',
+    'tasks.view',
+    'tasks.manage',
+    'tasks.notes.manage',
+    'reports.performance.view',
+    'reports.performance.export'
   );
 
 -- AGENT ROLE: Basic dialing and contact access
@@ -95,7 +105,9 @@ WHERE r.name = 'agent'
     'email.view',
     'email.send',
     'meetings.view',
-    'meetings.manage'
+    'meetings.manage',
+    'tasks.view',
+    'reports.performance.view'
   );
 
 SELECT 'Role permissions mapped' AS status;

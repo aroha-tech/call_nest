@@ -58,6 +58,12 @@ INSERT IGNORE INTO permissions (code, description) VALUES
   ('email.accounts.manage', 'Connect and manage email accounts (SMTP/OAuth)'),
 
   ('meetings.view', 'View meetings calendar and list'),
-  ('meetings.manage', 'Create, edit, and delete meetings');
+  ('meetings.manage', 'Create, edit, and delete meetings'),
+
+  ('tasks.view', 'View task manager and assigned tasks'),
+  ('tasks.manage', 'Create and manage task templates and assignments'),
+  ('tasks.notes.manage', 'Write manager notes on task logs'),
+  ('reports.performance.view', 'View role-wise task performance reports'),
+  ('reports.performance.export', 'Export role-wise task performance reports');
 
 SELECT CONCAT('Inserted ', ROW_COUNT(), ' permissions') AS status;

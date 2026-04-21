@@ -74,6 +74,13 @@ export const PERMISSIONS = {
 
   // Reports
   REPORTS_VIEW: 'reports.view',
+  REPORTS_PERFORMANCE_VIEW: 'reports.performance.view',
+  REPORTS_PERFORMANCE_EXPORT: 'reports.performance.export',
+
+  // Task manager
+  TASKS_VIEW: 'tasks.view',
+  TASKS_MANAGE: 'tasks.manage',
+  TASKS_NOTES_MANAGE: 'tasks.notes.manage',
 
   // User management
   USERS_MANAGE: 'users.manage',

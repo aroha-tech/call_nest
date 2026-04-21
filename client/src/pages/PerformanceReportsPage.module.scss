@@ -1,0 +1,85 @@
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.page {
+  width: 100%;
+}
+
+.filtersCard {
+  @include premium-panel;
+  border-radius: $radius-lg;
+  padding: $space-4;
+  margin-bottom: 14px;
+}
+
+.filtersGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 10px 12px;
+
+  @media (max-width: 980px) {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cardsRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.miniCard {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-md;
+  background: var(--color-bg-subtle);
+  padding: 10px;
+}
+
+.miniLabel {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.miniValue {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-bold;
+}
+
+.sectionCard {
+  @include premium-panel;
+  border-radius: $radius-lg;
+  padding: $space-4;
+  margin-bottom: 14px;
+}
+
+.sectionTitle {
+  margin: 0 0 10px;
+  font-size: $font-size-base;
+  font-weight: $font-weight-semibold;
+}
+
+.scoreGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 10px 12px;
+  margin-top: 10px;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.actions {
+  margin-top: 10px;
+}

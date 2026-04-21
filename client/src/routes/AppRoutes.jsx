@@ -16,7 +16,6 @@ import { TenantsPage } from '../pages/TenantsPage';
 import { UsersPage } from '../pages/UsersPage';
 import { TenantUsersPage } from '../pages/TenantUsersPage';
 import { UnauthorizedPage } from '../pages/UnauthorizedPage';
-import { PlaceholderPage } from '../pages/PlaceholderPage';
 import { CallScriptsPage } from '../features/callScripts/CallScriptsPage';
 import { hasPermission, hasAnyPermission, PERMISSIONS } from '../utils/permissionUtils';
 import { DispositionSettingsPage } from '../features/disposition/pages/tenant/DispositionSettingsPage';
@@ -65,6 +64,8 @@ import { DialerSessionSetupPage } from '../pages/DialerSessionSetupPage';
 import { StandalonePageLayout } from '../layouts/StandalonePageLayout';
 import { ScheduleMeetingsPage } from '../pages/ScheduleMeetingsPage';
 import { ScheduleCallbacksPage } from '../pages/ScheduleCallbacksPage';
+import { TaskManagerPage } from '../pages/TaskManagerPage';
+import { PerformanceReportsPage } from '../pages/PerformanceReportsPage';
 
 /**
  * Renders children only when email module is enabled for the tenant; otherwise redirects to dashboard.
@@ -648,11 +649,23 @@ function TenantRoutes() {
         />
       </Route>
       <Route
+        path="/task-manager"
+        element={
+          <ProtectedRoute permissions={[PERMISSIONS.TASKS_VIEW, PERMISSIONS.TASKS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]}>
+            <AppShellLayout>
+              <TaskManagerPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/reports"
         element={
-          <ProtectedRoute permission={PERMISSIONS.REPORTS_VIEW}>
+          <ProtectedRoute
+            permissions={[PERMISSIONS.REPORTS_VIEW, PERMISSIONS.REPORTS_PERFORMANCE_VIEW, PERMISSIONS.SETTINGS_MANAGE]}
+          >
             <AppShellLayout>
-              <PlaceholderPage title="Reports" />
+              <PerformanceReportsPage />
             </AppShellLayout>
           </ProtectedRoute>
         }
