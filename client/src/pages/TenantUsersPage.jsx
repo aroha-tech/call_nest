@@ -175,6 +175,11 @@ export function TenantUsersPage() {
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [users, managersForFilter]);
 
+  const adminReportsLabel = useMemo(() => {
+    const adminRow = users.find((u) => String(u.role || '').toLowerCase() === 'admin');
+    return adminRow ? adminRow.name || adminRow.email || '—' : '—';
+  }, [users]);
+
   const openCreate = () => {
     setEditing(null);
     setForm({
@@ -413,7 +418,9 @@ export function TenantUsersPage() {
                   <TableCell>
                     {u.role === 'agent'
                       ? u.manager_name || u.manager_email || (u.manager_id ? '—' : '— No manager —')
-                      : '—'}
+                      : u.role === 'manager'
+                        ? adminReportsLabel
+                        : '—'}
                   </TableCell>
                   <TableCell>
                     <StatusBadge isActive={!!u.is_enabled} />

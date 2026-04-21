@@ -231,6 +231,7 @@ export function DialerSessionCallHistoryPanel({ dialerSessionId }) {
                     navigate(`/dialer/session/${r.dialer_session_id}`, { state: location.state });
                   }
                 }}
+                dialSessionNavigateState={location.state}
                 formatWhen={(v) => safeDateTime(v)}
               />
             </div>

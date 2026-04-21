@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
@@ -20,6 +20,7 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } fro
 import { Badge } from '../components/ui/Badge';
 import { TableDataRegion } from '../components/admin/TableDataRegion';
 import listStyles from '../components/admin/adminDataList.module.scss';
+import { ScriptBodyEditor } from '../features/callScripts/ScriptBodyEditor';
 import styles from './MeetingsPage.module.scss';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -59,6 +60,15 @@ function mysqlToDatetimeLocal(mysql) {
   if (!mysql) return '';
   const s = String(mysql).replace(' ', 'T').slice(0, 16);
   return s;
+}
+
+/** Human label for merge-field keys shown on chips (e.g. start_at → Start At). */
+function formatMergeFieldLabel(key) {
+  return String(key)
+    .split('_')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
 }
 
 function monthRange(year, month0) {
@@ -232,6 +242,74 @@ export function MeetingsPage() {
   const [meetingPreviewSaving, setMeetingPreviewSaving] = useState(false);
   const [meetingPreviewError, setMeetingPreviewError] = useState(null);
   const [previewPlaceholderHelp, setPreviewPlaceholderHelp] = useState([]);
+  /** Sub-view when viewing resolved template: 'preview' (HTML) | 'plain' | null */
+  const [meetingPreviewSubModal, setMeetingPreviewSubModal] = useState(null);
+  /** Which resolved modal we are fetching for (for button loading). */
+  const [meetingPreviewResolveFor, setMeetingPreviewResolveFor] = useState(null);
+
+  const meetingTemplateHtmlRef = useRef(null);
+
+  const meetingPreviewVariableGroups = useMemo(() => {
+    if (!previewPlaceholderHelp.length) return [];
+    return [
+      {
+        moduleKey: 'meeting',
+        label: 'Meeting placeholders',
+        list: previewPlaceholderHelp.map((name) => ({
+          key: name,
+          label: formatMergeFieldLabel(name),
+        })),
+      },
+    ];
+  }, [previewPlaceholderHelp]);
+
+  const insertTemplateMergeField = useCallback(
+    (fieldKey) => {
+      if (!canManage) return;
+      const token = `{{${fieldKey}}}`;
+      const el = document.activeElement;
+      const kind = templateTab;
+      if (el?.id === 'meeting-template-subject' && el instanceof HTMLInputElement) {
+        setEmailTemplates((prev) =>
+          prev.map((t) => {
+            if (t.template_kind !== kind) return t;
+            const v = t.subject ?? '';
+            const s = el.selectionStart ?? v.length;
+            const e = el.selectionEnd ?? s;
+            const next = v.slice(0, s) + token + v.slice(e);
+            const pos = s + token.length;
+            requestAnimationFrame(() => {
+              el.setSelectionRange(pos, pos);
+              el.focus();
+            });
+            return { ...t, subject: next };
+          })
+        );
+        return;
+      }
+      if (el?.id === 'meeting-template-plain' && el instanceof HTMLTextAreaElement) {
+        setEmailTemplates((prev) =>
+          prev.map((t) => {
+            if (t.template_kind !== kind) return t;
+            const v = t.body_text ?? '';
+            const s = el.selectionStart ?? v.length;
+            const e = el.selectionEnd ?? s;
+            const next = v.slice(0, s) + token + v.slice(e);
+            const pos = s + token.length;
+            requestAnimationFrame(() => {
+              el.setSelectionRange(pos, pos);
+              el.focus();
+            });
+            return { ...t, body_text: next };
+          })
+        );
+        return;
+      }
+      meetingTemplateHtmlRef.current?.insertAtCursor(token);
+      meetingTemplateHtmlRef.current?.focus();
+    },
+    [canManage, templateTab]
+  );
 
   useEffect(() => {
     let c = false;
@@ -667,10 +745,22 @@ export function MeetingsPage() {
         body_html: d?.body_html ?? '',
         body_text: d?.body_text ?? '',
       });
+      return true;
     } catch (e) {
       setMeetingPreviewError(e?.response?.data?.error || e?.message || 'Preview failed');
+      return false;
     } finally {
       setMeetingPreviewResolving(false);
+    }
+  }
+
+  async function openMeetingPreviewResolvedModal(mode) {
+    setMeetingPreviewResolveFor(mode);
+    try {
+      const ok = await refreshMeetingPreviewWithDraft(meetingPreviewDraft);
+      if (ok) setMeetingPreviewSubModal(mode);
+    } finally {
+      setMeetingPreviewResolveFor(null);
     }
   }
 
@@ -682,6 +772,8 @@ export function MeetingsPage() {
     const kind = templateKindForMeetingForm(!!editing, form.meeting_status);
     setMeetingPreviewError(null);
     setMeetingPreviewKind(kind);
+    setMeetingPreviewSubModal(null);
+    setMeetingPreviewResolveFor(null);
     setMeetingPreviewOpen(true);
     setMeetingPreviewLoading(true);
     try {
@@ -718,6 +810,8 @@ export function MeetingsPage() {
           },
         ],
       });
+      setMeetingPreviewSubModal(null);
+      setMeetingPreviewResolveFor(null);
       setMeetingPreviewOpen(false);
     } catch (e) {
       setMeetingPreviewError(e?.response?.data?.error || e?.message || 'Save failed');
@@ -1243,7 +1337,12 @@ export function MeetingsPage() {
 
       <Modal
         isOpen={meetingPreviewOpen}
-        onClose={() => !meetingPreviewSaving && !meetingPreviewLoading && setMeetingPreviewOpen(false)}
+        onClose={() => {
+          if (meetingPreviewSaving || meetingPreviewLoading) return;
+          setMeetingPreviewSubModal(null);
+          setMeetingPreviewResolveFor(null);
+          setMeetingPreviewOpen(false);
+        }}
         title={`Attendee email — ${meetingPreviewKindLabel(meetingPreviewKind)}`}
         size="lg"
         footer={
@@ -1251,7 +1350,11 @@ export function MeetingsPage() {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => setMeetingPreviewOpen(false)}
+              onClick={() => {
+                setMeetingPreviewSubModal(null);
+                setMeetingPreviewResolveFor(null);
+                setMeetingPreviewOpen(false);
+              }}
               disabled={meetingPreviewSaving}
             >
               Close
@@ -1277,93 +1380,111 @@ export function MeetingsPage() {
         {meetingPreviewLoading ? (
           <p className={styles.listHint}>Loading…</p>
         ) : (
-          <>
-            <p className={styles.listHint} style={{ marginBottom: 12 }}>
-              Edit the template on the left (saved with placeholders). The right column shows how it looks with your current
-              form values. Saving replaces your tenant default for <strong>{meetingPreviewKindLabel(meetingPreviewKind)}</strong>{' '}
-              emails only.
-            </p>
-            {previewPlaceholderHelp.length > 0 && (
-              <div className={styles.placeholderHelp} style={{ marginBottom: 12 }}>
-                Placeholders:{' '}
-                {previewPlaceholderHelp.map((name, i) => (
-                  <React.Fragment key={name}>
-                    {i > 0 ? ', ' : null}
-                    <code>{`{{${name}}}`}</code>
-                  </React.Fragment>
-                ))}
-              </div>
-            )}
-            <div className={styles.previewSplit}>
-              <div className={styles.previewPanel}>
-                <h4 className={styles.previewPanelTitle}>Template</h4>
-                <Input
-                  label="Subject"
-                  value={meetingPreviewDraft.subject}
-                  onChange={(e) => setMeetingPreviewDraft((d) => ({ ...d, subject: e.target.value }))}
-                  disabled={!canManage}
+          <div className={styles.meetingEmailModal}>
+            <div className={`${styles.previewPanel} ${styles.previewPanelCompose} ${styles.composeOnlyPanel}`}>
+              <h4 className={styles.previewPanelTitle}>Compose</h4>
+              <Input
+                id="meeting-preview-subject"
+                label="Subject"
+                value={meetingPreviewDraft.subject}
+                onChange={(e) => setMeetingPreviewDraft((d) => ({ ...d, subject: e.target.value }))}
+                disabled={!canManage}
+              />
+              <div>
+                <div className={styles.fieldLabel}>Message (formatted)</div>
+                <p className={styles.fieldHint}>
+                  Use the toolbar for formatting. Insert meeting fields with <strong>Variable</strong> in the toolbar (same as
+                  call scripts).
+                </p>
+                <ScriptBodyEditor
+                  key={meetingPreviewKind}
+                  scrollableLayout
+                  variableGroups={meetingPreviewVariableGroups}
+                  value={meetingPreviewDraft.body_html}
+                  onChange={(html) => setMeetingPreviewDraft((d) => ({ ...d, body_html: html }))}
+                  readOnly={!canManage}
+                  placeholder="Write the email. Use Variable ▾ in the toolbar to insert {{fields}}."
                 />
-                <div>
-                  <label className={styles.listHint} style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>
-                    HTML body
-                  </label>
-                  <textarea
-                    className={styles.templateTextarea}
-                    value={meetingPreviewDraft.body_html}
-                    onChange={(e) => setMeetingPreviewDraft((d) => ({ ...d, body_html: e.target.value }))}
-                    disabled={!canManage}
-                    spellCheck={false}
-                  />
-                </div>
-                <div>
-                  <label className={styles.listHint} style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>
-                    Plain text body
-                  </label>
-                  <textarea
-                    className={styles.templateTextarea}
-                    value={meetingPreviewDraft.body_text}
-                    onChange={(e) => setMeetingPreviewDraft((d) => ({ ...d, body_text: e.target.value }))}
-                    disabled={!canManage}
-                    spellCheck={false}
-                  />
-                </div>
-                <div className={styles.templateActions}>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => refreshMeetingPreviewWithDraft(meetingPreviewDraft)}
-                    loading={meetingPreviewResolving}
-                  >
-                    Refresh preview
-                  </Button>
-                </div>
               </div>
-              <div className={styles.previewPanel}>
-                <h4 className={styles.previewPanelTitle}>Preview with this meeting</h4>
-                {meetingPreviewResolving ? (
-                  <p className={styles.listHint}>Updating…</p>
-                ) : (
-                  <>
-                    <Input label="Subject" value={meetingPreviewResolved.subject} readOnly />
-                    <div>
-                      <label className={styles.listHint} style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>
-                        HTML body
-                      </label>
-                      <div
-                        className={styles.previewResolvedHtml}
-                        dangerouslySetInnerHTML={{ __html: meetingPreviewResolved.body_html || '<p>—</p>' }}
-                      />
-                    </div>
-                    <div>
-                      <label className={styles.listHint} style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>
-                        Plain text
-                      </label>
-                      <pre className={styles.previewResolvedPre}>{meetingPreviewResolved.body_text || '—'}</pre>
-                    </div>
-                  </>
-                )}
+              <div className={styles.composePreviewActions}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => openMeetingPreviewResolvedModal('preview')}
+                  loading={meetingPreviewResolving && meetingPreviewResolveFor === 'preview'}
+                  disabled={meetingPreviewLoading || !!meetingPreviewResolveFor}
+                >
+                  Preview (this meeting)
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => openMeetingPreviewResolvedModal('plain')}
+                  loading={meetingPreviewResolving && meetingPreviewResolveFor === 'plain'}
+                  disabled={meetingPreviewLoading || !!meetingPreviewResolveFor}
+                >
+                  Plain text (this meeting)
+                </Button>
               </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={meetingPreviewOpen && meetingPreviewSubModal === 'preview'}
+        onClose={() => setMeetingPreviewSubModal(null)}
+        title="Preview — with this meeting"
+        size="lg"
+        footer={
+          <ModalFooter>
+            <Button type="button" variant="ghost" onClick={() => setMeetingPreviewSubModal(null)}>
+              Close
+            </Button>
+          </ModalFooter>
+        }
+      >
+        <p className={styles.previewModalHint}>Filled with the meeting currently on the form (read-only).</p>
+        {meetingPreviewResolving ? (
+          <p className={styles.listHint}>Updating…</p>
+        ) : (
+          <>
+            <Input label="Subject" value={meetingPreviewResolved.subject} readOnly />
+            <div>
+              <div className={styles.fieldLabel}>Formatted message</div>
+              <div
+                className={styles.previewResolvedHtml}
+                dangerouslySetInnerHTML={{ __html: meetingPreviewResolved.body_html || '<p>—</p>' }}
+              />
+            </div>
+          </>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={meetingPreviewOpen && meetingPreviewSubModal === 'plain'}
+        onClose={() => setMeetingPreviewSubModal(null)}
+        title="Plain text — with this meeting"
+        size="md"
+        footer={
+          <ModalFooter>
+            <Button type="button" variant="ghost" onClick={() => setMeetingPreviewSubModal(null)}>
+              Close
+            </Button>
+          </ModalFooter>
+        }
+      >
+        <p className={styles.previewModalHint}>Plain version after merge fields are filled (read-only).</p>
+        {meetingPreviewResolving ? (
+          <p className={styles.listHint}>Updating…</p>
+        ) : (
+          <>
+            <Input label="Subject" value={meetingPreviewResolved.subject} readOnly />
+            <div>
+              <div className={styles.fieldLabel}>Plain text body</div>
+              <pre className={styles.previewResolvedPre}>{meetingPreviewResolved.body_text || '—'}</pre>
             </div>
           </>
         )}
@@ -1410,20 +1531,38 @@ export function MeetingsPage() {
         {templateLoading ? (
           <p className={styles.listHint}>Loading templates…</p>
         ) : (
-          <>
-            <p className={styles.listHint} style={{ marginBottom: 12 }}>
-              These messages are sent to the attendee when a meeting is saved. Use placeholders below; values are filled in
-              automatically.
-            </p>
+          <div className={styles.meetingEmailModal}>
+            <div className={styles.meetingEmailIntro}>
+              <p className={styles.meetingEmailIntroLead}>
+                These emails go to the attendee when a meeting is saved. Pick a tab (new / updated / cancelled), edit, then
+                save.
+              </p>
+              <ul className={styles.meetingEmailBullets}>
+                <li>Put the cursor where you want a value, then click a merge field.</li>
+                <li>The formatted message uses the toolbar; plain text is optional and folded away.</li>
+              </ul>
+            </div>
             {placeholderHelp.length > 0 && (
-              <div className={styles.placeholderHelp}>
-                Placeholders:{' '}
-                {placeholderHelp.map((name, i) => (
-                  <React.Fragment key={name}>
-                    {i > 0 ? ', ' : null}
-                    <code>{`{{${name}}}`}</code>
-                  </React.Fragment>
-                ))}
+              <div className={styles.mergeFieldsCard}>
+                <p className={styles.mergeFieldsTitle}>Insert meeting details</p>
+                <p className={styles.mergeFieldsHint}>
+                  Focus Subject, the formatted message, or plain text, then click. Tooltip shows the code (e.g.{' '}
+                  <code className={styles.mergeFieldsCode}>{'{{title}}'}</code>).
+                </p>
+                <div className={styles.mergeFieldsChips} role="group" aria-label="Insert merge field">
+                  {placeholderHelp.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      className={styles.mergeFieldChip}
+                      disabled={!canManage || templateLoading}
+                      title={`Insert ${`{{${name}}}`} at cursor`}
+                      onClick={() => insertTemplateMergeField(name)}
+                    >
+                      {formatMergeFieldLabel(name)}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             <div className={styles.templateTabs}>
@@ -1441,35 +1580,39 @@ export function MeetingsPage() {
             {activeTemplate ? (
               <div className={styles.templateFields}>
                 <Input
+                  id="meeting-template-subject"
                   label="Subject"
                   value={activeTemplate.subject ?? ''}
                   onChange={(e) => updateEmailTemplateDraft(templateTab, 'subject', e.target.value)}
                   disabled={!canManage}
                 />
                 <div>
-                  <label className={styles.listHint} style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>
-                    HTML body
-                  </label>
-                  <textarea
-                    className={styles.templateTextarea}
+                  <div className={styles.fieldLabel}>Message (formatted)</div>
+                  <p className={styles.fieldHint}>Use the toolbar for bold, lists, and links.</p>
+                  <ScriptBodyEditor
+                    ref={meetingTemplateHtmlRef}
+                    key={templateTab}
+                    scrollableLayout
+                    hideVariableMenu
+                    variableGroups={null}
                     value={activeTemplate.body_html ?? ''}
-                    onChange={(e) => updateEmailTemplateDraft(templateTab, 'body_html', e.target.value)}
-                    disabled={!canManage}
-                    spellCheck={false}
+                    onChange={(html) => updateEmailTemplateDraft(templateTab, 'body_html', html)}
+                    readOnly={!canManage}
+                    placeholder="Write the email. Use the merge buttons above for meeting fields."
                   />
                 </div>
-                <div>
-                  <label className={styles.listHint} style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>
-                    Plain text body
-                  </label>
+                <details className={styles.optionalPlainDetails}>
+                  <summary className={styles.optionalPlainSummary}>Plain text version (optional)</summary>
+                  <p className={styles.optionalPlainHint}>Optional fallback for simple mail clients. Merge buttons work when this box is focused.</p>
                   <textarea
+                    id="meeting-template-plain"
                     className={styles.templateTextarea}
                     value={activeTemplate.body_text ?? ''}
                     onChange={(e) => updateEmailTemplateDraft(templateTab, 'body_text', e.target.value)}
                     disabled={!canManage}
                     spellCheck={false}
                   />
-                </div>
+                </details>
                 {canManage ? (
                   <div className={styles.templateActions}>
                     <Button type="button" variant="secondary" size="sm" onClick={() => setResetTemplateKind(templateTab)}>
@@ -1481,7 +1624,7 @@ export function MeetingsPage() {
             ) : (
               <p className={styles.listHint}>No template loaded for this tab.</p>
             )}
-          </>
+          </div>
         )}
       </Modal>
 

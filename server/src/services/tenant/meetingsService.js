@@ -214,6 +214,10 @@ export async function getMetrics(tenantId, { email_account_id = null } = {}) {
               WHEN m.meeting_status IN ('scheduled', 'rescheduled') AND m.start_at > NOW()
               THEN 1 ELSE 0
             END) AS upcoming,
+        SUM(CASE
+              WHEN m.meeting_status IN ('scheduled', 'rescheduled') AND m.start_at < NOW()
+              THEN 1 ELSE 0
+            END) AS missed,
         SUM(CASE WHEN m.meeting_status = 'completed' THEN 1 ELSE 0 END) AS completed,
         SUM(CASE WHEN m.meeting_status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
         SUM(CASE WHEN m.meeting_status = 'rescheduled' THEN 1 ELSE 0 END) AS rescheduled,
@@ -228,6 +232,7 @@ export async function getMetrics(tenantId, { email_account_id = null } = {}) {
     total: n(row?.total),
     scheduled: n(row?.scheduled),
     upcoming: n(row?.upcoming),
+    missed: n(row?.missed),
     completed: n(row?.completed),
     cancelled: n(row?.cancelled),
     rescheduled: n(row?.rescheduled),

@@ -17,7 +17,6 @@ import { templateVariablesAPI } from '../../services/templateVariablesAPI';
 import { useTemplateVariableAutocomplete } from '../../hooks/useTemplateVariables';
 import { renderPreview, linkify, linkifyHtml, stripHtml, DEFAULT_PREVIEW_DATA } from '../../utils/templateVariables';
 import { ScriptBodyEditor } from '../callScripts/ScriptBodyEditor';
-import { VariableSelector } from '../../components/VariableSelector';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { FilterBar } from '../../components/admin/FilterBar';
@@ -326,61 +325,51 @@ export function EmailTemplatesPage() {
             error={formErrors.subject}
             placeholder="Email subject (use {{variable}} for merge)"
           />
-          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-            <div style={{ flex: 1.6 }}>
-              <label className={styles.panelTitle}>Body (HTML)</label>
-              <ScriptBodyEditor
-                ref={editorRef}
-                value={formData.body_html}
-                onChange={(content) => setFormData({ ...formData, body_html: content })}
-                onEditorState={(plain, index) => {
-                  setEditorPlainText(plain);
-                  setEditorCursorIndex(index ?? 0);
-                }}
-                placeholder="HTML body. Use variables like {{contact_first_name}}."
-              />
-              {autocompleteActive && suggestions.length > 0 && (
-                <div className={styles.variableAutocomplete}>
-                  {suggestions.slice(0, 8).map((v) => (
-                    <button
-                      key={v.key}
-                      type="button"
-                      className={styles.variableAutocompleteItem}
-                      onClick={() => {
-                        if (!autocompleteContext) return;
-                        const insert = `{{${v.key}}}`;
-                        editorRef.current?.replaceRange(
-                          autocompleteContext.startIndex,
-                          editorCursorIndex,
-                          insert
-                        );
-                        editorRef.current?.focus();
-                      }}
-                    >
-                      <span>{v.label}</span>
-                      <code>{v.key}</code>
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-start' }}>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setShowPreviewModal(true)}
-                >
-                  Show Preview
-                </Button>
+          <div>
+            <label className={styles.panelTitle}>Body (HTML)</label>
+            <ScriptBodyEditor
+              ref={editorRef}
+              value={formData.body_html}
+              onChange={(content) => setFormData({ ...formData, body_html: content })}
+              onEditorState={(plain, index) => {
+                setEditorPlainText(plain);
+                setEditorCursorIndex(index ?? 0);
+              }}
+              placeholder="HTML body. Use variables like {{contact_first_name}}."
+            />
+            {autocompleteActive && suggestions.length > 0 && (
+              <div className={styles.variableAutocomplete}>
+                {suggestions.slice(0, 8).map((v) => (
+                  <button
+                    key={v.key}
+                    type="button"
+                    className={styles.variableAutocompleteItem}
+                    onClick={() => {
+                      if (!autocompleteContext) return;
+                      const insert = `{{${v.key}}}`;
+                      editorRef.current?.replaceRange(
+                        autocompleteContext.startIndex,
+                        editorCursorIndex,
+                        insert
+                      );
+                      editorRef.current?.focus();
+                    }}
+                  >
+                    <span>{v.label}</span>
+                    <code>{v.key}</code>
+                  </button>
+                ))}
               </div>
-            </div>
-            <div style={{ width: 220 }}>
-              <VariableSelector
-                onInsert={(text) => {
-                  editorRef.current?.insertAtCursor(text);
-                  editorRef.current?.focus();
-                }}
-              />
+            )}
+            <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-start' }}>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => setShowPreviewModal(true)}
+              >
+                Show Preview
+              </Button>
             </div>
           </div>
           <div>

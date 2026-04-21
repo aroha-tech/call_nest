@@ -251,6 +251,12 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   cursor: pointer;
   transition: color $transition-fast, background $transition-fast;
   text-align: left;
+  text-decoration: none;
+  box-sizing: border-box;
+
+  &:visited {
+    color: var(--color-text-secondary);
+  }
 
   &:hover {
     background: var(--color-bg-hover);
@@ -269,6 +275,10 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
     .navLabel {
       font-weight: $font-weight-semibold;
     }
+  }
+
+  &.navItemActive:visited {
+    color: var(--color-text-primary);
   }
 }
 
@@ -341,6 +351,12 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   cursor: pointer;
   transition: color $transition-fast, background $transition-fast;
   text-align: left;
+  text-decoration: none;
+  box-sizing: border-box;
+
+  &:visited {
+    color: var(--color-text-muted);
+  }
 
   &:hover {
     background: var(--color-bg-hover);
@@ -351,6 +367,10 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
     background: color-mix(in srgb, var(--color-primary-500) 14%, transparent);
     color: var(--color-primary-400);
     font-weight: $font-weight-semibold;
+  }
+
+  &.navChildActive:visited {
+    color: var(--color-primary-400);
   }
 }
 

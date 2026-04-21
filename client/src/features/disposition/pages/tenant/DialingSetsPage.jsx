@@ -101,7 +101,7 @@ export function DialingSetsPage({ readOnly = false }) {
     const usedIds = new Set(setDispositions.map(d => d.disposition_id));
     return allDispositions
       .filter(d => !usedIds.has(d.id) && d.is_active && !d.is_deleted)
-      .map(d => ({ value: d.id, label: `${d.name} (${d.code})` }));
+      .map(d => ({ value: d.id, label: d.name }));
   }, [allDispositions, setDispositions]);
 
   const openCreateModal = () => {
@@ -313,7 +313,6 @@ export function DialingSetsPage({ readOnly = false }) {
                     <TableRow>
                       {!readOnly && <TableHeaderCell width="52px">Reorder</TableHeaderCell>}
                       <TableHeaderCell>Disposition</TableHeaderCell>
-                      <TableHeaderCell width="100px">Code</TableHeaderCell>
                       {!readOnly && <TableHeaderCell width="60px" align="center">Remove</TableHeaderCell>}
                     </TableRow>
                   </TableHead>
@@ -344,7 +343,6 @@ export function DialingSetsPage({ readOnly = false }) {
                           </TableCell>
                         )}
                         <TableCell>{d.disposition_name}</TableCell>
-                        <TableCell><code>{d.disposition_code}</code></TableCell>
                         {!readOnly && (
                           <TableCell align="center">
                             <IconButton size="sm" variant="danger" onClick={() => handleRemoveDisposition(d.id)}>✕</IconButton>

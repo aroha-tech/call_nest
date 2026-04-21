@@ -5,16 +5,26 @@ import 'react-quill/dist/quill.snow.css';
 import { useTemplateVariables } from '../../hooks/useTemplateVariables';
 import styles from './ScriptBodyEditor.module.scss';
 
-const TOOLBAR_OPTIONS = [
-  [{ header: [1, 2, 3, false] }],
-  ['bold', 'italic', 'underline', 'strike'],
-  [{ list: 'ordered' }, { list: 'bullet' }],
-  ['link'],
-  ['clean'],
-];
+const getBundledQuill = () => ReactQuill.Quill;
 
 export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
-  { value = '', onChange, onEditorState, placeholder },
+  {
+    value = '',
+    onChange,
+    onEditorState,
+    placeholder,
+    /**
+     * When not null, Variable menu uses only these groups (e.g. meeting placeholders).
+     * Pass [] to disable CRM variables when placeholders are not loaded yet.
+     */
+    variableGroups = null,
+    compact = false,
+    readOnly = false,
+    /** Hide toolbar "Variable" when merge fields are provided elsewhere (e.g. meeting email chips). */
+    hideVariableMenu = false,
+    /** Fixed frame with vertical scroll inside the editor (no drag resize). For dense modals. */
+    scrollableLayout = false,
+  },
   ref
 ) {
   const quillRef = useRef(null);
@@ -31,6 +41,15 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
   }, []);
 
   const variableOptions = useMemo(() => {
+    if (variableGroups != null) {
+      return (variableGroups || [])
+        .map((g) => ({
+          moduleKey: g.moduleKey || 'custom',
+          label: g.label || 'Variables',
+          list: (g.list || []).filter((v) => v?.key),
+        }))
+        .filter((g) => g.list.length > 0);
+    }
     return moduleOrder
       .map((moduleKey) => {
         const list = grouped[moduleKey] || [];
@@ -41,7 +60,9 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
         };
       })
       .filter((g) => g.list.length > 0);
-  }, [grouped, moduleOrder, moduleLabels]);
+  }, [variableGroups, grouped, moduleOrder, moduleLabels]);
+
+  const varsLoadingEffective = variableGroups != null ? false : varsLoading;
 
   useImperativeHandle(ref, () => ({
     insertAtCursor(text) {
@@ -128,6 +149,50 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
     computeMenuPos();
   }, [varMenuOpen, computeMenuPos]);
 
+  const quillModules = useMemo(
+    () => ({
+      toolbar: { container: `#${toolbarId}` },
+      clipboard: {
+        // Prefer semantic structure over visual clipboard HTML (helps paragraphs / line breaks on paste).
+        matchVisual: false,
+      },
+    }),
+    [toolbarId]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const configureClipboard = () => {
+      const quill = quillRef.current?.getEditor?.();
+      if (cancelled || !quill?.clipboard || quill.__cnCallNestClipboard) return;
+      if (!quill.root) {
+        requestAnimationFrame(configureClipboard);
+        return;
+      }
+      const Quill = getBundledQuill();
+      if (!Quill?.import) return;
+      quill.__cnCallNestClipboard = true;
+      const Delta = Quill.import('delta');
+      quill.clipboard.addMatcher(Node.TEXT_NODE, (node, delta) => {
+        const text = node.data;
+        if (typeof text !== 'string') return delta;
+        if (!text.includes('\n') && !text.includes('\r')) return delta;
+        const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const parts = normalized.split('\n');
+        let d = new Delta();
+        parts.forEach((line, i) => {
+          if (i > 0) d = d.insert('\n');
+          d = d.insert(line);
+        });
+        return d;
+      });
+    };
+    configureClipboard();
+    return () => {
+      cancelled = true;
+    };
+  }, [toolbarId]);
+
   useEffect(() => {
     if (!varMenuOpen) return;
     const onDocMouseDown = (e) => {
@@ -157,7 +222,11 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
   }, [varMenuOpen, computeMenuPos]);
 
   return (
-    <div className={styles.editorResizeWrap}>
+    <div
+      className={`${styles.editorResizeWrap} ${compact ? styles.editorResizeWrapCompact : ''} ${
+        scrollableLayout ? styles.editorResizeWrapScroll : ''
+      }`}
+    >
       <div className={styles.editorWrap}>
         <div id={toolbarId} className={`ql-toolbar ql-snow ${styles.toolbar}`}>
           <span className="ql-formats">
@@ -181,19 +250,21 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
           <span className="ql-formats">
             <button type="button" className="ql-link" />
           </span>
-          <span className={`ql-formats ${styles.variableFormat}`} ref={varMenuWrapRef}>
-            <button
-              type="button"
-              className={styles.variableBtn}
-              onClick={() => setVarMenuOpen((v) => !v)}
-              disabled={varsLoading || variableOptions.length === 0}
-              aria-haspopup="menu"
-              aria-expanded={varMenuOpen}
-              ref={varBtnRef}
-            >
-              Variable ▾
-            </button>
-          </span>
+          {!hideVariableMenu ? (
+            <span className={`ql-formats ${styles.variableFormat}`} ref={varMenuWrapRef}>
+              <button
+                type="button"
+                className={styles.variableBtn}
+                onClick={() => setVarMenuOpen((v) => !v)}
+                disabled={varsLoadingEffective || variableOptions.length === 0}
+                aria-haspopup="menu"
+                aria-expanded={varMenuOpen}
+                ref={varBtnRef}
+              >
+                Variable ▾
+              </button>
+            </span>
+          ) : null}
           <span className="ql-formats">
             <button type="button" className="ql-clean" />
           </span>
@@ -203,12 +274,13 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
           theme="snow"
           value={value}
           onChange={handleChange}
-          modules={{ toolbar: { container: `#${toolbarId}` } }}
+          modules={quillModules}
           placeholder={placeholder}
           className={styles.quillEditor}
+          readOnly={readOnly}
         />
       </div>
-      {varMenuOpen && varMenuPos
+      {!hideVariableMenu && varMenuOpen && varMenuPos
         ? createPortal(
             <div
               className={styles.variableMenu}

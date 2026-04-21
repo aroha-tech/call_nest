@@ -76,7 +76,7 @@ export function DefaultDialingSetsPage() {
     const usedIds = new Set(setDispositions.map(d => d.default_disposition_id));
     return defaultDispositions
       .filter(d => !usedIds.has(d.id) && d.is_active)
-      .map(d => ({ value: d.id, label: `${d.name} (${d.code})` }));
+      .map(d => ({ value: d.id, label: d.name }));
   }, [defaultDispositions, setDispositions]);
 
   const openCreateModal = () => {
@@ -293,7 +293,6 @@ export function DefaultDialingSetsPage() {
                             </div>
                           </TableCell>
                           <TableCell>{d.disposition_name}</TableCell>
-                          <TableCell><code>{d.disposition_code}</code></TableCell>
                           <TableCell align="center">
                             <IconButton size="sm" variant="danger" onClick={() => handleRemoveDisposition(d.id)}>✕</IconButton>
                           </TableCell>

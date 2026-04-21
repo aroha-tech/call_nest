@@ -18,6 +18,23 @@
   }
 }
 
+.linkAnchor {
+  color: var(--color-primary-400);
+  font-weight: 500;
+  text-decoration: none;
+
+  &:hover {
+    color: var(--color-primary-300);
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
 /**
  * Call history table: extra class on <table> so colspan “detail” rows are not forced to Actions width.
  */

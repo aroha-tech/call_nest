@@ -4,7 +4,6 @@ import styles from './EmailLayout.module.scss';
 
 const NAV_ITEMS = [
   { to: '/email/sent', label: 'Sent', icon: '📤' },
-  { to: '/email/meetings', label: 'Meetings', icon: '📅' },
   { to: '/email/templates', label: 'Templates', icon: '📄' },
   { to: '/email/accounts', label: 'Accounts', icon: '⚙️' },
 ];

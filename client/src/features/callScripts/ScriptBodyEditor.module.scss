@@ -12,6 +12,77 @@
   background: var(--color-bg-surface);
 }
 
+.editorResizeWrapCompact {
+  min-height: 200px;
+  height: 240px;
+  max-height: 42vh;
+}
+
+/* Fixed height; content scrolls inside (modals). Disables drag-resize. */
+.editorResizeWrapScroll {
+  resize: none;
+  height: clamp(240px, 40vh, 380px);
+  max-height: 48vh;
+  min-height: 200px;
+}
+
+/*
+ * Quill + flex: the editor must sit in a chain with min-height: 0 so the
+ * .ql-editor keeps a fixed viewport and overflow-y scrolls when content grows.
+ */
+.editorResizeWrapScroll .editorWrap {
+  min-height: 0;
+
+  :global(.quill) {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :global(.ql-container.ql-snow) {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Fill the container; scroll when content is taller than the frame */
+  :global(.ql-editor) {
+    position: absolute;
+    inset: 0;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    box-sizing: border-box;
+    scrollbar-gutter: stable;
+
+    &::-webkit-scrollbar {
+      width: 9px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 6px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: var(--scrollbar-thumb-hover);
+      background-clip: padding-box;
+    }
+
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+}
+
 .editorWrap {
   flex: 1;
   display: flex;
@@ -26,14 +97,75 @@
     min-height: 0;
   }
 
-  :global(.ql-toolbar) {
+  :global(.ql-toolbar.ql-snow) {
     flex-shrink: 0;
     border: none;
     border-bottom: 1px solid var(--color-border-subtle);
     background: var(--color-bg-subtle);
+
+    :global(.ql-stroke) {
+      stroke: var(--color-text-secondary);
+    }
+    :global(.ql-stroke-miter) {
+      stroke: var(--color-text-secondary);
+    }
+    :global(.ql-fill) {
+      fill: var(--color-text-secondary);
+    }
+    :global(.ql-picker) {
+      color: var(--color-text-secondary);
+    }
+    :global(.ql-picker-label) {
+      color: inherit;
+    }
+    :global(.ql-picker-options) {
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-border-subtle);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+    }
+    :global(.ql-picker-item) {
+      color: var(--color-text-primary);
+    }
+    :global(button:hover .ql-stroke),
+    :global(button:focus .ql-stroke),
+    :global(button.ql-active .ql-stroke) {
+      stroke: var(--color-primary-500);
+    }
+    :global(button:hover .ql-stroke-miter),
+    :global(button:focus .ql-stroke-miter),
+    :global(button.ql-active .ql-stroke-miter) {
+      stroke: var(--color-primary-500);
+    }
+    :global(button:hover .ql-fill),
+    :global(button:focus .ql-fill),
+    :global(button.ql-active .ql-fill) {
+      fill: var(--color-primary-500);
+    }
+    :global(.ql-picker-label:hover),
+    :global(.ql-picker-label.ql-active) {
+      color: var(--color-primary-500);
+    }
+    :global(.ql-picker-label:hover .ql-stroke),
+    :global(.ql-picker-label.ql-active .ql-stroke) {
+      stroke: var(--color-primary-500);
+    }
+    :global(.ql-picker-label:hover .ql-fill),
+    :global(.ql-picker-label.ql-active .ql-fill) {
+      fill: var(--color-primary-500);
+    }
+
+    :global(button) {
+      border-radius: 10px;
+    }
+
+    :global(button:hover),
+    :global(button:focus-visible) {
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: 2px;
+    }
   }
 
-  :global(.ql-container) {
+  :global(.ql-container.ql-snow) {
     flex: 1;
     border: none;
     font-size: 0.9375rem;
@@ -44,19 +176,38 @@
   :global(.ql-editor) {
     min-height: 220px;
     color: var(--color-text-primary);
+  }
 
-    &.ql-blank::before {
-      color: var(--color-text-placeholder);
-    }
+  /* Quill snow ships placeholder as dark rgba — force theme color */
+  :global(.ql-editor.ql-blank::before) {
+    color: var(--color-text-placeholder) !important;
+    font-style: normal;
+    opacity: 0.9;
+  }
+
+  :global(.ql-snow .ql-editor a) {
+    color: var(--color-primary-500);
+  }
+
+  :global(.ql-snow .ql-editor blockquote) {
+    border-left-color: var(--color-border-strong);
+    color: var(--color-text-secondary);
+  }
+
+  :global(.ql-snow .ql-editor code),
+  :global(.ql-snow .ql-editor pre:not(.ql-syntax)) {
+    background: var(--color-bg-subtle);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border-subtle);
   }
 }
 
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
-  padding: 8px;
+  padding: 8px 10px;
 
   /* Override Quill Snow floats inside our custom toolbar */
   :global(.ql-formats) {
@@ -74,20 +225,29 @@
   position: relative;
   display: inline-flex;
   align-items: center;
+  margin-left: 8px;
+  margin-right: 8px;
+  padding-left: 14px;
+  padding-right: 14px;
+  border-left: 1px solid var(--color-border-subtle);
+  border-right: 1px solid var(--color-border-subtle);
 }
 
 .variableBtn {
-  height: 28px;
-  padding: 0 10px;
+  height: 30px;
+  min-width: 7.5rem;
+  padding: 0 14px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 8px;
   line-height: 1;
   border-radius: 10px;
   border: 1px solid var(--color-border-subtle);
   background: var(--color-bg-surface);
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
 
   &:disabled {
@@ -179,47 +339,28 @@
   padding: 2px 6px;
   border-radius: 8px;
   border: 1px solid var(--color-border-subtle);
-  background: rgba(0, 0, 0, 0.14);
+  background: var(--color-bg-subtle);
   white-space: nowrap;
 }
 
 .quillEditor {
-  :global(.ql-toolbar .ql-stroke) {
-    stroke: var(--color-text-tertiary);
-  }
-  :global(.ql-toolbar .ql-fill) {
-    fill: var(--color-text-tertiary);
-  }
-  :global(.ql-toolbar .ql-picker) {
-    color: var(--color-text-secondary);
-  }
-  :global(.ql-toolbar .ql-picker-options) {
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border-subtle);
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
-  }
-  :global(.ql-toolbar button) {
-    border-radius: 10px;
-  }
-  :global(.ql-toolbar button:hover .ql-stroke) {
-    stroke: var(--color-primary-500);
-  }
-  :global(.ql-toolbar button:hover .ql-fill) {
-    fill: var(--color-primary-500);
-  }
-  :global(.ql-toolbar button.ql-active .ql-stroke) {
-    stroke: var(--color-primary-500);
-  }
-  :global(.ql-toolbar button.ql-active .ql-fill) {
-    fill: var(--color-primary-500);
-  }
-  :global(.ql-toolbar .ql-picker-label:hover),
-  :global(.ql-toolbar .ql-picker-label.ql-active) {
-    color: var(--color-primary-500);
-  }
-  :global(.ql-toolbar button:hover),
-  :global(.ql-toolbar button:focus-visible) {
-    outline: 2px solid var(--color-focus-ring);
-    outline-offset: 2px;
-  }
+  min-height: 0;
+}
+
+/* Link tooltip is portaled next to the editor — theme it for dark mode */
+:global(.ql-snow .ql-tooltip) {
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  color: var(--color-text-primary);
+}
+
+:global(.ql-snow .ql-tooltip input[type='text']) {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-primary);
+}
+
+:global(.ql-snow .ql-tooltip a.ql-action::after) {
+  border-right-color: var(--color-border-subtle);
 }

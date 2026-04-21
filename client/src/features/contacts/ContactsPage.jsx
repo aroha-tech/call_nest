@@ -1909,7 +1909,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
                 onDelete={setDeleteItem}
                 showDialerCall={isDialer}
                 onDialerCall={(c) => openStartModal([c.id])}
-                displayNameLinkTo={isDialer ? (c) => `/leads/${c.id}?mode=view` : undefined}
+                displayNameLinkTo={(c) => `/leads/${c.id}?mode=view`}
               />
             ) : (
               <LeadDataTable
@@ -1933,6 +1933,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
                 onView={(c) => navigate(`/contacts/${c.id}?mode=view`)}
                 onEdit={(c) => navigate(`/contacts/${c.id}?mode=edit`)}
                 onDelete={setDeleteItem}
+                displayNameLinkTo={(c) => `/contacts/${c.id}?mode=view`}
               />
             )}
             </div>

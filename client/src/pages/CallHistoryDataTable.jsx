@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
 import { IconButton } from '../components/ui/IconButton';
@@ -55,17 +56,16 @@ function renderCell(col, r, { formatWhen, expandedNoteIds, toggleNoteExpand }) {
       return formatWhen?.(r.created_at) ?? r.created_at ?? '—';
     case 'contact': {
       const cid = r.contact_id != null ? Number(r.contact_id) : NaN;
-      const canOpenCustomer = Number.isFinite(cid) && cid > 0 && r.__openCustomer;
-      const onClick = () => {
-        if (canOpenCustomer) r.__openCustomer(r);
-        else r.__viewAttempt?.();
-      };
-      const canClick = Boolean(canOpenCustomer || r.__viewAttempt);
-      return (
-        <button type="button" className={styles.linkBtn} onClick={onClick} disabled={!canClick}>
-          {r.display_name || '—'}
-        </button>
-      );
+      const t = String(r.contact_type || '').toLowerCase();
+      const customerHref = Number.isFinite(cid) && cid > 0 ? (t === 'lead' ? `/leads/${cid}?mode=view` : `/contacts/${cid}?mode=view`) : '';
+      if (customerHref) {
+        return (
+          <Link to={customerHref} className={styles.linkAnchor} onClick={(e) => e.stopPropagation()}>
+            {r.display_name || '—'}
+          </Link>
+        );
+      }
+      return r.display_name || '—';
     }
     case 'phone':
       return r.phone_e164 || '—';
@@ -76,15 +76,16 @@ function renderCell(col, r, { formatWhen, expandedNoteIds, toggleNoteExpand }) {
       const no = r.dialer_user_session_no;
       if (!sid && (no == null || no === '')) return '—';
       const label = no != null && no !== '' ? `Session #${no}` : 'Dial session';
+      if (!sid) return label;
       return (
-        <button
-          type="button"
-          className={styles.linkBtn}
-          disabled={!sid}
-          onClick={() => sid && r.__openDialSession?.()}
+        <Link
+          to={`/dialer/session/${sid}`}
+          state={r.__dialSessionState}
+          className={styles.linkAnchor}
+          onClick={(e) => e.stopPropagation()}
         >
           {label}
-        </button>
+        </Link>
       );
     }
     case 'direction':
@@ -158,6 +159,7 @@ export function CallHistoryDataTable({
   /** Navigate to CRM contact/lead view (dialer-style); customer name uses this when contact_id is set. */
   onOpenCustomer,
   onOpenDialSession,
+  dialSessionNavigateState,
   formatWhen,
   columnFilters = [],
 }) {
@@ -257,6 +259,7 @@ export function CallHistoryDataTable({
             __viewAttempt: onViewAttempt ? () => onViewAttempt(r) : undefined,
             __openCustomer: onOpenCustomer ? (row) => onOpenCustomer(row) : undefined,
             __openDialSession: onOpenDialSession ? () => onOpenDialSession(r) : undefined,
+            __dialSessionState: dialSessionNavigateState,
           };
           const timelineEntries = buildAttemptHistoryEntries(r);
           const notesOpen = expandedNoteIds.has(String(r.id));

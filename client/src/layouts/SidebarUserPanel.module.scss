@@ -129,6 +129,12 @@
   border-radius: $radius-sm;
   text-align: left;
   cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+
+  &:visited {
+    color: var(--color-text-primary);
+  }
 
   &:hover {
     background: var(--color-bg-hover);

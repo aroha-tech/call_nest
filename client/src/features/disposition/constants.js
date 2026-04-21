@@ -18,3 +18,16 @@ export function getNextActionLabel(value) {
   const option = NEXT_ACTION_OPTIONS.find(opt => opt.value === value);
   return option?.label || value || '-';
 }
+
+/**
+ * Derive stored `code` from the display name when the code field is not shown in the UI.
+ */
+export function dispositionCodeFromName(name) {
+  const base = String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80);
+  return base || 'disposition';
+}

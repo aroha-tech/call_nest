@@ -335,6 +335,40 @@
   color: var(--color-primary-400);
 }
 
+.panelTitleAnchor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  text-decoration: none;
+
+  &:hover {
+    color: var(--color-primary-300);
+  }
+
+  &:visited {
+    color: inherit;
+  }
+
+  &:hover .panelTitleIcon {
+    color: var(--color-primary-300);
+  }
+}
+
+.inlineDashLink {
+  font-weight: $font-weight-semibold;
+  color: var(--color-primary-400);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  &:visited {
+    color: var(--color-primary-400);
+  }
+}
+
 .panelLink {
   font-size: $font-size-xs;
   font-weight: $font-weight-semibold;
@@ -356,6 +390,40 @@
   gap: $space-2;
 }
 
+/* Fixed three-row viewport for dashboard meetings / callbacks / connected calls */
+.dashboardListSlots {
+  min-height: calc(3 * 4.75rem + 2 * #{$space-2});
+}
+
+.dashboardSlotRow {
+  min-height: 4.75rem;
+  box-sizing: border-box;
+}
+
+/* Invisible spacer: keeps 3-row height without a box (no border/background) */
+.dashboardSlotSpacer {
+  min-height: 4.75rem;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  list-style: none;
+}
+
+.slotEmptyHint {
+  display: block;
+  width: 100%;
+  text-align: left;
+  color: var(--color-text-muted);
+  font-size: $font-size-xs;
+  line-height: $line-height-relaxed;
+  padding: 0;
+}
+
 .meetingRow {
   display: flex;
   align-items: flex-start;
@@ -374,6 +442,20 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   flex: 0 0 52px;
+}
+
+.callbackTimeOverdue {
+  flex: 0 0 64px;
+  line-height: 1.25;
+}
+
+.callbackDueLabel {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: $font-weight-bold;
+  color: var(--color-warning);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .meetingBody {

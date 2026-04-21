@@ -330,8 +330,6 @@ export function DialerSessionSetupPage() {
                           <span className={styles.dispoPreviewName}>{row.disposition_name || row.name || 'Disposition'}</span>
                           {row.next_action ? (
                             <span className={styles.dispoPreviewHint}>{row.next_action}</span>
-                          ) : row.disposition_code ? (
-                            <span className={styles.dispoPreviewHint}>{row.disposition_code}</span>
                           ) : null}
                         </li>
                       ))}

@@ -307,12 +307,6 @@ const MANAGER_NAV_ITEMS = [
         permissions: [PERMISSIONS.EMAIL_VIEW, PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.DIAL_EXECUTE],
       },
       {
-        key: 'meetings',
-        label: 'Meetings',
-        path: '/email/meetings',
-        permissions: [PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE],
-      },
-      {
         key: 'email-templates',
         label: 'Templates',
         path: '/email/templates',
@@ -422,12 +416,6 @@ const AGENT_NAV_ITEMS = [
         label: 'Sent',
         path: '/email/sent',
         permissions: [PERMISSIONS.EMAIL_VIEW, PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.DIAL_EXECUTE],
-      },
-      {
-        key: 'meetings',
-        label: 'Meetings',
-        path: '/email/meetings',
-        permissions: [PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE],
       },
       {
         key: 'email-templates',

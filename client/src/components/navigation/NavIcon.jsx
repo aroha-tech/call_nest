@@ -388,6 +388,28 @@ function IconCalendar() {
   );
 }
 
+/** Meetings — calendar with highlighted event row */
+function IconMeetings() {
+  return (
+    <Icon>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+      <path d="M7.5 14.5h9" />
+    </Icon>
+  );
+}
+
+/** Callbacks — reminder bell with small status dot */
+function IconCallbacks() {
+  return (
+    <Icon>
+      <path d="M6 10a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6" />
+      <path d="M10.5 19a1.5 1.5 0 0 0 3 0" />
+      <circle cx="18.5" cy="6.5" r="1.5" />
+    </Icon>
+  );
+}
+
 const NAV_ICON_MAP = {
   dashboard: IconDashboard,
   tenants: IconBuilding,
@@ -429,7 +451,9 @@ const NAV_ICON_MAP = {
   'email-sent': IconInbox,
   'email-templates': IconScrollText,
   'email-accounts': IconMail,
-  meetings: IconCalendar,
+  meetings: IconMeetings,
+  'schedule-meetings': IconMeetings,
+  'schedule-callbacks': IconCallbacks,
   settings: IconSettings,
   'settings-main': IconBuilding2,
   'contact-fields': IconBraces,

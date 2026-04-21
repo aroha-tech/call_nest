@@ -4,24 +4,54 @@ export const CONTACT_FORM_SECTION_IDS = {
   RECORD: 'record',
   IDENTITY: 'identity',
   LOCATION: 'location',
-  NOTES: 'notes',
-  STATUS: 'status',
+  /** Tags, contact notes, and status in one card (replaces legacy `tags` / `notes` / `status` sections). */
+  TAGS_NOTES_STATUS: 'tags_notes_status',
   PHONES: 'phones',
-  TAGS: 'tags',
   ASSIGNMENT: 'assignment',
   INDUSTRY: 'industry',
   CUSTOM: 'custom',
 };
 
+const LEGACY_TAGS_NOTES_STATUS = new Set(['tags', 'notes', 'status']);
+
+/** Normalize persisted order: collapse legacy trio into one section at the earliest of their positions. */
+export function normalizeContactFormSectionOrder(order) {
+  if (!Array.isArray(order)) return [];
+  const COMBINED = CONTACT_FORM_SECTION_IDS.TAGS_NOTES_STATUS;
+  let minI = -1;
+  for (let i = 0; i < order.length; i++) {
+    const id = order[i];
+    if (id === COMBINED || LEGACY_TAGS_NOTES_STATUS.has(id)) {
+      minI = minI === -1 ? i : Math.min(minI, i);
+    }
+  }
+  const filtered = order.filter((id) => id !== COMBINED && !LEGACY_TAGS_NOTES_STATUS.has(id));
+  if (minI === -1) return filtered;
+  const before = order.slice(0, minI).filter((id) => id !== COMBINED && !LEGACY_TAGS_NOTES_STATUS.has(id)).length;
+  const next = [...filtered];
+  next.splice(before, 0, COMBINED);
+  return next;
+}
+
+export function normalizeContactFormFullWidth(fullWidth) {
+  const fw = fullWidth && typeof fullWidth === 'object' ? { ...fullWidth } : {};
+  const COMBINED = CONTACT_FORM_SECTION_IDS.TAGS_NOTES_STATUS;
+  if ('notes' in fw || 'status' in fw || 'tags' in fw) {
+    fw[COMBINED] = !!(fw[COMBINED] || fw.notes || fw.status || fw.tags);
+    delete fw.notes;
+    delete fw.status;
+    delete fw.tags;
+  }
+  return fw;
+}
+
 const ALL_ORDER = [
   CONTACT_FORM_SECTION_IDS.IDENTITY,
   CONTACT_FORM_SECTION_IDS.PHONES,
   CONTACT_FORM_SECTION_IDS.RECORD,
-  CONTACT_FORM_SECTION_IDS.TAGS,
+  CONTACT_FORM_SECTION_IDS.TAGS_NOTES_STATUS,
   CONTACT_FORM_SECTION_IDS.LOCATION,
-  CONTACT_FORM_SECTION_IDS.NOTES,
   CONTACT_FORM_SECTION_IDS.ASSIGNMENT,
-  CONTACT_FORM_SECTION_IDS.STATUS,
   CONTACT_FORM_SECTION_IDS.INDUSTRY,
   CONTACT_FORM_SECTION_IDS.CUSTOM,
 ];
@@ -54,7 +84,7 @@ function migrateV1ColumnsToLayout(parsed) {
     seen.add(id);
     return true;
   });
-  return { order: uniq, fullWidth: {} };
+  return { order: normalizeContactFormSectionOrder(uniq), fullWidth: {} };
 }
 
 function storageKeyV2(recordType) {
@@ -75,9 +105,10 @@ export function loadContactFormColumns(recordType) {
       const parsed = JSON.parse(v2);
       if (Array.isArray(parsed.order) && parsed.order.length) {
         return {
-          order: parsed.order.map(String),
-          fullWidth:
-            parsed.fullWidth && typeof parsed.fullWidth === 'object' ? { ...parsed.fullWidth } : {},
+          order: normalizeContactFormSectionOrder(parsed.order.map(String)),
+          fullWidth: normalizeContactFormFullWidth(
+            parsed.fullWidth && typeof parsed.fullWidth === 'object' ? parsed.fullWidth : {}
+          ),
         };
       }
     }
@@ -111,12 +142,14 @@ export function saveContactFormColumns(recordType, layout) {
 export function reconcileContactFormColumns(prev, visibleSet, recordType) {
   const allowed = new Set(ALL_ORDER);
 
-  const orderIn = Array.isArray(prev?.order) ? prev.order.filter((id) => allowed.has(id) && visibleSet.has(id)) : [];
+  const normalizedOrder = normalizeContactFormSectionOrder(Array.isArray(prev?.order) ? prev.order : []);
+  const normalizedFw = normalizeContactFormFullWidth(prev?.fullWidth);
+  const orderIn = normalizedOrder.filter((id) => allowed.has(id) && visibleSet.has(id));
   const seen = new Set(orderIn);
   const missing = ALL_ORDER.filter((id) => visibleSet.has(id) && allowed.has(id) && !seen.has(id));
   const order = [...orderIn, ...missing];
 
-  const fullWidth = { ...(prev?.fullWidth && typeof prev.fullWidth === 'object' ? prev.fullWidth : {}) };
+  const fullWidth = { ...normalizedFw };
   for (const id of Object.keys(fullWidth)) {
     if (!visibleSet.has(id) || !allowed.has(id)) delete fullWidth[id];
   }

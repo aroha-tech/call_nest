@@ -21,7 +21,7 @@ import {
   useContactTemperaturesOptions, 
   useDispoActionsOptions 
 } from '../../hooks/useMasterData';
-import { NEXT_ACTION_OPTIONS, getNextActionLabel } from '../../constants';
+import { NEXT_ACTION_OPTIONS, getNextActionLabel, dispositionCodeFromName } from '../../constants';
 import styles from '../../components/MasterCRUDPage.module.scss';
 import listStyles from '../../../../components/admin/adminDataList.module.scss';
 import { FilterBar } from '../../../../components/admin/FilterBar';
@@ -179,7 +179,6 @@ export function DefaultDispositionsPage() {
 
     const errors = {};
     if (!formData.name) errors.name = 'Name is required';
-    if (!formData.code) errors.code = 'Code is required';
     if (!formData.dispo_type_id) errors.dispo_type_id = 'Type is required';
 
     if (Object.keys(errors).length > 0) {
@@ -192,8 +191,12 @@ export function DefaultDispositionsPage() {
       !formData.industry_id || formData.industry_id === GLOBAL_INDUSTRY_VALUE
         ? null
         : formData.industry_id;
+    const resolvedCode =
+      String(formData.code || '').trim() || dispositionCodeFromName(formData.name);
+
     const submitData = {
       ...formData,
+      code: resolvedCode,
       industry_id: industryId,
       contact_status_id: formData.contact_status_id || null,
       contact_temperature_id: formData.contact_temperature_id || null,
@@ -318,7 +321,6 @@ export function DefaultDispositionsPage() {
                   <TableRow>
                     <TableHeaderCell>Name</TableHeaderCell>
                     <TableHeaderCell width="140px">Industry</TableHeaderCell>
-                    <TableHeaderCell width="120px">Code</TableHeaderCell>
                     <TableHeaderCell width="100px">Type</TableHeaderCell>
                     <TableHeaderCell width="110px">Next Action</TableHeaderCell>
                     <TableHeaderCell width="90px">Connected</TableHeaderCell>
@@ -334,7 +336,6 @@ export function DefaultDispositionsPage() {
                       <TableCell>
                         {item.industry_name || (item.industry_id ? '—' : 'Global')}
                       </TableCell>
-                      <TableCell><code>{item.code}</code></TableCell>
                       <TableCell><Badge variant="primary">{item.dispo_type_name}</Badge></TableCell>
                       <TableCell>{getNextActionLabel(item.next_action)}</TableCell>
                       <TableCell>
@@ -420,13 +421,6 @@ export function DefaultDispositionsPage() {
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               error={formErrors.name}
               placeholder="e.g. Interested - Call Back"
-            />
-            <Input
-              label="Code"
-              value={formData.code || ''}
-              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-              error={formErrors.code}
-              placeholder="e.g. interested_callback"
             />
             <Select
               label="Disposition Type"

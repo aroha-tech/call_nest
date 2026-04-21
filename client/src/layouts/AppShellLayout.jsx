@@ -97,10 +97,15 @@ function roleLabelForSidebar(user, isPlatform) {
   return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
 }
 
+/** True when the click should use default link behavior only (new tab, etc.). */
+function isModifiedClick(e) {
+  return e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
+}
+
 /**
  * Expandable navigation group component.
  */
-function NavGroup({ item, activeKey, activeParentKey, onNavigate, expandedGroups, toggleGroup }) {
+function NavGroup({ item, activeKey, activeParentKey, onPrimaryNavFollow, expandedGroups, toggleGroup }) {
   const isExpanded = expandedGroups[item.key];
   const isActive = activeParentKey === item.key;
 
@@ -121,15 +126,18 @@ function NavGroup({ item, activeKey, activeParentKey, onNavigate, expandedGroups
       {isExpanded && (
         <div className={styles.navGroupChildren}>
           {item.children.map((child) => (
-            <button
+            <Link
               key={child.key}
-              type="button"
+              to={child.path}
               className={`${styles.navChild} ${activeKey === child.key ? styles.navChildActive : ''}`}
-              onClick={() => onNavigate(child.path)}
+              onClick={(e) => {
+                if (isModifiedClick(e)) return;
+                onPrimaryNavFollow?.();
+              }}
             >
               <NavIcon navKey={child.key} className={styles.navChildIcon} />
               <span className={styles.navLabel}>{child.label}</span>
-            </button>
+            </Link>
           ))}
         </div>
       )}
@@ -142,7 +150,7 @@ function NavGroup({ item, activeKey, activeParentKey, onNavigate, expandedGroups
  */
 export function AppShellLayout({ children }) {
   const location = useLocation();
-  const { items, activeKey, activeParentKey, goTo, tenantSlug, isPlatform } = useSalesNavigation();
+  const { items, activeKey, activeParentKey, tenantSlug, isPlatform } = useSalesNavigation();
   const { scheme, setScheme } = useColorScheme();
   const tenant = useAppSelector(selectTenant);
   const user = useAppSelector(selectUser);
@@ -200,11 +208,6 @@ export function AppShellLayout({ children }) {
       setExpandedGroups((prev) => ({ ...prev, [activeParentKey]: true }));
     }
   }, [activeParentKey]);
-
-  const handleNavClick = (path) => {
-    goTo(path);
-    if (!isDesktopSidebarBreakpoint()) setSidebarOpen(false);
-  };
 
   const closeSidebarIfMobileOverlay = () => {
     if (!isDesktopSidebarBreakpoint()) setSidebarOpen(false);
@@ -279,21 +282,24 @@ export function AppShellLayout({ children }) {
                   item={item}
                   activeKey={activeKey}
                   activeParentKey={activeParentKey}
-                  onNavigate={handleNavClick}
+                  onPrimaryNavFollow={closeSidebarIfMobileOverlay}
                   expandedGroups={navExpandedGroups}
                   toggleGroup={toggleGroup}
                 />
               ) : (
-                <button
-                  type="button"
+                <Link
+                  to={item.path}
                   className={`${styles.navItem} ${activeKey === item.key ? styles.navItemActive : ''}`}
-                  onClick={() => handleNavClick(item.path)}
+                  onClick={(e) => {
+                    if (isModifiedClick(e)) return;
+                    closeSidebarIfMobileOverlay();
+                  }}
                 >
                   <span className={styles.navItemMain}>
                     <NavIcon navKey={item.key} className={styles.navItemIcon} />
                     <span className={styles.navLabel}>{item.label}</span>
                   </span>
-                </button>
+                </Link>
               )}
             </Fragment>
           ))}

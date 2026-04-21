@@ -39,6 +39,7 @@ export function MeetingMetricCards({ data, loading }) {
     { label: 'Completed', value: data?.completed, variant: 'completed' },
     { label: 'Cancelled', value: data?.cancelled, variant: 'cancelled' },
     { label: 'Rescheduled', value: data?.rescheduled, variant: 'rescheduled' },
+    { label: 'Missed', value: data?.missed, variant: 'missed' },
     { label: "Today's meetings", value: data?.today, variant: 'today' },
   ];
 

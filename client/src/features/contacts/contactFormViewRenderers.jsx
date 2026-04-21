@@ -135,28 +135,49 @@ export function createContactFormViewSectionRenderers(ctx) {
       </section>
     ),
 
-    [CONTACT_FORM_SECTION_IDS.NOTES]: () => (
-      <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-notes">
-        <h2 id="view-section-notes" className={styles.sectionTitle}>
-          Contact notes
+    [CONTACT_FORM_SECTION_IDS.TAGS_NOTES_STATUS]: () => (
+      <section
+        className={`${styles.section} ${styles.sectionCompact}`}
+        aria-labelledby="view-section-tags-notes-status"
+      >
+        <h2 id="view-section-tags-notes-status" className={styles.sectionTitle}>
+          Tags, notes &amp; status
         </h2>
-        <ViewField label="Notes" className={styles.fullWidthFieldDense}>
-          {formData.notes != null && String(formData.notes).trim() ? (
-            <span className={styles.viewNotesMultiline}>{formData.notes}</span>
-          ) : (
-            '—'
-          )}
-        </ViewField>
-      </section>
-    ),
 
-    [CONTACT_FORM_SECTION_IDS.STATUS]: () => (
-      <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-status">
-        <h2 id="view-section-status" className={styles.sectionTitle}>
-          Status
-        </h2>
-        <div className={styles.fieldGridDense}>
-          <ViewField label="Contact status">{statusDisplay}</ViewField>
+        <div className={styles.formSubsection}>
+          <h3 className={styles.formSubsectionTitle}>Tags</h3>
+          {(formData.tag_ids || []).length === 0 ? (
+            <p className={styles.tagEmptyHint}>—</p>
+          ) : (
+            <div className={styles.tagChips} role="list">
+              {(formData.tag_ids || []).map((tid) => {
+                const label = contactTagOptions.find((o) => o.value === String(tid))?.label || tid;
+                return (
+                  <span key={tid} className={styles.tagChip} role="listitem">
+                    <span className={styles.tagChipLabel}>{label}</span>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className={styles.formSubsection}>
+          <h3 className={styles.formSubsectionTitle}>Contact notes</h3>
+          <div className={styles.viewValue}>
+            {formData.notes != null && String(formData.notes).trim() ? (
+              <span className={styles.viewNotesMultiline}>{formData.notes}</span>
+            ) : (
+              '—'
+            )}
+          </div>
+        </div>
+
+        <div className={styles.formSubsection}>
+          <h3 className={styles.formSubsectionTitle}>Status</h3>
+          <div className={styles.fieldGridDense}>
+            <ViewField label="Contact status">{statusDisplay}</ViewField>
+          </div>
         </div>
       </section>
     ),
@@ -179,28 +200,6 @@ export function createContactFormViewSectionRenderers(ctx) {
             );
           })}
         </ul>
-      </section>
-    ),
-
-    [CONTACT_FORM_SECTION_IDS.TAGS]: () => (
-      <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-tags">
-        <h2 id="view-section-tags" className={styles.sectionTitle}>
-          Tags
-        </h2>
-        {(formData.tag_ids || []).length === 0 ? (
-          <p className={styles.tagEmptyHint}>—</p>
-        ) : (
-          <div className={styles.tagChips} role="list">
-            {(formData.tag_ids || []).map((tid) => {
-              const label = contactTagOptions.find((o) => o.value === String(tid))?.label || tid;
-              return (
-                <span key={tid} className={styles.tagChip} role="listitem">
-                  <span className={styles.tagChipLabel}>{label}</span>
-                </span>
-              );
-            })}
-          </div>
-        )}
       </section>
     ),
 

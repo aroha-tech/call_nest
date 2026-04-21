@@ -31,6 +31,12 @@ const ROLE_ORDER = ['admin', 'manager', 'agent'];
 /** Recent activity card: show only the newest rows; full list is on /activities. */
 const DASHBOARD_ACTIVITY_PREVIEW_LIMIT = 5;
 
+/** Meetings calendar in dashboard widgets (legacy path redirects to schedule). */
+const DASHBOARD_MEETINGS_PATH = '/email/meetings';
+
+/** Fixed number of rows in meetings / callbacks / connected-calls dashboard cards (extras → full list links). */
+const DASHBOARD_LIST_SLOT_COUNT = 3;
+
 /** Emoji as code points keeps source files ASCII-clean on Windows editors. */
 const E = {
   target: String.fromCodePoint(0x1f3af),
@@ -63,6 +69,12 @@ function contactPath(row) {
   if (!row?.contact_id) return null;
   const t = String(row.contact_type || '').toLowerCase();
   return t === 'lead' ? `/leads/${row.contact_id}` : `/contacts/${row.contact_id}`;
+}
+
+function isPendingCallbackOverdue(scheduledAt) {
+  const d = scheduledAt ? new Date(String(scheduledAt).replace(' ', 'T')) : null;
+  if (!d || Number.isNaN(d.getTime())) return false;
+  return d.getTime() < Date.now();
 }
 
 function ExecutiveKpiCard({ matIcon, matWrapClass, label, value, hint, to, badge, static: isStatic }) {
@@ -288,7 +300,14 @@ export function TenantDashboardPage() {
   const usersTotal = data?.usersTotal ?? 0;
   const usersByRole = data?.usersByRole ?? {};
   const upcomingMeetings = data?.upcomingMeetings ?? [];
+  const pendingCallbacks = data?.pendingCallbacks ?? [];
   const recentConnectedCalls = data?.recentConnectedCalls ?? [];
+  const meetingsPreview = upcomingMeetings.slice(0, DASHBOARD_LIST_SLOT_COUNT);
+  const meetingsHasMore = upcomingMeetings.length > DASHBOARD_LIST_SLOT_COUNT;
+  const callbacksPreview = pendingCallbacks.slice(0, DASHBOARD_LIST_SLOT_COUNT);
+  const callbacksHasMore = pendingCallbacks.length > DASHBOARD_LIST_SLOT_COUNT;
+  const callsPreview = recentConnectedCalls.slice(0, DASHBOARD_LIST_SLOT_COUNT);
+  const callsHasMore = recentConnectedCalls.length > DASHBOARD_LIST_SLOT_COUNT;
   const callsToday = data?.callsToday ?? { count: 0, avgDurationSec: null };
   const meetingsMetric = data?.meetingsMetric ?? 0;
   const emailsTotal = data?.emailsTotal ?? 0;
@@ -431,7 +450,7 @@ export function TenantDashboardPage() {
             label="Meetings"
             value={meetingsMetric.toLocaleString()}
             hint={data?.dateRange ? 'Starts in range' : 'Upcoming scheduled'}
-            to={canMeetings ? '/email/meetings' : undefined}
+            to={canMeetings ? DASHBOARD_MEETINGS_PATH : undefined}
             static={!canMeetings}
           />
           <ExecutiveKpiCard
@@ -460,24 +479,25 @@ export function TenantDashboardPage() {
               <section className={styles.panel}>
                 <div className={styles.panelHead}>
                   <h2 className={styles.panelTitleWithIcon}>
-                    <MaterialSymbol name="event_upcoming" size="sm" className={styles.panelTitleIcon} />
-                    Upcoming meetings
+                    <Link to={DASHBOARD_MEETINGS_PATH} className={styles.panelTitleAnchor}>
+                      <MaterialSymbol name="event_upcoming" size="sm" className={styles.panelTitleIcon} />
+                      Upcoming meetings
+                    </Link>
                   </h2>
-                  <Link to="/email/meetings" className={styles.panelLink}>
+                  <Link to={DASHBOARD_MEETINGS_PATH} className={styles.panelLink}>
                     Calendar
                   </Link>
                 </div>
-                {!upcomingMeetings.length ? (
-                  <p className={styles.skeletonNote}>No upcoming meetings in your scope.</p>
-                ) : (
-                  <ul className={styles.meetingList}>
-                    {upcomingMeetings.map((m) => {
+                <ul className={`${styles.meetingList} ${styles.dashboardListSlots}`}>
+                  {Array.from({ length: DASHBOARD_LIST_SLOT_COUNT }, (_, slot) => {
+                    const m = meetingsPreview[slot];
+                    if (m) {
                       const joinUrl =
                         m.location && /^https?:\/\//i.test(String(m.location).trim())
                           ? String(m.location).trim()
                           : null;
                       return (
-                        <li key={m.id} className={styles.meetingRow}>
+                        <li key={m.id} className={`${styles.meetingRow} ${styles.dashboardSlotRow}`}>
                           <span className={styles.meetingTime}>{formatMeetingSlot(m.start_at, dtMode)}</span>
                           <div className={styles.meetingBody}>
                             <p className={styles.meetingTitle}>{m.title || 'Meeting'}</p>
@@ -500,7 +520,7 @@ export function TenantDashboardPage() {
                               </span>
                             </a>
                           ) : (
-                            <Link to="/email/meetings" className={styles.joinBtn}>
+                            <Link to={DASHBOARD_MEETINGS_PATH} className={styles.joinBtn}>
                               <span className={styles.joinBtnInner}>
                                 <MaterialSymbol name="event" size="sm" />
                                 Open
@@ -509,71 +529,121 @@ export function TenantDashboardPage() {
                           )}
                         </li>
                       );
-                    })}
-                  </ul>
-                )}
+                    }
+                    const emptyFirst = slot === 0 && upcomingMeetings.length === 0;
+                    return (
+                      <li
+                        key={`meeting-slot-${slot}`}
+                        className={styles.dashboardSlotSpacer}
+                        aria-hidden={!emptyFirst}
+                      >
+                        {emptyFirst ? (
+                          <span className={styles.slotEmptyHint}>No upcoming meetings in your scope.</span>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+                {meetingsHasMore ? (
+                  <Link
+                    to={DASHBOARD_MEETINGS_PATH}
+                    className={styles.panelLink}
+                    style={{ marginTop: 12, display: 'inline-block' }}
+                  >
+                    All meetings {'\u2192'}
+                  </Link>
+                ) : null}
               </section>
             ) : null}
 
             <section className={styles.panel}>
               <div className={styles.panelHead}>
                 <h2 className={styles.panelTitleWithIcon}>
-                  <MaterialSymbol name="phone_callback" size="sm" className={styles.panelTitleIcon} />
-                  Connected calls
+                  {canCallHistory ? (
+                    <Link to="/calls/history" className={styles.panelTitleAnchor}>
+                      <MaterialSymbol name="phone_callback" size="sm" className={styles.panelTitleIcon} />
+                      Connected calls
+                    </Link>
+                  ) : (
+                    <>
+                      <MaterialSymbol name="phone_callback" size="sm" className={styles.panelTitleIcon} />
+                      Connected calls
+                    </>
+                  )}
                 </h2>
                 <div className={styles.callsHeadStats}>
                   <span className={styles.callStatPill}>{callsToday.count ?? 0} today</span>
                   <span className={styles.callStatPill}>{avgToday} avg</span>
                 </div>
               </div>
-              {!recentConnectedCalls.length ? (
-                <p className={styles.skeletonNote}>No connected calls in your scope yet.</p>
-              ) : (
-                <div className={styles.tableWrap}>
-                  <table className={styles.dataTable}>
-                    <thead>
-                      <tr>
-                        <th>Lead / contact</th>
-                        <th>Duration</th>
-                        <th>Disposition</th>
-                        <th>Timestamp</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recentConnectedCalls.map((row) => {
-                        const cp = contactPath(row);
-                        return (
-                          <tr key={row.id}>
-                            <td>
-                              {cp ? (
-                                <Link to={cp} className={styles.leadLink}>
-                                  {row.display_name?.trim() || `Contact #${row.contact_id}`}
-                                </Link>
-                              ) : (
-                                row.display_name?.trim() || '—'
-                              )}
-                            </td>
-                            <td>{formatDurationSec(row.duration_sec)}</td>
-                            <td>
-                              <span className={styles.dispoPill}>
-                                {row.disposition_name?.trim() || '—'}
-                              </span>
-                            </td>
-                            <td>{formatDateTimeDisplay(row.started_at, dtMode)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <ul className={`${styles.meetingList} ${styles.dashboardListSlots}`}>
+                {Array.from({ length: DASHBOARD_LIST_SLOT_COUNT }, (_, slot) => {
+                  const row = callsPreview[slot];
+                  if (row) {
+                    const cp = contactPath(row);
+                    const name = row.display_name?.trim() || `Contact #${row.contact_id}`;
+                    return (
+                      <li key={row.id} className={`${styles.meetingRow} ${styles.dashboardSlotRow}`}>
+                        <span className={styles.meetingTime}>
+                          {formatDateTimeDisplay(row.started_at, dtMode)}
+                        </span>
+                        <div className={styles.meetingBody}>
+                          <p className={styles.meetingTitle}>
+                            {cp ? (
+                              <Link to={cp} className={styles.leadLink}>
+                                {name}
+                              </Link>
+                            ) : (
+                              name
+                            )}
+                          </p>
+                          <p className={styles.meetingMeta}>
+                            {formatDurationSec(row.duration_sec)} ·{' '}
+                            <span className={styles.dispoPill}>
+                              {row.disposition_name?.trim() || '—'}
+                            </span>
+                          </p>
+                        </div>
+                        {cp ? (
+                          <Link to={cp} className={styles.joinBtn}>
+                            <span className={styles.joinBtnInner}>
+                              <MaterialSymbol name="person" size="sm" />
+                              Contact
+                            </span>
+                          </Link>
+                        ) : canCallHistory ? (
+                          <Link to="/calls/history" className={styles.joinBtn}>
+                            <span className={styles.joinBtnInner}>
+                              <MaterialSymbol name="history" size="sm" />
+                              History
+                            </span>
+                          </Link>
+                        ) : null}
+                      </li>
+                    );
+                  }
+                  const emptyFirst = slot === 0 && !recentConnectedCalls.length;
+                  return (
+                    <li
+                      key={`calls-slot-${slot}`}
+                      className={styles.dashboardSlotSpacer}
+                      aria-hidden={!emptyFirst}
+                    >
+                      {emptyFirst ? (
+                        <span className={styles.slotEmptyHint}>No connected calls in your scope yet.</span>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
               {canCallHistory ? (
                 <Link
                   to="/calls/history"
                   className={styles.panelLink}
                   style={{ marginTop: 12, display: 'inline-block' }}
                 >
-                  Full call history {'\u2192'}
+                  {callsHasMore ? `All connected calls (${recentConnectedCalls.length}) ` : 'Full call history '}
+                  {'\u2192'}
                 </Link>
               ) : null}
             </section>
@@ -583,24 +653,152 @@ export function TenantDashboardPage() {
             <section className={styles.panel}>
               <div className={styles.panelHead}>
                 <h2 className={styles.panelTitleWithIcon}>
-                  <MaterialSymbol name="ring_volume" size="sm" className={styles.panelTitleIcon} />
-                  Pending callbacks
+                  {can(PERMISSIONS.SCHEDULE_VIEW) ? (
+                    <Link to="/schedule/callbacks" className={styles.panelTitleAnchor}>
+                      <MaterialSymbol name="ring_volume" size="sm" className={styles.panelTitleIcon} />
+                      Pending callbacks
+                    </Link>
+                  ) : (
+                    <>
+                      <MaterialSymbol name="ring_volume" size="sm" className={styles.panelTitleIcon} />
+                      Pending callbacks
+                    </>
+                  )}
                 </h2>
-                <span className={styles.pendingBadge}>Coming soon</span>
+                {can(PERMISSIONS.SCHEDULE_VIEW) ? (
+                  <Link to="/schedule/callbacks" className={styles.panelLink}>
+                    Open callbacks
+                  </Link>
+                ) : null}
               </div>
-              <p className={styles.skeletonNote}>
-                This module will list follow-ups and missed calls assigned to you or your team. The activity engine is
-                next; for now, use Call history and your dialer queue.
-              </p>
-              {[1, 2, 3].map((i) => (
-                <div key={i} className={styles.skeletonRow}>
-                  <div className={styles.skeletonAvatar} />
-                  <div className={styles.skeletonCol}>
-                    <div className={styles.skeletonLine} style={{ width: '55%' }} />
-                    <div className={styles.skeletonLine} style={{ width: '36%' }} />
-                  </div>
-                </div>
-              ))}
+              {can(PERMISSIONS.SCHEDULE_VIEW) ? (
+                <>
+                  <ul className={`${styles.meetingList} ${styles.dashboardListSlots}`}>
+                    {Array.from({ length: DASHBOARD_LIST_SLOT_COUNT }, (_, slot) => {
+                      const cb = callbacksPreview[slot];
+                      if (cb) {
+                        const cp = contactPath(cb);
+                        const overdue = isPendingCallbackOverdue(cb.scheduled_at);
+                        const showAssignee = role === 'admin' || role === 'manager';
+                        const metaParts = [
+                          cb.contact_phone?.trim() || null,
+                          showAssignee && cb.assigned_name?.trim() ? cb.assigned_name.trim() : null,
+                        ].filter(Boolean);
+                        const title =
+                          cb.contact_name?.trim() ||
+                          (cb.contact_id ? `Contact #${cb.contact_id}` : 'Callback');
+                        return (
+                          <li key={cb.id} className={`${styles.meetingRow} ${styles.dashboardSlotRow}`}>
+                            <span
+                              className={`${styles.meetingTime} ${overdue ? styles.callbackTimeOverdue : ''}`.trim()}
+                            >
+                              {overdue ? (
+                                <>
+                                  <span className={styles.callbackDueLabel}>Overdue</span>
+                                  <br />
+                                </>
+                              ) : null}
+                              {formatMeetingSlot(cb.scheduled_at, dtMode)}
+                            </span>
+                            <div className={styles.meetingBody}>
+                              <p className={styles.meetingTitle}>
+                                {cp ? (
+                                  <Link to={cp} className={styles.leadLink}>
+                                    {title}
+                                  </Link>
+                                ) : (
+                                  title
+                                )}
+                              </p>
+                              <p className={styles.meetingMeta}>
+                                {metaParts.length ? metaParts.join(' · ') : '—'}
+                                {cb.notes?.trim() ? ` · ${cb.notes.trim()}` : ''}
+                              </p>
+                            </div>
+                            <Link to="/schedule/callbacks" className={styles.joinBtn}>
+                              <span className={styles.joinBtnInner}>
+                                <MaterialSymbol name="event" size="sm" />
+                                Open
+                              </span>
+                            </Link>
+                          </li>
+                        );
+                      }
+                      const emptyFirst = slot === 0 && pendingCallbacks.length === 0;
+                      return (
+                        <li
+                          key={`cb-slot-${slot}`}
+                          className={styles.dashboardSlotSpacer}
+                          aria-hidden={!emptyFirst}
+                        >
+                          {emptyFirst ? (
+                            <span className={styles.slotEmptyHint}>
+                              No pending callbacks in your scope. Open{' '}
+                              <Link to="/schedule/callbacks" className={styles.inlineDashLink}>
+                                Callbacks
+                              </Link>{' '}
+                              to add one.
+                            </span>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {callbacksHasMore ? (
+                    <Link
+                      to="/schedule/callbacks"
+                      className={styles.panelLink}
+                      style={{ marginTop: 12, display: 'inline-block' }}
+                    >
+                      All callbacks ({pendingCallbacks.length}) {'\u2192'}
+                    </Link>
+                  ) : null}
+                  {pendingCallbacks.length === 0 ? (
+                    <p className={styles.skeletonNote} style={{ marginTop: 10, marginBottom: 0 }}>
+                      You can also use{' '}
+                      {canCallHistory ? (
+                        <Link to="/calls/history" className={styles.inlineDashLink}>
+                          Call history
+                        </Link>
+                      ) : (
+                        'Call history'
+                      )}
+                      {' '}and{' '}
+                      {canDial ? (
+                        <Link to="/dialer" className={styles.inlineDashLink}>
+                          your dialer queue
+                        </Link>
+                      ) : (
+                        'your dialer queue'
+                      )}
+                      .
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <p className={styles.skeletonNote}>
+                    Scheduled callbacks live in the Schedule hub when your role includes schedule access. For call
+                    context, use{' '}
+                    {canCallHistory ? (
+                      <Link to="/calls/history" className={styles.inlineDashLink}>
+                        Call history
+                      </Link>
+                    ) : (
+                      'Call history'
+                    )}
+                    {' '}and{' '}
+                    {canDial ? (
+                      <Link to="/dialer" className={styles.inlineDashLink}>
+                        your dialer queue
+                      </Link>
+                    ) : (
+                      'your dialer queue'
+                    )}
+                    .
+                  </p>
+                </>
+              )}
             </section>
 
             <section className={styles.panel}>
@@ -637,7 +835,7 @@ export function TenantDashboardPage() {
                   </Link>
                 ) : null}
                 {canMeetings ? (
-                  <Link to="/email/meetings" className={styles.quickBtn}>
+                  <Link to={DASHBOARD_MEETINGS_PATH} className={styles.quickBtn}>
                     <MaterialSymbol name="calendar_month" size="md" className={styles.quickBtnMat} />
                     <span>Meeting</span>
                   </Link>

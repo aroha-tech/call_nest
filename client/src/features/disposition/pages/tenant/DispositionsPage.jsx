@@ -22,7 +22,7 @@ import {
   useDispoActionsOptions,
   useIndustriesOptions 
 } from '../../hooks/useMasterData';
-import { NEXT_ACTION_OPTIONS, getNextActionLabel } from '../../constants';
+import { NEXT_ACTION_OPTIONS, getNextActionLabel, dispositionCodeFromName } from '../../constants';
 import styles from '../../components/MasterCRUDPage.module.scss';
 import listStyles from '../../../../components/admin/adminDataList.module.scss';
 import { useTableLoadingState } from '../../../../hooks/useTableLoadingState';
@@ -230,8 +230,12 @@ export function DispositionsPage({ readOnly = false }) {
 
     const validActions = (formData.actions || []).filter(a => a.action_id);
 
+    const resolvedCode =
+      String(formData.code || '').trim() || dispositionCodeFromName(formData.name);
+
     const submitData = {
       ...formData,
+      code: resolvedCode,
       contact_status_id: formData.contact_status_id || null,
       contact_temperature_id: formData.contact_temperature_id || null,
       next_action: formData.next_action || null,
@@ -357,7 +361,6 @@ export function DispositionsPage({ readOnly = false }) {
           <TableHead>
             <TableRow>
               <TableHeaderCell>Name</TableHeaderCell>
-              <TableHeaderCell width="100px">Code</TableHeaderCell>
               <TableHeaderCell width="100px">Type</TableHeaderCell>
               <TableHeaderCell width="110px">Next Action</TableHeaderCell>
               <TableHeaderCell width="90px">Connected</TableHeaderCell>
@@ -378,7 +381,6 @@ export function DispositionsPage({ readOnly = false }) {
                     )}
                   </div>
                 </TableCell>
-                <TableCell><code>{item.code}</code></TableCell>
                 <TableCell><Badge variant="primary">{item.dispo_type_name}</Badge></TableCell>
                 <TableCell>{getNextActionLabel(item.next_action)}</TableCell>
                 <TableCell>
@@ -467,13 +469,6 @@ export function DispositionsPage({ readOnly = false }) {
                 disabled
                 readOnly
                 placeholder="e.g. Interested - Call Back"
-              />
-              <Input
-                label="Code"
-                value={viewFormData.code || ''}
-                disabled
-                readOnly
-                placeholder="e.g. interested_callback"
               />
               <Select
                 label="Disposition Type"
@@ -613,7 +608,6 @@ export function DispositionsPage({ readOnly = false }) {
           {/* Form Grid - 2 columns on desktop, 1 on mobile */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
             <Input label="Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: e.target.value })} error={formErrors.name} placeholder="e.g. Interested - Call Back" />
-            <Input label="Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: e.target.value })} error={formErrors.code} placeholder="e.g. interested_callback" />
             <Select label="Disposition Type" value={formData.dispo_type_id || ''} onChange={(e) => setFormData({ ...formData, dispo_type_id: e.target.value })} options={dispoTypeOptions} error={formErrors.dispo_type_id} />
             <Select label="Contact Status (optional)" value={formData.contact_status_id || ''} onChange={(e) => setFormData({ ...formData, contact_status_id: e.target.value })} options={statusOptions} error={formErrors.contact_status_id} placeholder="Select..." />
             <Select label="Contact Temperature (optional)" value={formData.contact_temperature_id || ''} onChange={(e) => setFormData({ ...formData, contact_temperature_id: e.target.value })} options={tempOptions} error={formErrors.contact_temperature_id} placeholder="Select..." />

@@ -266,52 +266,106 @@ export function createContactFormEditSectionRenderers(ctx) {
       </section>
     ),
 
-    [CONTACT_FORM_SECTION_IDS.NOTES]: () => (
-      <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-notes">
-        <h2 id="contact-section-notes" className={styles.sectionTitle}>
-          Contact notes
+    [CONTACT_FORM_SECTION_IDS.TAGS_NOTES_STATUS]: () => (
+      <section
+        className={`${styles.section} ${styles.sectionCompact}`}
+        aria-labelledby="contact-section-tags-notes-status"
+      >
+        <h2 id="contact-section-tags-notes-status" className={styles.sectionTitle}>
+          Tags, notes &amp; status
         </h2>
-        {showFormHints ? (
-          <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
-            Persistent notes on this record. Notes for a specific call are saved on the call attempt when you set a
-            disposition.
-          </p>
-        ) : null}
-        <textarea
-          id="contact-notes-input"
-          className={styles.notesTextarea}
-          value={formData.notes ?? ''}
-          onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
-          placeholder="General notes about this lead or contact…"
-          rows={5}
-          disabled={!isEditing}
-        />
-      </section>
-    ),
 
-    [CONTACT_FORM_SECTION_IDS.STATUS]: () => (
-      <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-status">
-        <h2 id="contact-section-status" className={styles.sectionTitle}>
-          Status
-        </h2>
-        {showFormHints ? (
-          <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
-            Lifecycle stage from Admin → Masters → Contact statuses.
-          </p>
-        ) : null}
-        <div className={styles.fieldGridDense}>
-          <Select
-            label="Contact status"
-            value={formData.status_id || ''}
-            onChange={(e) => setFormData((p) => ({ ...p, status_id: e.target.value }))}
-            disabled={contactStatusesLoading}
-            allowEmpty
-            placeholder="— None —"
-            options={contactStatuses.map((s) => ({
-              value: s.id,
-              label: s.name ? `${s.name}${s.code ? ` (${s.code})` : ''}` : s.code || '—',
-            }))}
+        <div className={styles.formSubsection}>
+          <h3 className={styles.formSubsectionTitle}>Tags</h3>
+          {showFormHints ? (
+            <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
+              Tenant tag catalog (Settings → Contact tags).
+            </p>
+          ) : null}
+          {(formData.tag_ids || []).length === 0 ? (
+            <p className={styles.tagEmptyHint}>No tags yet — add one below.</p>
+          ) : null}
+          <div className={styles.tagChips} role="list">
+            {(formData.tag_ids || []).map((tid) => {
+              const label = contactTagOptions.find((o) => o.value === String(tid))?.label || '—';
+              return (
+                <span key={tid} className={styles.tagChip} role="listitem">
+                  <span className={styles.tagChipLabel}>{label}</span>
+                  <button
+                    type="button"
+                    className={styles.tagRemove}
+                    onClick={() =>
+                      setFormData((p) => ({
+                        ...p,
+                        tag_ids: (p.tag_ids || []).filter((x) => String(x) !== String(tid)),
+                      }))
+                    }
+                    aria-label={`Remove tag ${label}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+          <SelectOncePick
+            className={styles.tagAddSelect}
+            ariaLabel="Add tag"
+            options={contactTagOptions}
+            excludeValues={formData.tag_ids || []}
+            onPick={(e) => {
+              const v = e.target.value;
+              if (!v) return;
+              setFormData((p) => {
+                const cur = p.tag_ids || [];
+                if (cur.map(String).includes(v)) return p;
+                return { ...p, tag_ids: [...cur, v] };
+              });
+            }}
+            placeholder="Add tag…"
           />
+        </div>
+
+        <div className={styles.formSubsection}>
+          <h3 className={styles.formSubsectionTitle}>Contact notes</h3>
+          {showFormHints ? (
+            <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
+              Persistent notes on this record. Notes for a specific call are saved on the call attempt when you set a
+              disposition.
+            </p>
+          ) : null}
+          <textarea
+            id="contact-notes-input"
+            className={styles.notesTextarea}
+            value={formData.notes ?? ''}
+            onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
+            placeholder="General notes about this lead or contact…"
+            rows={5}
+            disabled={!isEditing}
+          />
+        </div>
+
+        <div className={styles.formSubsection}>
+          <h3 className={styles.formSubsectionTitle}>Status</h3>
+          {showFormHints ? (
+            <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
+              Lifecycle stage from Admin → Masters → Contact statuses.
+            </p>
+          ) : null}
+          <div className={styles.fieldGridDense}>
+            <Select
+              label="Contact status"
+              value={formData.status_id || ''}
+              onChange={(e) => setFormData((p) => ({ ...p, status_id: e.target.value }))}
+              disabled={contactStatusesLoading}
+              allowEmpty
+              placeholder="— None —"
+              options={contactStatuses.map((s) => ({
+                value: s.id,
+                label: s.name ? `${s.name}${s.code ? ` (${s.code})` : ''}` : s.code || '—',
+              }))}
+            />
+          </div>
         </div>
       </section>
     ),
@@ -433,57 +487,6 @@ export function createContactFormEditSectionRenderers(ctx) {
             );
           })}
         </div>
-      </section>
-    ),
-
-    [CONTACT_FORM_SECTION_IDS.TAGS]: () => (
-      <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-tags">
-        <h2 id="contact-section-tags" className={styles.sectionTitle}>
-          Tags
-        </h2>
-        {showFormHints ? (
-          <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>Tenant tag catalog (Settings → Contact tags).</p>
-        ) : null}
-        {(formData.tag_ids || []).length === 0 ? <p className={styles.tagEmptyHint}>No tags yet — add one below.</p> : null}
-        <div className={styles.tagChips} role="list">
-          {(formData.tag_ids || []).map((tid) => {
-            const label = contactTagOptions.find((o) => o.value === String(tid))?.label || '—';
-            return (
-              <span key={tid} className={styles.tagChip} role="listitem">
-                <span className={styles.tagChipLabel}>{label}</span>
-                <button
-                  type="button"
-                  className={styles.tagRemove}
-                  onClick={() =>
-                    setFormData((p) => ({
-                      ...p,
-                      tag_ids: (p.tag_ids || []).filter((x) => String(x) !== String(tid)),
-                    }))
-                  }
-                  aria-label={`Remove tag ${label}`}
-                >
-                  ×
-                </button>
-              </span>
-            );
-          })}
-        </div>
-        <SelectOncePick
-          className={styles.tagAddSelect}
-          ariaLabel="Add tag"
-          options={contactTagOptions}
-          excludeValues={formData.tag_ids || []}
-          onPick={(e) => {
-            const v = e.target.value;
-            if (!v) return;
-            setFormData((p) => {
-              const cur = p.tag_ids || [];
-              if (cur.map(String).includes(v)) return p;
-              return { ...p, tag_ids: [...cur, v] };
-            });
-          }}
-          placeholder="Add tag…"
-        />
       </section>
     ),
 

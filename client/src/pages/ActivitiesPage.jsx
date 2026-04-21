@@ -913,6 +913,7 @@ export function ActivitiesPage() {
                     navigate(`/dialer/session/${r.dialer_session_id}`, { state: { fromCallHistory: true } });
                   }
                 }}
+                dialSessionNavigateState={{ fromCallHistory: true }}
                 formatWhen={(v) => safeDateTime(v)}
               />
             </div>

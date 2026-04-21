@@ -17,7 +17,6 @@ import { templateVariablesAPI } from '../../services/templateVariablesAPI';
 import { useTemplateVariableAutocomplete } from '../../hooks/useTemplateVariables';
 import { renderPreview, linkify, linkifyHtml, DEFAULT_PREVIEW_DATA } from '../../utils/templateVariables';
 import { ScriptBodyEditor } from '../callScripts/ScriptBodyEditor';
-import { VariableSelector } from '../../components/VariableSelector';
 import styles from '../../features/disposition/components/MasterCRUDPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { FilterBar } from '../../components/admin/FilterBar';
@@ -135,11 +134,6 @@ export function EmailSentPage() {
     editorPlainText,
     editorCursorIndex
   );
-
-  const handleInsertVariable = useCallback((text) => {
-    editorRef.current?.insertAtCursor(text);
-    editorRef.current?.focus();
-  }, []);
 
   const fetchAccounts = useCallback(() => emailAccountsAPI.getAll(true), []);
   const fetchTemplates = useCallback(() => emailTemplatesAPI.getAll(true), []);
@@ -542,56 +536,51 @@ export function EmailSentPage() {
                 onChange={(e) => setComposeForm({ ...composeForm, subject: e.target.value })}
                 placeholder="Subject"
               />
-              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                <div style={{ flex: 1.6 }}>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 500 }}>Body (HTML)</label>
-                  <ScriptBodyEditor
-                    ref={editorRef}
-                    value={composeForm.body_html}
-                    onChange={(content) => setComposeForm({ ...composeForm, body_html: content })}
-                    onEditorState={(plain, index) => {
-                      setEditorPlainText(plain);
-                      setEditorCursorIndex(index ?? 0);
-                    }}
-                    placeholder="Write your email body. Use variables like {{contact_first_name}}."
-                  />
-                  {autocompleteActive && suggestions.length > 0 && (
-                    <div className={styles.variableAutocomplete}>
-                      {suggestions.slice(0, 8).map((v) => (
-                        <button
-                          key={v.key}
-                          type="button"
-                          className={styles.variableAutocompleteItem}
-                          onClick={() => {
-                            if (!autocompleteContext) return;
-                            const insert = `{{${v.key}}}`;
-                            editorRef.current?.replaceRange(
-                              autocompleteContext.startIndex,
-                              editorCursorIndex,
-                              insert
-                            );
-                            editorRef.current?.focus();
-                          }}
-                        >
-                          <span>{v.label}</span>
-                          <code>{v.key}</code>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-start' }}>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setShowPreviewModal(true)}
-                    >
-                      Show Preview
-                    </Button>
+              <div>
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: 500 }}>Body (HTML)</label>
+                <ScriptBodyEditor
+                  ref={editorRef}
+                  value={composeForm.body_html}
+                  onChange={(content) => setComposeForm({ ...composeForm, body_html: content })}
+                  onEditorState={(plain, index) => {
+                    setEditorPlainText(plain);
+                    setEditorCursorIndex(index ?? 0);
+                  }}
+                  placeholder="Write your email body. Use variables like {{contact_first_name}}."
+                />
+                {autocompleteActive && suggestions.length > 0 && (
+                  <div className={styles.variableAutocomplete}>
+                    {suggestions.slice(0, 8).map((v) => (
+                      <button
+                        key={v.key}
+                        type="button"
+                        className={styles.variableAutocompleteItem}
+                        onClick={() => {
+                          if (!autocompleteContext) return;
+                          const insert = `{{${v.key}}}`;
+                          editorRef.current?.replaceRange(
+                            autocompleteContext.startIndex,
+                            editorCursorIndex,
+                            insert
+                          );
+                          editorRef.current?.focus();
+                        }}
+                      >
+                        <span>{v.label}</span>
+                        <code>{v.key}</code>
+                      </button>
+                    ))}
                   </div>
-                </div>
-                <div style={{ width: 220 }}>
-                  <VariableSelector onInsert={handleInsertVariable} />
+                )}
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-start' }}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setShowPreviewModal(true)}
+                  >
+                    Show Preview
+                  </Button>
                 </div>
               </div>
             </>

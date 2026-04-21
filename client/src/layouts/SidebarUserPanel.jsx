@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAppSelector } from '../app/hooks';
 import { selectUser } from '../features/auth/authSelectors';
 import { getUserDisplayName, getUserInitials } from '../features/auth/utils/userDisplay';
@@ -32,7 +32,6 @@ function SettingsIcon() {
  */
 export function SidebarUserPanel({ onNavigate }) {
   const user = useAppSelector(selectUser);
-  const navigate = useNavigate();
   const logout = useLogout();
   const [menuOpen, setMenuOpen] = useState(false);
   const wrapRef = useRef(null);
@@ -53,12 +52,6 @@ export function SidebarUserPanel({ onNavigate }) {
   const displayName = getUserDisplayName(user);
   const initials = getUserInitials(user);
   const photo = user.profilePhotoUrl;
-
-  function goProfile() {
-    setMenuOpen(false);
-    navigate('/profile');
-    onNavigate?.();
-  }
 
   return (
     <div className={styles.footer}>
@@ -90,9 +83,18 @@ export function SidebarUserPanel({ onNavigate }) {
           </button>
           {menuOpen && (
             <div className={styles.menu} role="menu">
-              <button type="button" className={styles.menuItem} role="menuitem" onClick={goProfile}>
+              <Link
+                to="/profile"
+                className={styles.menuItem}
+                role="menuitem"
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                  setMenuOpen(false);
+                  onNavigate?.();
+                }}
+              >
                 Show profile
-              </button>
+              </Link>
             </div>
           )}
         </div>

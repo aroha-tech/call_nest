@@ -2,6 +2,7 @@ import { query } from '../../config/db.js';
 import { sqlDateBetweenInclusive } from '../../utils/dateRangeQuery.js';
 import { getCreatedByUserIdsForScope } from './userMessageScopeService.js';
 import { listTenantActivityFeed } from './tenantActivityLogService.js';
+import { listDashboardPendingCallbacks } from './scheduledCallbacksService.js';
 
 async function buildActivityFeed(tenantId, actingUser) {
   return listTenantActivityFeed(tenantId, actingUser, { limit: 45 });
@@ -214,12 +215,14 @@ async function getAdminDashboard(tenantId, actingUser, range) {
 
   const [
     upcomingMeetings,
+    pendingCallbacks,
     recentConnectedCalls,
     callsToday,
     emailsTotal,
     meetingsMetric,
   ] = await Promise.all([
     listUpcomingMeetings(tenantId, actingUser, 6),
+    listDashboardPendingCallbacks(tenantId, actingUser, 6),
     listRecentConnectedCalls(tenantId, actingUser, 8),
     getCallsTodayStats(tenantId, actingUser),
     getOutboundSentEmailCount(tenantId, actingUser, range),
@@ -242,6 +245,7 @@ async function getAdminDashboard(tenantId, actingUser, range) {
     campaignsActive: Number(activeCampaignRow?.total ?? 0),
     meetingsMetric,
     upcomingMeetings,
+    pendingCallbacks,
     recentConnectedCalls,
     callsToday,
     emailsTotal,
@@ -317,12 +321,14 @@ async function getManagerDashboard(tenantId, actingUser, range) {
 
   const [
     upcomingMeetings,
+    pendingCallbacks,
     recentConnectedCalls,
     callsToday,
     emailsTotal,
     meetingsMetric,
   ] = await Promise.all([
     listUpcomingMeetings(tenantId, actingUser, 6),
+    listDashboardPendingCallbacks(tenantId, actingUser, 6),
     listRecentConnectedCalls(tenantId, actingUser, 8),
     getCallsTodayStats(tenantId, actingUser),
     getOutboundSentEmailCount(tenantId, actingUser, range),
@@ -345,6 +351,7 @@ async function getManagerDashboard(tenantId, actingUser, range) {
     campaignsActive: Number(activeCampaignRow?.total ?? 0),
     meetingsMetric,
     upcomingMeetings,
+    pendingCallbacks,
     recentConnectedCalls,
     callsToday,
     emailsTotal,
@@ -371,12 +378,14 @@ async function getAgentDashboard(tenantId, actingUser, range) {
 
   const [
     upcomingMeetings,
+    pendingCallbacks,
     recentConnectedCalls,
     callsToday,
     emailsTotal,
     meetingsMetric,
   ] = await Promise.all([
     listUpcomingMeetings(tenantId, actingUser, 6),
+    listDashboardPendingCallbacks(tenantId, actingUser, 6),
     listRecentConnectedCalls(tenantId, actingUser, 8),
     getCallsTodayStats(tenantId, actingUser),
     getOutboundSentEmailCount(tenantId, actingUser, range),
@@ -395,6 +404,7 @@ async function getAgentDashboard(tenantId, actingUser, range) {
     campaignsActive: null,
     meetingsMetric,
     upcomingMeetings,
+    pendingCallbacks,
     recentConnectedCalls,
     callsToday,
     emailsTotal,

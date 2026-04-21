@@ -106,6 +106,49 @@ function normalizeMysqlDatetime(raw) {
   throw err;
 }
 
+/**
+ * Pending callbacks for the tenant dashboard widget (same assignee scope as list/metrics).
+ * Oldest scheduled first (overdue pending appears before future).
+ */
+export async function listDashboardPendingCallbacks(tenantId, actingUser, limit = 6) {
+  const scopedIds = await getAssignedUserIdsForScope(tenantId, actingUser);
+  const lim = Math.min(20, Math.max(1, limit));
+  const scopeClause =
+    scopedIds == null ? '' : ` AND sc.assigned_user_id IN (${scopedIds.map(() => '?').join(',')}) `;
+  const scopeParams = scopedIds == null ? [] : scopedIds;
+
+  const rows = await query(
+    `SELECT sc.id, sc.contact_id, sc.scheduled_at, sc.status, sc.notes,
+            c.display_name AS contact_name, c.type AS contact_type,
+            cp.phone AS contact_phone,
+            u.name AS assigned_name
+     FROM scheduled_callbacks sc
+     INNER JOIN contacts c
+       ON c.id = sc.contact_id AND c.tenant_id = sc.tenant_id AND c.deleted_at IS NULL
+     LEFT JOIN contact_phones cp
+       ON cp.id = sc.contact_phone_id AND cp.tenant_id = sc.tenant_id
+     LEFT JOIN users u
+       ON u.id = sc.assigned_user_id AND u.tenant_id = sc.tenant_id AND u.is_deleted = 0
+     WHERE sc.tenant_id = ? AND sc.deleted_at IS NULL
+       AND sc.status = 'pending'${scopeClause}
+     ORDER BY sc.scheduled_at ASC
+     LIMIT ${lim}`,
+    [tenantId, ...scopeParams]
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    contact_id: r.contact_id,
+    scheduled_at: r.scheduled_at,
+    status: r.status,
+    notes: r.notes,
+    contact_name: r.contact_name,
+    contact_type: r.contact_type,
+    contact_phone: r.contact_phone,
+    assigned_name: r.assigned_name,
+  }));
+}
+
 export async function getCallbackMetrics(tenantId, actingUser, { assigned_user_id = null } = {}) {
   const scopedIds = await getAssignedUserIdsForScope(tenantId, actingUser);
   const { effectiveIds } = enforceRequestedUserIdInScope(assigned_user_id, scopedIds);
