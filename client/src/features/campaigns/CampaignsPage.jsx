@@ -497,7 +497,9 @@ export function CampaignsPage() {
     return (
       <div className={listStyles.page}>
         <PageHeader title="Campaigns" />
-        <Alert variant="error">You do not have permission to view campaigns.</Alert>
+        <Alert variant="error" display="inline">
+          You do not have permission to view campaigns.
+        </Alert>
       </div>
     );
   }
@@ -508,8 +510,8 @@ export function CampaignsPage() {
         title="Campaigns"
         description={
           role === 'agent'
-            ? 'Campaigns with no specific manager, and campaigns tied to your manager. Open a campaign to work your assigned contacts.'
-            : 'Static campaigns tag contacts with campaign_id. Filter campaigns use rules (Tag uses multi-select: is any of). Owning manager: if set, only that manager sees the campaign; if empty, all managers see it. Agents only see assigned records when opening a campaign.'
+            ? 'Campaigns you can access—open one to work assigned records.'
+            : 'Static = membership; filter = rules. Owning manager limits visibility; agents see assignments inside a campaign.'
         }
         actions={
           isAdmin && canCreate ? (

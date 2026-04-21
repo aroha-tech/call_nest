@@ -269,7 +269,7 @@ export function RegisterTenantForm() {
         </p>
 
         {error && (
-          <Alert variant="error" className={styles.alert}>
+          <Alert variant="error" className={styles.alert} display="inline">
             {error}
           </Alert>
         )}

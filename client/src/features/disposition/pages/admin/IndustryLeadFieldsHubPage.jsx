@@ -43,7 +43,7 @@ export function IndustryLeadFieldsHubPage() {
     <div className={styles.page}>
       <PageHeader
         title="Industry lead fields"
-        description="Choose an industry, then define lead and contact fields for that vertical. Tenants see fields for their assigned industry; optional packs can be enabled in each tenant’s Company settings."
+        description="Define lead and contact fields per industry. Tenants see fields for their industry (optional packs in Company settings)."
         actions={
           <Link className={styles.topLink} to="/admin/masters/industries">
             Industries list

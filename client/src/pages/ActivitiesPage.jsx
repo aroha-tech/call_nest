@@ -639,7 +639,9 @@ export function ActivitiesPage() {
     return (
       <div className={listStyles.page}>
         <PageHeader title="Call history" description="Calls & follow-ups" />
-        <Alert variant="error">You don’t have access to the call module.</Alert>
+        <Alert variant="error" display="inline">
+          You don’t have access to the call module.
+        </Alert>
       </div>
     );
   }
@@ -662,7 +664,7 @@ export function ActivitiesPage() {
     <div className={listStyles.page}>
       <PageHeader
         title="Call history"
-        description="Call attempts only — use a row to narrow the list to that customer’s calls. Full CRM activity (assignments, all dials, WhatsApp, deals) is on the lead/contact screen under Activity."
+        description="Call attempts. Open a row to filter that customer’s calls; full CRM activity is on the lead/contact Activity tab."
         actions={
           canStartCall ? (
             <div className={styles.headerActions}>

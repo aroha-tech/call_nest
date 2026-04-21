@@ -1,8 +1,9 @@
 @import '../styles/variables.scss';
 
 .page {
-  max-width: 1120px;
+  max-width: 1280px;
   margin: 0 auto;
+  padding-bottom: 32px;
 }
 
 .pageDescWrap {
@@ -63,11 +64,11 @@
 
 .dealCard {
   border: 1px solid var(--color-border-subtle, #e5e7eb);
-  border-radius: 12px;
-  padding: 18px 20px;
-  margin-bottom: 18px;
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin-bottom: 20px;
   background: var(--color-bg-surface, #fff);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
 }
 
 .dealHeader {
@@ -91,29 +92,91 @@
   gap: 8px;
 }
 
+.stageTableWrap {
+  margin-top: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border-subtle, #e2e8f0);
+  overflow: hidden;
+  background: var(--color-bg-muted, #f8fafc);
+}
+
 .stageTable {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
+  background: var(--color-bg-surface, #fff);
 
   th,
   td {
     text-align: left;
-    padding: 10px 12px;
+    padding: 16px 18px;
+    vertical-align: middle;
     border-bottom: 1px solid var(--color-border-subtle, #f1f5f9);
   }
 
   th {
     color: var(--color-text-secondary, #64748b);
     font-weight: 600;
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
+    background: var(--color-bg-muted, #f8fafc);
   }
 
   tbody tr:hover td {
     background: var(--color-bg-muted, #f8fafc);
   }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+}
+
+.stageNameCell {
+  font-weight: 600;
+  color: var(--color-text-primary, #0f172a);
+}
+
+.stagePctBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--color-primary-700, #1d4ed8);
+}
+
+.stageActionsCol {
+  width: 108px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.outcomePill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.outcomePillOpen {
+  background: rgba(100, 116, 139, 0.15);
+  color: var(--color-text-secondary, #64748b);
+}
+
+.outcomePillWon {
+  background: rgba(34, 197, 94, 0.18);
+  color: #15803d;
+}
+
+.outcomePillLost {
+  background: rgba(239, 68, 68, 0.14);
+  color: #b91c1c;
 }
 
 .stageOrderCol {
@@ -166,43 +229,94 @@
   max-width: 360px;
 }
 
+.boardToolbarActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .boardPipelineSelect {
   width: 100%;
 }
 
+.boardRoot {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 240px);
+  margin-top: 4px;
+}
+
 .boardScroll {
   display: flex;
-  gap: 14px;
+  flex: 1;
+  gap: 16px;
   overflow-x: auto;
-  padding-bottom: 12px;
-  min-height: 240px;
+  padding: 4px 4px 20px;
+  min-height: calc(100dvh - 280px);
+  align-items: stretch;
   scrollbar-gutter: stable;
 }
 
 .boardCol {
-  flex: 0 0 280px;
-  min-width: 240px;
+  flex: 1 0 268px;
+  min-width: 256px;
+  max-width: 320px;
   display: flex;
   flex-direction: column;
   background: var(--color-bg-muted, #f8fafc);
   border: 1px solid var(--color-border-subtle, #e2e8f0);
-  border-radius: 12px;
-  max-height: 72vh;
+  border-radius: 14px;
+  min-height: calc(100dvh - 260px);
+  max-height: none;
   overflow: hidden;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.07);
 }
 
 .boardColHead {
-  padding: 12px 14px 10px;
+  padding: 14px 16px 12px;
   border-bottom: 1px solid var(--color-border-subtle, #e2e8f0);
-  background: var(--color-bg-surface, #fff);
+  background: linear-gradient(
+    180deg,
+    var(--color-bg-surface, #fff) 0%,
+    var(--color-bg-muted, #f1f5f9) 100%
+  );
+}
+
+.boardColTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .boardColTitle {
-  font-size: 0.9375rem;
+  font-size: 1rem;
   font-weight: 700;
-  margin: 0 0 6px;
+  margin: 0;
   color: var(--color-text-primary, #0f172a);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.boardColOutcome {
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.boardColOutcomeWon {
+  background: rgba(34, 197, 94, 0.2);
+  color: #16a34a;
+}
+
+.boardColOutcomeLost {
+  background: rgba(239, 68, 68, 0.18);
+  color: #dc2626;
 }
 
 .boardColMeta {
@@ -232,35 +346,53 @@
 .boardColBody {
   flex: 1;
   overflow-y: auto;
-  padding: 10px;
-  min-height: 120px;
+  padding: 12px;
+  min-height: 280px;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.boardColBodyDropActive {
+  background: rgba(37, 99, 235, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.2);
 }
 
 .boardColEmpty {
   font-size: 0.8125rem;
   color: var(--color-text-tertiary, #94a3b8);
   text-align: center;
-  padding: 20px 12px;
+  padding: 28px 14px;
   border: 1px dashed var(--color-border-subtle, #cbd5e1);
-  border-radius: 8px;
-  margin-bottom: 8px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  background: var(--color-bg-surface, #fff);
+  opacity: 0.92;
 }
 
 .oppCard {
   display: block;
-  padding: 12px;
-  margin-bottom: 8px;
+  padding: 14px 14px;
+  margin-bottom: 10px;
   background: var(--color-bg-surface, #fff);
   border: 1px solid var(--color-border-subtle, #e5e7eb);
-  border-radius: 10px;
+  border-radius: 12px;
   text-decoration: none;
   color: inherit;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  cursor: grab;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
 
   &:hover {
     border-color: var(--color-primary-400, #60a5fa);
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.14);
+    transform: translateY(-1px);
   }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.oppCardDragging {
+  opacity: 0.6;
 }
 
 .oppName {
@@ -380,6 +512,12 @@
   @media (max-width: 560px) {
     grid-template-columns: 1fr;
   }
+}
+
+.inlineHint {
+  margin: -8px 0 0;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #64748b);
 }
 
 .terminalBox {

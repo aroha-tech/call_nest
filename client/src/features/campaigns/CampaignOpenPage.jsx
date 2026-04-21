@@ -81,7 +81,7 @@ export function CampaignOpenPage() {
     <div className={listStyles.page}>
       <PageHeader
         title="Campaign workspace"
-        description="Your assigned records in this campaign (static: by campaign membership; filter: by campaign rules)."
+        description="Your assigned records (static = membership; filter = rules)."
         actions={
           <Button variant="secondary" onClick={() => navigate('/campaigns')}>
             ← All campaigns

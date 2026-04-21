@@ -994,7 +994,9 @@ export function ContactFormPage({ defaultType }) {
     return (
       <div className={styles.stateWrap}>
         <PageHeader title={title} />
-        <Alert variant="error">{contactError}</Alert>
+        <Alert variant="error" display="inline">
+          {contactError}
+        </Alert>
         <Button variant="ghost" onClick={() => navigate(-1)} style={{ marginTop: 12 }}>
           Back
         </Button>

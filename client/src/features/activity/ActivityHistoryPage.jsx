@@ -136,7 +136,7 @@ export function ActivityHistoryPage() {
     <div className={masterStyles.page}>
       <PageHeader
         title="Activity history"
-        description="Full workspace activity log (same visibility rules as your dashboard). Open a row when a link is available."
+        description="Workspace activity log (same visibility as your dashboard)."
         breadcrumbs={
           <Link to="/" className={styles.crumb}>
             Dashboard
@@ -181,7 +181,7 @@ export function ActivityHistoryPage() {
               <EmptyState
                 icon={String.fromCodePoint(0x1f4cb)}
                 title="No activities"
-                description="Nothing matches this filter or search. Try All, another tab, or clear the search."
+                description="Nothing matches. Try another tab or clear search."
               />
             </div>
           ) : (

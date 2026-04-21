@@ -139,7 +139,7 @@ export function IntegrationsPage() {
     <div className={listStyles.page}>
       <PageHeader
         title="Integrations"
-        description="Connect provider accounts, store tokens, and receive leads via webhook."
+        description="Connect providers, store tokens, receive leads via webhook."
         actions={<Button onClick={openCreate}>+ Add Integration</Button>}
       />
 

@@ -106,7 +106,7 @@ export function LoginForm() {
         <h1 className={styles.title}>Sign in</h1>
         <p className={styles.lead}>Use your workspace email and password.</p>
         {sessionMessage && (
-          <Alert variant="warning" className={styles.alert}>
+          <Alert variant="warning" className={styles.alert} display="inline">
             {sessionMessage}
           </Alert>
         )}
@@ -130,13 +130,13 @@ export function LoginForm() {
           </div>
         )}
         {registered && !workspaceHost && (
-          <Alert variant="success" className={styles.alert}>
+          <Alert variant="success" className={styles.alert} display="inline">
             Account created. Please sign in from your workspace URL (your administrator can share it), then use your
             email and password.
           </Alert>
         )}
         {error && (
-          <Alert variant="error" className={styles.alert}>
+          <Alert variant="error" className={styles.alert} display="inline">
             {error}
           </Alert>
         )}

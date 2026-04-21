@@ -10,38 +10,126 @@
   align-items: flex-end;
   gap: $space-2;
   pointer-events: none;
-  max-width: min(100vw - 24px, 360px);
+  max-width: min(100vw - 24px, 400px);
 }
 
 .toast {
-  pointer-events: none;
-  padding: $space-3 $space-4;
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: $space-3;
+  padding: $space-3 $space-3 $space-3 $space-3;
   font-size: $font-size-sm;
-  line-height: 1.4;
+  line-height: $line-height-normal;
   color: var(--color-text-primary);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-subtle);
   border-radius: $radius-md;
-  box-shadow: $shadow-lg;
-  animation: toastIn 0.2s ease-out;
+  border: 1px solid var(--color-border-subtle);
+  /* Solid elevated surface so controls (e.g. theme toggle) never show through */
+  background: var(--color-bg-elevated);
+  box-shadow:
+    $shadow-lg,
+    0 0 0 1px rgba(0, 0, 0, 0.12);
+  animation: toastIn 0.22s ease-out;
+  width: 100%;
+  text-align: start;
+}
 
-  &.warning {
-    border-inline-start: 3px solid var(--color-warning);
+.iconWrap {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: $radius-sm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.title {
+  font-weight: $font-weight-semibold;
+  font-size: $font-size-sm;
+  margin-bottom: 2px;
+  color: var(--color-text-primary);
+}
+
+.message {
+  font-size: $font-size-sm;
+  color: var(--color-text-primary);
+  opacity: 0.92;
+  word-break: break-word;
+}
+
+.dismiss {
+  flex-shrink: 0;
+  margin: -4px -4px 0 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: $radius-sm;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    color: var(--color-text-primary);
+    background: var(--color-bg-muted);
   }
+}
 
-  &.error {
-    border-inline-start: 3px solid var(--color-danger);
+.success {
+  background: color-mix(in srgb, var(--color-success) 28%, var(--color-bg-elevated));
+  border-color: color-mix(in srgb, var(--color-success) 48%, var(--color-border-strong));
+
+  .iconWrap {
+    background: color-mix(in srgb, var(--color-success) 38%, var(--color-bg-subtle));
+    color: var(--color-success);
   }
+}
 
-  &.info {
-    border-inline-start: 3px solid var(--color-info);
+.warning {
+  background: color-mix(in srgb, var(--color-warning) 26%, var(--color-bg-elevated));
+  border-color: color-mix(in srgb, var(--color-warning) 45%, var(--color-border-strong));
+
+  .iconWrap {
+    background: color-mix(in srgb, var(--color-warning) 36%, var(--color-bg-subtle));
+    color: var(--color-warning);
+  }
+}
+
+.error {
+  background: color-mix(in srgb, var(--color-danger) 26%, var(--color-bg-elevated));
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border-strong));
+
+  .iconWrap {
+    background: color-mix(in srgb, var(--color-danger) 34%, var(--color-bg-subtle));
+    color: var(--color-danger);
+  }
+}
+
+.info {
+  background: color-mix(in srgb, var(--color-info) 24%, var(--color-bg-elevated));
+  border-color: color-mix(in srgb, var(--color-info) 42%, var(--color-border-strong));
+
+  .iconWrap {
+    background: color-mix(in srgb, var(--color-info) 32%, var(--color-bg-subtle));
+    color: var(--color-info);
   }
 }
 
 @keyframes toastIn {
   from {
     opacity: 0;
-    transform: translateY(-6px);
+    transform: translateY(-8px);
   }
   to {
     opacity: 1;

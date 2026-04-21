@@ -114,7 +114,7 @@ export function PerformanceReportsPage() {
     <div className={styles.page}>
       <PageHeader
         title="Performance Reports"
-        description="Role-wise KPIs, calendar performance, trend analytics, export, and coaching insights."
+        description="KPIs, calendar performance, trends, export, and coaching."
         actions={canExport ? <Button onClick={exportCsv}>Export CSV</Button> : undefined}
       />
       {error ? <Alert variant="error">{error}</Alert> : null}

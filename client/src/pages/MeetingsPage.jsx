@@ -848,7 +848,7 @@ export function MeetingsPage() {
     <div className={styles.page}>
       <PageHeader
         title="Meetings"
-        description="Calendar across your connected email accounts. Add attendee email and track status."
+        description="Meetings from connected email—add attendees and track status."
         actions={
           canManage ? (
             <Button type="button" onClick={openCreate} disabled={!hasEmailAccounts}>

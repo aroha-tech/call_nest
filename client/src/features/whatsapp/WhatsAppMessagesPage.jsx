@@ -398,8 +398,8 @@ export function WhatsAppMessagesPage() {
         title="WhatsApp Messages"
         description={
           showSentByColumn
-            ? 'Messages sent by you and your team. Send template or text messages from here.'
-            : 'Your sent messages. Send template or text messages from here.'
+            ? 'Team sent messages—send templates or text from here.'
+            : 'Your sent messages—send templates or text from here.'
         }
         actions={
           canSend ? (

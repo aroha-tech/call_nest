@@ -269,7 +269,9 @@ export function TenantCompanySettingsPage() {
     return (
       <div className={styles.page}>
         <PageHeader title="Company settings" description="Manage your organization profile." />
-        <Alert variant="error">{loadError || 'Could not load settings'}</Alert>
+        <Alert variant="error" display="inline">
+          {loadError || 'Could not load settings'}
+        </Alert>
       </div>
     );
   }
@@ -278,7 +280,7 @@ export function TenantCompanySettingsPage() {
     <div className={styles.page}>
       <PageHeader
         title="Company settings"
-        description="Your company name, workspace address, and industry. Workspace address is used in your team’s sign-in URL."
+        description="Company name, workspace URL (sign-in), and industry."
       />
 
       {slugChangedNotice && (

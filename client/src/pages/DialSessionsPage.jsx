@@ -418,7 +418,9 @@ export function DialSessionsPage() {
     return (
       <div className={listStyles.page}>
         <PageHeader title="Dial sessions" description="Power dialer queues" />
-        <Alert variant="error">You don’t have access to dial sessions.</Alert>
+        <Alert variant="error" display="inline">
+          You don’t have access to dial sessions.
+        </Alert>
       </div>
     );
   }
@@ -427,7 +429,7 @@ export function DialSessionsPage() {
     <div className={listStyles.page}>
       <PageHeader
         title="Dial sessions"
-        description="Power-dial queues: session # is per user; open a row to run or review the queue. Related calls appear on Call history."
+        description="Per-user dial queues—open a session to run or review. Related calls are on Call history."
         actions={
           <div className={styles.headerActions}>
             <Button type="button" variant="secondary" size="sm" onClick={() => navigate('/dialer')}>

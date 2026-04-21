@@ -576,7 +576,9 @@ export function ContactActivityPanel({
   if (error) {
     return (
       <div className={styles.wrap}>
-        <Alert variant="error">{error}</Alert>
+        <Alert variant="error" display="inline">
+          {error}
+        </Alert>
       </div>
     );
   }

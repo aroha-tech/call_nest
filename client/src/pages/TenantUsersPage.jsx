@@ -274,8 +274,8 @@ export function TenantUsersPage() {
 
   const pageTitle = isManagerTeamView ? 'My team' : 'Users';
   const pageDescription = isManagerTeamView
-    ? 'Agents assigned to you by an administrator. Reporting assignments can only be changed by an admin.'
-    : 'Manage users in your organization';
+    ? 'Agents assigned to you; only an admin can change reporting lines.'
+    : 'Manage users in your organization.';
   const canAddUser = isFullAccess;
 
   return (
@@ -382,9 +382,9 @@ export function TenantUsersPage() {
                   }
                   description={
                     search || showDisabled || hasActiveUserFilters
-                      ? 'Try a different search or change filters and click Apply, or Reset.'
+                      ? 'Adjust search/filters and Apply, or Reset.'
                       : isManagerTeamView
-                        ? 'No agents are assigned to you yet. An administrator can assign agents to your team.'
+                        ? 'No agents assigned yet—ask an admin to assign your team.'
                         : 'Add users to your organization.'
                   }
                   action={

@@ -623,7 +623,7 @@ export function ContactImportPage({ type }) {
     <div className={listStyles.page}>
       <PageHeader
         title={title}
-        description="Upload CSV or Excel (.xlsx) exports from Meta, Google, IndiaMART, JustDial, 99acres, MagicBricks, NoBroker, etc. Column names are auto-mapped; adjust below if needed. Duplicates match on primary phone. You can upload a real .xlsx file — renaming .xlsx to .csv is not needed."
+        description="Upload a CSV/XLSX file. We auto-map columns and check duplicates by primary phone."
         actions={
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Button variant="secondary" onClick={() => navigate(historyPath)}>
@@ -715,42 +715,33 @@ export function ContactImportPage({ type }) {
                     }}
                     className={styles.fileInput}
                   />
-                    <div className={styles.footerNote} style={{ marginTop: 8 }}>
-                      Each row needs a <b>name</b> (full name, first+last, or display name) and <b>first name or email</b>.
-                      Phone columns like mobile / contact_number / whatsapp are detected automatically.
-                      <div style={{ marginTop: 6 }}>
-                        <b>Duplicates:</b> same primary phone within this import type ({type}) — Skip mode leaves the
-                        existing row unchanged; Update mode refreshes it. Leads and contacts are separate: the same
-                        number can exist as both a lead and a contact without merging or changing type.
-                      </div>
-                      <div style={{ marginTop: 6 }}>
-                        <b>Max file size:</b> {CSV_IMPORT_MAX_MB} MB · <b>Max rows per run:</b> 2000 (split larger files).
-                      </div>
-                      <div className={styles.sampleCsvBlock}>
-                        <div className={styles.sampleCsvTitle}>Sample CSV (download)</div>
-                        <p className={styles.sampleCsvIntro}>{importSampleIntro}</p>
-                        <ul className={styles.sampleCsvList}>
-                          {importSampleLinks.map(({ filename, label }) => (
-                            <li key={filename}>
-                              <a
-                                href={importSampleHref(filename)}
-                                download={filename}
-                                className={styles.sampleCsvLink}
-                                title={filename}
-                              >
-                                {label}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                  <div className={styles.footerNote} style={{ marginTop: 8 }}>
+                    Keep required identity columns and a valid phone/email. Max file size: {CSV_IMPORT_MAX_MB} MB.
+                    <div className={styles.sampleCsvBlock} style={{ marginTop: 8 }}>
+                      <div className={styles.sampleCsvTitle}>Sample CSV (download)</div>
+                      <p className={styles.sampleCsvIntro}>{importSampleIntro}</p>
+                      <ul className={styles.sampleCsvList}>
+                        {importSampleLinks.map(({ filename, label }) => (
+                          <li key={filename}>
+                            <a
+                              href={importSampleHref(filename)}
+                              download={filename}
+                              className={styles.sampleCsvLink}
+                              title={filename}
+                            >
+                              {label}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
+                  </div>
                 </div>
 
                 <div className={styles.stepCard}>
                   <div className={styles.stepTitle}>
                     <div className={styles.stepTitleText}>Import settings</div>
-                    <div className={styles.stepHint}>Duplicates are checked by primary phone</div>
+                    <div className={styles.stepHint}>Duplicates are matched by primary phone.</div>
                   </div>
 
                   <div className={styles.grid2}>
@@ -807,10 +798,7 @@ export function ContactImportPage({ type }) {
                         />
                       </div>
                     ) : null}
-                    <div className={styles.importBulkHint}>
-                      Manager and agent columns in the file override these defaults. For rows that already exist,
-                      selected tags are added alongside existing tags (nothing is removed).
-                    </div>
+                    <div className={styles.importBulkHint}>File-level manager/agent values override defaults.</div>
                   </div>
 
                   <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
@@ -858,16 +846,11 @@ export function ContactImportPage({ type }) {
                 <div className={styles.stepTitle}>
                   <div className={styles.stepTitleText}>Match columns &amp; preview contacts</div>
                   <div className={styles.stepHint}>
-                    One column from your file per column below. Pick what to save each as, check the header and samples,
-                    then review the contact preview — it updates as you change mappings.
+                    Select how each file column should be saved.
                   </div>
                 </div>
                 <div className={styles.footerNote} style={{ marginBottom: 10 }}>
-                  For each column, choose where it should be saved. <b>Unmapped</b> skips that column. Standard
-                  contact fields (name, phone, city, …) and your existing extra fields are in the list. Pick{' '}
-                  <b>Add new custom field</b> when you need a new extra field — values import into it. Use{' '}
-                  <b>Data type</b> only if the values in the file don&apos;t match the usual format. Sample rows are from
-                  your file.
+                  Use <b>Unmapped</b> to skip a column. Use <b>Add new custom field</b> only when needed.
                 </div>
                 <div className={styles.dataMappingTitle}>Match your file columns</div>
                 <div className={styles.excelWrap}>
@@ -970,9 +953,7 @@ export function ContactImportPage({ type }) {
                                     )}
                                     {current.target === 'new_custom' ? (
                                       <span className={styles.fieldTypeHint}>
-                                        Suggested <b>{col.suggestedFieldType || 'text'}</b> from your header and samples
-                                        — change <b>Data type</b> if that doesn&apos;t fit. The new field uses this
-                                        column&apos;s header as its name.
+                                        Suggested type: <b>{col.suggestedFieldType || 'text'}</b>.
                                       </span>
                                     ) : current.target === 'custom' && current.customFieldId ? (
                                       (() => {
@@ -981,8 +962,7 @@ export function ContactImportPage({ type }) {
                                         );
                                         return cf?.type ? (
                                           <span className={styles.fieldTypeHint}>
-                                            This field is usually <b>{cf.type}</b>. The list above starts there — change{' '}
-                                            <b>Data type</b> only if this file uses a different format.
+                                            Default type: <b>{cf.type}</b>.
                                           </span>
                                         ) : null;
                                       })()
@@ -1064,19 +1044,11 @@ export function ContactImportPage({ type }) {
                     ) : null}
                   </div>
                   <div className={styles.footerNote} style={{ marginBottom: 10 }}>
-                    <b>New</b> = new row for this import type. <b>Skip dup</b> / <b>Update dup</b> = that primary phone
-                    already exists as a <b>{type}</b>. If it exists only as the other type (lead vs contact), preview
-                    shows <b>New</b> — a second record is created. Fix mapping errors before importing. Extra contact
-                    details (city,
-                    state, …) and your own extra fields show as separate columns when filled. <b>Sample</b> is the
-                    preview row number; errors use the real file row.
+                    Check outcome and fix any row errors before starting import.
                   </div>
                   {reviewData && Number(reviewData.totalRows) > IMPORT_BACKGROUND_ROW_THRESHOLD ? (
                     <Alert variant="info" style={{ marginBottom: 12 }}>
-                      This file has more than {IMPORT_BACKGROUND_ROW_THRESHOLD} rows. <b>Start import</b> will queue a{' '}
-                      <b>background job</b> (this page returns right away). Track progress under{' '}
-                      <Link to="/settings/background-jobs">Settings → Background tasks</Link>; when the job finishes, a
-                      row appears in <Link to={historyPath}>Import history</Link> with created/updated counts.
+                      Large file detected ({IMPORT_BACKGROUND_ROW_THRESHOLD}+ rows). Import runs in background.
                     </Alert>
                   ) : null}
                   <div className={styles.reviewScroll}>
@@ -1161,7 +1133,7 @@ export function ContactImportPage({ type }) {
                 <div className={styles.stepTitleText}>Help</div>
                 <div className={styles.stepHint}>What columns can the import understand?</div>
               </div>
-                <div className={styles.footerNote}>
+              <div className={styles.footerNote}>
                 <div>
                   <b>We match common header names</b> (e.g. name, mobile, email, city, source, status) to the right
                   field when you load the file. You can always change the <b>Save as</b> dropdown.

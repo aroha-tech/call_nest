@@ -33,7 +33,9 @@ export function VariableSelector({ onInsert, className = '' }) {
   if (error) {
     return (
       <div className={`${styles.wrapper} ${className}`}>
-        <Alert variant="error">{error}</Alert>
+        <Alert variant="error" display="inline">
+          {error}
+        </Alert>
       </div>
     );
   }

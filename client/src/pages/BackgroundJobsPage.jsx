@@ -360,7 +360,7 @@ export function BackgroundJobsPage() {
     <div className={listStyles.page}>
       <PageHeader
         title="Background tasks"
-        description="Imports, exports, and bulk actions run in the background with live progress. Completed, failed, and cancelled rows stay until you press Refresh or until the automatic refresh every 90 seconds—then they are cleared from this list so only active work remains. Download exports before they disappear."
+        description="Background imports, exports, and bulk jobs with live progress. Finished rows clear on refresh—download exports before they drop off."
         actions={
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <span

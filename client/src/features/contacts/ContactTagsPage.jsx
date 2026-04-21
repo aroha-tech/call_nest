@@ -95,7 +95,9 @@ export function ContactTagsPage() {
     return (
       <div className={listStyles.page}>
         <PageHeader title="Contact tags" />
-        <Alert variant="error">Only admin or manager can manage contact tags.</Alert>
+        <Alert variant="error" display="inline">
+          Only admin or manager can manage contact tags.
+        </Alert>
       </div>
     );
   }
@@ -104,7 +106,7 @@ export function ContactTagsPage() {
     <div className={listStyles.page}>
       <PageHeader
         title="Contact tags"
-        description="Tags are shared for the whole organization. Admin can archive any tag; managers can archive tags they created. Everyone assigns any tag on leads and contacts."
+        description="Shared org tags. Admin and tag-creating managers can archive; everyone can assign on leads and contacts."
         actions={<Button onClick={openCreate}>+ New tag</Button>}
       />
 

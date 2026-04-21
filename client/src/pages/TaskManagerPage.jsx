@@ -240,12 +240,12 @@ export function TaskManagerPage() {
 
   const pageDescription = useMemo(() => {
     if (isAgentRole) {
-      return 'Your daily targets, upcoming schedule, and past performance in one place. Notes stay visible to you and your manager.';
+      return 'Your targets, schedule, and history—notes visible to you and your manager.';
     }
     if (role === 'manager') {
-      return 'Run your team like a CRM workspace: assign targets only to agents who report to you, review today’s execution, and scan history by rep.';
+      return 'Targets and execution for your team: assign, review today, and browse history by rep.';
     }
-    return 'Create templates, assign work across the tenant, and monitor execution with a clear today / upcoming / history flow.';
+    return 'Templates, assignments, and execution across the tenant (today / upcoming / history).';
   }, [isAgentRole, role]);
 
   const loadManageCatalog = useCallback(async () => {

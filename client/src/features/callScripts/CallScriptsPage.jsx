@@ -285,7 +285,7 @@ export function CallScriptsPage() {
               <EmptyState
                 icon="📜"
                 title={search || showInactive ? 'No results found' : 'No call scripts yet'}
-                description={search || showInactive ? 'Try a different search or clear filters.' : 'Add a script to guide agents during calls. Use variables for dynamic content.'}
+                description={search || showInactive ? 'Try another search or clear filters.' : 'Add scripts for calls; use variables for dynamic text.'}
                 action={canAddScript && !search && !showInactive ? openCreate : undefined}
                 actionLabel="Add Script"
               />

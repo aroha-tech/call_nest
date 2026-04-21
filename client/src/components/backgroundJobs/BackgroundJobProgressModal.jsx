@@ -364,7 +364,7 @@ export function BackgroundJobProgressModal({
       ) : null}
 
       {job && statusStr === 'failed' ? (
-        <Alert variant="error">
+        <Alert variant="error" display="inline">
           <strong>We couldn’t complete this.</strong>
           <div className={styles.failLead}>
             {job.errorMessage ||

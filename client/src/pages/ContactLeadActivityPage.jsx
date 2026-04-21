@@ -168,7 +168,7 @@ export function ContactLeadActivityPage({ recordType }) {
     <div className={listStyles.page}>
       <PageHeader
         title="Activity"
-        description="Overview loads first. Open the timeline when you need the full story — it loads in pages as you scroll."
+        description="Summary first; open the timeline for full history (paged as you scroll)."
         actions={
           <Button type="button" variant="secondary" size="sm" onClick={() => navigate(recordPath)}>
             Back to record

@@ -76,7 +76,7 @@ export function TemplateVariablesPage() {
   return (
     <MasterCRUDPage
       title="Template Variables"
-      description="System-level variables for call scripts, WhatsApp, email and SMS templates (e.g. {{contact_first_name}})"
+      description="System variables for scripts and templates (e.g. {{contact_first_name}})."
       data={templateVariables}
       loading={loading}
       error={error}

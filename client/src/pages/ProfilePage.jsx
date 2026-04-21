@@ -169,7 +169,7 @@ export function ProfilePage() {
     <div className={styles.page}>
       <PageHeader
         title="Profile"
-        description="Update your name, date/time display, and password. Email changes will be available later with verification."
+        description="Name, date/time display, and password. Email change with verification is planned."
       />
       <form className={styles.card} onSubmit={handleSubmit} noValidate>
         <div className={styles.hero}>
@@ -193,7 +193,7 @@ export function ProfilePage() {
         </div>
 
         {apiError && (
-          <Alert variant="error" className={styles.alert}>
+          <Alert variant="error" className={styles.alert} display="inline">
             {apiError}
           </Alert>
         )}

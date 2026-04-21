@@ -350,7 +350,7 @@ export function DispositionsPage({ readOnly = false }) {
               <EmptyState
                 icon="📋"
                 title={search || showInactive ? 'No results found' : 'No dispositions yet'}
-                description={search || showInactive ? 'Try a different search or clear filters.' : 'Create dispositions or import from industry templates (only when you have none).'}
+                description={search || showInactive ? 'Try another search or clear filters.' : 'Create dispositions or import from industry templates when you have none.'}
                 action={!readOnly && hasNoDispositions ? () => setShowCloneModal(true) : undefined}
                 actionLabel="Import from Template"
               />

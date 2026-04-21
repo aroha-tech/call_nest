@@ -31,7 +31,7 @@ export function DispositionAdminPage() {
     <div className={styles.page}>
       <PageHeader
         title="Disposition Management"
-        description="Configure global disposition settings, default templates, and campaign masters (Campaign Types & Campaign Statuses are also under System Masters)."
+        description="Global dispositions, defaults, and campaign masters (types/statuses also under System Masters)."
       />
 
       <Tabs>

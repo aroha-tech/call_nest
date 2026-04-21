@@ -62,7 +62,7 @@ export function ContactImportHistoryPage({ type }) {
     <div className={listStyles.page}>
       <PageHeader
         title={title}
-        description="Each row is one CSV import run: file name, counts, and a sample of row errors if any."
+        description="One row per import run: file, counts, and sample errors if any."
         actions={
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Button variant="secondary" onClick={() => navigate(importPath)}>

@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAppSelector } from '../app/hooks';
+import { selectUser } from '../features/auth/authSelectors';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { IconButton } from '../components/ui/IconButton';
@@ -10,10 +12,91 @@ import { Alert } from '../components/ui/Alert';
 import { Spinner } from '../components/ui/Spinner';
 import { Modal, ModalFooter, ConfirmModal } from '../components/ui/Modal';
 import { dealsAPI } from '../services/dealsAPI';
+import { opportunitiesAPI } from '../services/opportunitiesAPI';
+import { contactsAPI } from '../services/contactsAPI';
+import { tenantUsersAPI } from '../services/tenantUsersAPI';
 import { useToast } from '../context/ToastContext';
 import styles from './DealsPage.module.scss';
 
+/**
+ * Combined value: `${percent}|open|won|lost`.
+ * Won/Lost only exist at 100% (closed). Below 100% is always open pipeline weight.
+ */
+function buildStageProgressOutcomeOptions() {
+  const opts = [];
+  for (let pct = 10; pct <= 90; pct += 10) {
+    opts.push({
+      value: `${pct}|open`,
+      label: `${pct}% · Open (active pipeline)`,
+    });
+  }
+  opts.push({ value: '100|open', label: '100% · Open (active pipeline)' });
+  opts.push({ value: '100|won', label: '100% · Won (closed successfully)' });
+  opts.push({ value: '100|lost', label: '100% · Lost (closed / missed)' });
+  return opts;
+}
+
+const STAGE_PROGRESS_OUTCOME_OPTIONS = buildStageProgressOutcomeOptions();
+
+function progressOutcomeFromStage(s) {
+  let won = Number(s?.is_closed_won) === 1 || s?.is_closed_won === true;
+  let lost = Number(s?.is_closed_lost) === 1 || s?.is_closed_lost === true;
+  if (won && lost) lost = false;
+  if (won) return '100|won';
+  if (lost) return '100|lost';
+
+  const raw = Number(s?.progression_percent);
+  const rounded = Number.isFinite(raw) ? Math.round(raw / 10) * 10 : 10;
+  const pct = Math.min(100, Math.max(10, rounded));
+  if (pct >= 100) return '100|open';
+  return `${pct}|open`;
+}
+
+function parseProgressOutcome(v) {
+  const str = String(v || '');
+  const [a, b] = str.split('|');
+  const parsedPct = Math.min(100, Math.max(10, Number(a) || 10));
+  const kind = b === 'won' || b === 'lost' ? b : 'open';
+  const progression_percent = kind === 'won' || kind === 'lost' ? 100 : parsedPct;
+  return {
+    progression_percent,
+    is_closed_won: kind === 'won',
+    is_closed_lost: kind === 'lost',
+  };
+}
+
+/** Move one opportunity between board columns without refetching (avoids full-board loading flash). */
+function moveOppBetweenColumns(prev, oppId, fromStageId, toStageId) {
+  if (!prev?.columns?.length) return prev;
+  const fromId = String(fromStageId);
+  const toId = String(toStageId);
+  let moved = null;
+  const without = prev.columns.map((col) => {
+    if (String(col.id) !== fromId) return col;
+    const opps = col.opportunities || [];
+    const i = opps.findIndex((o) => Number(o.id) === Number(oppId));
+    if (i === -1) return col;
+    moved = { ...opps[i], stage_id: Number(toStageId) };
+    return {
+      ...col,
+      opportunities: [...opps.slice(0, i), ...opps.slice(i + 1)],
+    };
+  });
+  if (!moved) return prev;
+  return {
+    ...prev,
+    columns: without.map((col) => {
+      if (String(col.id) !== toId) return col;
+      return {
+        ...col,
+        opportunities: [moved, ...(col.opportunities || [])],
+      };
+    }),
+  };
+}
+
 export function DealsPage() {
+  const user = useAppSelector(selectUser);
   const { showToast } = useToast();
   const [tab, setTab] = useState('setup');
   const [deals, setDeals] = useState([]);
@@ -26,10 +109,16 @@ export function DealsPage() {
 
   const [dealModal, setDealModal] = useState(null);
   const [stageModal, setStageModal] = useState(null);
+  const [boardAddModal, setBoardAddModal] = useState(null);
   const [deleteDeal, setDeleteDeal] = useState(null);
   const [deleteStage, setDeleteStage] = useState(null);
   const [saving, setSaving] = useState(false);
   const [draggingStageId, setDraggingStageId] = useState(null);
+  const [draggingOppId, setDraggingOppId] = useState(null);
+  const [dragOverStageId, setDragOverStageId] = useState(null);
+  const [contactSearchLoading, setContactSearchLoading] = useState(false);
+  const [contactOptions, setContactOptions] = useState([]);
+  const [ownerOptions, setOwnerOptions] = useState([]);
 
   const fetchDeals = useCallback(async () => {
     setLoading(true);
@@ -89,6 +178,37 @@ export function DealsPage() {
     () => deals.filter((d) => d.is_active).map((d) => ({ value: String(d.id), label: d.name })),
     [deals]
   );
+  const selectedBoardDeal = useMemo(
+    () => deals.find((d) => String(d.id) === String(boardDealId)),
+    [deals, boardDealId]
+  );
+  const ownerChoices = useMemo(() => {
+    if (ownerOptions.length) return ownerOptions;
+    if (user?.id) return [{ value: String(user.id), label: user.name || user.email || 'Me' }];
+    return [];
+  }, [ownerOptions, user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await tenantUsersAPI.getAll({ page: 1, limit: 200, includeDisabled: false });
+        if (cancelled) return;
+        const users = res?.data?.data ?? [];
+        setOwnerOptions(
+          users.map((u) => ({
+            value: String(u.id),
+            label: u.name || u.email || '—',
+          }))
+        );
+      } catch {
+        if (!cancelled) setOwnerOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function saveDeal(e) {
     e?.preventDefault?.();
@@ -127,18 +247,19 @@ export function DealsPage() {
   async function saveStage(e) {
     e?.preventDefault?.();
     if (!stageModal) return;
-    const { mode, dealId, stageId, name, progression_percent, is_closed_won, is_closed_lost } = stageModal;
+    const { mode, dealId, stageId, name, progressOutcome } = stageModal;
     if (!String(name || '').trim()) {
       showToast('Stage name is required', 'warning');
       return;
     }
+    const { progression_percent, is_closed_won, is_closed_lost } = parseProgressOutcome(progressOutcome);
     setSaving(true);
     try {
       const body = {
         name: name.trim(),
-        progression_percent: progression_percent === '' ? 0 : Number(progression_percent),
-        is_closed_won: !!is_closed_won,
-        is_closed_lost: !!is_closed_lost,
+        progression_percent,
+        is_closed_won,
+        is_closed_lost,
       };
       if (mode === 'create') {
         await dealsAPI.createStage(dealId, body);
@@ -206,6 +327,26 @@ export function DealsPage() {
     setDraggingStageId(null);
   }, []);
 
+  const handleOppDragStart = useCallback((e, oppId, fromStageId) => {
+    e.dataTransfer.setData(
+      'application/json',
+      JSON.stringify({ oppId: Number(oppId), fromStageId: Number(fromStageId) })
+    );
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggingOppId(Number(oppId));
+  }, []);
+
+  const handleOppDragEnd = useCallback(() => {
+    setDraggingOppId(null);
+    setDragOverStageId(null);
+  }, []);
+
+  const handleOppStageDragOver = useCallback((e, targetStageId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverStageId(Number(targetStageId));
+  }, []);
+
   async function handleStageDrop(e, dealId, stages, targetStageId) {
     e.preventDefault();
     setDraggingStageId(null);
@@ -230,10 +371,119 @@ export function DealsPage() {
     }
   }
 
+  async function handleOppDrop(e, targetStageId) {
+    e.preventDefault();
+    const raw = e.dataTransfer.getData('application/json');
+    setDragOverStageId(null);
+    setDraggingOppId(null);
+    if (!raw) return;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    const oppId = Number(parsed?.oppId);
+    const fromStageId = Number(parsed?.fromStageId);
+    if (!oppId || !targetStageId || String(fromStageId) === String(targetStageId)) return;
+
+    const snapshot = boardData;
+    setBoardData((prev) => moveOppBetweenColumns(prev, oppId, fromStageId, targetStageId));
+
+    try {
+      await opportunitiesAPI.update(oppId, { stage_id: Number(targetStageId) });
+      showToast('Deal moved', 'success');
+    } catch (err) {
+      setBoardData(snapshot);
+      showToast(err.response?.data?.error || err.message, 'error');
+    }
+  }
+
+  function openBoardAddDeal() {
+    if (!selectedBoardDeal) return;
+    const firstStageId = selectedBoardDeal.stages?.[0]?.id
+      ? String(selectedBoardDeal.stages[0].id)
+      : '';
+    setBoardAddModal({
+      dealId: String(selectedBoardDeal.id),
+      stageId: firstStageId,
+      contactType: 'lead',
+      contactSearch: '',
+      contactId: '',
+      ownerId: user?.id ? String(user.id) : '',
+      title: '',
+      amount: '',
+    });
+    setContactOptions([]);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!boardAddModal) return;
+      setContactSearchLoading(true);
+      try {
+        const res = await contactsAPI.getAll({
+          type: boardAddModal.contactType,
+          search: boardAddModal.contactSearch || undefined,
+          page: 1,
+          limit: 50,
+        });
+        if (cancelled) return;
+        const rows = res?.data?.data ?? [];
+        setContactOptions(
+          rows.map((r) => ({
+            value: String(r.id),
+            label: [
+              r.display_name || r.first_name || r.email || `#${r.id}`,
+              r.primary_phone || r.email || '',
+            ]
+              .filter(Boolean)
+              .join(' · '),
+          }))
+        );
+      } catch {
+        if (!cancelled) setContactOptions([]);
+      } finally {
+        if (!cancelled) setContactSearchLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [boardAddModal]);
+
+  async function saveBoardDeal(e) {
+    e?.preventDefault?.();
+    if (!boardAddModal) return;
+    if (!boardAddModal.contactId || !boardAddModal.stageId || !boardAddModal.ownerId) {
+      showToast('Contact, stage, and owner are required', 'warning');
+      return;
+    }
+    setSaving(true);
+    try {
+      await opportunitiesAPI.create({
+        contact_id: Number(boardAddModal.contactId),
+        deal_id: Number(boardAddModal.dealId),
+        stage_id: Number(boardAddModal.stageId),
+        owner_id: Number(boardAddModal.ownerId),
+        title: boardAddModal.title?.trim() || null,
+        amount: boardAddModal.amount === '' ? null : Number(boardAddModal.amount),
+      });
+      setBoardAddModal(null);
+      await fetchBoard();
+      showToast('Deal added', 'success');
+    } catch (err) {
+      showToast(err.response?.data?.error || err.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading && !deals.length) {
     return (
       <div className={styles.page}>
-        <PageHeader title="Deals" description="Pipelines, stages, and board" />
+        <PageHeader title="Deals" description="Pipelines and board by stage." />
         <Spinner size="lg" />
       </div>
     );
@@ -243,16 +493,7 @@ export function DealsPage() {
     <div className={styles.page}>
       <PageHeader
         title="Deals"
-        description={
-          <span className={styles.pageDescWrap}>
-            <span className={styles.pageLead}>
-              Pipelines define your sales path. Stages carry a progress % for forecasting; the board shows open deals by stage.
-            </span>
-            <span className={styles.pageSub}>
-              Add the full deal (amount, owner, close date, campaign, etc.) on each lead or contact — not here.
-            </span>
-          </span>
-        }
+        description="Pipelines and board by stage. Full deal fields stay on each lead or contact."
         actions={
           <Button type="button" variant="primary" size="sm" onClick={() => setDealModal({ mode: 'create', name: '', description: '', is_active: true })}>
             New pipeline
@@ -317,7 +558,7 @@ export function DealsPage() {
                   >
                     <EditIcon />
                   </IconButton>
-                  <Button type="button" size="sm" variant="secondary" onClick={() => setStageModal({ mode: 'create', dealId: d.id, name: '', progression_percent: 0, is_closed_won: false, is_closed_lost: false })}>
+                  <Button type="button" size="sm" variant="secondary" onClick={() => setStageModal({ mode: 'create', dealId: d.id, name: '', progressOutcome: '10|open' })}>
                     Add stage
                   </Button>
                   <Button type="button" size="sm" variant="ghost" onClick={() => setDeleteDeal({ id: d.id, name: d.name })}>
@@ -327,64 +568,71 @@ export function DealsPage() {
               </div>
 
               {d.stages?.length ? (
-                <table className={styles.stageTable}>
-                  <thead>
-                    <tr>
-                      <th className={styles.stageOrderCol}>Reorder</th>
-                      <th>Stage</th>
-                      <th>Progress %</th>
-                      <th>Terminal</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {d.stages.map((s) => (
-                      <tr
-                        key={s.id}
-                        className={String(draggingStageId) === String(s.id) ? styles.stageRowDragging : ''}
-                        onDragOver={handleStageDragOver}
-                        onDrop={(e) => handleStageDrop(e, d.id, d.stages, s.id)}
-                      >
-                        <td className={styles.stageOrderCol}>
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            className={styles.stageDragHandle}
-                            draggable={!saving}
-                            title="Drag to reorder stages"
-                            aria-label={`Drag to reorder ${s.name}`}
-                            onDragStart={(e) => handleStageDragStart(e, s.id)}
-                            onDragEnd={handleStageDragEnd}
-                          >
-                            <span className={styles.stageDragGrip} aria-hidden>
-                              ⠿
-                            </span>
-                          </div>
-                        </td>
-                        <td>{s.name}</td>
-                        <td>{s.progression_percent}%</td>
-                        <td>
-                          {s.is_closed_won ? 'Won' : ''}
-                          {s.is_closed_lost ? 'Lost' : ''}
-                          {!s.is_closed_won && !s.is_closed_lost ? '—' : null}
-                        </td>
-                        <td>
-                          <RowActionGroup>
-                            <IconButton
-                              size="sm"
-                              title="Edit stage"
-                              onClick={() =>
-                                setStageModal({
-                                  mode: 'edit',
-                                  dealId: d.id,
-                                  stageId: s.id,
-                                  name: s.name,
-                                  progression_percent: s.progression_percent,
-                                  is_closed_won: !!s.is_closed_won,
-                                  is_closed_lost: !!s.is_closed_lost,
-                                })
-                              }
+                <div className={styles.stageTableWrap}>
+                  <table className={styles.stageTable}>
+                    <thead>
+                      <tr>
+                        <th className={styles.stageOrderCol}>Reorder</th>
+                        <th>Stage</th>
+                        <th>Forecast</th>
+                        <th>Outcome</th>
+                        <th className={styles.stageActionsCol} />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {d.stages.map((s) => (
+                        <tr
+                          key={s.id}
+                          className={String(draggingStageId) === String(s.id) ? styles.stageRowDragging : ''}
+                          onDragOver={handleStageDragOver}
+                          onDrop={(e) => handleStageDrop(e, d.id, d.stages, s.id)}
+                        >
+                          <td className={styles.stageOrderCol}>
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              className={styles.stageDragHandle}
+                              draggable={!saving}
+                              title="Drag to reorder stages"
+                              aria-label={`Drag to reorder ${s.name}`}
+                              onDragStart={(e) => handleStageDragStart(e, s.id)}
+                              onDragEnd={handleStageDragEnd}
                             >
+                              <span className={styles.stageDragGrip} aria-hidden>
+                                ⠿
+                              </span>
+                            </div>
+                          </td>
+                          <td className={styles.stageNameCell}>{s.name}</td>
+                          <td>
+                            <span className={styles.stagePctBadge}>
+                              {Math.round(Number(s.progression_percent) || 0)}%
+                            </span>
+                          </td>
+                          <td>
+                            {Number(s.is_closed_won) === 1 || s.is_closed_won === true ? (
+                              <span className={`${styles.outcomePill} ${styles.outcomePillWon}`}>Won</span>
+                            ) : Number(s.is_closed_lost) === 1 || s.is_closed_lost === true ? (
+                              <span className={`${styles.outcomePill} ${styles.outcomePillLost}`}>Lost</span>
+                            ) : (
+                              <span className={`${styles.outcomePill} ${styles.outcomePillOpen}`}>Open</span>
+                            )}
+                          </td>
+                          <td className={styles.stageActionsCol}>
+                            <RowActionGroup>
+                              <IconButton
+                                size="sm"
+                                title="Edit stage"
+                                onClick={() =>
+                                  setStageModal({
+                                    mode: 'edit',
+                                    dealId: d.id,
+                                    stageId: s.id,
+                                    name: s.name,
+                                    progressOutcome: progressOutcomeFromStage(s),
+                                  })
+                                }
+                              >
                               <EditIcon />
                             </IconButton>
                             <IconButton
@@ -395,12 +643,13 @@ export function DealsPage() {
                             >
                               <TrashIcon />
                             </IconButton>
-                          </RowActionGroup>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                            </RowActionGroup>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ) : (
                 <p className={styles.emptyHint}>No stages — add at least one.</p>
               )}
@@ -421,23 +670,41 @@ export function DealsPage() {
                 options={[{ value: '', label: 'Choose a pipeline…' }, ...dealOptions]}
               />
             </div>
-            <Button type="button" variant="secondary" size="sm" disabled={!boardDealId || boardLoading} onClick={fetchBoard}>
-              Refresh
-            </Button>
+            <div className={styles.boardToolbarActions}>
+              <Button type="button" variant="secondary" size="sm" disabled={!selectedBoardDeal} onClick={openBoardAddDeal}>
+                New deal
+              </Button>
+              <Button type="button" variant="secondary" size="sm" disabled={!boardDealId || boardLoading} onClick={fetchBoard}>
+                Refresh
+              </Button>
+            </div>
           </div>
           {boardLoading && <Spinner />}
           {!boardLoading && boardData && (
-            <div className={styles.boardScroll}>
-              {boardData.columns.map((col) => (
-                <div key={col.id} className={styles.boardCol}>
-                  <div className={styles.boardColHead}>
-                    <div className={styles.boardColTitle}>{col.name}</div>
-                    <div className={styles.boardColMeta}>
-                      <span className={styles.boardColBadge}>{col.progression_percent}%</span>
-                      <span className={styles.boardColCount}>{col.opportunities?.length || 0} deals</span>
+            <div className={styles.boardRoot}>
+              <div className={styles.boardScroll}>
+                {boardData.columns.map((col) => (
+                  <div key={col.id} className={styles.boardCol}>
+                    <div className={styles.boardColHead}>
+                      <div className={styles.boardColTitleRow}>
+                        <div className={styles.boardColTitle}>{col.name}</div>
+                        {Number(col.is_closed_won) === 1 || col.is_closed_won === true ? (
+                          <span className={`${styles.boardColOutcome} ${styles.boardColOutcomeWon}`}>Won</span>
+                        ) : Number(col.is_closed_lost) === 1 || col.is_closed_lost === true ? (
+                          <span className={`${styles.boardColOutcome} ${styles.boardColOutcomeLost}`}>Lost</span>
+                        ) : null}
+                      </div>
+                      <div className={styles.boardColMeta}>
+                        <span className={styles.boardColBadge}>{Math.round(Number(col.progression_percent) || 0)}%</span>
+                        <span className={styles.boardColCount}>{col.opportunities?.length || 0} deals</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className={styles.boardColBody}>
+                  <div
+                    className={`${styles.boardColBody} ${String(dragOverStageId) === String(col.id) ? styles.boardColBodyDropActive : ''}`}
+                    onDragOver={(e) => handleOppStageDragOver(e, col.id)}
+                    onDragLeave={() => setDragOverStageId((prev) => (String(prev) === String(col.id) ? null : prev))}
+                    onDrop={(e) => handleOppDrop(e, col.id)}
+                  >
                     {(col.opportunities || []).length === 0 ? (
                       <div className={styles.boardColEmpty}>No deals in this stage</div>
                     ) : null}
@@ -445,7 +712,10 @@ export function DealsPage() {
                       <Link
                         key={o.id}
                         to={o.contact_type === 'lead' ? `/leads/${o.contact_id}` : `/contacts/${o.contact_id}`}
-                        className={styles.oppCard}
+                        className={`${styles.oppCard} ${String(draggingOppId) === String(o.id) ? styles.oppCardDragging : ''}`}
+                        draggable={!saving}
+                        onDragStart={(e) => handleOppDragStart(e, o.id, col.id)}
+                        onDragEnd={handleOppDragEnd}
                       >
                         <div className={styles.oppName}>{o.display_name || o.email || '—'}</div>
                         {o.account_name ? <div className={styles.oppMeta}>{o.account_name}</div> : null}
@@ -462,7 +732,8 @@ export function DealsPage() {
                     ))}
                   </div>
                 </div>
-              ))}
+                    ))}
+              </div>
             </div>
           )}
         </>
@@ -533,69 +804,105 @@ export function DealsPage() {
         >
           <form onSubmit={saveStage} className={styles.modalForm}>
             <p className={styles.modalHint}>
-              Progress % drives default probability on deals in this stage. Mark at most one terminal outcome: won or lost.
+              Choose 10–90% for open pipeline stages. At 100% you can keep the stage open or mark it closed as Won or Lost.
             </p>
             <div className={styles.modalFields}>
-              <div className={styles.stageFormGrid}>
-                <Input
-                  label="Stage name"
-                  placeholder="e.g. Qualification"
-                  value={stageModal.name}
-                  onChange={(e) => setStageModal((p) => ({ ...p, name: e.target.value }))}
-                  required
-                />
-                <Input
-                  label="Progress %"
-                  hint="0–100 · used for forecasting weight"
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={0.01}
-                  value={stageModal.progression_percent}
-                  onChange={(e) => setStageModal((p) => ({ ...p, progression_percent: e.target.value }))}
-                />
-              </div>
-              <div className={styles.terminalBox}>
-                <div className={styles.terminalBoxTitle}>Terminal stage</div>
-                <p className={styles.terminalBoxHint}>Optional. Use for closed-won or closed-lost columns on the board.</p>
-                <label className={styles.checkboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={!!stageModal.is_closed_won}
-                    onChange={(e) =>
-                      setStageModal((p) => ({
-                        ...p,
-                        is_closed_won: e.target.checked,
-                        is_closed_lost: e.target.checked ? false : p.is_closed_lost,
-                      }))
-                    }
-                  />
-                  <span>
-                    <strong>Closed won</strong>
-                    <span className={styles.checkboxSub}>Deal succeeds in this stage.</span>
-                  </span>
-                </label>
-                <label className={styles.checkboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={!!stageModal.is_closed_lost}
-                    onChange={(e) =>
-                      setStageModal((p) => ({
-                        ...p,
-                        is_closed_lost: e.target.checked,
-                        is_closed_won: e.target.checked ? false : p.is_closed_won,
-                      }))
-                    }
-                  />
-                  <span>
-                    <strong>Closed lost</strong>
-                    <span className={styles.checkboxSub}>Deal ends unsuccessfully.</span>
-                  </span>
-                </label>
-              </div>
+              <Input
+                label="Stage name"
+                placeholder="e.g. Qualification"
+                value={stageModal.name}
+                onChange={(e) => setStageModal((p) => ({ ...p, name: e.target.value }))}
+                required
+              />
+              <Select
+                label="Forecast & outcome"
+                options={STAGE_PROGRESS_OUTCOME_OPTIONS}
+                value={stageModal.progressOutcome}
+                onChange={(e) => setStageModal((p) => ({ ...p, progressOutcome: e.target.value }))}
+                placeholder="Select…"
+              />
             </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => setStageModal(null)} disabled={saving}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" loading={saving}>
+                Save
+              </Button>
+            </ModalFooter>
+          </form>
+        </Modal>
+      )}
+
+      {boardAddModal && (
+        <Modal isOpen size="lg" title="New deal" onClose={() => !saving && setBoardAddModal(null)}>
+          <form onSubmit={saveBoardDeal} className={styles.modalForm}>
+            <div className={styles.modalFields}>
+              <div className={styles.stageFormGrid}>
+                <Input label="Pipeline" value={selectedBoardDeal?.name || '—'} disabled />
+                <Select
+                  label="Stage"
+                  value={boardAddModal.stageId}
+                  onChange={(e) => setBoardAddModal((p) => ({ ...p, stageId: e.target.value }))}
+                  options={
+                    selectedBoardDeal?.stages?.map((s) => ({
+                      value: String(s.id),
+                      label: `${s.name} (${s.progression_percent}%)`,
+                    })) || []
+                  }
+                  required
+                />
+                <Select
+                  label="Contact type"
+                  value={boardAddModal.contactType}
+                  onChange={(e) =>
+                    setBoardAddModal((p) => ({ ...p, contactType: e.target.value, contactId: '' }))
+                  }
+                  options={[
+                    { value: 'lead', label: 'Lead' },
+                    { value: 'contact', label: 'Contact' },
+                  ]}
+                />
+                <Input
+                  label="Search contact"
+                  placeholder="Name, email, or phone"
+                  value={boardAddModal.contactSearch}
+                  onChange={(e) => setBoardAddModal((p) => ({ ...p, contactSearch: e.target.value }))}
+                />
+                <Select
+                  label="Select contact"
+                  value={boardAddModal.contactId}
+                  onChange={(e) => setBoardAddModal((p) => ({ ...p, contactId: e.target.value }))}
+                  options={contactOptions}
+                  placeholder={contactSearchLoading ? 'Loading...' : 'Choose contact'}
+                  required
+                />
+                <Select
+                  label="Deal owner"
+                  value={boardAddModal.ownerId}
+                  onChange={(e) => setBoardAddModal((p) => ({ ...p, ownerId: e.target.value }))}
+                  options={ownerChoices}
+                  placeholder="Select owner"
+                  required
+                />
+                <Input
+                  label="Deal name (optional)"
+                  value={boardAddModal.title}
+                  onChange={(e) => setBoardAddModal((p) => ({ ...p, title: e.target.value }))}
+                  placeholder="e.g. Acme - Enterprise plan"
+                />
+                <Input
+                  label="Amount (optional)"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={boardAddModal.amount}
+                  onChange={(e) => setBoardAddModal((p) => ({ ...p, amount: e.target.value }))}
+                />
+              </div>
+            </div>
+            <ModalFooter>
+              <Button type="button" variant="ghost" onClick={() => setBoardAddModal(null)} disabled={saving}>
                 Cancel
               </Button>
               <Button type="submit" variant="primary" loading={saving}>

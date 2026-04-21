@@ -17,8 +17,8 @@ export function WorkflowMapPage({ variant }) {
           title="Workflow"
           description={
             isPlatform
-              ? 'Visual map of how tenants, system masters, default dialer assets, and platform users fit together.'
-              : 'Visual map of how leads, contacts, campaigns, dialer configuration, and channels connect in your workspace.'
+              ? 'How tenants, masters, dialer defaults, and platform users connect.'
+              : 'How leads, contacts, campaigns, dialer, and channels connect in your workspace.'
           }
         />
       </div>
