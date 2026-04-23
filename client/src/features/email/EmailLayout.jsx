@@ -4,6 +4,8 @@ import styles from './EmailLayout.module.scss';
 
 const NAV_ITEMS = [
   { to: '/email/sent', label: 'Sent', icon: '📤' },
+  // TODO(email-campaigns): Keep hidden for now. Re-enable when bulk campaign flow is approved.
+  // { to: '/email/campaigns', label: 'Campaigns', icon: '📣' },
   { to: '/email/templates', label: 'Templates', icon: '📄' },
   { to: '/email/accounts', label: 'Accounts', icon: '⚙️' },
 ];

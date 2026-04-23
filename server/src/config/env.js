@@ -96,6 +96,10 @@ export const env = {
   },
   /** Optional. Full URL for WhatsApp status webhook (e.g. ngrok). Used when account has no webhook_url set. */
   whatsappStatusCallbackUrl: process.env.WHATSAPP_STATUS_CALLBACK_URL || '',
+  /** Web Push (VAPID) config for browser system notifications. */
+  webPushVapidSubject: process.env.WEB_PUSH_VAPID_SUBJECT || '',
+  webPushVapidPublicKey: process.env.WEB_PUSH_VAPID_PUBLIC_KEY || '',
+  webPushVapidPrivateKey: process.env.WEB_PUSH_VAPID_PRIVATE_KEY || '',
 
   /** Email OAuth (Gmail / Outlook). Frontend redirect after connect. */
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3001',

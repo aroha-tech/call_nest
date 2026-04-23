@@ -11,6 +11,8 @@ const SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
   'https://mail.google.com/',
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/calendar.events',
 ];
 
 /** Used by OAuth flows and Gmail API client (must match Google Cloud redirect URI). */

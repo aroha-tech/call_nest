@@ -12,6 +12,7 @@ export const JOB_TYPES = {
   CONTACTS_BULK_ADD_TAGS: 'contacts_bulk_add_tags',
   CONTACTS_BULK_REMOVE_TAGS: 'contacts_bulk_remove_tags',
   CONTACTS_BULK_DELETE: 'contacts_bulk_delete',
+  EMAIL_CAMPAIGN_SEND: 'email_campaign_send',
 };
 
 const TERMINAL = new Set(['completed', 'failed', 'cancelled']);

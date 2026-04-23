@@ -62,6 +62,14 @@ function mysqlToDatetimeLocal(mysql) {
   return s;
 }
 
+function formatDateTimeLocalInputValue(d) {
+  const dt = d instanceof Date ? d : new Date(d);
+  if (Number.isNaN(dt.getTime())) return '';
+  return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}T${pad2(dt.getHours())}:${pad2(
+    dt.getMinutes()
+  )}`;
+}
+
 /** Human label for merge-field keys shown on chips (e.g. start_at → Start At). */
 function formatMergeFieldLabel(key) {
   return String(key)
@@ -117,6 +125,9 @@ function meetingPayloadFromForm(form, accounts) {
     location: form.location?.trim() ?? '',
     description: form.description?.trim() ?? '',
     meeting_status: form.meeting_status || 'scheduled',
+    meeting_platform: form.meeting_platform || 'google_meet',
+    meeting_duration_min: form.meeting_duration_min ? Number(form.meeting_duration_min) : null,
+    meeting_owner_user_id: form.meeting_owner_user_id ? Number(form.meeting_owner_user_id) : null,
     attendee_email: form.attendee_email?.trim() ?? '',
     email_account_id: form.email_account_id ? Number(form.email_account_id) : null,
     ...(acc
@@ -129,6 +140,10 @@ function meetingPreviewKindLabel(kind) {
   if (kind === 'created') return 'New meeting';
   if (kind === 'updated') return 'Update';
   return 'Cancelled';
+}
+
+function isProviderReauthError(errorLike) {
+  return String(errorLike?.response?.data?.code || '').trim() === 'PROVIDER_REAUTH_REQUIRED';
 }
 
 function formatMeetingWhen(v) {
@@ -220,9 +235,13 @@ export function MeetingsPage() {
     end_at: '',
     meeting_status: 'scheduled',
     assigned_user_id: '',
+    meeting_owner_user_id: '',
+    meeting_platform: 'google_meet',
+    meeting_duration_min: '30',
   });
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [providerReconnectRequired, setProviderReconnectRequired] = useState(false);
 
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [templateTab, setTemplateTab] = useState('created');
@@ -346,6 +365,14 @@ export function MeetingsPage() {
       .filter((u) => String(u.role || '').toLowerCase() === 'agent')
       .map((u) => ({ value: String(u.id), label: u.name || u.email || `User ${u.id}` }));
     return [{ value: '', label: 'Select agent' }, ...agents];
+  }, [teamMembers]);
+
+  const ownerOptions = useMemo(() => {
+    const members = (teamMembers || []).map((u) => ({
+      value: String(u.id),
+      label: u.name || u.email || `User ${u.id}`,
+    }));
+    return [{ value: '', label: 'Select owner' }, ...members];
   }, [teamMembers]);
 
   useEffect(() => {
@@ -564,6 +591,9 @@ export function MeetingsPage() {
       end_at: '',
       meeting_status: 'scheduled',
       assigned_user_id: '',
+      meeting_owner_user_id: '',
+      meeting_platform: 'google_meet',
+      meeting_duration_min: '30',
     });
     setModalOpen(true);
   }
@@ -587,6 +617,9 @@ export function MeetingsPage() {
       end_at,
       meeting_status: 'scheduled',
       assigned_user_id: '',
+      meeting_owner_user_id: '',
+      meeting_platform: 'google_meet',
+      meeting_duration_min: '60',
     });
     setModalOpen(true);
   }
@@ -606,6 +639,9 @@ export function MeetingsPage() {
       end_at: mysqlToDatetimeLocal(m.end_at),
       meeting_status: m.meeting_status || 'scheduled',
       assigned_user_id: m.assigned_user_id != null ? String(m.assigned_user_id) : '',
+      meeting_owner_user_id: m.meeting_owner_user_id != null ? String(m.meeting_owner_user_id) : '',
+      meeting_platform: m.meeting_platform || 'google_meet',
+      meeting_duration_min: m.meeting_duration_min != null ? String(m.meeting_duration_min) : '30',
     });
     setModalOpen(true);
   }
@@ -613,17 +649,34 @@ export function MeetingsPage() {
   const canSaveMeeting = useMemo(() => {
     const hasEntity = Boolean(selectedEntityId);
     const hasAssigned = Boolean(form.assigned_user_id);
+    const hasOwner = Boolean(form.meeting_owner_user_id);
+    const hasPlatform = Boolean(form.meeting_platform);
+    const hasDuration = Boolean(form.meeting_duration_min);
     const hasTitle = Boolean(form.title?.trim());
     const hasAcc = Boolean(form.email_account_id);
     const hasTimes = Boolean(form.start_at && form.end_at);
-    return hasEntity && hasAssigned && hasTitle && hasAcc && hasTimes && !saving;
-  }, [selectedEntityId, form.assigned_user_id, form.title, form.email_account_id, form.start_at, form.end_at, saving]);
+    return hasEntity && hasAssigned && hasOwner && hasPlatform && hasDuration && hasTitle && hasAcc && hasTimes && !saving;
+  }, [
+    selectedEntityId,
+    form.assigned_user_id,
+    form.meeting_owner_user_id,
+    form.meeting_platform,
+    form.meeting_duration_min,
+    form.title,
+    form.email_account_id,
+    form.start_at,
+    form.end_at,
+    saving,
+  ]);
 
   async function handleSave(e) {
     e.preventDefault();
     const nextErrors = {};
     if (!selectedEntityId) nextErrors.entity = 'Select a contact or lead';
     if (!form.assigned_user_id) nextErrors.assigned_user_id = 'Assigned agent is required';
+    if (!form.meeting_owner_user_id) nextErrors.meeting_owner_user_id = 'Meeting owner is required';
+    if (!form.meeting_platform) nextErrors.meeting_platform = 'Platform is required';
+    if (!form.meeting_duration_min) nextErrors.meeting_duration_min = 'Duration is required';
     if (!form.title?.trim()) nextErrors.title = 'Title is required';
     if (!form.email_account_id) nextErrors.email_account_id = 'Email account is required';
     setMeetingFormErrors(nextErrors);
@@ -631,8 +684,23 @@ export function MeetingsPage() {
     const start_at = localDatetimeToMysql(form.start_at);
     const end_at = localDatetimeToMysql(form.end_at);
     if (!start_at || !end_at) return;
+    const startTs = new Date(form.start_at).getTime();
+    const endTs = new Date(form.end_at).getTime();
+    if (!Number.isFinite(startTs) || !Number.isFinite(endTs)) {
+      setError('Invalid start/end datetime');
+      return;
+    }
+    if (startTs < Date.now()) {
+      setError('Only upcoming meetings are allowed.');
+      return;
+    }
+    if (endTs <= startTs) {
+      setError('End time must be after start time.');
+      return;
+    }
     setSaving(true);
     setError(null);
+    setProviderReconnectRequired(false);
     try {
       const payload = {
         email_account_id: Number(form.email_account_id),
@@ -643,6 +711,9 @@ export function MeetingsPage() {
         start_at,
         end_at,
         meeting_status: form.meeting_status,
+        meeting_platform: form.meeting_platform,
+        meeting_duration_min: Number(form.meeting_duration_min),
+        meeting_owner_user_id: Number(form.meeting_owner_user_id),
         contact_id: Number(selectedEntityId),
         assigned_user_id: Number(form.assigned_user_id),
       };
@@ -654,6 +725,7 @@ export function MeetingsPage() {
       setModalOpen(false);
       bumpMeetingsData();
     } catch (err) {
+      setProviderReconnectRequired(isProviderReauthError(err));
       setError(err?.response?.data?.error || err?.message || 'Save failed');
     } finally {
       setSaving(false);
@@ -1109,6 +1181,21 @@ export function MeetingsPage() {
         }
       >
         <form id="meeting-form" onSubmit={handleSave}>
+          {providerReconnectRequired ? (
+            <Alert variant="warning" style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                <span>Provider permissions expired. Reconnect this account to continue native meeting sync.</span>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate('/email/accounts')}
+                >
+                  Reconnect account
+                </Button>
+              </div>
+            </Alert>
+          ) : null}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
             <div style={{ gridColumn: '1 / -1' }}>
               <div className={styles.listHint} style={{ fontWeight: 700, marginBottom: 6 }}>
@@ -1181,14 +1268,71 @@ export function MeetingsPage() {
               required
               disabled={!canManage}
             />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <p className={styles.listHint} style={{ margin: 0 }}>
+                Connected account permissions power native meeting links and future provider sync features. If any
+                provider action fails, reconnect the same account once to refresh scopes.
+              </p>
+            </div>
             <Select
               label="Assigned to"
               value={form.assigned_user_id}
               onChange={(e) => {
-                setForm((f) => ({ ...f, assigned_user_id: e.target.value }));
+                setForm((f) => ({
+                  ...f,
+                  assigned_user_id: e.target.value,
+                  meeting_owner_user_id: f.meeting_owner_user_id || e.target.value,
+                }));
                 setMeetingFormErrors((e2) => ({ ...e2, assigned_user_id: undefined }));
               }}
               options={agentOptions}
+              disabled={!canManage}
+            />
+            <Select
+              label="Meeting owner"
+              value={form.meeting_owner_user_id}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, meeting_owner_user_id: e.target.value }));
+                setMeetingFormErrors((e2) => ({ ...e2, meeting_owner_user_id: undefined }));
+              }}
+              options={ownerOptions}
+              disabled={!canManage}
+            />
+            <Select
+              label="Platform"
+              value={form.meeting_platform}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, meeting_platform: e.target.value }));
+                setMeetingFormErrors((e2) => ({ ...e2, meeting_platform: undefined }));
+              }}
+              options={[
+                { value: 'google_meet', label: 'Google Meet' },
+                { value: 'microsoft_teams', label: 'Microsoft Teams' },
+              ]}
+              disabled={!canManage}
+            />
+            <Select
+              label="Duration"
+              value={form.meeting_duration_min}
+              onChange={(e) => {
+                const mins = Number(e.target.value || 0);
+                setForm((f) => {
+                  const startMs = new Date(f.start_at).getTime();
+                  const endAt =
+                    Number.isFinite(startMs) && mins > 0
+                      ? formatDateTimeLocalInputValue(new Date(startMs + mins * 60000))
+                      : f.end_at;
+                  return { ...f, meeting_duration_min: e.target.value, end_at: endAt };
+                });
+                setMeetingFormErrors((e2) => ({ ...e2, meeting_duration_min: undefined }));
+              }}
+              options={[
+                { value: '15', label: '15 minutes' },
+                { value: '30', label: '30 minutes' },
+                { value: '45', label: '45 minutes' },
+                { value: '60', label: '60 minutes' },
+                { value: '90', label: '90 minutes' },
+              ]}
               disabled={!canManage}
             />
             <Input
@@ -1217,7 +1361,18 @@ export function MeetingsPage() {
               label="Start"
               type="datetime-local"
               value={form.start_at}
-              onChange={(e) => setForm((f) => ({ ...f, start_at: e.target.value }))}
+              min={formatDateTimeLocalInputValue(new Date())}
+              onChange={(e) =>
+                setForm((f) => {
+                  const mins = Number(f.meeting_duration_min || 0);
+                  const startMs = new Date(e.target.value).getTime();
+                  const endAt =
+                    Number.isFinite(startMs) && mins > 0
+                      ? formatDateTimeLocalInputValue(new Date(startMs + mins * 60000))
+                      : f.end_at;
+                  return { ...f, start_at: e.target.value, end_at: endAt };
+                })
+              }
               required
               disabled={!canManage}
             />
@@ -1225,6 +1380,7 @@ export function MeetingsPage() {
               label="End"
               type="datetime-local"
               value={form.end_at}
+              min={form.start_at || formatDateTimeLocalInputValue(new Date())}
               onChange={(e) => setForm((f) => ({ ...f, end_at: e.target.value }))}
               required
               disabled={!canManage}

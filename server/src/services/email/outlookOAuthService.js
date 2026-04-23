@@ -15,6 +15,8 @@ const SCOPES = [
   'profile',
   'email',
   'Mail.Send',
+  'Calendars.ReadWrite',
+  'OnlineMeetings.ReadWrite',
 ];
 
 function getRedirectUri() {

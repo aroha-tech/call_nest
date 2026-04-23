@@ -26,6 +26,59 @@ const PROVIDER_OPTIONS = [
   { value: 'outlook', label: 'Microsoft Outlook (OAuth)' },
 ];
 
+const OAUTH_PROVIDERS = new Set(['gmail', 'outlook']);
+
+function getReauthState(row) {
+  const provider = String(row?.provider || '').toLowerCase();
+  if (!OAUTH_PROVIDERS.has(provider)) {
+    return { requiresReauth: false, label: 'N/A', variant: 'muted', reason: '' };
+  }
+  const expiresRaw = row?.token_expires_at;
+  if (!expiresRaw) {
+    return {
+      requiresReauth: true,
+      label: 'Reauthorization needed',
+      variant: 'warning',
+      reason: 'Token expiry not available',
+    };
+  }
+  const expMs = (() => {
+    const raw = String(expiresRaw || '').trim();
+    if (!raw) return NaN;
+    // MySQL DATETIME often arrives without timezone; treat it as UTC for token expiry checks.
+    const normalized = raw.includes('T')
+      ? raw
+      : raw.includes(' ')
+        ? raw.replace(' ', 'T')
+        : raw;
+    const withZone = /Z$|[+-]\d{2}:\d{2}$/.test(normalized) ? normalized : `${normalized}Z`;
+    return new Date(withZone).getTime();
+  })();
+  if (!Number.isFinite(expMs)) {
+    return {
+      requiresReauth: true,
+      label: 'Reauthorization needed',
+      variant: 'warning',
+      reason: 'Token expiry is invalid',
+    };
+  }
+  const minutesLeft = Math.floor((expMs - Date.now()) / 60000);
+  if (minutesLeft <= 10) {
+    return {
+      requiresReauth: true,
+      label: 'Reauthorization needed',
+      variant: 'warning',
+      reason: minutesLeft <= 0 ? 'Token expired' : `Token expires in ${minutesLeft} min`,
+    };
+  }
+  return {
+    requiresReauth: false,
+    label: 'Authorized',
+    variant: 'success',
+    reason: `Token valid for ~${Math.floor(minutesLeft / 60)}h`,
+  };
+}
+
 const defaultFormData = () => ({
   provider: 'smtp',
   account_name: '',
@@ -284,6 +337,7 @@ export function EmailAccountsPage() {
               <TableHeaderCell>Account</TableHeaderCell>
               <TableHeaderCell>Email</TableHeaderCell>
               <TableHeaderCell>Provider</TableHeaderCell>
+              <TableHeaderCell>Authorization</TableHeaderCell>
               <TableHeaderCell>Status</TableHeaderCell>
               {canManageAccounts ? (
                 <TableHeaderCell width="180px" align="center">Actions</TableHeaderCell>
@@ -301,6 +355,14 @@ export function EmailAccountsPage() {
                   </Badge>
                 </TableCell>
                 <TableCell>
+                  <Badge
+                    variant={getReauthState(row).variant}
+                    title={getReauthState(row).reason || undefined}
+                  >
+                    {getReauthState(row).label}
+                  </Badge>
+                </TableCell>
+                <TableCell>
                   <Badge variant={row.status === 'active' ? 'success' : 'muted'}>{row.status}</Badge>
                 </TableCell>
                 {canManageAccounts ? (
@@ -309,7 +371,11 @@ export function EmailAccountsPage() {
                     {(row.provider === 'gmail' || row.provider === 'outlook') && (
                       <IconButton
                         size="sm"
-                        title="Reconnect / Re-authorize"
+                        title={
+                          getReauthState(row).requiresReauth
+                            ? 'Reauthorize now (required)'
+                            : 'Reauthorize account permissions'
+                        }
                         onClick={() => handleReconnect(row)}
                         disabled={!!oauthLoading}
                       >

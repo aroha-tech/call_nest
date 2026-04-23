@@ -14,6 +14,10 @@ const DEFAULT_BODY_TEXT = {
 Title: {{title}}
 Start: {{start_at}}
 End: {{end_at}}
+Duration (minutes): {{meeting_duration_min}}
+Platform: {{meeting_platform}}
+Meeting link: {{meeting_link}}
+Meeting owner: {{meeting_owner_name}}
 Location: {{location}}
 Status: {{meeting_status}}
 
@@ -26,6 +30,10 @@ Sent from: {{account_label}} <{{account_email}}>`,
 Title: {{title}}
 Start: {{start_at}}
 End: {{end_at}}
+Duration (minutes): {{meeting_duration_min}}
+Platform: {{meeting_platform}}
+Meeting link: {{meeting_link}}
+Meeting owner: {{meeting_owner_name}}
 Location: {{location}}
 Status: {{meeting_status}}
 
@@ -38,6 +46,10 @@ Sent from: {{account_label}} <{{account_email}}>`,
 Title: {{title}}
 Start: {{start_at}}
 End: {{end_at}}
+Duration (minutes): {{meeting_duration_min}}
+Platform: {{meeting_platform}}
+Meeting link: {{meeting_link}}
+Meeting owner: {{meeting_owner_name}}
 Location: {{location}}
 Status: {{meeting_status}}
 
@@ -53,6 +65,10 @@ const DEFAULT_BODY_HTML = {
 <li><strong>Title:</strong> {{title}}</li>
 <li><strong>Start:</strong> {{start_at}}</li>
 <li><strong>End:</strong> {{end_at}}</li>
+<li><strong>Duration (minutes):</strong> {{meeting_duration_min}}</li>
+<li><strong>Platform:</strong> {{meeting_platform}}</li>
+<li><strong>Meeting link:</strong> {{meeting_link}}</li>
+<li><strong>Meeting owner:</strong> {{meeting_owner_name}}</li>
 <li><strong>Location:</strong> {{location}}</li>
 <li><strong>Status:</strong> {{meeting_status}}</li>
 </ul>
@@ -63,6 +79,10 @@ const DEFAULT_BODY_HTML = {
 <li><strong>Title:</strong> {{title}}</li>
 <li><strong>Start:</strong> {{start_at}}</li>
 <li><strong>End:</strong> {{end_at}}</li>
+<li><strong>Duration (minutes):</strong> {{meeting_duration_min}}</li>
+<li><strong>Platform:</strong> {{meeting_platform}}</li>
+<li><strong>Meeting link:</strong> {{meeting_link}}</li>
+<li><strong>Meeting owner:</strong> {{meeting_owner_name}}</li>
 <li><strong>Location:</strong> {{location}}</li>
 <li><strong>Status:</strong> {{meeting_status}}</li>
 </ul>
@@ -73,6 +93,10 @@ const DEFAULT_BODY_HTML = {
 <li><strong>Title:</strong> {{title}}</li>
 <li><strong>Start:</strong> {{start_at}}</li>
 <li><strong>End:</strong> {{end_at}}</li>
+<li><strong>Duration (minutes):</strong> {{meeting_duration_min}}</li>
+<li><strong>Platform:</strong> {{meeting_platform}}</li>
+<li><strong>Meeting link:</strong> {{meeting_link}}</li>
+<li><strong>Meeting owner:</strong> {{meeting_owner_name}}</li>
 <li><strong>Location:</strong> {{location}}</li>
 <li><strong>Status:</strong> {{meeting_status}}</li>
 </ul>
@@ -88,6 +112,10 @@ export const MEETING_TEMPLATE_PLACEHOLDERS = [
   'location',
   'description',
   'meeting_status',
+  'meeting_platform',
+  'meeting_link',
+  'meeting_duration_min',
+  'meeting_owner_name',
   'attendee_email',
   'account_label',
   'account_email',

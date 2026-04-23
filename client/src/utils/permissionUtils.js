@@ -108,6 +108,8 @@ export const PERMISSIONS = {
   EMAIL_SEND: 'email.send',
   EMAIL_TEMPLATES_MANAGE: 'email.templates.manage',
   EMAIL_ACCOUNTS_MANAGE: 'email.accounts.manage',
+  NOTIFICATIONS_VIEW: 'notifications.view',
+  NOTIFICATIONS_MANAGE: 'notifications.manage',
 
   MEETINGS_VIEW: 'meetings.view',
   MEETINGS_MANAGE: 'meetings.manage',

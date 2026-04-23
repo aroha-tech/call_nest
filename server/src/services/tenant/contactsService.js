@@ -38,6 +38,7 @@ import {
 import * as contactTagsService from './contactTagsService.js';
 import * as contactAssignmentHistoryService from './contactAssignmentHistoryService.js';
 import * as contactActivityEventsService from './contactActivityEventsService.js';
+import { createAndDispatchNotification } from './notificationService.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
 import * as tenantIndustryFieldsService from './tenantIndustryFieldsService.js';
 
@@ -2933,21 +2934,59 @@ export async function assignContacts(tenantId, user, payload) {
       to_campaign_id: c.campaign_id ?? null,
     });
   }
+  const summaryParts = [];
+  if (midProvided) summaryParts.push('manager');
+  if (aidProvided) summaryParts.push('agent');
+  if (cidProvided) summaryParts.push('campaign');
+
   if (historyRows.length > 0) {
-    await contactAssignmentHistoryService.recordChangesBulk(tenantId, historyRows);
-    const summaryParts = [];
-    if (midProvided) summaryParts.push('manager');
-    if (aidProvided) summaryParts.push('agent');
-    if (cidProvided) summaryParts.push('campaign');
-    await safeLogTenantActivity(tenantId, user?.id, {
-      event_category: 'contact',
-      event_type: 'contact.bulk_assign',
-      summary: `Updated assignment for ${historyRows.length} record(s) (${summaryParts.join(', ')})`,
-      payload_json: {
-        contacts_touched: historyRows.length,
-        fields: summaryParts,
-      },
+    try {
+      await contactAssignmentHistoryService.recordChangesBulk(tenantId, historyRows);
+      await safeLogTenantActivity(tenantId, user?.id, {
+        event_category: 'contact',
+        event_type: 'contact.bulk_assign',
+        summary: `Updated assignment for ${historyRows.length} record(s) (${summaryParts.join(', ')})`,
+        payload_json: {
+          contacts_touched: historyRows.length,
+          fields: summaryParts,
+        },
+      });
+    } catch (e) {
+      console.error('[contacts.assign] history/log failed:', e?.message || e);
+    }
+  }
+
+  // Notify based on actual updated rows (not only history rows) so UI stays consistent.
+  if (affectedRows > 0 && updated.length > 0) {
+    const first = updated[0];
+    await createAndDispatchNotification(tenantId, user?.id, {
+      moduleKey: 'contacts',
+      eventType: 'contact_assigned',
+      severity: 'normal',
+      title: `Contacts reassigned (${affectedRows})`,
+      body: 'Contact ownership/assignment was updated.',
+      assignedUserId: first?.assigned_user_id,
+      managerId: first?.manager_id,
+      entityType: 'contact',
+      entityId: first?.id,
+      ctaPath: '/contacts',
+      eventHash: `contacts:assign:${tenantId}:${Date.now()}:${affectedRows}`,
     });
+    if (cidProvided) {
+      await createAndDispatchNotification(tenantId, user?.id, {
+        moduleKey: 'contacts',
+        eventType: 'campaign_assigned',
+        severity: 'normal',
+        title: `Campaign assignment updated (${affectedRows})`,
+        body: 'Contacts/leads were assigned to a campaign.',
+        assignedUserId: first?.assigned_user_id,
+        managerId: first?.manager_id,
+        entityType: 'contact',
+        entityId: first?.id,
+        ctaPath: '/campaigns',
+        eventHash: `contacts:campaign:${tenantId}:${Date.now()}:${affectedRows}`,
+      });
+    }
   }
 
   return { updatedCount: affectedRows, data: updated };

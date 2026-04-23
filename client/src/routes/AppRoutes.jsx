@@ -66,6 +66,7 @@ import { ScheduleMeetingsPage } from '../pages/ScheduleMeetingsPage';
 import { ScheduleCallbacksPage } from '../pages/ScheduleCallbacksPage';
 import { TaskManagerPage } from '../pages/TaskManagerPage';
 import { PerformanceReportsPage } from '../pages/PerformanceReportsPage';
+import { NotificationsPage } from '../features/notifications/NotificationsPage';
 
 /**
  * Renders children only when email module is enabled for the tenant; otherwise redirects to dashboard.
@@ -333,6 +334,8 @@ function TenantRoutes() {
       />
       {/* Email module (hidden and inaccessible when email_module_enabled is false) */}
       <Route path="/email" element={<Navigate to="/email/sent" replace />} />
+      {/* TODO(email-campaigns): Route intentionally hidden until bulk campaign module is released.
+          Re-enable /email/campaigns route with EmailCampaignsPage when product approval is done. */}
       <Route
         path="/email/sent"
         element={
@@ -654,6 +657,16 @@ function TenantRoutes() {
           <ProtectedRoute permissions={[PERMISSIONS.TASKS_VIEW, PERMISSIONS.TASKS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]}>
             <AppShellLayout>
               <TaskManagerPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.NOTIFICATIONS_VIEW}>
+            <AppShellLayout>
+              <NotificationsPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

@@ -12,7 +12,7 @@ export function getTenantRealtimeSocketUrl() {
 }
 
 /**
- * Tenant realtime via Socket.IO (background jobs today; call_updated etc. later).
+ * Tenant realtime via Socket.IO.
  * @param {{ getToken?: () => string | null, onConnect?: () => void, onDisconnect?: (reason: string) => void, onEvent: (event: string, data: unknown) => void, onError?: (e: Error) => void }} opts
  * @returns {() => void} disconnect
  */
@@ -66,9 +66,17 @@ export function connectTenantRealtimeSocket(opts) {
     onError?.(err instanceof Error ? err : new Error(String(msg)));
   });
 
-  socket.on('background_job', (data) => {
-    if (cancelled) return;
-    onEvent('background_job', data);
+  const passthroughEvents = [
+    'background_job',
+    'notification_created',
+    'notification_updated',
+    'notification_unread_count',
+  ];
+  passthroughEvents.forEach((eventName) => {
+    socket.on(eventName, (data) => {
+      if (cancelled) return;
+      onEvent(eventName, data);
+    });
   });
 
   return () => {

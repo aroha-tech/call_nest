@@ -2,7 +2,7 @@ import { query } from '../../config/db.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 const LIST_COLUMNS =
-  'id, tenant_id, provider, account_name, email_address, display_name, status, created_at, updated_at';
+  'id, tenant_id, provider, account_name, email_address, display_name, status, token_expires_at, created_at, updated_at';
 
 export async function findAll(tenantId, includeInactive = false) {
   let sql = `

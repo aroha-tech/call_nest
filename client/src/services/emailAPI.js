@@ -68,3 +68,26 @@ export const emailSendAPI = {
   send: (data) =>
     axiosInstance.post(`${BASE}/send`, data, { timeout: 120_000 }),
 };
+
+export const emailCampaignsAPI = {
+  list: (params = {}) =>
+    axiosInstance.get(`${BASE}/campaigns`, {
+      params: {
+        page: params.page ?? 1,
+        limit: params.limit ?? 20,
+        status: params.status || undefined,
+        search: params.search || undefined,
+      },
+    }),
+  getById: (id) => axiosInstance.get(`${BASE}/campaigns/${id}`),
+  listRecipients: (id, params = {}) =>
+    axiosInstance.get(`${BASE}/campaigns/${id}/recipients`, {
+      params: {
+        page: params.page ?? 1,
+        limit: params.limit ?? 50,
+        status: params.status || undefined,
+      },
+    }),
+  create: (data) => axiosInstance.post(`${BASE}/campaigns`, data),
+  queue: (id) => axiosInstance.post(`${BASE}/campaigns/${id}/queue`),
+};

@@ -14,6 +14,9 @@ import { dialerSessionsAPI } from '../services/dialerSessionsAPI';
 import { dealsAPI } from '../services/dealsAPI';
 import { contactsAPI } from '../services/contactsAPI';
 import { templateVariablesAPI } from '../services/templateVariablesAPI';
+import { scheduleHubAPI } from '../services/scheduleHubAPI';
+import { meetingsAPI } from '../services/meetingsAPI';
+import { emailAccountsAPI } from '../services/emailAPI';
 import { extractTemplateKeys, renderScriptHtml } from '../utils/callScriptHtml';
 import { useToast } from '../context/ToastContext';
 import {
@@ -171,6 +174,28 @@ function coerceAttemptId(v) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function localDatetimeToMysql(s) {
+  if (!s) return '';
+  const t = String(s).trim();
+  if (!t) return '';
+  const n = t.replace('T', ' ');
+  if (n.length === 16) return `${n}:00`;
+  return n.length === 19 ? n : n;
+}
+
+function formatDateTimeLocalInputValue(d) {
+  const dt = d instanceof Date ? d : new Date(d);
+  if (Number.isNaN(dt.getTime())) return '';
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(
+    2,
+    '0'
+  )}T${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+}
+
+function isProviderReauthError(errorLike) {
+  return String(errorLike?.response?.data?.code || '').trim() === 'PROVIDER_REAUTH_REQUIRED';
+}
+
 /** Dispositions are UUID strings (CHAR(36)); never use Number() — Number(uuid) is NaN. */
 function coerceDispositionId(v) {
   const s = String(v ?? '').trim();
@@ -225,6 +250,32 @@ export function DialerSessionPage() {
   const [callHistoryRows, setCallHistoryRows] = useState([]);
   const [savingDialCallNotes, setSavingDialCallNotes] = useState(false);
   const [savingDialContactNotes, setSavingDialContactNotes] = useState(false);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [emailAccounts, setEmailAccounts] = useState([]);
+  const [dispositionActionFlow, setDispositionActionFlow] = useState(null);
+  const [callbackModalOpen, setCallbackModalOpen] = useState(false);
+  const [meetingModalOpen, setMeetingModalOpen] = useState(false);
+  const [actionModalSaving, setActionModalSaving] = useState(false);
+  const [actionModalError, setActionModalError] = useState('');
+  const [actionModalNeedsReconnect, setActionModalNeedsReconnect] = useState(false);
+  const [callbackForm, setCallbackForm] = useState({
+    assigned_user_id: '',
+    scheduled_at: '',
+    notes: '',
+  });
+  const [meetingForm, setMeetingForm] = useState({
+    email_account_id: '',
+    assigned_user_id: '',
+    meeting_owner_user_id: '',
+    meeting_platform: 'google_meet',
+    meeting_duration_min: '30',
+    title: '',
+    attendee_email: '',
+    start_at: '',
+    end_at: '',
+    location: '',
+    description: '',
+  });
   const [tick, setTick] = useState(0);
   const [uiTimer, setUiTimer] = useState(() => {
     if (!id) return { startedAtMs: null, pausedAtMs: null, pausedTotalMs: 0 };
@@ -638,6 +689,36 @@ export function DialerSessionPage() {
 
   useEffect(() => {
     let cancelled = false;
+    scheduleHubAPI
+      .meta()
+      .then((res) => {
+        if (!cancelled) setTeamMembers(res?.data?.data?.teamMembers ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setTeamMembers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    emailAccountsAPI
+      .getAll(false)
+      .then((res) => {
+        if (!cancelled) setEmailAccounts(Array.isArray(res?.data?.data) ? res.data.data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setEmailAccounts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const res = await templateVariablesAPI.getGrouped();
@@ -917,6 +998,106 @@ export function DialerSessionPage() {
     }
   }
 
+  const teamAgentOptions = useMemo(
+    () =>
+      (teamMembers || [])
+        .filter((u) => String(u.role || '').toLowerCase() === 'agent')
+        .map((u) => ({ value: String(u.id), label: u.name || u.email || `User ${u.id}` })),
+    [teamMembers]
+  );
+
+  const teamMemberOptions = useMemo(
+    () =>
+      (teamMembers || [])
+        .map((u) => ({ value: String(u.id), label: u.name || u.email || `User ${u.id}` }))
+        .filter((opt) => opt.value),
+    [teamMembers]
+  );
+
+  const minimumNowLocal = useMemo(() => formatDateTimeLocalInputValue(new Date()), [meetingModalOpen]);
+
+  const activeEmailAccountOptions = useMemo(
+    () =>
+      (emailAccounts || [])
+        .filter((a) => a.status === 'active' || a.status == null)
+        .map((a) => ({ value: String(a.id), label: a.account_name || a.email_address })),
+    [emailAccounts]
+  );
+
+  const advanceDispositionFlow = useCallback(
+    async (flow) => {
+      const nextFlow = flow || dispositionActionFlow;
+      if (!nextFlow) return;
+      const remaining = Array.isArray(nextFlow.pendingActions) ? nextFlow.pendingActions : [];
+      if (remaining.length === 0) {
+        setDispositionActionFlow(null);
+        await setDisposition(nextFlow.disposition.id, nextFlow.disposition.next_action, nextFlow.dealOpt || null);
+        return;
+      }
+      const nextActionCode = remaining[0];
+      const rest = remaining.slice(1);
+      setDispositionActionFlow({ ...nextFlow, pendingActions: rest });
+      setActionModalError('');
+      setActionModalNeedsReconnect(false);
+      if (nextActionCode === 'schedule_callback') {
+        const now = new Date();
+        const assignedDefault = String(
+          nextFlow.defaultAssignedUserId || nextFlow.disposition?.agent_user_id || user?.id || ''
+        );
+        const dtLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+          now.getDate()
+        ).padStart(2, '0')}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        setCallbackForm({ assigned_user_id: assignedDefault, scheduled_at: dtLocal, notes: '' });
+        setCallbackModalOpen(true);
+        return;
+      }
+      if (nextActionCode === 'schedule_meeting') {
+        const now = new Date();
+        const start = new Date(now.getTime() + 30 * 60 * 1000);
+        const end = new Date(start.getTime() + 30 * 60 * 1000);
+        const toLocal = (d) =>
+          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(
+            2,
+            '0'
+          )}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        setMeetingForm({
+          email_account_id: activeEmailAccountOptions[0]?.value || '',
+          assigned_user_id: String(nextFlow.defaultAssignedUserId || user?.id || ''),
+          meeting_owner_user_id: String(nextFlow.defaultAssignedUserId || user?.id || ''),
+          meeting_platform: 'google_meet',
+          meeting_duration_min: '30',
+          title: `${leadContact?.display_name || 'Contact'} follow-up`,
+          attendee_email: leadContact?.email || '',
+          start_at: toLocal(start),
+          end_at: toLocal(end),
+          location: '',
+          description: '',
+        });
+        setMeetingModalOpen(true);
+        return;
+      }
+      await advanceDispositionFlow({ ...nextFlow, pendingActions: rest });
+    },
+    [activeEmailAccountOptions, dispositionActionFlow, leadContact?.display_name, leadContact?.email, setDisposition, user?.id]
+  );
+
+  function startDispositionActionFlow(disposition, dealOpt = null) {
+    const actions = Array.isArray(disposition?.action_codes) ? disposition.action_codes : [];
+    const pendingActions = actions.filter((code) => code === 'schedule_callback' || code === 'schedule_meeting');
+    if (pendingActions.length === 0) {
+      setDisposition(disposition.id, disposition.next_action, dealOpt);
+      return;
+    }
+    const flow = {
+      disposition,
+      dealOpt,
+      pendingActions,
+      defaultAssignedUserId: user?.id || '',
+    };
+    setDispositionActionFlow(flow);
+    void advanceDispositionFlow(flow);
+  }
+
   function onDispositionButtonClick(d) {
     if (d.requires_deal_selection) {
       setError('');
@@ -925,7 +1106,7 @@ export function DialerSessionPage() {
       setDealPickStageId('');
       return;
     }
-    setDisposition(d.id, d.next_action);
+    startDispositionActionFlow(d);
   }
 
   async function confirmDealDispositionPick() {
@@ -938,7 +1119,101 @@ export function DialerSessionPage() {
     }
     const d = dealPickDispo;
     setDealPickDispo(null);
-    await setDisposition(d.id, d.next_action, { deal_id: did, stage_id: sid });
+    startDispositionActionFlow(d, { deal_id: did, stage_id: sid });
+  }
+
+  async function saveCallbackFromDispositionFlow() {
+    if (!dispositionActionFlow?.disposition || !currentItem?.contact_id) return;
+    if (!callbackForm.assigned_user_id || !callbackForm.scheduled_at) {
+      setActionModalError('Assigned user and callback time are required.');
+      return;
+    }
+    setActionModalSaving(true);
+    setActionModalError('');
+    setActionModalNeedsReconnect(false);
+    try {
+      await scheduleHubAPI.createCallback({
+        contact_id: Number(currentItem.contact_id),
+        assigned_user_id: Number(callbackForm.assigned_user_id),
+        scheduled_at: callbackForm.scheduled_at,
+        notes: callbackForm.notes?.trim() || null,
+      });
+      setCallbackModalOpen(false);
+      await advanceDispositionFlow();
+    } catch (e) {
+      setActionModalNeedsReconnect(isProviderReauthError(e));
+      setActionModalError(e?.response?.data?.error || e?.message || 'Failed to create callback.');
+    } finally {
+      setActionModalSaving(false);
+    }
+  }
+
+  async function saveMeetingFromDispositionFlow() {
+    if (!dispositionActionFlow?.disposition || !currentItem?.contact_id) return;
+    if (
+      !meetingForm.email_account_id ||
+      !meetingForm.assigned_user_id ||
+      !meetingForm.meeting_owner_user_id ||
+      !meetingForm.meeting_platform ||
+      !meetingForm.meeting_duration_min ||
+      !meetingForm.title?.trim() ||
+      !meetingForm.start_at ||
+      !meetingForm.end_at
+    ) {
+      setActionModalError(
+        'Email account, assigned user, meeting owner, platform, duration, title, start and end time are required.'
+      );
+      return;
+    }
+    const startTs = new Date(meetingForm.start_at).getTime();
+    const endTs = new Date(meetingForm.end_at).getTime();
+    if (!Number.isFinite(startTs) || !Number.isFinite(endTs)) {
+      setActionModalError('Enter a valid start/end date and time.');
+      return;
+    }
+    if (startTs < Date.now()) {
+      setActionModalError('Meeting can only be scheduled for upcoming date/time.');
+      return;
+    }
+    if (endTs <= startTs) {
+      setActionModalError('End time must be after start time.');
+      return;
+    }
+    setActionModalSaving(true);
+    setActionModalError('');
+    setActionModalNeedsReconnect(false);
+    try {
+      await meetingsAPI.create({
+        email_account_id: Number(meetingForm.email_account_id),
+        assigned_user_id: Number(meetingForm.assigned_user_id),
+        meeting_owner_user_id: Number(meetingForm.meeting_owner_user_id),
+        meeting_platform: meetingForm.meeting_platform,
+        meeting_duration_min: Number(meetingForm.meeting_duration_min),
+        contact_id: Number(currentItem.contact_id),
+        title: meetingForm.title.trim(),
+        attendee_email: meetingForm.attendee_email?.trim() || null,
+        start_at: localDatetimeToMysql(meetingForm.start_at),
+        end_at: localDatetimeToMysql(meetingForm.end_at),
+        location: meetingForm.location?.trim() || null,
+        description: meetingForm.description?.trim() || null,
+        meeting_status: 'scheduled',
+      });
+      setMeetingModalOpen(false);
+      await advanceDispositionFlow();
+    } catch (e) {
+      setActionModalNeedsReconnect(isProviderReauthError(e));
+      setActionModalError(e?.response?.data?.error || e?.message || 'Failed to create meeting.');
+    } finally {
+      setActionModalSaving(false);
+    }
+  }
+
+  function syncMeetingEndFromStart(nextStart, nextDuration) {
+    const d = Number(nextDuration);
+    const startDate = new Date(nextStart);
+    if (!Number.isFinite(d) || Number.isNaN(startDate.getTime())) return '';
+    const endDate = new Date(startDate.getTime() + d * 60000);
+    return formatDateTimeLocalInputValue(endDate);
   }
 
   async function saveDialCallNotesClick() {
@@ -1950,6 +2225,195 @@ export function DialerSessionPage() {
                 options={dealPickStageOptions}
                 placeholder={dealPickDealId ? 'Select stage…' : 'Select a pipeline first'}
                 disabled={!dealPickDealId}
+              />
+            </div>
+          </Modal>
+          <Modal
+            isOpen={callbackModalOpen}
+            onClose={() => {
+              if (actionModalSaving) return;
+              setCallbackModalOpen(false);
+              setDispositionActionFlow(null);
+            }}
+            title="Schedule callback"
+            size="sm"
+            footer={
+              <ModalFooter>
+                <Button
+                  variant="ghost"
+                  disabled={actionModalSaving}
+                  onClick={() => {
+                    setCallbackModalOpen(false);
+                    setDispositionActionFlow(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={saveCallbackFromDispositionFlow} loading={actionModalSaving}>
+                  Save callback
+                </Button>
+              </ModalFooter>
+            }
+          >
+            {actionModalError ? <Alert variant="error">{actionModalError}</Alert> : null}
+            <div style={{ display: 'grid', gap: 12 }}>
+              <Select
+                label="Assigned to"
+                value={callbackForm.assigned_user_id}
+                onChange={(e) => setCallbackForm((prev) => ({ ...prev, assigned_user_id: e.target.value }))}
+                options={[{ value: '', label: 'Select agent' }, ...teamAgentOptions]}
+              />
+              <Input
+                label="When"
+                type="datetime-local"
+                value={callbackForm.scheduled_at}
+                onChange={(e) => setCallbackForm((prev) => ({ ...prev, scheduled_at: e.target.value }))}
+              />
+              <Input
+                label="Notes"
+                value={callbackForm.notes}
+                onChange={(e) => setCallbackForm((prev) => ({ ...prev, notes: e.target.value }))}
+                placeholder="Optional callback notes"
+              />
+            </div>
+          </Modal>
+          <Modal
+            isOpen={meetingModalOpen}
+            onClose={() => {
+              if (actionModalSaving) return;
+              setMeetingModalOpen(false);
+              setDispositionActionFlow(null);
+            }}
+            title="Schedule meeting"
+            size="lg"
+            footer={
+              <ModalFooter>
+                <Button
+                  variant="ghost"
+                  disabled={actionModalSaving}
+                  onClick={() => {
+                    setMeetingModalOpen(false);
+                    setDispositionActionFlow(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={saveMeetingFromDispositionFlow} loading={actionModalSaving}>
+                  Save meeting
+                </Button>
+              </ModalFooter>
+            }
+          >
+            {actionModalError ? <Alert variant="error">{actionModalError}</Alert> : null}
+            {actionModalNeedsReconnect ? (
+              <Alert variant="warning">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                  <span>Provider permissions expired. Reconnect this account to continue native meeting sync.</span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => navigate('/email/accounts')}
+                  >
+                    Reconnect account
+                  </Button>
+                </div>
+              </Alert>
+            ) : null}
+            <p style={{ margin: '0 0 10px', color: 'var(--color-text-secondary)', fontSize: 13 }}>
+              Account permissions are used for native meeting links and future provider sync changes. If provider
+              access fails, reconnect the same account to refresh scopes.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+              <Select
+                label="Email account"
+                value={meetingForm.email_account_id}
+                onChange={(e) => setMeetingForm((prev) => ({ ...prev, email_account_id: e.target.value }))}
+                options={[{ value: '', label: 'Select account' }, ...activeEmailAccountOptions]}
+              />
+              <Select
+                label="Assigned to"
+                value={meetingForm.assigned_user_id}
+                onChange={(e) => setMeetingForm((prev) => ({ ...prev, assigned_user_id: e.target.value }))}
+                options={[{ value: '', label: 'Select agent' }, ...teamAgentOptions]}
+              />
+              <Select
+                label="Meeting owner"
+                value={meetingForm.meeting_owner_user_id}
+                onChange={(e) => setMeetingForm((prev) => ({ ...prev, meeting_owner_user_id: e.target.value }))}
+                options={[{ value: '', label: 'Select owner' }, ...teamMemberOptions]}
+              />
+              <Select
+                label="Platform"
+                value={meetingForm.meeting_platform}
+                onChange={(e) => setMeetingForm((prev) => ({ ...prev, meeting_platform: e.target.value }))}
+                options={[
+                  { value: 'google_meet', label: 'Google Meet' },
+                  { value: 'microsoft_teams', label: 'Microsoft Teams' },
+                ]}
+              />
+              <Select
+                label="Duration"
+                value={meetingForm.meeting_duration_min}
+                onChange={(e) =>
+                  setMeetingForm((prev) => {
+                    const nextDuration = e.target.value;
+                    return {
+                      ...prev,
+                      meeting_duration_min: nextDuration,
+                      end_at: syncMeetingEndFromStart(prev.start_at, nextDuration) || prev.end_at,
+                    };
+                  })
+                }
+                options={[
+                  { value: '15', label: '15 minutes' },
+                  { value: '30', label: '30 minutes' },
+                  { value: '45', label: '45 minutes' },
+                  { value: '60', label: '60 minutes' },
+                  { value: '90', label: '90 minutes' },
+                ]}
+              />
+              <Input
+                label="Title"
+                value={meetingForm.title}
+                onChange={(e) => setMeetingForm((prev) => ({ ...prev, title: e.target.value }))}
+              />
+              <Input
+                label="Attendee email"
+                type="email"
+                value={meetingForm.attendee_email}
+                onChange={(e) => setMeetingForm((prev) => ({ ...prev, attendee_email: e.target.value }))}
+              />
+              <Input
+                label="Start"
+                type="datetime-local"
+                value={meetingForm.start_at}
+                min={minimumNowLocal}
+                onChange={(e) =>
+                  setMeetingForm((prev) => ({
+                    ...prev,
+                    start_at: e.target.value,
+                    end_at:
+                      syncMeetingEndFromStart(e.target.value, prev.meeting_duration_min) || prev.end_at,
+                  }))
+                }
+              />
+              <Input
+                label="End"
+                type="datetime-local"
+                value={meetingForm.end_at}
+                min={meetingForm.start_at || minimumNowLocal}
+                onChange={(e) => setMeetingForm((prev) => ({ ...prev, end_at: e.target.value }))}
+              />
+              <Input
+                label="Location"
+                value={meetingForm.location}
+                onChange={(e) => setMeetingForm((prev) => ({ ...prev, location: e.target.value }))}
+              />
+              <Input
+                label="Description"
+                value={meetingForm.description}
+                onChange={(e) => setMeetingForm((prev) => ({ ...prev, description: e.target.value }))}
               />
             </div>
           </Modal>

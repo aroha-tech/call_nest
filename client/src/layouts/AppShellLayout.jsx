@@ -7,6 +7,7 @@ import { selectTenant, selectUser } from '../features/auth/authSelectors';
 import { NavIcon, NavChevron } from '../components/navigation/NavIcon';
 import { useColorScheme } from '../context/ColorSchemeContext';
 import { getBreadcrumbItems } from './breadcrumbUtils';
+import { NotificationBell } from '../features/notifications/NotificationBell';
 import styles from './AppShellLayout.module.scss';
 
 /** Survives route changes: each `<Route>` wraps its own `AppShellLayout`, so the component remounts on navigation. */
@@ -348,6 +349,7 @@ export function AppShellLayout({ children }) {
             </nav>
           </div>
           <div className={styles.topbarRight}>
+            <NotificationBell />
             <button
               type="button"
               role="switch"

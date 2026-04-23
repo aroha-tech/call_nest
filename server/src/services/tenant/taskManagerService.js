@@ -1,4 +1,5 @@
 import { query } from '../../config/db.js';
+import { createAndDispatchNotification } from './notificationService.js';
 
 function n(v, d = 0) {
   const x = Number(v);
@@ -419,6 +420,18 @@ export async function createAssignment(tenantId, actingUser, payload) {
     [tenantId, result.insertId]
   );
   await createDailyLogsForAssignment(tenantId, row, actingUser.id);
+  await createAndDispatchNotification(tenantId, actingUser.id, {
+    moduleKey: 'tasks',
+    eventType: 'task_assigned',
+    severity: 'high',
+    title: `New task assigned: ${row?.title || 'Task'}`,
+    body: row?.start_date ? `From ${row.start_date} to ${row.end_date}` : '',
+    assignedUserId: row?.assigned_to_user_id,
+    entityType: 'task_assignment',
+    entityId: row?.id,
+    ctaPath: '/task-manager',
+    eventHash: `task:assigned:${tenantId}:${row?.id}`,
+  });
   return row;
 }
 

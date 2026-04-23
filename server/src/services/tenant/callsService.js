@@ -3,6 +3,7 @@ import { getTelephonyProvider } from './telephony/telephonyProviderRegistry.js';
 import * as opportunitiesService from './opportunitiesService.js';
 import { loadDispositionCallApplyMeta } from './dispositionApplyDealHelper.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
+import { createAndDispatchNotification, listUserIdsByRoles } from './notificationService.js';
 
 const CALL_ATTEMPT_IDS_CAP = 5000;
 
@@ -1126,6 +1127,17 @@ export async function setAttemptDisposition(
       ref_call_attempt_id: id,
       payload_json: { disposition_id: dispForDb },
     });
+    await createAndDispatchNotification(tenantId, user?.id, {
+      moduleKey: 'disposition',
+      eventType: 'critical_status_changed',
+      severity: 'normal',
+      title: `Disposition updated: ${dispRow?.name || 'Updated'}`,
+      body: cRow?.display_name ? `Contact: ${cRow.display_name}` : 'Disposition updated for call attempt.',
+      entityType: 'call_attempt',
+      entityId: id,
+      ctaPath: '/calls/history',
+      eventHash: `disposition:set:${tenantId}:${id}:${dispForDb}`,
+    });
   }
 
   // Only advance the dialer queue when a real disposition was chosen. Tenant dispositions
@@ -1137,6 +1149,21 @@ export async function setAttemptDisposition(
   if (dispForDb && applyMeta) {
     const na = String(applyMeta.next_action || '').trim().toLowerCase();
     next_action = na || null;
+    if (na === 'schedule_callback') {
+      const escalationRecipients = await listUserIdsByRoles(tenantId, ['admin', 'manager']);
+      await createAndDispatchNotification(tenantId, user?.id, {
+        moduleKey: 'calling',
+        eventType: 'session_followup_required',
+        severity: 'high',
+        title: 'Callback follow-up required',
+        body: 'Disposition indicates a scheduled callback action.',
+        recipientUserIds: escalationRecipients,
+        entityType: 'call_attempt',
+        entityId: id,
+        ctaPath: '/schedule/callbacks',
+        eventHash: `calling:followup:${tenantId}:${id}`,
+      });
+    }
     if (na !== 'next_number') {
       await query(
         `UPDATE dialer_session_items

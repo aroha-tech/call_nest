@@ -3,6 +3,7 @@ import path from 'path';
 import { takeBackgroundImportBuffer } from './backgroundImportBufferRegistry.js';
 import * as contactsService from './contactsService.js';
 import * as contactImportBatchService from './contactImportBatchService.js';
+import * as emailCampaignService from './emailCampaignService.js';
 import {
   JOB_TYPES,
   completeJob,
@@ -269,6 +270,11 @@ export async function runTenantBackgroundJobRow(jobRow) {
           step: 'export',
         });
         await completeJob(tenantId, jobId, { result: { rowCount }, artifactPath: outPath });
+        break;
+      }
+
+      case JOB_TYPES.EMAIL_CAMPAIGN_SEND: {
+        await emailCampaignService.runCampaignSendJob(jobRow);
         break;
       }
 

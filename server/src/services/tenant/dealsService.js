@@ -1,6 +1,7 @@
 import { query } from '../../config/db.js';
 import { buildOwnershipWhere } from './contactsService.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
+import { createAndDispatchNotification } from './notificationService.js';
 
 function trimStr(v) {
   if (v === null || v === undefined) return null;
@@ -166,6 +167,17 @@ export async function createDeal(tenantId, user, payload) {
     entity_type: 'deal',
     entity_id: dealId,
     payload_json: { is_active: !!isActive },
+  });
+  await createAndDispatchNotification(tenantId, user?.id, {
+    moduleKey: 'deals',
+    eventType: 'deal_created',
+    severity: 'normal',
+    title: `Pipeline created: ${out?.name || name}`,
+    body: 'A new deal pipeline has been created.',
+    entityType: 'deal',
+    entityId: dealId,
+    ctaPath: '/deals',
+    eventHash: `deal:create:${tenantId}:${dealId}`,
   });
   return out;
 }

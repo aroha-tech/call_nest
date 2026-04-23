@@ -1,10 +1,57 @@
 import { query } from '../../config/db.js';
 import { trySendMeetingAttendeeEmail } from './meetingNotifyService.js';
+import {
+  createNativeMeetingRoom,
+  updateNativeMeetingRoom,
+  deleteNativeMeetingRoom,
+} from './meetingProviderSyncService.js';
+import { createAndDispatchNotification, listUserIdsByRoles } from './notificationService.js';
 
 function trimStr(v) {
   if (v === null || v === undefined) return null;
   const t = String(v).trim();
   return t === '' ? null : t;
+}
+
+function normalizeMeetingPlatform(v) {
+  const raw = String(v || '')
+    .trim()
+    .toLowerCase();
+  if (!raw) return 'google_meet';
+  if (raw === 'google' || raw === 'google_meet' || raw === 'google-meet') return 'google_meet';
+  if (raw === 'teams' || raw === 'microsoft_teams' || raw === 'microsoft-teams') return 'microsoft_teams';
+  if (raw === 'custom') return 'custom';
+  return null;
+}
+
+function parseDurationMinutes(v, fallback = 30) {
+  if (v === undefined || v === null || v === '') return fallback;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.floor(n);
+}
+
+function parseMysqlDateTime(raw) {
+  if (!raw) return null;
+  const d = new Date(String(raw).replace(' ', 'T'));
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
+
+function encodeUrlSafe(v) {
+  return encodeURIComponent(String(v || '').trim());
+}
+
+function buildAutoMeetingLink(platform, { title, start_at, end_at }) {
+  if (platform === 'google_meet') return 'https://meet.google.com/new';
+  if (platform === 'microsoft_teams') {
+    const subject = encodeUrlSafe(title || 'Meeting');
+    const startIso = parseMysqlDateTime(start_at)?.toISOString() || '';
+    const endIso = parseMysqlDateTime(end_at)?.toISOString() || '';
+    const qs = `subject=${encodeUrlSafe(subject)}&startTime=${encodeUrlSafe(startIso)}&endTime=${encodeUrlSafe(endIso)}`;
+    return `https://teams.microsoft.com/l/meeting/new?${qs}`;
+  }
+  return null;
 }
 
 async function assertEmailAccount(tenantId, emailAccountId) {
@@ -60,6 +107,22 @@ async function assertUserOptional(tenantId, userId) {
   return uid;
 }
 
+async function assertMeetingOwnerOptional(tenantId, userId) {
+  if (userId == null || userId === '') return null;
+  const uid = Number(userId);
+  if (!Number.isFinite(uid)) return null;
+  const [row] = await query(
+    `SELECT id FROM users WHERE tenant_id = ? AND id = ? AND is_deleted = 0 LIMIT 1`,
+    [tenantId, uid]
+  );
+  if (!row) {
+    const err = new Error('Meeting owner not found');
+    err.status = 400;
+    throw err;
+  }
+  return uid;
+}
+
 /**
  * @param {number} tenantId
  * @param {{ email_account_id?: number|string|null, from?: string, to?: string }} filters
@@ -82,14 +145,23 @@ export async function listInRange(tenantId, { email_account_id = null, from = nu
       m.start_at,
       m.end_at,
       m.meeting_status,
+      m.meeting_platform,
+      m.meeting_link,
+      m.meeting_duration_min,
+      m.meeting_owner_user_id,
+      m.provider_event_id,
+      m.provider_calendar_id,
       m.attendance_status,
       m.created_at,
       m.updated_at,
       ea.email_address AS account_email,
-      COALESCE(ea.account_name, ea.email_address) AS account_label
+      COALESCE(ea.account_name, ea.email_address) AS account_label,
+      owner_u.name AS meeting_owner_name
     FROM tenant_meetings m
     INNER JOIN email_accounts ea
       ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id AND ea.is_deleted = 0
+    LEFT JOIN users owner_u
+      ON owner_u.id = m.meeting_owner_user_id AND owner_u.tenant_id = m.tenant_id
     WHERE m.tenant_id = ? AND m.deleted_at IS NULL
   `;
   const p2 = [tenantId];
@@ -129,14 +201,23 @@ const LIST_SELECT = `
       m.start_at,
       m.end_at,
       m.meeting_status,
+      m.meeting_platform,
+      m.meeting_link,
+      m.meeting_duration_min,
+      m.meeting_owner_user_id,
+      m.provider_event_id,
+      m.provider_calendar_id,
       m.attendance_status,
       m.created_at,
       m.updated_at,
       ea.email_address AS account_email,
-      COALESCE(ea.account_name, ea.email_address) AS account_label
+      COALESCE(ea.account_name, ea.email_address) AS account_label,
+      owner_u.name AS meeting_owner_name
     FROM tenant_meetings m
     INNER JOIN email_accounts ea
       ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id AND ea.is_deleted = 0
+    LEFT JOIN users owner_u
+      ON owner_u.id = m.meeting_owner_user_id AND owner_u.tenant_id = m.tenant_id
 `;
 
 /**
@@ -247,10 +328,13 @@ export async function findById(tenantId, id) {
     `SELECT
         m.*,
         ea.email_address AS account_email,
-        COALESCE(ea.account_name, ea.email_address) AS account_label
+        COALESCE(ea.account_name, ea.email_address) AS account_label,
+        owner_u.name AS meeting_owner_name
      FROM tenant_meetings m
      INNER JOIN email_accounts ea
        ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id AND ea.is_deleted = 0
+     LEFT JOIN users owner_u
+       ON owner_u.id = m.meeting_owner_user_id AND owner_u.tenant_id = m.tenant_id
      WHERE m.tenant_id = ? AND m.id = ? AND m.deleted_at IS NULL`,
     [tenantId, mid]
   );
@@ -277,6 +361,18 @@ export async function create(tenantId, userId, payload) {
     err.status = 400;
     throw err;
   }
+  const startDt = parseMysqlDateTime(start_at);
+  const endDt = parseMysqlDateTime(end_at);
+  if (!startDt || !endDt) {
+    const err = new Error('Invalid meeting datetime');
+    err.status = 400;
+    throw err;
+  }
+  if (startDt.getTime() < Date.now()) {
+    const err = new Error('Meeting start time must be in the future');
+    err.status = 400;
+    throw err;
+  }
 
   const status = trimStr(payload.meeting_status) || 'scheduled';
   const allowed = ['scheduled', 'completed', 'cancelled', 'rescheduled'];
@@ -288,6 +384,45 @@ export async function create(tenantId, userId, payload) {
 
   const contact_id = await assertContactOptional(tenantId, payload.contact_id);
   const assigned_user_id = await assertUserOptional(tenantId, payload.assigned_user_id);
+  const meeting_owner_user_id = await assertMeetingOwnerOptional(
+    tenantId,
+    payload.meeting_owner_user_id ?? payload.assigned_user_id
+  );
+  const meeting_platform = normalizeMeetingPlatform(payload.meeting_platform);
+  if (!meeting_platform) {
+    const err = new Error('Invalid meeting_platform');
+    err.status = 400;
+    throw err;
+  }
+  const meeting_duration_min = parseDurationMinutes(
+    payload.meeting_duration_min,
+    Math.max(1, Math.round((endDt.getTime() - startDt.getTime()) / 60000))
+  );
+  if (!meeting_duration_min) {
+    const err = new Error('Invalid meeting_duration_min');
+    err.status = 400;
+    throw err;
+  }
+  const explicitMeetingLink = trimStr(payload.meeting_link);
+  const fallback_meeting_link =
+    explicitMeetingLink || buildAutoMeetingLink(meeting_platform, { title, start_at, end_at });
+  let nativeRoom = null;
+  try {
+    nativeRoom = await createNativeMeetingRoom(tenantId, userId, {
+      email_account_id,
+      meeting_platform,
+      title,
+      description: trimStr(payload.description),
+      location: trimStr(payload.location),
+      attendee_email: trimStr(payload.attendee_email),
+      start_at,
+      end_at,
+    });
+  } catch (e) {
+    // Keep CRM meeting flow alive even when provider calendar integration is misconfigured.
+    console.error('createNativeMeetingRoom(create):', e?.message || e);
+  }
+  const meeting_link = nativeRoom?.meeting_link || fallback_meeting_link;
   const attendanceRaw = trimStr(payload.attendance_status) || 'unknown';
   const attAllowed = ['unknown', 'attended', 'no_show', 'cancelled'];
   if (!attAllowed.includes(attendanceRaw)) {
@@ -299,8 +434,9 @@ export async function create(tenantId, userId, payload) {
   const result = await query(
     `INSERT INTO tenant_meetings
       (tenant_id, contact_id, assigned_user_id, email_account_id, title, description, location, attendee_email,
-       start_at, end_at, meeting_status, attendance_status, created_by, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       start_at, end_at, meeting_status, meeting_platform, meeting_link, meeting_duration_min, meeting_owner_user_id,
+       provider_event_id, provider_calendar_id, attendance_status, created_by, updated_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
       contact_id,
@@ -313,6 +449,12 @@ export async function create(tenantId, userId, payload) {
       start_at,
       end_at,
       status,
+      meeting_platform,
+      meeting_link,
+      meeting_duration_min,
+      meeting_owner_user_id,
+      nativeRoom?.provider_event_id || null,
+      nativeRoom?.provider_calendar_id || null,
       attendanceRaw,
       userId ?? null,
       userId ?? null,
@@ -321,6 +463,20 @@ export async function create(tenantId, userId, payload) {
   const row = await findById(tenantId, result.insertId);
   const notifyKind = row?.meeting_status === 'cancelled' ? 'cancelled' : 'created';
   void trySendMeetingAttendeeEmail(tenantId, userId, row, notifyKind);
+  const escalationRecipients = await listUserIdsByRoles(tenantId, ['admin', 'manager']);
+  await createAndDispatchNotification(tenantId, userId, {
+    moduleKey: 'meetings',
+    eventType: 'meeting_created',
+    severity: 'normal',
+    title: `Meeting created: ${row?.title || 'Meeting'}`,
+    body: row?.start_at ? `Scheduled at ${row.start_at}` : '',
+    assignedUserId: row?.assigned_user_id,
+    recipientUserIds: escalationRecipients,
+    entityType: 'meeting',
+    entityId: row?.id,
+    ctaPath: '/schedule/meetings',
+    eventHash: `meeting:create:${tenantId}:${row?.id}`,
+  });
   return row;
 }
 
@@ -370,6 +526,35 @@ export async function update(tenantId, userId, id, payload) {
     updates.push('end_at = ?');
     params.push(trimStr(payload.end_at));
   }
+  if (payload.meeting_platform !== undefined) {
+    const platform = normalizeMeetingPlatform(payload.meeting_platform);
+    if (!platform) {
+      const err = new Error('Invalid meeting_platform');
+      err.status = 400;
+      throw err;
+    }
+    updates.push('meeting_platform = ?');
+    params.push(platform);
+  }
+  if (payload.meeting_duration_min !== undefined) {
+    const duration = parseDurationMinutes(payload.meeting_duration_min, null);
+    if (!duration) {
+      const err = new Error('Invalid meeting_duration_min');
+      err.status = 400;
+      throw err;
+    }
+    updates.push('meeting_duration_min = ?');
+    params.push(duration);
+  }
+  if (payload.meeting_owner_user_id !== undefined) {
+    const ownerId = await assertMeetingOwnerOptional(tenantId, payload.meeting_owner_user_id);
+    updates.push('meeting_owner_user_id = ?');
+    params.push(ownerId);
+  }
+  if (payload.meeting_link !== undefined) {
+    updates.push('meeting_link = ?');
+    params.push(trimStr(payload.meeting_link));
+  }
   if (payload.meeting_status !== undefined) {
     const s = trimStr(payload.meeting_status);
     const allowed = ['scheduled', 'completed', 'cancelled', 'rescheduled'];
@@ -412,6 +597,79 @@ export async function update(tenantId, userId, id, payload) {
     err.status = 400;
     throw err;
   }
+  const nextStartDt = parseMysqlDateTime(sa);
+  const nextEndDt = parseMysqlDateTime(ea);
+  if (!nextStartDt || !nextEndDt) {
+    const err = new Error('Invalid meeting datetime');
+    err.status = 400;
+    throw err;
+  }
+  if (nextStartDt.getTime() < Date.now()) {
+    const err = new Error('Meeting start time must be in the future');
+    err.status = 400;
+    throw err;
+  }
+  const nextPlatform =
+    payload.meeting_platform !== undefined
+      ? normalizeMeetingPlatform(payload.meeting_platform)
+      : normalizeMeetingPlatform(existing.meeting_platform) || 'google_meet';
+  if (!nextPlatform) {
+    const err = new Error('Invalid meeting_platform');
+    err.status = 400;
+    throw err;
+  }
+  const hasExplicitLinkInPayload = Object.prototype.hasOwnProperty.call(payload, 'meeting_link');
+  const hasPlatformOrTimeChange =
+    payload.meeting_platform !== undefined ||
+    payload.start_at !== undefined ||
+    payload.end_at !== undefined ||
+    payload.title !== undefined;
+  if (!hasExplicitLinkInPayload && hasPlatformOrTimeChange) {
+    let nativeRoom = null;
+    try {
+      nativeRoom = await updateNativeMeetingRoom(tenantId, userId, {
+        email_account_id,
+        meeting_platform: nextPlatform,
+        title: payload.title !== undefined ? trimStr(payload.title) || existing.title : existing.title,
+        description:
+          payload.description !== undefined ? trimStr(payload.description) : existing.description,
+        location: payload.location !== undefined ? trimStr(payload.location) : existing.location,
+        attendee_email:
+          payload.attendee_email !== undefined
+            ? trimStr(payload.attendee_email)
+            : existing.attendee_email,
+        start_at: sa,
+        end_at: ea,
+        provider_event_id: existing.provider_event_id,
+        provider_calendar_id: existing.provider_calendar_id,
+        meeting_link: existing.meeting_link,
+      });
+    } catch (e) {
+      // Keep CRM update flow alive even when provider calendar integration is misconfigured.
+      console.error('updateNativeMeetingRoom(update):', e?.message || e);
+    }
+    updates.push('meeting_link = ?');
+    params.push(
+      nativeRoom?.meeting_link ||
+        buildAutoMeetingLink(nextPlatform, {
+          title: payload.title !== undefined ? trimStr(payload.title) || existing.title : existing.title,
+          start_at: sa,
+          end_at: ea,
+        })
+    );
+    updates.push('provider_event_id = ?');
+    params.push(nativeRoom?.provider_event_id || existing.provider_event_id || null);
+    updates.push('provider_calendar_id = ?');
+    params.push(nativeRoom?.provider_calendar_id || existing.provider_calendar_id || null);
+  }
+  if (
+    payload.meeting_duration_min === undefined &&
+    (payload.start_at !== undefined || payload.end_at !== undefined)
+  ) {
+    const inferredDuration = Math.max(1, Math.round((nextEndDt.getTime() - nextStartDt.getTime()) / 60000));
+    updates.push('meeting_duration_min = ?');
+    params.push(inferredDuration);
+  }
 
   updates.push('updated_by = ?');
   params.push(userId ?? null);
@@ -419,9 +677,37 @@ export async function update(tenantId, userId, id, payload) {
 
   await query(`UPDATE tenant_meetings SET ${updates.join(', ')} WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL`, params);
 
-  const row = await findById(tenantId, id);
+  let row = await findById(tenantId, id);
+  if (row && row.meeting_status === 'cancelled' && existing.meeting_status !== 'cancelled') {
+    try {
+      await deleteNativeMeetingRoom(tenantId, userId, row);
+      await query(
+        `UPDATE tenant_meetings
+         SET provider_event_id = NULL, provider_calendar_id = NULL
+         WHERE tenant_id = ? AND id = ?`,
+        [tenantId, Number(id)]
+      );
+      row = await findById(tenantId, id);
+    } catch (e) {
+      console.error('deleteNativeMeetingRoom(cancelled):', e?.message || e);
+    }
+  }
   const notifyKind = row?.meeting_status === 'cancelled' ? 'cancelled' : 'updated';
   void trySendMeetingAttendeeEmail(tenantId, userId, row, notifyKind);
+  const escalationRecipients = await listUserIdsByRoles(tenantId, ['admin', 'manager']);
+  await createAndDispatchNotification(tenantId, userId, {
+    moduleKey: 'meetings',
+    eventType: 'meeting_rescheduled',
+    severity: row?.meeting_status === 'cancelled' ? 'high' : 'normal',
+    title: `Meeting updated: ${row?.title || 'Meeting'}`,
+    body: row?.start_at ? `Updated schedule: ${row.start_at}` : '',
+    assignedUserId: row?.assigned_user_id,
+    recipientUserIds: escalationRecipients,
+    entityType: 'meeting',
+    entityId: row?.id,
+    ctaPath: '/schedule/meetings',
+    eventHash: `meeting:update:${tenantId}:${row?.id}:${row?.updated_at || ''}`,
+  });
   return row;
 }
 
@@ -431,6 +717,11 @@ export async function remove(tenantId, userId, id) {
     const err = new Error('Meeting not found');
     err.status = 404;
     throw err;
+  }
+  try {
+    await deleteNativeMeetingRoom(tenantId, userId, existing);
+  } catch (e) {
+    console.error('deleteNativeMeetingRoom(remove):', e?.message || e);
   }
   await query(
     `UPDATE tenant_meetings

@@ -1,0 +1,89 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.list {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.item {
+  border-bottom: 1px solid var(--color-border);
+  padding: 12px;
+  background: var(--color-bg-elevated);
+}
+
+.itemUnread {
+  background: color-mix(in srgb, var(--color-primary-500) 9%, transparent);
+}
+
+.itemTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.title {
+  font-weight: 600;
+}
+
+.meta {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+}
+
+.pushStatusRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pushStatusLabel {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.pushStatusBadge {
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+}
+
+.push_enabled {
+  background: color-mix(in srgb, #22c55e 16%, transparent);
+  border-color: color-mix(in srgb, #22c55e 40%, var(--color-border));
+}
+
+.push_blocked,
+.push_unsupported {
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+  border-color: color-mix(in srgb, #ef4444 35%, var(--color-border));
+}
+
+.push_not_enabled,
+.push_permission_only {
+  background: color-mix(in srgb, #f59e0b 14%, transparent);
+  border-color: color-mix(in srgb, #f59e0b 35%, var(--color-border));
+}
+
+.pushHint {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+

@@ -6,6 +6,7 @@ import * as emailSendController from '../../controllers/tenant/emailSendControll
 import * as emailSettingsController from '../../controllers/tenant/emailSettingsController.js';
 import * as emailOAuthController from '../../controllers/tenant/emailOAuthController.js';
 import * as emailSyncController from '../../controllers/tenant/emailSyncController.js';
+import * as emailCampaignsController from '../../controllers/tenant/emailCampaignsController.js';
 import { tenantAuthMiddleware, requirePermission } from '../../middleware/auth.js';
 import { requireEmailModuleEnabled } from '../../middleware/requireEmailModule.js';
 
@@ -15,6 +16,7 @@ const emailView = requirePermission(['email.view', 'settings.manage', 'dial.exec
 const emailSend = requirePermission(['email.send', 'settings.manage', 'dial.execute']);
 const emailTemplatesManage = requirePermission(['email.templates.manage', 'settings.manage']);
 const emailAccountsManage = requirePermission(['email.accounts.manage', 'settings.manage']);
+const emailCampaignsManage = requirePermission(['email.send', 'settings.manage']);
 
 // OAuth callbacks (no auth — provider redirects here)
 router.get('/oauth/google/callback', emailOAuthController.callbackGoogle);
@@ -61,5 +63,12 @@ router.get('/messages/:id', emailView, emailMessagesController.getById);
 
 // Send
 router.post('/send', emailSend, emailSendController.send);
+
+// Campaigns (bulk email)
+router.get('/campaigns', emailView, emailCampaignsController.list);
+router.get('/campaigns/:id', emailView, emailCampaignsController.getById);
+router.get('/campaigns/:id/recipients', emailView, emailCampaignsController.listRecipients);
+router.post('/campaigns', emailCampaignsManage, emailCampaignsController.create);
+router.post('/campaigns/:id/queue', emailCampaignsManage, emailCampaignsController.queue);
 
 export default router;

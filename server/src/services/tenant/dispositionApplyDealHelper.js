@@ -85,9 +85,12 @@ export async function enrichDispositionsForDialerSession(tenantId, dispositions)
 
   return parsed.map(({ raw, arr }) => {
     const { actions: _drop, ...rest } = raw;
+    const action_codes = arr
+      .map((a) => (a?.action_id ? codeById.get(String(a.action_id)) : null))
+      .filter(Boolean);
     const requires_deal_selection = arr.some(
       (a) => a?.action_id && codeById.get(String(a.action_id)) === APPLY_DEAL_ACTION_CODE
     );
-    return { ...rest, requires_deal_selection };
+    return { ...rest, requires_deal_selection, action_codes };
   });
 }
