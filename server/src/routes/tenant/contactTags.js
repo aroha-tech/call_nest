@@ -30,4 +30,16 @@ router.delete(
   contactTagsController.remove
 );
 
+router.delete(
+  '/:id/permanent',
+  requirePermission(['contacts.update', 'leads.update']),
+  contactTagsController.removePermanent
+);
+
+router.patch(
+  '/:id/unarchive',
+  requirePermission(['contacts.update', 'leads.update']),
+  contactTagsController.unarchive
+);
+
 export default router;

@@ -5,9 +5,9 @@ const ROLE_ORDER = ['admin', 'manager', 'agent'];
 const ROLE_LABELS = { admin: 'Admins', manager: 'Managers', agent: 'Agents' };
 
 const DONUT_COLORS = {
-  admin: 'var(--color-primary-500)',
-  manager: 'var(--color-primary-400)',
-  agent: 'color-mix(in srgb, var(--color-primary-300) 85%, var(--color-info))',
+  admin: 'var(--color-text-primary)',
+  manager: 'var(--color-text-secondary)',
+  agent: 'var(--color-text-muted)',
 };
 
 /** Clockwise donut arc; angles in degrees from top (0° = 12 o'clock). */

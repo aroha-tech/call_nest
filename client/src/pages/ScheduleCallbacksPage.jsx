@@ -16,6 +16,7 @@ import { scheduleHubAPI } from '../services/scheduleHubAPI';
 import styles from './MeetingsPage.module.scss';
 import { CallbackMetricCards } from '../features/callbacks/CallbackMetricCards';
 import { contactsAPI } from '../services/contactsAPI';
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const NEAR_WINDOW_MINUTES = 120;
@@ -52,17 +53,6 @@ function buildMonthCells(year, month0) {
     }
   }
   return cells;
-}
-
-function formatWhen(v) {
-  if (!v) return '—';
-  try {
-    const d = new Date(String(v).replace(' ', 'T'));
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-  } catch {
-    return '—';
-  }
 }
 
 function callbackStatusBadgeVariant(status) {
@@ -105,6 +95,7 @@ function defaultDateTimeLocalForDay(ymd) {
 }
 
 export function ScheduleCallbacksPage() {
+  const { formatDateTime, formatMonthYear } = useDateTimeDisplay();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month0, setMonth0] = useState(now.getMonth());
@@ -377,7 +368,7 @@ export function ScheduleCallbacksPage() {
     setMonth0(d.getMonth());
   }
 
-  const monthTitle = new Date(year, month0, 1).toLocaleString(undefined, { month: 'long', year: 'numeric' });
+  const monthTitle = formatMonthYear(new Date(year, month0, 1));
   const listTotalPages = Math.max(1, listPagination.totalPages || 1);
 
   const openCreateCallbackModal = useCallback(
@@ -658,7 +649,7 @@ export function ScheduleCallbacksPage() {
                         style={{ cursor: 'pointer' }}
                         title="Click to edit callback"
                       >
-                        <TableCell>{formatWhen(r.scheduled_at)}</TableCell>
+                        <TableCell>{formatDateTime(String(r.scheduled_at || '').replace(' ', 'T'))}</TableCell>
                         <TableCell noTruncate>{r.contact_name || '—'}</TableCell>
                         <TableCell noTruncate>{r.contact_phone || '—'}</TableCell>
                         <TableCell noTruncate>{r.assigned_name || r.assigned_email || '—'}</TableCell>

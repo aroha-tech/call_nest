@@ -13,7 +13,8 @@
   color: var(--color-text-muted, #64748b);
   text-decoration: none;
   &:hover {
-    text-decoration: underline;
+    text-decoration: none;
+    opacity: 0.92;
     color: var(--color-text, #0f172a);
   }
 }

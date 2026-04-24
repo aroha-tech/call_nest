@@ -21,29 +21,9 @@ function formatDurationSec(sec) {
   return `${r}s`;
 }
 
-/** Timeline label style (reference UI): `-- MM/DD/YYYY @ h:mm AM UTC by Agent -- phone -- text` */
-function formatUtcTimelineWhen(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  const dateStr = d.toLocaleDateString('en-US', {
-    timeZone: 'UTC',
-    month: '2-digit',
-    day: '2-digit',
-    year: 'numeric',
-  });
-  const timeStr = d.toLocaleTimeString('en-US', {
-    timeZone: 'UTC',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
-  return `${dateStr} @ ${timeStr} UTC`;
-}
-
-function formatCallHistoryTimelineLine(row, entry) {
+function formatCallHistoryTimelineLine(row, entry, formatWhen) {
   const whenIso = entry.whenIso || row.ended_at || row.started_at || row.created_at;
-  const datePart = formatUtcTimelineWhen(whenIso);
+  const datePart = formatWhen?.(whenIso) ?? '—';
   const agent = String(row.agent_name || '—').trim() || '—';
   const phone = String(row.phone_e164 || '—').trim() || '—';
   const text = String(entry.text || '—').trim() || '—';
@@ -311,7 +291,9 @@ export function CallHistoryDataTable({
                       <ul className={styles.notesTimelineList}>
                         {timelineEntries.map((entry) => (
                           <li key={entry.key}>
-                            <p className={styles.notesTimelineLine}>{formatCallHistoryTimelineLine(r, entry)}</p>
+                            <p className={styles.notesTimelineLine}>
+                              {formatCallHistoryTimelineLine(r, entry, formatWhen)}
+                            </p>
                           </li>
                         ))}
                       </ul>

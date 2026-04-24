@@ -41,13 +41,10 @@ import { isNoListFilter } from '../utils/listFilterNarrowing';
 
 function emptyThemeFormFields() {
   return {
-    theme_primary: '',
     theme_logo_url: '',
     theme_workspace_title: '',
     theme_radius_px: '',
     theme_font_preset: 'inter',
-    theme_gradient_start: '',
-    theme_gradient_end: '',
   };
 }
 
@@ -64,26 +61,16 @@ function themeFieldsFromRow(row) {
     return emptyThemeFormFields();
   }
   return {
-    theme_primary: typeof t.primary === 'string' ? t.primary : '',
     theme_logo_url: typeof t.logoUrl === 'string' ? t.logoUrl : '',
     theme_workspace_title: typeof t.workspaceTitle === 'string' ? t.workspaceTitle : '',
     theme_radius_px: t.radiusPx != null && t.radiusPx !== '' ? String(t.radiusPx) : '',
     theme_font_preset: t.fontPreset === 'system' ? 'system' : 'inter',
-    theme_gradient_start: typeof t.gradientStart === 'string' ? t.gradientStart : '',
-    theme_gradient_end: typeof t.gradientEnd === 'string' ? t.gradientEnd : '',
   };
 }
 
 /** @returns {{ value: object|null, error?: string }} */
 function themePayloadFromForm(form) {
   const o = {};
-  const p = form.theme_primary?.trim();
-  if (p) {
-    if (!/^#[0-9A-Fa-f]{6}$/.test(p)) {
-      return { value: null, error: 'Brand color must be #RRGGBB (six hex digits).' };
-    }
-    o.primary = p.toLowerCase();
-  }
   const logo = form.theme_logo_url?.trim();
   if (logo) {
     try {
@@ -98,20 +85,6 @@ function themePayloadFromForm(form) {
   }
   const wt = form.theme_workspace_title?.trim();
   if (wt) o.workspaceTitle = wt.slice(0, 120);
-  const gs = form.theme_gradient_start?.trim();
-  if (gs) {
-    if (!/^#[0-9A-Fa-f]{6}$/.test(gs)) {
-      return { value: null, error: 'Gradient start must be #RRGGBB.' };
-    }
-    o.gradientStart = gs.toLowerCase();
-  }
-  const ge = form.theme_gradient_end?.trim();
-  if (ge) {
-    if (!/^#[0-9A-Fa-f]{6}$/.test(ge)) {
-      return { value: null, error: 'Gradient end must be #RRGGBB.' };
-    }
-    o.gradientEnd = ge.toLowerCase();
-  }
   if (form.theme_font_preset === 'system') o.fontPreset = 'system';
   const rp = form.theme_radius_px;
   if (rp !== '' && rp != null && String(rp).trim() !== '') {
@@ -828,39 +801,9 @@ export function TenantsPage() {
             <div className={styles.formSection}>
               <h3 className={styles.formSectionTitle}>Workspace appearance</h3>
               <p className={styles.formSectionHint}>
-                Colors and logo apply to this tenant&apos;s app after sign-in. Users see updates on their
-                next session refresh. Logo URL must use HTTPS.
+                Logo and typography apply to this tenant&apos;s app after sign-in. Users see updates on
+                their next session refresh. Logo URL must use HTTPS.
               </p>
-              <div className={styles.themeColorRow}>
-                <label className={styles.colorPickerLabel}>
-                  <span className={styles.colorPickerLabelText}>Swatch</span>
-                  <input
-                    type="color"
-                    className={styles.colorPicker}
-                    aria-label="Pick brand color"
-                    value={
-                      /^#[0-9A-Fa-f]{6}$/.test(form.theme_primary || '')
-                        ? form.theme_primary
-                        : '#6366f1'
-                    }
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, theme_primary: e.target.value.toLowerCase() }))
-                    }
-                  />
-                </label>
-                <div className={styles.themeColorInputGrow}>
-                  <Input
-                    label="Brand color"
-                    value={form.theme_primary}
-                    onChange={(e) => {
-                      clearFormErr('submit');
-                      setForm((f) => ({ ...f, theme_primary: e.target.value }));
-                    }}
-                    placeholder="#8A3FFC"
-                    hint="Six-digit hex. Drives buttons, focus rings, and accent UI."
-                  />
-                </div>
-              </div>
               <Input
                 label="Logo URL (HTTPS)"
                 value={form.theme_logo_url}
@@ -901,27 +844,6 @@ export function TenantsPage() {
                   ]}
                   value={form.theme_font_preset}
                   onChange={(e) => setForm((f) => ({ ...f, theme_font_preset: e.target.value }))}
-                />
-              </div>
-              <div className={styles.themeSplitRow}>
-                <Input
-                  label="Gradient start (optional)"
-                  value={form.theme_gradient_start}
-                  onChange={(e) => {
-                    clearFormErr('submit');
-                    setForm((f) => ({ ...f, theme_gradient_start: e.target.value }));
-                  }}
-                  placeholder="#4c1d95"
-                  hint="For future dashboard cards; exposed as CSS variables."
-                />
-                <Input
-                  label="Gradient end (optional)"
-                  value={form.theme_gradient_end}
-                  onChange={(e) => {
-                    clearFormErr('submit');
-                    setForm((f) => ({ ...f, theme_gradient_end: e.target.value }));
-                  }}
-                  placeholder="#7c3aed"
                 />
               </div>
             </div>

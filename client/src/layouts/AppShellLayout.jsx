@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, Fragment } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Fragment } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useSalesNavigation } from '../hooks/useSalesNavigation';
 import { SidebarUserPanel } from './SidebarUserPanel';
@@ -8,6 +8,8 @@ import { NavIcon, NavChevron } from '../components/navigation/NavIcon';
 import { useColorScheme } from '../context/ColorSchemeContext';
 import { getBreadcrumbItems } from './breadcrumbUtils';
 import { NotificationBell } from '../features/notifications/NotificationBell';
+import { useSiteEntryPermissions } from '../hooks/useSiteEntryPermissions';
+import { MaterialSymbol } from '../components/ui/MaterialSymbol';
 import styles from './AppShellLayout.module.scss';
 
 /** Survives route changes: each `<Route>` wraps its own `AppShellLayout`, so the component remounts on navigation. */
@@ -157,6 +159,8 @@ export function AppShellLayout({ children }) {
   const user = useAppSelector(selectUser);
   const [sidebarOpen, setSidebarOpen] = useState(getInitialSidebarOpen);
 
+  useSiteEntryPermissions(user?.id);
+
   useEffect(() => {
     try {
       sessionStorage.setItem(SIDEBAR_OPEN_STORAGE_KEY, sidebarOpen ? 'true' : 'false');
@@ -173,6 +177,9 @@ export function AppShellLayout({ children }) {
   }, []);
   const [expandedGroups, setExpandedGroups] = useState({});
   const [navSearchQuery, setNavSearchQuery] = useState('');
+  const [navSearchOpen, setNavSearchOpen] = useState(false);
+  const navSearchRootRef = useRef(null);
+  const navSearchInputRef = useRef(null);
 
   const filteredNavItems = useMemo(
     () => filterNavMenuBySearch(items, navSearchQuery),
@@ -210,6 +217,23 @@ export function AppShellLayout({ children }) {
     }
   }, [activeParentKey]);
 
+  useEffect(() => {
+    if (navSearchOpen) {
+      navSearchInputRef.current?.focus();
+    }
+  }, [navSearchOpen]);
+
+  useEffect(() => {
+    if (!navSearchOpen) return;
+    const onPointerDown = (e) => {
+      if (navSearchRootRef.current && !navSearchRootRef.current.contains(e.target)) {
+        setNavSearchOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
+  }, [navSearchOpen]);
+
   const closeSidebarIfMobileOverlay = () => {
     if (!isDesktopSidebarBreakpoint()) setSidebarOpen(false);
   };
@@ -227,7 +251,10 @@ export function AppShellLayout({ children }) {
       />
 
       {/* Sidebar */}
-      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''}`}>
+      <aside
+        className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''}`}
+        data-app-shell-sidebar
+      >
         <div className={styles.sidebarHeader}>
           {logoUrl ? (
             <div className={styles.brandRow}>
@@ -241,32 +268,61 @@ export function AppShellLayout({ children }) {
             <span className={styles.tenant}>{workspaceSubtitle}</span>
           )}
         </div>
-        <div className={styles.navSearch}>
-          <div className={styles.navSearchInner}>
-            <span className={styles.navSearchIcon} aria-hidden>
-              🔍
-            </span>
-            <input
-              type="text"
-              inputMode="search"
-              className={styles.navSearchInput}
-              placeholder="Search menu…"
-              value={navSearchQuery}
-              onChange={(e) => setNavSearchQuery(e.target.value)}
-              aria-label="Search menu"
-              autoComplete="off"
-              spellCheck="false"
-            />
-            {navSearchQuery.trim() ? (
+        <div className={styles.navSearch} ref={navSearchRootRef}>
+          <div
+            className={`${styles.navSearchTrack} ${navSearchOpen ? styles.navSearchTrackOpen : ''}`}
+          >
+            <div
+              className={`${styles.navSearchPill} ${!navSearchOpen ? styles.navSearchPillCollapsed : ''} ${navSearchQuery.trim() && !navSearchOpen ? styles.navSearchPillHasValue : ''}`}
+            >
+              {navSearchOpen ? (
+                <>
+                  <input
+                    ref={navSearchInputRef}
+                    type="text"
+                    inputMode="search"
+                    className={styles.navSearchPillInput}
+                    placeholder="Search menu…"
+                    value={navSearchQuery}
+                    onChange={(e) => setNavSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setNavSearchOpen(false);
+                      }
+                    }}
+                    aria-label="Search menu"
+                    autoComplete="off"
+                    spellCheck="false"
+                  />
+                  {navSearchQuery.trim() ? (
+                    <button
+                      type="button"
+                      className={styles.navSearchPillClear}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNavSearchQuery('');
+                        navSearchInputRef.current?.focus();
+                      }}
+                      aria-label="Clear menu search"
+                    >
+                      ✕
+                    </button>
+                  ) : null}
+                </>
+              ) : null}
               <button
                 type="button"
-                className={styles.navSearchClear}
-                onClick={() => setNavSearchQuery('')}
-                aria-label="Clear menu search"
+                className={styles.navSearchPillIconBtn}
+                onClick={() => {
+                  if (!navSearchOpen) setNavSearchOpen(true);
+                }}
+                aria-label={navSearchOpen ? 'Menu search' : 'Open menu search'}
+                aria-expanded={navSearchOpen}
               >
-                ×
+                <MaterialSymbol name="search" size="sm" className={styles.navSearchSearchGlyph} />
               </button>
-            ) : null}
+            </div>
           </div>
         </div>
         <nav className={styles.nav} aria-label="Main navigation">

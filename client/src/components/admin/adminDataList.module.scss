@@ -268,6 +268,10 @@
 .tableCardToolbarTopLead {
   margin-bottom: 0;
   border-bottom-color: var(--color-border);
+  /* Keep bulk row + search on one line so expandable search grows left in place */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tableCardToolbarTopSearch {
@@ -278,7 +282,9 @@
 }
 
 .searchInToolbar {
-  width: 100%;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
   max-width: 420px;
   margin-left: auto;
 }

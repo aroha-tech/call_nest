@@ -92,12 +92,13 @@
 
   a {
     font-weight: $font-weight-semibold;
-    color: var(--color-primary-500);
+    color: var(--color-text-primary);
     text-decoration: none;
 
     &:hover {
-      color: var(--color-primary-400);
-      text-decoration: underline;
+      color: var(--color-text-primary);
+      text-decoration: none;
+      opacity: 0.92;
     }
   }
 }

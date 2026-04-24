@@ -1,21 +1,30 @@
+.activityToolbarTop {
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .toolbarTabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--space-3, 0.75rem);
-  flex: 1;
-  min-width: min(100%, 280px);
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .crumb {
   font-size: var(--font-size-sm, 0.875rem);
   color: var(--color-text-secondary, #94a3b8);
   text-decoration: none;
+  font-weight: 600;
 }
 
 .crumb:hover {
-  color: var(--color-accent, #38bdf8);
-  text-decoration: underline;
+  color: var(--color-text-primary, #f1f5f9);
+  text-decoration: none;
+  opacity: 0.92;
 }
 
 .loading,
@@ -54,7 +63,7 @@
 .activitySub {
   margin-top: 2px;
   font-size: var(--font-size-xs, 0.75rem);
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-secondary, #94a3b8);
   line-height: 1.35;
 }
 
@@ -85,12 +94,12 @@
 }
 
 .memberRole {
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-secondary, #94a3b8);
   font-weight: 500;
 }
 
 .whenCell {
   font-size: var(--font-size-xs, 0.75rem);
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-secondary, #94a3b8);
   white-space: nowrap;
 }

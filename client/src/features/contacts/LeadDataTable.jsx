@@ -10,6 +10,7 @@ import styles from './LeadDataTable.module.scss';
 import { parseCustomFieldColumnId } from './customFieldColumnIds';
 import { parseIndustryFieldColumnId } from './industryFieldColumnIds';
 import { IconPhone } from './ListActionsMenuIcons';
+import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 
 const ACTION_MENU_MIN_W = 160;
 
@@ -210,6 +211,7 @@ export function LeadDataTable({
   onDialerCall,
   displayNameLinkTo,
 }) {
+  const { formatDateTime, formatDate } = useDateTimeDisplay();
   const selectionEnabled = showSelection ?? canBulkAssign;
   const visibleDefs = useMemo(() => {
     const map = new Map(applicableColumns.map((c) => [c.id, c]));
@@ -217,28 +219,6 @@ export function LeadDataTable({
   }, [applicableColumns, visibleColumnIds]);
 
   const hasFilter = (field) => columnFilters.some((f) => f.field === field);
-
-  const formatCreated = (v) => {
-    if (!v) return '—';
-    try {
-      const d = new Date(v);
-      if (Number.isNaN(d.getTime())) return '—';
-      return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-    } catch {
-      return '—';
-    }
-  };
-
-  const formatDateOnly = (v) => {
-    if (!v) return '—';
-    try {
-      const d = new Date(v);
-      if (Number.isNaN(d.getTime())) return '—';
-      return d.toLocaleDateString(undefined, { dateStyle: 'short' });
-    } catch {
-      return '—';
-    }
-  };
 
   const renderCell = (col, c) => {
     const indKey = parseIndustryFieldColumnId(col.id);
@@ -326,13 +306,13 @@ export function LeadDataTable({
       case 'tax_id':
         return c.tax_id || '—';
       case 'date_of_birth':
-        return formatDateOnly(c.date_of_birth);
+        return formatDate(c.date_of_birth);
       case 'created_at':
-        return formatCreated(c.created_at);
+        return formatDateTime(c.created_at);
       case 'call_count_total':
         return c.call_count_total == null ? '0' : String(c.call_count_total);
       case 'last_called_at':
-        return formatCreated(c.last_called_at);
+        return formatDateTime(c.last_called_at);
       default:
         return '—';
     }

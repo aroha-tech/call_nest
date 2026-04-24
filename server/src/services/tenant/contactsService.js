@@ -74,6 +74,95 @@ function trimStr(v) {
   return t === '' ? null : t;
 }
 
+function normalizeEmailForTenantUniq(email) {
+  const t = trimStr(email);
+  return t ? t.toLowerCase() : null;
+}
+
+function coerceExcludeContactId(excludeId) {
+  if (excludeId == null || excludeId === '') return null;
+  const n = Number(excludeId);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+async function findContactByTenantEmail(tenantId, emailNormalized, excludeId = null) {
+  if (!emailNormalized) return null;
+  const params = [tenantId, emailNormalized];
+  let sql = `SELECT id, type
+             FROM contacts
+             WHERE tenant_id = ?
+               AND deleted_at IS NULL
+               AND LOWER(TRIM(email)) = ?`;
+  const ex = coerceExcludeContactId(excludeId);
+  if (ex != null) {
+    sql += ' AND id <> ?';
+    params.push(ex);
+  }
+  sql += ' LIMIT 1';
+  const [row] = await query(sql, params);
+  return row || null;
+}
+
+async function assertTenantEmailUnique(tenantId, email, excludeId = null) {
+  const emailNormalized = normalizeEmailForTenantUniq(email);
+  if (!emailNormalized) return;
+  const existing = await findContactByTenantEmail(tenantId, emailNormalized, excludeId);
+  if (existing) {
+    const err = new Error('Email already exists in this tenant');
+    err.status = 409;
+    throw err;
+  }
+}
+
+function payloadHasNonEmptyPhone(phones) {
+  if (!Array.isArray(phones)) return false;
+  return phones.some((p) => p?.phone && String(p.phone).trim());
+}
+
+function assertManualContactHasEmailOrPhoneCreate(payload) {
+  if (normalizeEmailForTenantUniq(payload?.email)) return;
+  if (payloadHasNonEmptyPhone(payload?.phones)) return;
+  const err = new Error('Either email or at least one phone number is required');
+  err.status = 400;
+  throw err;
+}
+
+async function assertManualContactHasEmailOrPhoneUpdate(tenantId, contactId, existing, payload) {
+  const { email, phones } = payload;
+  const nextEmail = email !== undefined ? email : existing.email;
+  if (normalizeEmailForTenantUniq(nextEmail)) return;
+
+  if (Array.isArray(phones)) {
+    if (payloadHasNonEmptyPhone(phones)) return;
+    const err = new Error('Either email or at least one phone number is required');
+    err.status = 400;
+    throw err;
+  }
+
+  if (payloadHasNonEmptyPhone(existing.phones)) return;
+
+  const cid = coerceExcludeContactId(contactId ?? existing?.id);
+  if (cid == null) {
+    const err = new Error('Either email or at least one phone number is required');
+    err.status = 400;
+    throw err;
+  }
+
+  const [row] = await query(
+    `SELECT 1 AS ok
+     FROM contact_phones
+     WHERE tenant_id = ? AND contact_id = ?
+       AND phone IS NOT NULL AND TRIM(phone) <> ''
+     LIMIT 1`,
+    [tenantId, cid]
+  );
+  if (row) return;
+
+  const err = new Error('Either email or at least one phone number is required');
+  err.status = 400;
+  throw err;
+}
+
 /** TEXT column — cap length defensively (UTF-8 safe slice on JS string). */
 const CONTACT_NOTES_MAX_LEN = 60000;
 function normalizeContactNotesForDb(v) {
@@ -1530,7 +1619,7 @@ async function flushImportCreateBuffer(
   user,
   type,
   buffer,
-  sessionPhoneMap,
+  sessionEmailMap,
   statusCache,
   validatedTagIds,
   preloadedAgentManagerId = undefined
@@ -1697,9 +1786,9 @@ async function flushImportCreateBuffer(
     }
 
     for (let i = 0; i < n; i++) {
-      const primaryPhone = buffer[i].primaryPhone;
-      if (primaryPhone != null && primaryPhone !== '') {
-        sessionPhoneMap.set(primaryPhone, { id: contactIds[i], type });
+      const emailKey = buffer[i].emailKey;
+      if (emailKey != null && emailKey !== '') {
+        sessionEmailMap.set(emailKey, { id: contactIds[i], type });
       }
     }
   };
@@ -1712,8 +1801,8 @@ async function flushImportCreateBuffer(
     for (const item of buffer) {
       const createdContact = await createContact(tenantId, user, item.payload, { skipFetch: true });
       if (createdContact?.id != null) fallbackIds.push(createdContact.id);
-      if (item.primaryPhone != null && item.primaryPhone !== '' && createdContact?.id != null) {
-        sessionPhoneMap.set(item.primaryPhone, { id: createdContact.id, type });
+      if (item.emailKey != null && item.emailKey !== '' && createdContact?.id != null) {
+        sessionEmailMap.set(item.emailKey, { id: createdContact.id, type });
       }
     }
     if (validatedTagIds.length > 0 && fallbackIds.length > 0) {
@@ -1730,6 +1819,8 @@ export async function createContact(tenantId, user, payload, options = {}) {
   } = payload;
 
   assertUniquePhoneLabels(phones);
+  assertManualContactHasEmailOrPhoneCreate(payload);
+  await assertTenantEmailUnique(tenantId, payload?.email, null);
 
   const { insertParams, phones: ph, custom_fields: cf, tag_ids } = await buildContactInsertRow(
     tenantId,
@@ -2023,6 +2114,16 @@ export async function updateContact(id, tenantId, user, payload, options = {}) {
 
   if (Array.isArray(phones)) {
     assertUniquePhoneLabels(phones);
+  }
+
+  await assertManualContactHasEmailOrPhoneUpdate(tenantId, id, existing, payload);
+
+  if (email !== undefined) {
+    const incomingNorm = normalizeEmailForTenantUniq(email);
+    const currentNorm = normalizeEmailForTenantUniq(existing.email);
+    if (incomingNorm !== currentNorm) {
+      await assertTenantEmailUnique(tenantId, email, existing.id);
+    }
   }
 
   const updates = [];
@@ -3297,41 +3398,31 @@ function isProviderLogicalFieldMappedInHeaderMapping(headerMapping, defKey, cust
   return false;
 }
 
-/**
- * Sync-only: primary phone E.164 for duplicate prefetch (no DB). Matches phone resolution in
- * {@link resolveCsvRowToImportPayload} without running custom-field / provider async work.
- */
-function peekImportPrimaryPhoneE164(normalized, headerMapping, defaultCountryCode) {
+/** Sync-only: normalized email for duplicate prefetch (no DB). */
+function peekImportEmailNormalized(normalized, headerMapping) {
   const row = { ...normalized };
   if (headerMapping && typeof headerMapping === 'object') {
     for (const nk of Object.keys(headerMapping)) {
-      if (headerMapping[nk]?.target === 'ignore') {
-        delete row[nk];
-      }
+      if (headerMapping[nk]?.target === 'ignore') delete row[nk];
     }
   }
-  let mappedPrimaryPhone = null;
+  let mappedEmail = null;
   if (headerMapping) {
     for (const [nk, cfg] of Object.entries(headerMapping)) {
       const val = row[nk];
       if (val === undefined) continue;
       const target = cfg?.target;
       if (!target || target === 'ignore') continue;
-      if (target === 'primary_phone') mappedPrimaryPhone = val;
+      if (target === 'email') mappedEmail = val;
     }
   }
-  const normalizedForPhones = { ...row };
-  if (mappedPrimaryPhone != null && String(mappedPrimaryPhone).trim()) {
-    normalizedForPhones.primary_phone = mappedPrimaryPhone;
-  }
-  const phones = buildPhonesFromCsvRow(normalizedForPhones, defaultCountryCode, toE164Phone);
-  return phones.find((p) => p.is_primary)?.phone || null;
+  const extracted = extractNamesAndEmailFromNormalizedRow(row);
+  return normalizeEmailForTenantUniq(mappedEmail || extracted.email);
 }
 
-/** Load existing rows keyed by primary phone for import duplicate detection (same `recordType` only — leads and contacts are independent). */
-async function prefetchImportExistingByPhones(tenantId, phones, recordType) {
-  const rt = String(recordType || 'lead').toLowerCase() === 'contact' ? 'contact' : 'lead';
-  const unique = [...new Set((phones || []).filter(Boolean))];
+/** Load existing rows keyed by normalized email for import duplicate detection (tenant-wide). */
+async function prefetchImportExistingByEmails(tenantId, emails) {
+  const unique = [...new Set((emails || []).filter(Boolean))];
   const map = new Map();
   if (unique.length === 0) return map;
   const chunkSize = 450;
@@ -3339,15 +3430,16 @@ async function prefetchImportExistingByPhones(tenantId, phones, recordType) {
     const chunk = unique.slice(i, i + chunkSize);
     const ph = chunk.map(() => '?').join(',');
     const rows = await query(
-      `SELECT p.phone AS phone, c.id AS id, c.type AS type
-       FROM contact_phones p
-       INNER JOIN contacts c
-         ON c.id = p.contact_id AND c.tenant_id = p.tenant_id
-       WHERE p.tenant_id = ? AND c.type = ? AND p.phone IN (${ph}) AND c.deleted_at IS NULL`,
-      [tenantId, rt, ...chunk]
+      `SELECT id, type, LOWER(TRIM(email)) AS email_key
+       FROM contacts
+       WHERE tenant_id = ?
+         AND deleted_at IS NULL
+         AND email IS NOT NULL
+         AND LOWER(TRIM(email)) IN (${ph})`,
+      [tenantId, ...chunk]
     );
     for (const r of rows) {
-      if (r?.phone) map.set(r.phone, { id: r.id, type: r.type });
+      if (r?.email_key) map.set(r.email_key, { id: r.id, type: r.type });
     }
   }
   return map;
@@ -4426,17 +4518,17 @@ export async function importContactsCsv(
     preloadedAgentManagerId = ur?.manager_id ?? null;
   }
 
-  const peekPhones = [];
+  const peekEmails = [];
   for (let ri = 0; ri < records.length; ri++) {
     const prow = records[ri] || {};
     const normalizedPeek = {};
     for (const [k, v] of Object.entries(prow)) {
       normalizedPeek[normalizeHeader(k)] = v;
     }
-    peekPhones.push(peekImportPrimaryPhoneE164(normalizedPeek, headerMapping, defaultCountryCode));
+    peekEmails.push(peekImportEmailNormalized(normalizedPeek, headerMapping));
   }
-  const prefetchMap = await prefetchImportExistingByPhones(tenantId, peekPhones, type);
-  const sessionPhoneMap = new Map(prefetchMap);
+  const prefetchMap = await prefetchImportExistingByEmails(tenantId, peekEmails);
+  const sessionEmailMap = new Map(prefetchMap);
 
   /**
    * Row-based progress stride: each tick advances processed_count by ~this many rows (see loop `i % stride`).
@@ -4455,7 +4547,7 @@ export async function importContactsCsv(
   const errors = [];
 
   const pendingImportCreates = [];
-  const pendingPhoneKeys = new Set();
+  const pendingEmailKeys = new Set();
   const pendingTagMergeIds = [];
 
   const flushPendingTagMerges = async () => {
@@ -4470,14 +4562,14 @@ export async function importContactsCsv(
     if (pendingImportCreates.length === 0) return;
     const batch = pendingImportCreates.splice(0, pendingImportCreates.length);
     for (const b of batch) {
-      if (b.primaryPhone) pendingPhoneKeys.delete(b.primaryPhone);
+      if (b.emailKey) pendingEmailKeys.delete(b.emailKey);
     }
     await flushImportCreateBuffer(
       tenantId,
       user,
       type,
       batch,
-      sessionPhoneMap,
+      sessionEmailMap,
       statusCache,
       validatedTagIds,
       preloadedAgentManagerId
@@ -4537,7 +4629,8 @@ export async function importContactsCsv(
         primaryPhone,
       } = resolved;
 
-      if (primaryPhone && pendingPhoneKeys.has(primaryPhone)) {
+      const emailKey = normalizeEmailForTenantUniq(email);
+      if (emailKey && pendingEmailKeys.has(emailKey)) {
         await flushPendingCreates();
       }
 
@@ -4551,8 +4644,8 @@ export async function importContactsCsv(
       const coreRowFields = pickDefinedCoreFieldsFromResolved(resolved);
 
       let existingId = null;
-      if (primaryPhone) {
-        const ex = sessionPhoneMap.get(primaryPhone);
+      if (emailKey) {
+        const ex = sessionEmailMap.get(emailKey);
         if (ex) existingId = ex.id;
       }
 
@@ -4585,7 +4678,7 @@ export async function importContactsCsv(
             contactSnapshot: snapshot,
             skipActivityLog: true,
           });
-          if (primaryPhone) sessionPhoneMap.set(primaryPhone, { id: existingId, type });
+          if (emailKey) sessionEmailMap.set(emailKey, { id: existingId, type: snapshot.type || type });
           if (validatedTagIds.length > 0) {
             pendingTagMergeIds.push(existingId);
             if (pendingTagMergeIds.length >= IMPORT_TAG_MERGE_CHUNK) await flushPendingTagMerges();
@@ -4611,8 +4704,8 @@ export async function importContactsCsv(
           ...(validatedTagIds.length > 0 ? { tag_ids: validatedTagIds } : {}),
         };
 
-        pendingImportCreates.push({ primaryPhone, payload: createPayload });
-        if (primaryPhone) pendingPhoneKeys.add(primaryPhone);
+        pendingImportCreates.push({ emailKey, payload: createPayload });
+        if (emailKey) pendingEmailKeys.add(emailKey);
 
         if (pendingImportCreates.length >= IMPORT_BULK_CREATE_CHUNK) {
           await flushPendingCreates();
@@ -4729,16 +4822,16 @@ export async function previewResolvedContactsImportCsv(
 
   const statusCache = new Map();
   const cfDefCache = new Map();
-  const previewPeekPhones = [];
+  const previewPeekEmails = [];
   for (let pi = 0; pi < records.length && pi < sampleLimit; pi++) {
     const pr = records[pi] || {};
     const npeek = {};
     for (const [k, v] of Object.entries(pr)) {
       npeek[normalizeHeader(k)] = v;
     }
-    previewPeekPhones.push(peekImportPrimaryPhoneE164(npeek, headerMapping, defaultCountryCode));
+    previewPeekEmails.push(peekImportEmailNormalized(npeek, headerMapping));
   }
-  const previewPrefetchMap = await prefetchImportExistingByPhones(tenantId, previewPeekPhones, importType);
+  const previewPrefetchMap = await prefetchImportExistingByEmails(tenantId, previewPeekEmails);
 
   for (let i = 0; i < records.length && i < sampleLimit; i++) {
     const rowIndex = headerRowIndex + i + 2;
@@ -4769,8 +4862,9 @@ export async function previewResolvedContactsImportCsv(
     }
 
     let duplicate_action = 'create';
-    if (resolved.primaryPhone) {
-      const ex = previewPrefetchMap.get(resolved.primaryPhone);
+    const previewEmailKey = normalizeEmailForTenantUniq(resolved.email);
+    if (previewEmailKey) {
+      const ex = previewPrefetchMap.get(previewEmailKey);
       if (ex?.id) {
         duplicate_action = mode === 'skip' ? 'skip' : 'update';
       }

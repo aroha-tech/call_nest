@@ -151,13 +151,14 @@
 
   /* Clickable links (URLs in preview are linkified) */
   a {
-    color: var(--color-primary-500);
-    text-decoration: underline;
+    color: var(--color-text-primary);
+    text-decoration: none;
     cursor: pointer;
     word-break: break-all;
 
     &:hover {
-      color: var(--color-primary-400);
+      color: var(--color-text-primary);
+      opacity: 0.92;
     }
   }
 

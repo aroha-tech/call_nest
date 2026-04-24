@@ -19,6 +19,7 @@ import { meetingsAPI } from '../services/meetingsAPI';
 import { emailAccountsAPI } from '../services/emailAPI';
 import { extractTemplateKeys, renderScriptHtml } from '../utils/callScriptHtml';
 import { useToast } from '../context/ToastContext';
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import {
   DEFAULT_PHONE_COUNTRY_CODE,
   PHONE_NATIONAL_MAX_DIGITS,
@@ -51,31 +52,8 @@ function formatPhoneLabel(raw) {
 /** Matches `contact_phones.label` ENUM — one row per type per contact. */
 const CONTACT_PHONE_LABEL_ENUM = ['mobile', 'home', 'work', 'whatsapp', 'other'];
 
-function safeDateTime(v) {
-  if (!v) return '—';
-  try {
-    const d = new Date(v);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-  } catch {
-    return '—';
-  }
-}
-
-/** Call log lines (script / activity panels) */
-function formatDialerLogWhen(iso) {
-  if (iso == null || iso === '') return '—';
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-  } catch {
-    return '—';
-  }
-}
-
-function formatDialerHistoryLine(row) {
-  const when = formatDialerLogWhen(row.started_at || row.created_at);
+function formatDialerHistoryLine(row, formatDateTime) {
+  const when = formatDateTime?.(row.started_at || row.created_at) ?? '—';
   const agent = row.agent_name?.trim() || '—';
   const phone = row.phone_e164?.trim() || '—';
   const dispo = row.disposition_name?.trim() || null;
@@ -86,8 +64,8 @@ function formatDialerHistoryLine(row) {
   return `— ${when} by ${agent} — ${phone} — ${summary}`;
 }
 
-function formatDialerHistoryEntryLine(row, entry) {
-  const when = formatDialerLogWhen(entry?.whenIso || row.started_at || row.created_at);
+function formatDialerHistoryEntryLine(row, entry, formatDateTime) {
+  const when = formatDateTime?.(entry?.whenIso || row.started_at || row.created_at) ?? '—';
   const agent = row.agent_name?.trim() || '—';
   const phone = row.phone_e164?.trim() || '—';
   const text = entry?.text != null && String(entry.text).trim() ? String(entry.text).trim() : '—';
@@ -212,6 +190,7 @@ function resolveLastAttemptId(items = []) {
 }
 
 export function DialerSessionPage() {
+  const { formatDateTime } = useDateTimeDisplay();
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -2043,7 +2022,7 @@ export function DialerSessionPage() {
                                             : ''
                                         }`.trim()}
                                       >
-                                        {formatDialerHistoryEntryLine(row, entry)}
+                                        {formatDialerHistoryEntryLine(row, entry, formatDateTime)}
                                       </li>
                                     ))
                                   )}
@@ -2077,7 +2056,7 @@ export function DialerSessionPage() {
                                   : ''
                               }`.trim()}
                             >
-                              {formatDialerHistoryEntryLine(row, entry)}
+                              {formatDialerHistoryEntryLine(row, entry, formatDateTime)}
                             </li>
                           ))
                         )}
@@ -2131,7 +2110,7 @@ export function DialerSessionPage() {
                               {it.state}
                             </span>
                           </td>
-                          <td>{safeDateTime(it.called_at)}</td>
+                          <td>{formatDateTime(it.called_at)}</td>
                           <td>{it.last_attempt_id ? 'Yes' : '—'}</td>
                         </tr>
                       ))}

@@ -67,6 +67,8 @@ import { ScheduleCallbacksPage } from '../pages/ScheduleCallbacksPage';
 import { TaskManagerPage } from '../pages/TaskManagerPage';
 import { PerformanceReportsPage } from '../pages/PerformanceReportsPage';
 import { NotificationsPage } from '../features/notifications/NotificationsPage';
+import { MeetingAttendeeEmailSettingsPage } from '../pages/MeetingAttendeeEmailSettingsPage';
+import { TenantDomainHostGate } from './TenantDomainHostGate';
 
 /**
  * Renders children only when email module is enabled for the tenant; otherwise redirects to dashboard.
@@ -506,7 +508,7 @@ function TenantRoutes() {
       <Route
         path="/contacts/import"
         element={
-          <ProtectedRoute permission={PERMISSIONS.CONTACTS_CREATE}>
+          <ProtectedRoute permissions={[PERMISSIONS.CONTACTS_CREATE, PERMISSIONS.LEADS_CREATE]}>
             <AppShellLayout>
               <ContactImportPage type="contact" />
             </AppShellLayout>
@@ -516,7 +518,7 @@ function TenantRoutes() {
       <Route
         path="/contacts/import/history"
         element={
-          <ProtectedRoute permissions={[PERMISSIONS.CONTACTS_READ, PERMISSIONS.CONTACTS_CREATE]}>
+          <ProtectedRoute permissions={[PERMISSIONS.CONTACTS_READ, PERMISSIONS.CONTACTS_CREATE, PERMISSIONS.LEADS_CREATE]}>
             <AppShellLayout>
               <ContactImportHistoryPage type="contact" />
             </AppShellLayout>
@@ -526,7 +528,7 @@ function TenantRoutes() {
       <Route
         path="/contacts/new"
         element={
-          <ProtectedRoute permission={PERMISSIONS.CONTACTS_CREATE}>
+          <ProtectedRoute permissions={[PERMISSIONS.CONTACTS_CREATE, PERMISSIONS.LEADS_CREATE]}>
             <AppShellLayout>
               <ContactFormPage defaultType="contact" />
             </AppShellLayout>
@@ -719,6 +721,16 @@ function TenantRoutes() {
           <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
             <AppShellLayout>
               <IntegrationsPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/meeting-attendee-emails"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+            <AppShellLayout>
+              <MeetingAttendeeEmailSettingsPage />
             </AppShellLayout>
           </ProtectedRoute>
         }
@@ -986,7 +998,11 @@ export function AppRoutes() {
   }
 
   if (isTenant) {
-    return <TenantRoutes />;
+    return (
+      <TenantDomainHostGate>
+        <TenantRoutes />
+      </TenantDomainHostGate>
+    );
   }
 
   // Development fallback (e.g. localhost without explicit domain):

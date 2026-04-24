@@ -304,11 +304,12 @@
 }
 
 .viewLink {
-  color: var(--color-primary, #6366f1);
+  color: var(--color-text-primary);
   text-decoration: none;
 
   &:hover {
-    text-decoration: underline;
+    text-decoration: none;
+    opacity: 0.92;
   }
 }
 
@@ -346,7 +347,7 @@
 .section {
   margin: 0;
   padding: $space-5;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--color-border-strong);
   border-radius: $radius-lg;
   background: var(--color-bg-elevated, rgba(255, 255, 255, 0.02));
   box-shadow: $shadow-xs;
@@ -363,7 +364,7 @@
 .formSubsection {
   margin-top: $space-4;
   padding-top: $space-4;
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--color-border-strong);
 
   &:first-of-type {
     margin-top: 0;
@@ -442,7 +443,7 @@
   font-weight: $font-weight-medium;
   color: var(--color-text-primary);
   background: var(--color-bg-subtle, rgba(255, 255, 255, 0.06));
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--color-border-strong);
   max-width: 100%;
 }
 
@@ -520,7 +521,7 @@
   align-items: flex-end;
   gap: $space-3;
   padding: $space-4;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--color-border-strong);
   border-radius: $radius-md;
   background: var(--color-input-bg);
 }

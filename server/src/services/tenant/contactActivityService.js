@@ -208,6 +208,24 @@ async function loadContactAndEnrichForActivity(tenantId, user, cid) {
   return { contactOut };
 }
 
+function pickMatchedImportBatch(importBatches = [], contactCreatedAt) {
+  if (!Array.isArray(importBatches) || importBatches.length === 0) return null;
+  const createdMs = sortMs(contactCreatedAt);
+  if (!createdMs) return importBatches[0] || null;
+  let best = null;
+  let bestDelta = Number.POSITIVE_INFINITY;
+  for (const batch of importBatches) {
+    const batchMs = sortMs(batch?.created_at);
+    if (!batchMs) continue;
+    const delta = Math.abs(batchMs - createdMs);
+    if (delta < bestDelta) {
+      bestDelta = delta;
+      best = batch;
+    }
+  }
+  return best || importBatches[0] || null;
+}
+
 function assertValidContactId(contactId) {
   const cid = Number(contactId);
   if (!Number.isFinite(cid) || cid <= 0) {
@@ -365,9 +383,10 @@ async function buildContactActivityTimelineBundle(tenantId, user, cid, contactOu
 
   const timeline = [];
 
+  const matchedImportBatch = pickMatchedImportBatch(importBatchesNearby, contactOut.created_at);
   const createdRefs = baseRefs(cid);
-  if (importBatchesNearby?.[0]?.id) {
-    createdRefs.import_batch_id = Number(importBatchesNearby[0].id);
+  if (matchedImportBatch?.id) {
+    createdRefs.import_batch_id = Number(matchedImportBatch.id);
   }
   timeline.push({
     type: 'contact_created',
@@ -376,7 +395,7 @@ async function buildContactActivityTimelineBundle(tenantId, user, cid, contactOu
       record_type: contactOut.type,
       created_source: contactOut.created_source,
       created_by_name: contactOut.created_by_name,
-      import_batches_nearby: importBatchesNearby || [],
+      import_batch: matchedImportBatch,
     },
     refs: createdRefs,
   });
@@ -598,9 +617,10 @@ export async function getContactActivityTimelinePage(tenantId, user, contactId, 
     );
   }
   {
+    const matchedImportBatch = pickMatchedImportBatch(importBatchesNearby, contactOut.created_at);
     const createdRefs = baseRefs(cid);
-    if (importBatchesNearby?.[0]?.id) {
-      createdRefs.import_batch_id = Number(importBatchesNearby[0].id);
+    if (matchedImportBatch?.id) {
+      createdRefs.import_batch_id = Number(matchedImportBatch.id);
     }
     const ev = {
       type: 'contact_created',
@@ -609,7 +629,7 @@ export async function getContactActivityTimelinePage(tenantId, user, contactId, 
         record_type: contactOut.type,
         created_source: contactOut.created_source,
         created_by_name: contactOut.created_by_name,
-        import_batches_nearby: importBatchesNearby || [],
+        import_batch: matchedImportBatch,
       },
       refs: createdRefs,
     };

@@ -91,12 +91,12 @@ $bp-2xl: 1536px;
   --color-accent-brand: var(--color-primary-600);
   --color-accent-brand-subtle: color-mix(in srgb, var(--color-primary-600) 18%, transparent);
 
-  // Surfaces (dark theme — #0b0e14 family)
-  --color-bg-body: #0b0e14;
-  --color-bg-surface: #121826;
-  --color-bg-elevated: #161d2a;
-  --color-bg-subtle: #1a1f2c;
-  --color-bg-muted: #252b3a;
+  // Surfaces (dark theme — pure black baseline)
+  --color-bg-body: #000000;
+  --color-bg-surface: #000000;
+  --color-bg-elevated: #000000;
+  --color-bg-subtle: #0a0a0a;
+  --color-bg-muted: #141414;
   --color-bg-hover: rgba(255, 255, 255, 0.05);
   --color-bg-active: rgba(255, 255, 255, 0.08);
 
@@ -105,11 +105,11 @@ $bp-2xl: 1536px;
   --color-time-range-select-bg: #252b3a;
   --color-time-range-select-border: rgba(255, 255, 255, 0.1);
 
-  // Borders
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-subtle: rgba(255, 255, 255, 0.06);
-  --color-border-strong: rgba(255, 255, 255, 0.12);
-  --color-border-focus: var(--color-primary-500);
+  // Borders (higher contrast for dark + light shells)
+  --color-border: rgba(255, 255, 255, 0.2);
+  --color-border-subtle: rgba(255, 255, 255, 0.14);
+  --color-border-strong: rgba(255, 255, 255, 0.3);
+  --color-border-focus: rgba(255, 255, 255, 0.72);
 
   // Text
   --color-text-primary: #f4f7fb;
@@ -130,13 +130,13 @@ $bp-2xl: 1536px;
   --color-info-subtle: rgba(80, 200, 255, 0.15);
 
   // Focus
-  --color-focus-ring: rgba(80, 200, 255, 0.4);
+  --color-focus-ring: rgba(255, 255, 255, 0.22);
 
   // Inputs
   --color-input-bg: var(--color-bg-subtle);
-  --color-input-border: var(--color-border);
-  --color-input-border-hover: var(--color-border-strong);
-  --color-input-border-focus: var(--color-primary-500);
+  --color-input-border: rgba(255, 255, 255, 0.22);
+  --color-input-border-hover: rgba(255, 255, 255, 0.34);
+  --color-input-border-focus: rgba(255, 255, 255, 0.78);
   --color-input-placeholder: var(--color-text-placeholder);
 
   // Scrollbar
@@ -144,12 +144,12 @@ $bp-2xl: 1536px;
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.15);
 
   // Shell sidebar (aligns with body; gradient uses tokens)
-  --color-shell-sidebar-base: #0b0e14;
+  --color-shell-sidebar-base: #000000;
 
   // Tenant white-label (overridden in JS when `tenant.theme` is set)
   --tenant-shell-radius: #{$radius-sm};
-  --tenant-gradient-start: transparent;
-  --tenant-gradient-end: transparent;
+  --tenant-gradient-start: #000000;
+  --tenant-gradient-end: #000000;
 
   // Panel / glass (theme-aware; used by mixins)
   --glass-bg: rgba(15, 18, 26, 0.88);
@@ -160,11 +160,11 @@ $bp-2xl: 1536px;
 
 // Light appearance — semantic surfaces & text (tenant primary scale still set by `applyWorkspaceTheme`)
 :root[data-color-scheme='light'] {
-  --color-bg-body: #f1f5f9;
+  --color-bg-body: #ffffff;
   --color-bg-surface: #ffffff;
   --color-bg-elevated: #ffffff;
-  --color-bg-subtle: #f8fafc;
-  --color-bg-muted: #e2e8f0;
+  --color-bg-subtle: #ffffff;
+  --color-bg-muted: #f5f5f5;
   --color-bg-hover: rgba(15, 23, 42, 0.05);
   --color-bg-active: rgba(15, 23, 42, 0.08);
 
@@ -172,10 +172,10 @@ $bp-2xl: 1536px;
   --color-time-range-select-bg: #ffffff;
   --color-time-range-select-border: rgba(15, 23, 42, 0.12);
 
-  --color-border: rgba(15, 23, 42, 0.1);
-  --color-border-subtle: rgba(15, 23, 42, 0.06);
-  --color-border-strong: rgba(15, 23, 42, 0.14);
-  --color-border-focus: var(--color-primary-500);
+  --color-border: rgba(15, 23, 42, 0.18);
+  --color-border-subtle: rgba(15, 23, 42, 0.12);
+  --color-border-strong: rgba(15, 23, 42, 0.26);
+  --color-border-focus: rgba(15, 23, 42, 0.72);
 
   --color-text-primary: #0f172a;
   --color-text-secondary: #475569;
@@ -190,12 +190,12 @@ $bp-2xl: 1536px;
   --color-info-subtle: rgba(80, 200, 255, 0.12);
   --color-accent-brand-subtle: color-mix(in srgb, var(--color-primary-600) 12%, transparent);
 
-  --color-focus-ring: rgba(var(--color-primary-rgb), 0.35);
+  --color-focus-ring: rgba(15, 23, 42, 0.16);
 
   --color-input-bg: #ffffff;
-  --color-input-border: rgba(15, 23, 42, 0.12);
-  --color-input-border-hover: rgba(15, 23, 42, 0.2);
-  --color-input-border-focus: var(--color-primary-500);
+  --color-input-border: rgba(15, 23, 42, 0.22);
+  --color-input-border-hover: rgba(15, 23, 42, 0.34);
+  --color-input-border-focus: rgba(15, 23, 42, 0.78);
   --color-input-placeholder: var(--color-text-placeholder);
 
   --scrollbar-thumb: rgba(15, 23, 42, 0.2);

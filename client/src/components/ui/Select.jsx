@@ -15,13 +15,13 @@ function createSelectStyles({ compact = false } = {}) {
       fontWeight: 500,
       backgroundColor: 'var(--color-input-bg, #1a1b26)',
       borderColor: state.isFocused
-        ? 'var(--color-input-border-focus, #6366f1)'
-        : 'var(--color-input-border, rgba(255, 255, 255, 0.12))',
-      boxShadow: state.isFocused ? '0 0 0 3px var(--color-focus-ring, rgba(99, 102, 241, 0.25))' : 'none',
+        ? 'var(--color-input-border-focus)'
+        : 'var(--color-input-border)',
+      boxShadow: state.isFocused ? '0 0 0 3px var(--color-focus-ring)' : 'none',
       '&:hover': {
         borderColor: state.isFocused
-          ? 'var(--color-input-border-focus, #6366f1)'
-          : 'var(--color-input-border-hover, rgba(255, 255, 255, 0.2))',
+          ? 'var(--color-input-border-focus)'
+          : 'var(--color-input-border-hover)',
       },
     }),
     menuPortal: (base) => ({ ...base, zIndex: 20000 }),
@@ -36,9 +36,9 @@ function createSelectStyles({ compact = false } = {}) {
       cursor: 'pointer',
       fontSize,
       backgroundColor: state.isSelected
-        ? 'rgba(99, 102, 241, 0.35)'
+        ? 'color-mix(in srgb, var(--color-text-primary) 22%, var(--color-bg-elevated))'
         : state.isFocused
-          ? 'rgba(255, 255, 255, 0.06)'
+          ? 'color-mix(in srgb, var(--color-text-primary) 10%, transparent)'
           : 'transparent',
       color: 'var(--color-text-primary, #e2e8f0)',
     }),

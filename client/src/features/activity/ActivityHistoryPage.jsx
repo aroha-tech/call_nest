@@ -147,7 +147,7 @@ export function ActivityHistoryPage() {
       {error ? <div className={styles.error}>{error}</div> : null}
 
       <div className={listStyles.tableCard}>
-        <div className={listStyles.tableCardToolbarTop}>
+        <div className={`${listStyles.tableCardToolbarTop} ${styles.activityToolbarTop}`}>
           <div className={styles.toolbarTabs}>
             <div className={dashStyles.activityTabs} role="tablist" aria-label="Filter activity">
               {tabOptions.map((t) => (

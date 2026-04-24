@@ -67,8 +67,9 @@ function requiredLabelText(label, required) {
   return required ? `${base} *` : base;
 }
 
-function formatRecordDate(iso) {
+function formatRecordDate(iso, formatDateTime) {
   if (iso == null || iso === '') return '—';
+  if (typeof formatDateTime === 'function') return formatDateTime(iso);
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return String(iso);
@@ -119,6 +120,7 @@ export function createContactFormEditSectionRenderers(ctx) {
     clearDynamicFieldError,
     setConvertTypeOpen,
     canConvertRecordType,
+    formatDateTime,
   } = ctx;
 
   return {
@@ -130,10 +132,10 @@ export function createContactFormEditSectionRenderers(ctx) {
           </h2>
           <div className={styles.recordMetaGrid}>
             <RecordViewField styles={styles} label="Created">
-              {formatRecordDate(contact.created_at)}
+              {formatRecordDate(contact.created_at, formatDateTime)}
             </RecordViewField>
             <RecordViewField styles={styles} label="Last updated">
-              {formatRecordDate(contact.updated_at)}
+              {formatRecordDate(contact.updated_at, formatDateTime)}
             </RecordViewField>
           </div>
           {isEditing && canConvertRecordType ? (
@@ -153,7 +155,7 @@ export function createContactFormEditSectionRenderers(ctx) {
         </h2>
         {showFormHints ? (
           <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
-            Display name required; first name or email required. Display name follows first + last until you edit it.
+            Display name required; add an email or at least one phone. Display name follows first + last until you edit it.
           </p>
         ) : null}
         <div className={styles.fieldGridDense}>
@@ -184,6 +186,7 @@ export function createContactFormEditSectionRenderers(ctx) {
             onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
             type="email"
             autoComplete="email"
+            error={formErrors.email || formErrors.contact_channel}
           />
           <Input
             label="Company"
@@ -204,8 +207,11 @@ export function createContactFormEditSectionRenderers(ctx) {
             label="Website"
             value={formData.website}
             onChange={(e) => setFormData((p) => ({ ...p, website: e.target.value }))}
-            type="url"
-            placeholder="https://"
+            type="text"
+            inputMode="url"
+            autoComplete="url"
+            placeholder="example.com"
+            error={formErrors.website}
           />
           <Input
             label="Date of birth"
@@ -362,7 +368,7 @@ export function createContactFormEditSectionRenderers(ctx) {
               placeholder="— None —"
               options={contactStatuses.map((s) => ({
                 value: s.id,
-                label: s.name ? `${s.name}${s.code ? ` (${s.code})` : ''}` : s.code || '—',
+                label: s.name ? `${s.name}` : s.code || '—',
               }))}
             />
           </div>
@@ -378,7 +384,9 @@ export function createContactFormEditSectionRenderers(ctx) {
               Phone numbers
             </h2>
             {showFormHints ? (
-              <p className={`${styles.sectionDesc} ${styles.sectionDescTight}`}>One label per row; one primary when possible.</p>
+              <p className={`${styles.sectionDesc} ${styles.sectionDescTight}`}>
+                One label per row; one primary when possible. Either an email (above) or at least one number is required.
+              </p>
             ) : null}
           </div>
           <Button
@@ -433,6 +441,7 @@ export function createContactFormEditSectionRenderers(ctx) {
                     placeholder="10-digit number"
                     inputMode="numeric"
                     maxLength={PHONE_NATIONAL_MAX_DIGITS}
+                    error={idx === 0 ? formErrors.phones || formErrors.contact_channel : undefined}
                   />
                 </div>
                 <div className={styles.phoneLabel}>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Spinner } from '../components/ui/Spinner';
 import { Button } from '../components/ui/Button';
 import { SearchInput } from '../components/ui/SearchInput';
@@ -13,6 +13,7 @@ import {
   TIME_RANGE_PRESET_OPTIONS,
   computeDashboardInclusiveDates,
 } from '../utils/dateRangePresets';
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import dashStyles from './TenantDashboardPage.module.scss';
 import styles from './PlatformDashboardPage.module.scss';
 
@@ -28,17 +29,6 @@ const PLATFORM_KIND_LABEL = {
   tenant: 'Organization',
   user: 'User',
 };
-
-function formatPlatformAt(iso) {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-  } catch {
-    return '—';
-  }
-}
 
 const QUICK_LINKS = [
   { to: '/admin/users', label: 'Users', mat: 'group', hint: 'Workspace users' },
@@ -74,8 +64,8 @@ function ExecutiveKpiCard({ matIcon, matWrapClass, label, value, hint, to, badge
 }
 
 export function PlatformDashboardPage() {
+  const { formatDateTime } = useDateTimeDisplay();
   const { showToast } = useToast();
-  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [statsRefreshing, setStatsRefreshing] = useState(false);
@@ -86,7 +76,6 @@ export function PlatformDashboardPage() {
   const [activeRange, setActiveRange] = useState(null);
   const activeRangeRef = useRef(null);
   const initialFetch = useRef(true);
-  const [dashSearch, setDashSearch] = useState('');
   const [rangeMenuOpen, setRangeMenuOpen] = useState(false);
   const rangeWrapRef = useRef(null);
 
@@ -201,15 +190,6 @@ export function PlatformDashboardPage() {
     return `Monitoring ${t.toLocaleString()} customer organizations and ${u.toLocaleString()} workspace users (excludes platform tenant).${rangeBit}`;
   }, [stats]);
 
-  function onPlatformSearch(q) {
-    const term = String(q || '').trim();
-    if (!term) {
-      navigate('/admin/tenants');
-      return;
-    }
-    navigate(`/admin/users?q=${encodeURIComponent(term)}`);
-  }
-
   if (loading) {
     return (
       <div className={dashStyles.page}>
@@ -235,17 +215,6 @@ export function PlatformDashboardPage() {
 
   return (
     <div className={dashStyles.page}>
-      <div className={dashStyles.topBar}>
-        <div className={dashStyles.searchWrap}>
-          <SearchInput
-            value={dashSearch}
-            onChange={(e) => setDashSearch(e.target.value)}
-            placeholder="Search tenants, users, or masters… (Enter)"
-            onSearch={onPlatformSearch}
-          />
-        </div>
-      </div>
-
       <header className={dashStyles.hero}>
         <div className={dashStyles.heroTitles}>
           <h1 className={dashStyles.heroTitle}>Executive dashboard</h1>
@@ -429,7 +398,7 @@ export function PlatformDashboardPage() {
                       const key = `${it.kind}-${it.at}-${idx}`;
                       const rowInner = (
                         <>
-                          <span className={styles.platformActivityTime}>{formatPlatformAt(it.at)}</span>
+                          <span className={styles.platformActivityTime}>{formatDateTime(it.at)}</span>
                           <div className={styles.platformActivityBody}>
                             <div className={styles.platformActivityTitleRow}>
                               <span className={styles.platformActivityChip}>{kindLabel}</span>

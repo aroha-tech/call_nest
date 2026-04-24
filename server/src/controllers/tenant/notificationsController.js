@@ -51,6 +51,32 @@ export async function markAllRead(req, res, next) {
   }
 }
 
+export async function dismiss(req, res, next) {
+  try {
+    const tenantId = tenantIdFromReq(req);
+    const result = await notificationService.dismissNotification(tenantId, req.user.id, req.params.id);
+    return res.json(result);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function dismissAll(req, res, next) {
+  try {
+    const tenantId = tenantIdFromReq(req);
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const filters = {
+      module_key: body.module_key,
+      status: body.status,
+      severity: body.severity,
+    };
+    const result = await notificationService.dismissAllNotifications(tenantId, req.user.id, filters);
+    return res.json(result);
+  } catch (err) {
+    return next(err);
+  }
+}
+
 export async function listPreferences(req, res, next) {
   try {
     const tenantId = tenantIdFromReq(req);

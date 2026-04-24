@@ -46,17 +46,7 @@ import {
   inferCallHistoryTimePresetFromLegacySnapshot,
   resolveCallHistoryListParams,
 } from '../utils/dateRangePresets';
-
-function safeDateTime(v) {
-  if (!v) return '—';
-  try {
-    const d = new Date(v);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-  } catch {
-    return '—';
-  }
-}
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 
 function IconBlank() {
   return <span style={{ display: 'block', width: 18, height: 18 }} aria-hidden />;
@@ -94,6 +84,7 @@ function IconReset() {
 }
 
 export function ActivitiesPage() {
+  const { formatDateTime } = useDateTimeDisplay();
   const navigate = useNavigate();
   const user = useAppSelector(selectUser);
   const { canAny } = usePermissions();
@@ -916,7 +907,7 @@ export function ActivitiesPage() {
                   }
                 }}
                 dialSessionNavigateState={{ fromCallHistory: true }}
-                formatWhen={(v) => safeDateTime(v)}
+                formatWhen={formatDateTime}
               />
             </div>
           )}
@@ -941,7 +932,7 @@ export function ActivitiesPage() {
         isOpen={Boolean(attemptDetailRow)}
         onClose={() => setAttemptDetailRow(null)}
         row={attemptDetailRow}
-        formatWhen={safeDateTime}
+        formatWhen={formatDateTime}
         dialSessionNavigateState={{ fromCallHistory: true }}
         onFilterByCustomer={(id) => {
           clearSelection();

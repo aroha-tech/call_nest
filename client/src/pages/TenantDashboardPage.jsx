@@ -6,7 +6,6 @@ import { usePermissions } from '../hooks/usePermission';
 import { tenantDashboardAPI } from '../services/tenantAPI';
 import { Spinner } from '../components/ui/Spinner';
 import { Button } from '../components/ui/Button';
-import { SearchInput } from '../components/ui/SearchInput';
 import { TenantDataCharts } from '../components/dashboard/DashboardDataCharts';
 import { PERMISSIONS } from '../utils/permissionUtils';
 import { useToast } from '../context/ToastContext';
@@ -17,7 +16,7 @@ import {
   TIME_RANGE_PRESET_OPTIONS,
   computeDashboardInclusiveDates,
 } from '../utils/dateRangePresets';
-import { formatDateTimeDisplay } from '../utils/dateTimeDisplay';
+import { formatDateTimeDisplay, formatTimeDisplay } from '../utils/dateTimeDisplay';
 import {
   ActivityFeedTable,
   ActivityFullHistoryLink,
@@ -55,14 +54,7 @@ function formatDurationSec(sec) {
 }
 
 function formatMeetingSlot(startAt, mode) {
-  if (!startAt) return '—';
-  const d = startAt instanceof Date ? startAt : new Date(startAt);
-  if (Number.isNaN(d.getTime())) return '—';
-  const opts = { hour: '2-digit', minute: '2-digit', hour12: true };
-  if (mode !== 'browser_local') {
-    return new Intl.DateTimeFormat('en-IN', { ...opts, timeZone: 'Asia/Kolkata' }).format(d);
-  }
-  return new Intl.DateTimeFormat(undefined, opts).format(d);
+  return formatTimeDisplay(startAt, mode);
 }
 
 function contactPath(row) {
@@ -264,20 +256,6 @@ export function TenantDashboardPage() {
     return rows;
   }, [data?.activityFeed, activityFeedFilter]);
 
-  function onDashboardSearch(q) {
-    const term = String(q || '').trim();
-    if (canCallHistory) {
-      navigate(term ? `/calls/history?q=${encodeURIComponent(term)}` : '/calls/history');
-      return;
-    }
-    if (can(PERMISSIONS.LEADS_READ)) {
-      navigate('/leads');
-      if (term) showToast('Search from the Leads list, or use Call history if you have access.', 'info');
-      return;
-    }
-    showToast('You do not have a search destination available.', 'warning');
-  }
-
   if (loading) {
     return (
       <div className={styles.page}>
@@ -323,17 +301,6 @@ export function TenantDashboardPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.topBar}>
-        <div className={styles.searchWrap}>
-          <SearchInput
-            value={dashSearch}
-            onChange={(e) => setDashSearch(e.target.value)}
-            placeholder="Search leads, tasks, or insights... (Enter)"
-            onSearch={onDashboardSearch}
-          />
-        </div>
-      </div>
-
       <header className={styles.hero}>
         <div className={styles.heroTitles}>
           <h1 className={styles.heroTitle}>{dashboardTitle}</h1>

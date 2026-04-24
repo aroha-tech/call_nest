@@ -23,6 +23,11 @@ export async function tenantResolver(req, res, next) {
   req.isPlatform = false;
   req.tenant = null;
 
+  // Public discovery (invalid subdomain, workspace lookup by email) — must not 404 before routes run
+  if (req.path.startsWith('/api/public/')) {
+    return next();
+  }
+
   const host = req.headers.host || '';
   const [hostname] = host.split(':');
   const subdomain = getSubdomainFromHost(host);

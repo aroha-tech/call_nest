@@ -25,7 +25,7 @@ Status: {{meeting_status}}
 
 Attendee: {{attendee_email}}
 Sent from: {{account_label}} <{{account_email}}>`,
-  updated: `The following meeting has been updated.
+  updated: `A meeting in your calendar has been updated.
 
 Title: {{title}}
 Start: {{start_at}}
@@ -74,7 +74,7 @@ const DEFAULT_BODY_HTML = {
 </ul>
 <p>{{description}}</p>
 <p style="color:#666;font-size:12px;">Attendee: {{attendee_email}} · Sent from {{account_label}} &lt;{{account_email}}&gt;</p>`,
-  updated: `<p>The following meeting has been updated.</p>
+  updated: `<p>A meeting in your calendar has been updated.</p>
 <ul>
 <li><strong>Title:</strong> {{title}}</li>
 <li><strong>Start:</strong> {{start_at}}</li>

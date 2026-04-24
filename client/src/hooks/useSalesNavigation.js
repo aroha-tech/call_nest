@@ -189,6 +189,12 @@ const TENANT_ADMIN_NAV_ITEMS = [
       },
       { key: 'integrations', label: 'Integrations', path: '/settings/integrations', permission: PERMISSIONS.SETTINGS_MANAGE },
       {
+        key: 'meeting-attendee-emails',
+        label: 'Meeting attendee emails',
+        path: '/settings/meeting-attendee-emails',
+        permission: PERMISSIONS.SETTINGS_MANAGE,
+      },
+      {
         key: 'background-jobs',
         label: 'Background tasks',
         path: '/settings/background-jobs',

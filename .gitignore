@@ -1,0 +1,5 @@
+# Local env files — never commit secrets
+nginx_file_backup/.env
+.env
+.env.local
+.env.*.local

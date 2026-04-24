@@ -13,15 +13,9 @@ import { sanitizeAttemptNotesForDisplay } from '../utils/callAttemptNotesDisplay
 import { formatDateTimeDisplay, formatRelativeTimeShort } from '../utils/dateTimeDisplay';
 import styles from './ContactActivityPanel.module.scss';
 
-function safeDateTime(v) {
+function safeDateTime(v, mode = 'ist_fixed') {
   if (!v) return '—';
-  try {
-    const d = new Date(v);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-  } catch {
-    return '—';
-  }
+  return formatDateTimeDisplay(v, mode);
 }
 
 function formatMoney(n) {
@@ -147,7 +141,7 @@ function messageStatusPresentation(raw) {
  * Row model for the activity table: what happened, status, who, info, icon.
  * @returns {{ title: string, subtitle: string, detail: string|null, info: string, statusLabel: string, statusVariant: string, actorName: string|null, iconName: string, iconWrap: string }}
  */
-function contactTimelineRowModel(ev) {
+function contactTimelineRowModel(ev, mode = 'ist_fixed') {
   const p = ev.payload || {};
   const cat = typeLabel(ev.type);
   const icon = contactTimelineIcon(ev);
@@ -167,18 +161,16 @@ function contactTimelineRowModel(ev) {
   switch (ev.type) {
     case 'contact_created': {
       const kind = p.record_type === 'lead' ? 'Lead' : 'Contact';
-      const importLines =
-        Array.isArray(p.import_batches_nearby) && p.import_batches_nearby.length > 0
-          ? p.import_batches_nearby
-              .map((b) => `${b.original_filename || 'Import'} · ${safeDateTime(b.created_at)}`)
-              .join('\n')
-          : null;
+      const importBatch = p.import_batch || null;
+      const importLine = importBatch
+        ? `${importBatch.original_filename || 'Import'} · ${safeDateTime(importBatch.created_at, mode)}`
+        : null;
       return {
         ...base,
         title: `${kind} added`,
         subtitle: `Source: ${p.created_source || '—'}`,
-        detail: importLines,
-        info: truncateText(p.import_batches_nearby?.[0]?.original_filename, 36) || '—',
+        detail: importLine,
+        info: truncateText(importBatch?.original_filename, 36) || '—',
         statusLabel: 'Created',
         statusVariant: 'purple',
         actorName: p.created_by_name || null,
@@ -471,7 +463,6 @@ export function ContactActivityPanel({
   error,
   onViewCallAttempt,
   timelineMeta = null,
-  onLoadTimeline,
   onLoadMoreTimeline,
 }) {
   const navigate = useNavigate();
@@ -633,16 +624,16 @@ export function ContactActivityPanel({
         <div className={styles.grid}>
           <div>
             <span className={styles.dt}>Created</span>
-            <span className={styles.dd}>{safeDateTime(contact.created_at)}</span>
+            <span className={styles.dd}>{safeDateTime(contact.created_at, dtMode)}</span>
           </div>
           <div>
             <span className={styles.dt}>Last updated</span>
-            <span className={styles.dd}>{safeDateTime(contact.updated_at)}</span>
+            <span className={styles.dd}>{safeDateTime(contact.updated_at, dtMode)}</span>
           </div>
           <div>
             <span className={styles.dt}>First / last call</span>
             <span className={styles.dd}>
-              {safeDateTime(contact.first_called_at)} → {safeDateTime(contact.last_called_at)}
+              {safeDateTime(contact.first_called_at, dtMode)} → {safeDateTime(contact.last_called_at, dtMode)}
             </span>
           </div>
           <div>
@@ -729,7 +720,7 @@ export function ContactActivityPanel({
                 {o.stage_name ? ` · ${o.stage_name}` : ''}
                 {o.title ? ` — ${o.title}` : ''}
                 <div style={{ opacity: 0.85, marginTop: 4 }}>
-                  Amount {formatMoney(o.amount ?? o.expected_revenue)} · Updated {safeDateTime(o.updated_at)}
+                  Amount {formatMoney(o.amount ?? o.expected_revenue)} · Updated {safeDateTime(o.updated_at, dtMode)}
                 </div>
               </div>
             ))}
@@ -745,17 +736,6 @@ export function ContactActivityPanel({
           Newest first — each row shows what happened, current status, extra context, who was involved, and how long ago.
           Use the action buttons to open dial sessions, call details, or messages.
         </p>
-
-        {lazyTimeline && !timelineMeta.loaded && !timelineMeta.loading ? (
-          <div className={styles.timelineLoadRow}>
-            <Button type="button" variant="secondary" onClick={onLoadTimeline}>
-              Load activity timeline
-            </Button>
-            <span className={styles.timelineLoadHint}>
-              Loads {timelineMeta.pageSize || 10} events at a time; scroll down for more.
-            </span>
-          </div>
-        ) : null}
 
         {lazyTimeline && timelineMeta.loading && !timelineMeta.loaded ? (
           <div className={styles.timelineLoadingRow} aria-busy="true">
@@ -812,7 +792,7 @@ export function ContactActivityPanel({
                   </thead>
                   <tbody>
                     {filteredTimelineRows.map((ev, idx) => {
-                      const row = contactTimelineRowModel(ev);
+                      const row = contactTimelineRowModel(ev, dtMode);
                       const statusClass =
                         {
                           teal: styles.caStatusTeal,

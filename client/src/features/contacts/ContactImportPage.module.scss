@@ -343,16 +343,16 @@
 .sampleCsvLink {
   font-size: $font-size-xs;
   font-weight: $font-weight-medium;
-  color: var(--color-primary-600, #2563eb);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  color: var(--color-text-primary);
+  text-decoration: none;
 
   &:hover {
-    color: var(--color-primary-700, #1d4ed8);
+    color: var(--color-text-primary);
+    opacity: 0.92;
   }
 
   &:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--color-primary-500, #3b82f6) 55%, transparent);
+    outline: 2px solid color-mix(in srgb, var(--color-text-primary) 45%, transparent);
     outline-offset: 2px;
     border-radius: 2px;
   }

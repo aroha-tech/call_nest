@@ -6,27 +6,18 @@ import { contactsAPI } from '../services/contactsAPI';
 import { ContactActivityPanel } from './ContactActivityPanel';
 import { CallHistoryAttemptDetailModal } from './CallHistoryAttemptDetailModal';
 import listStyles from '../components/admin/adminDataList.module.scss';
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 
 const TIMELINE_PAGE_SIZE = 10;
-
-function safeDateTime(v) {
-  if (!v) return '—';
-  try {
-    const d = new Date(v);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-  } catch {
-    return '—';
-  }
-}
 
 /**
  * CRM activity only — full timeline for one lead or contact (not call history / dial sessions).
  * Routes: /leads/:id/activity, /contacts/:id/activity
  *
- * Loads overview first (fast); timeline is loaded on demand in pages of TIMELINE_PAGE_SIZE with infinite scroll.
+ * Loads overview first (fast); timeline auto-loads in pages of TIMELINE_PAGE_SIZE with infinite scroll.
  */
 export function ContactLeadActivityPage({ recordType }) {
+  const { formatDateTime } = useDateTimeDisplay();
   const { id } = useParams();
   const navigate = useNavigate();
   const [summary, setSummary] = useState(null);
@@ -142,6 +133,11 @@ export function ContactLeadActivityPage({ recordType }) {
     fetchTimelinePage(null, { append: false });
   }, [fetchTimelinePage]);
 
+  useEffect(() => {
+    if (!id) return;
+    handleLoadTimeline();
+  }, [id, handleLoadTimeline]);
+
   const handleLoadMoreTimeline = useCallback(() => {
     if (!timelineMeta.hasMore || timelineMeta.loadingMore || timelineMeta.loading || !timelineCursor) return;
     fetchTimelinePage(timelineCursor, { append: true });
@@ -168,7 +164,7 @@ export function ContactLeadActivityPage({ recordType }) {
     <div className={listStyles.page}>
       <PageHeader
         title="Activity"
-        description="Summary first; open the timeline for full history (paged as you scroll)."
+        description="Summary first; timeline opens with latest 10 events (paged as you scroll)."
         actions={
           <Button type="button" variant="secondary" size="sm" onClick={() => navigate(recordPath)}>
             Back to record
@@ -186,14 +182,13 @@ export function ContactLeadActivityPage({ recordType }) {
           error: timelineError,
           nextCursor: timelineCursor,
         }}
-        onLoadTimeline={handleLoadTimeline}
         onLoadMoreTimeline={handleLoadMoreTimeline}
       />
       <CallHistoryAttemptDetailModal
         isOpen={Boolean(attemptDetailRow)}
         onClose={() => setAttemptDetailRow(null)}
         row={attemptDetailRow}
-        formatWhen={safeDateTime}
+        formatWhen={formatDateTime}
         onFilterByCustomer={(cid) => {
           setAttemptDetailRow(null);
           navigate(`/calls/history?contact_id=${encodeURIComponent(cid)}`);

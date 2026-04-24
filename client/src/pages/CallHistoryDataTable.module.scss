@@ -3,13 +3,14 @@
   border: none;
   padding: 0;
   font: inherit;
-  color: var(--color-primary-600);
+  color: var(--color-text-primary);
   cursor: pointer;
   text-align: left;
 
   &:hover:not(:disabled) {
-    color: var(--color-primary-500);
-    text-decoration: underline;
+    color: var(--color-text-primary);
+    text-decoration: none;
+    opacity: 0.92;
   }
 
   &:disabled {
@@ -19,13 +20,14 @@
 }
 
 .linkAnchor {
-  color: var(--color-primary-400);
+  color: var(--color-text-primary);
   font-weight: 500;
   text-decoration: none;
 
   &:hover {
-    color: var(--color-primary-300);
-    text-decoration: underline;
+    color: var(--color-text-primary);
+    text-decoration: none;
+    opacity: 0.92;
   }
 
   &:focus-visible {

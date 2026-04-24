@@ -21,6 +21,8 @@ import { ContactCallHistorySection } from './ContactCallHistorySection';
 import { useContactStatusesOptions } from '../disposition/hooks/useMasterData';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import { usePermission, usePermissions } from '../../hooks/usePermission';
+import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
+import { useToast } from '../../context/ToastContext';
 import { getMe as getMeAPI } from '../auth/authAPI';
 import {
   DEFAULT_PHONE_COUNTRY_CODE,
@@ -92,6 +94,30 @@ function isRequiredFlag(v) {
   return v === 1 || v === true || v === '1';
 }
 
+/** Accepts full URLs or bare domains like example.com (no https/www required). */
+function isValidWebsiteLoose(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return true;
+  if (/^https?:\/\//i.test(s)) {
+    try {
+      const u = new URL(s);
+      return !!u.host;
+    } catch {
+      return false;
+    }
+  }
+  return (
+    /^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}([/?#].*)?$/i.test(s) || /^localhost(:\d+)?([/?#].*)?$/i.test(s)
+  );
+}
+
+function formHasAnyEnteredPhone(phones) {
+  for (const p of phones || []) {
+    if (onlyNationalDigits(p?.number || '').length > 0) return true;
+  }
+  return false;
+}
+
 /** Whether value is missing/invalid for a required tenant or industry dynamic field. */
 function isTypedDynamicFieldValueEmpty(fieldType, raw) {
   if (raw === undefined || raw === null) return true;
@@ -141,6 +167,8 @@ function ViewField({ label, children, className = '' }) {
 }
 
 export function ContactFormPage({ defaultType }) {
+  const { formatDateTime } = useDateTimeDisplay();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
@@ -707,10 +735,12 @@ export function ContactFormPage({ defaultType }) {
   const validate = () => {
     const errs = {};
     if (!formData.display_name || !String(formData.display_name).trim()) {
-      errs.display_name = 'display_name is required';
+      errs.display_name = 'Display name is required';
     }
-    if (!formData.first_name?.trim() && !formData.email?.trim()) {
-      errs.first_name = 'Either first_name or email is required';
+    const hasEmail = !!(formData.email && String(formData.email).trim());
+    const hasPhone = formHasAnyEnteredPhone(formData.phones);
+    if (!hasEmail && !hasPhone) {
+      errs.contact_channel = 'Enter an email or at least one phone number';
     }
     const phoneErr = uniqueLabelError(formData.phones);
     if (phoneErr) errs.phones = phoneErr;
@@ -737,6 +767,11 @@ export function ContactFormPage({ defaultType }) {
       if (isTypedDynamicFieldValueEmpty(f.type, raw)) {
         errs[`custom:${f.field_id}`] = `${f.label || f.name || 'Field'} is required`;
       }
+    }
+
+    const w = formData.website?.trim();
+    if (w && !isValidWebsiteLoose(w)) {
+      errs.website = 'Enter a valid website or domain (e.g. example.com)';
     }
 
     return errs;
@@ -782,7 +817,12 @@ export function ContactFormPage({ defaultType }) {
     setSubmitError(null);
     const errs = validate();
     setFormErrors(errs);
-    if (Object.keys(errs).length > 0) return;
+    if (Object.keys(errs).length > 0) {
+      const messages = [...new Set(Object.values(errs))];
+      const summary = messages.slice(0, 4).join(' ');
+      showToast(summary || 'Please fix the highlighted fields.', 'warning');
+      return;
+    }
 
     const payload = buildSubmitPayload();
     const result = isNew ? await createMutation.mutate(payload) : await updateMutation.mutate(payload);
@@ -922,6 +962,7 @@ export function ContactFormPage({ defaultType }) {
     clearDynamicFieldError,
     setConvertTypeOpen,
     canConvertRecordType,
+    formatDateTime,
   });
 
   const renderEditSection = (sectionId) => editSectionRenderers[sectionId]?.() ?? null;
@@ -976,6 +1017,7 @@ export function ContactFormPage({ defaultType }) {
     loadingCustomFields,
     customFields,
     formatCustomFieldForView,
+    formatDateTime,
   });
   const renderViewSection = (sectionId) => viewSectionRenderers[sectionId]?.() ?? null;
 
@@ -1129,9 +1171,19 @@ export function ContactFormPage({ defaultType }) {
 
       {submitError && <Alert variant="error">{submitError}</Alert>}
       {(isNew || isEditing) && formErrors.phones && <Alert variant="warning">{formErrors.phones}</Alert>}
+      {(isNew || isEditing) && formErrors.contact_channel && !formErrors.phones && (
+        <Alert variant="warning" display="inline">
+          {formErrors.contact_channel}
+        </Alert>
+      )}
 
       {isNew || isEditing ? (
-      <form id="contact-record-form" onSubmit={handleSubmit} className={`${styles.form} ${styles.formCompact}`}>
+      <form
+        id="contact-record-form"
+        onSubmit={handleSubmit}
+        noValidate
+        className={`${styles.form} ${styles.formCompact}`}
+      >
         <ContactFormSectionLayout
           layoutEditMode={layoutEditMode && (isNew || isEditing)}
           columns={formColumns}

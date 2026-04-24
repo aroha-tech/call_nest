@@ -117,12 +117,13 @@
 .managerMailto {
   display: inline-block;
   font-size: $font-size-sm;
-  color: var(--color-primary-400);
+  color: var(--color-text-primary);
   word-break: break-all;
 
   &:hover {
-    color: var(--color-primary-300);
-    text-decoration: underline;
+    color: var(--color-text-primary);
+    text-decoration: none;
+    opacity: 0.92;
   }
 }
 

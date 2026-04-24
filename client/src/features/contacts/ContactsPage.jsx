@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { selectUser } from '../../features/auth/authSelectors';
@@ -27,6 +28,8 @@ import { useTableLoadingState } from '../../hooks/useTableLoadingState';
 import { AssignContactsBulkModal } from './AssignContactsBulkModal';
 import { AddTagsBulkModal } from './AddTagsBulkModal';
 import { RemoveTagsBulkModal } from './RemoveTagsBulkModal';
+import { AddCampaignBulkModal } from './AddCampaignBulkModal';
+import { RemoveCampaignBulkModal } from './RemoveCampaignBulkModal';
 import { BackgroundJobProgressModal } from '../../components/backgroundJobs/BackgroundJobProgressModal';
 import { LeadDataTable } from './LeadDataTable';
 import { LeadColumnCustomizeModal } from './LeadColumnCustomizeModal';
@@ -67,6 +70,8 @@ import {
   IconPlus,
   IconTag,
   IconTagOff,
+  IconTarget,
+  IconTargetOff,
   IconTrash,
   IconUserMinus,
   IconUserPlus,
@@ -114,6 +119,9 @@ function IconReset() {
     </svg>
   );
 }
+
+/** Wider than min-width so viewport clamp leaves room for long labels */
+const LIST_ACTIONS_MENU_VIEWPORT_CLAMP_W = 320;
 
 function bulkToolbarHintText({ canBulkAssign, canBulkDelete, canBulkTag }) {
   const parts = [];
@@ -175,16 +183,57 @@ function ListActionsMenu({
   onAssign,
   onUnassign,
   onBulkDelete,
+  onAddCampaign,
+  onRemoveCampaign,
   onAddTag,
   onRemoveTag,
 }) {
   const wrapRef = useRef(null);
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState(null);
+
+  const updateMenuPosition = useCallback(() => {
+    if (!open || !btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    const margin = 8;
+    const maxW = Math.min(LIST_ACTIONS_MENU_VIEWPORT_CLAMP_W, window.innerWidth - margin * 2);
+    let left = rect.left;
+    if (left + maxW > window.innerWidth - margin) {
+      left = Math.max(margin, window.innerWidth - margin - maxW);
+    }
+    if (left < margin) left = margin;
+    setMenuPos({
+      top: rect.bottom + 6,
+      left,
+    });
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPos(null);
+      return;
+    }
+    updateMenuPosition();
+  }, [open, updateMenuPosition]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onScrollOrResize = () => updateMenuPosition();
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize);
+    return () => {
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize);
+    };
+  }, [open, updateMenuPosition]);
 
   useEffect(() => {
     if (!open) return;
     const onDoc = (e) => {
       if (wrapRef.current?.contains(e.target)) return;
+      if (menuRef.current?.contains(e.target)) return;
       setOpen(false);
     };
     const onKey = (e) => {
@@ -217,162 +266,195 @@ function ListActionsMenu({
   /** Divider after Filters when any list actions follow (import/export/new/customize). */
   const showDividerAfterFilters = showFiltersEntry;
 
+  const menu =
+    open && menuPos
+      ? createPortal(
+          <div
+            ref={menuRef}
+            className={pageStyles.bulkActionsMenu}
+            style={{ top: menuPos.top, left: menuPos.left }}
+            role="menu"
+          >
+            <div className={pageStyles.actionsMenuSection}>
+              {showFiltersEntry ? (
+                <ListActionsMenuItem
+                  icon={IconFilter}
+                  onClick={() => {
+                    setOpen(false);
+                    onOpenFilters();
+                  }}
+                >
+                  Filters…
+                </ListActionsMenuItem>
+              ) : null}
+              {showDividerAfterFilters ? <ListActionsMenuDivider /> : null}
+              {canCreate ? (
+                <ListActionsMenuItem
+                  icon={IconImport}
+                  onClick={() => {
+                    setOpen(false);
+                    navigate(type === 'lead' ? '/leads/import' : '/contacts/import');
+                  }}
+                >
+                  Import CSV
+                </ListActionsMenuItem>
+              ) : null}
+              {canRead ? (
+                <ListActionsMenuItem
+                  icon={IconExport}
+                  onClick={() => {
+                    setOpen(false);
+                    onOpenExport();
+                  }}
+                >
+                  Export CSV
+                </ListActionsMenuItem>
+              ) : null}
+              {hasImportExport ? <ListActionsMenuDivider /> : null}
+              {canCreate ? (
+                <ListActionsMenuItem
+                  icon={IconPlus}
+                  onClick={() => {
+                    setOpen(false);
+                    navigate(type === 'lead' ? '/leads/new' : '/contacts/new');
+                  }}
+                >
+                  {type === 'lead' ? 'New lead' : 'New contact'}
+                </ListActionsMenuItem>
+              ) : null}
+              <ListActionsMenuItem
+                icon={IconColumns}
+                onClick={() => {
+                  setOpen(false);
+                  onCustomizeColumns();
+                }}
+              >
+                Customize columns
+              </ListActionsMenuItem>
+            </div>
+
+            {showBulkSection ? (
+              <div className={pageStyles.actionsMenuSection}>
+                <ListActionsMenuDivider />
+                <p className={pageStyles.listActionsMenuHint}>With rows selected</p>
+                {isDialer && type === 'lead' ? (
+                  <ListActionsMenuItem
+                    icon={IconPhone}
+                    disabled={bulkDisabled}
+                    onClick={() => {
+                      setOpen(false);
+                      onCallSelected();
+                    }}
+                  >
+                    Call selected
+                  </ListActionsMenuItem>
+                ) : null}
+                {canBulkAssign ? (
+                  <>
+                    <ListActionsMenuItem
+                      icon={IconUserPlus}
+                      disabled={bulkDisabled}
+                      onClick={() => {
+                        setOpen(false);
+                        onAssign();
+                      }}
+                    >
+                      Assign…
+                    </ListActionsMenuItem>
+                    <ListActionsMenuItem
+                      icon={IconUserMinus}
+                      disabled={bulkDisabled}
+                      onClick={() => {
+                        setOpen(false);
+                        onUnassign();
+                      }}
+                    >
+                      Remove agent
+                    </ListActionsMenuItem>
+                  </>
+                ) : null}
+                {canBulkTag ? (
+                  <>
+                    <ListActionsMenuItem
+                      icon={IconTarget}
+                      disabled={bulkDisabled}
+                      onClick={() => {
+                        setOpen(false);
+                        onAddCampaign();
+                      }}
+                    >
+                      Add campaign…
+                    </ListActionsMenuItem>
+                    <ListActionsMenuItem
+                      icon={IconTargetOff}
+                      disabled={bulkDisabled}
+                      onClick={() => {
+                        setOpen(false);
+                        onRemoveCampaign();
+                      }}
+                    >
+                      Remove campaign…
+                    </ListActionsMenuItem>
+                    <ListActionsMenuItem
+                      icon={IconTag}
+                      disabled={bulkDisabled}
+                      onClick={() => {
+                        setOpen(false);
+                        onAddTag();
+                      }}
+                    >
+                      Add tag…
+                    </ListActionsMenuItem>
+                    <ListActionsMenuItem
+                      icon={IconTagOff}
+                      disabled={bulkDisabled}
+                      onClick={() => {
+                        setOpen(false);
+                        onRemoveTag();
+                      }}
+                    >
+                      Remove tag…
+                    </ListActionsMenuItem>
+                  </>
+                ) : null}
+                {canBulkDelete ? (
+                  <ListActionsMenuItem
+                    icon={IconTrash}
+                    danger
+                    disabled={bulkDisabled}
+                    onClick={() => {
+                      setOpen(false);
+                      onBulkDelete();
+                    }}
+                  >
+                    Delete selected
+                  </ListActionsMenuItem>
+                ) : null}
+              </div>
+            ) : null}
+          </div>,
+          document.body
+        )
+      : null;
+
   return (
     <div className={pageStyles.bulkActionsWrap} ref={wrapRef}>
-      <Button
-        size="sm"
-        variant="primary"
-        className={pageStyles.toolbarControlBtn}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <span className={pageStyles.actionsTriggerInner}>
-          Actions
-          <IconChevronDown className={pageStyles.actionsTriggerChevron} />
-        </span>
-      </Button>
-      {open ? (
-        <div className={pageStyles.bulkActionsMenu} role="menu">
-          <div className={pageStyles.actionsMenuSection}>
-            {showFiltersEntry ? (
-              <ListActionsMenuItem
-                icon={IconFilter}
-                onClick={() => {
-                  setOpen(false);
-                  onOpenFilters();
-                }}
-              >
-                Filters…
-              </ListActionsMenuItem>
-            ) : null}
-            {showDividerAfterFilters ? <ListActionsMenuDivider /> : null}
-            {canCreate ? (
-              <ListActionsMenuItem
-                icon={IconImport}
-                onClick={() => {
-                  setOpen(false);
-                  navigate(type === 'lead' ? '/leads/import' : '/contacts/import');
-                }}
-              >
-                Import CSV
-              </ListActionsMenuItem>
-            ) : null}
-            {canRead ? (
-              <ListActionsMenuItem
-                icon={IconExport}
-                onClick={() => {
-                  setOpen(false);
-                  onOpenExport();
-                }}
-              >
-                Export CSV
-              </ListActionsMenuItem>
-            ) : null}
-            {hasImportExport ? <ListActionsMenuDivider /> : null}
-            {canCreate ? (
-              <ListActionsMenuItem
-                icon={IconPlus}
-                onClick={() => {
-                  setOpen(false);
-                  navigate(type === 'lead' ? '/leads/new' : '/contacts/new');
-                }}
-              >
-                {type === 'lead' ? 'New lead' : 'New contact'}
-              </ListActionsMenuItem>
-            ) : null}
-            <ListActionsMenuItem
-              icon={IconColumns}
-              onClick={() => {
-                setOpen(false);
-                onCustomizeColumns();
-              }}
-            >
-              Customize columns
-            </ListActionsMenuItem>
-          </div>
-
-          {showBulkSection ? (
-            <div className={pageStyles.actionsMenuSection}>
-              <ListActionsMenuDivider />
-              <p className={pageStyles.listActionsMenuHint}>With rows selected</p>
-              {isDialer && type === 'lead' ? (
-                <ListActionsMenuItem
-                  icon={IconPhone}
-                  disabled={bulkDisabled}
-                  onClick={() => {
-                    setOpen(false);
-                    onCallSelected();
-                  }}
-                >
-                  Call selected
-                </ListActionsMenuItem>
-              ) : null}
-              {canBulkAssign ? (
-                <>
-                  <ListActionsMenuItem
-                    icon={IconUserPlus}
-                    disabled={bulkDisabled}
-                    onClick={() => {
-                      setOpen(false);
-                      onAssign();
-                    }}
-                  >
-                    Assign…
-                  </ListActionsMenuItem>
-                  <ListActionsMenuItem
-                    icon={IconUserMinus}
-                    disabled={bulkDisabled}
-                    onClick={() => {
-                      setOpen(false);
-                      onUnassign();
-                    }}
-                  >
-                    Remove agent
-                  </ListActionsMenuItem>
-                </>
-              ) : null}
-              {canBulkTag ? (
-                <>
-                  <ListActionsMenuItem
-                    icon={IconTag}
-                    disabled={bulkDisabled}
-                    onClick={() => {
-                      setOpen(false);
-                      onAddTag();
-                    }}
-                  >
-                    Add tag…
-                  </ListActionsMenuItem>
-                  <ListActionsMenuItem
-                    icon={IconTagOff}
-                    disabled={bulkDisabled}
-                    onClick={() => {
-                      setOpen(false);
-                      onRemoveTag();
-                    }}
-                  >
-                    Remove tag…
-                  </ListActionsMenuItem>
-                </>
-              ) : null}
-              {canBulkDelete ? (
-                <ListActionsMenuItem
-                  icon={IconTrash}
-                  danger
-                  disabled={bulkDisabled}
-                  onClick={() => {
-                    setOpen(false);
-                    onBulkDelete();
-                  }}
-                >
-                  Delete selected
-                </ListActionsMenuItem>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+      <span ref={btnRef} className={pageStyles.bulkActionsTriggerMeasure}>
+        <Button
+          size="sm"
+          variant="primary"
+          className={pageStyles.toolbarControlBtn}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+        >
+          <span className={pageStyles.actionsTriggerInner}>
+            Actions
+            <IconChevronDown className={pageStyles.actionsTriggerChevron} />
+          </span>
+        </Button>
+      </span>
+      {menu}
     </div>
   );
 }
@@ -386,7 +468,9 @@ export function ContactsPage({ type, mode = 'crm' }) {
   const isDialer = mode === 'dialer';
 
   const canRead = usePermission(type === 'lead' ? 'leads.read' : 'contacts.read');
-  const canCreate = usePermission(type === 'lead' ? 'leads.create' : 'contacts.create');
+  const canCreate = useAnyPermission(
+    type === 'lead' ? ['leads.create'] : ['contacts.create', 'leads.create']
+  );
   /** API allows PUT with contacts.update OR leads.update; managers/agents often have only leads.update. */
   const canUpdate = useAnyPermission(
     type === 'lead' ? ['leads.update'] : ['contacts.update', 'leads.update']
@@ -437,6 +521,8 @@ export function ContactsPage({ type, mode = 'crm' }) {
   const [bulkDeleteQueueing, setBulkDeleteQueueing] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [assignOpen, setAssignOpen] = useState(false);
+  const [bulkAddCampaignOpen, setBulkAddCampaignOpen] = useState(false);
+  const [bulkRemoveCampaignOpen, setBulkRemoveCampaignOpen] = useState(false);
   const [bulkTagOpen, setBulkTagOpen] = useState(false);
   const [bulkRemoveTagOpen, setBulkRemoveTagOpen] = useState(false);
   const [exportCsvOpen, setExportCsvOpen] = useState(false);
@@ -1765,7 +1851,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
           className={
             type === 'lead'
               ? `${listStyles.tableCardToolbarTop} ${listStyles.tableCardToolbarTopLead}`
-              : listStyles.tableCardToolbarTop
+              : `${listStyles.tableCardToolbarTop} ${pageStyles.contactsTableToolbarTop}`
           }
         >
           <div className={listStyles.tableCardToolbarLeft}>
@@ -1831,6 +1917,8 @@ export function ContactsPage({ type, mode = 'crm' }) {
                   onAssign={() => setAssignOpen(true)}
                   onUnassign={openUnassignConfirm}
                   onBulkDelete={() => setBulkDeleteConfirmOpen(true)}
+                  onAddCampaign={() => setBulkAddCampaignOpen(true)}
+                  onRemoveCampaign={() => setBulkRemoveCampaignOpen(true)}
                   onAddTag={() => setBulkTagOpen(true)}
                   onRemoveTag={() => setBulkRemoveTagOpen(true)}
                 />
@@ -2067,6 +2155,32 @@ export function ContactsPage({ type, mode = 'crm' }) {
       <AddTagsBulkModal
         isOpen={bulkTagOpen}
         onClose={() => setBulkTagOpen(false)}
+        selectedIds={[...selectedIds]}
+        recordLabel={type === 'lead' ? 'leads' : 'contacts'}
+        bulkJobContext={bulkJobModalContext}
+        onBulkJobQueued={onBulkJobQueued}
+        onSuccess={() => {
+          clearSelection();
+          refetch();
+        }}
+      />
+
+      <AddCampaignBulkModal
+        isOpen={bulkAddCampaignOpen}
+        onClose={() => setBulkAddCampaignOpen(false)}
+        selectedIds={[...selectedIds]}
+        recordLabel={type === 'lead' ? 'leads' : 'contacts'}
+        bulkJobContext={bulkJobModalContext}
+        onBulkJobQueued={onBulkJobQueued}
+        onSuccess={() => {
+          clearSelection();
+          refetch();
+        }}
+      />
+
+      <RemoveCampaignBulkModal
+        isOpen={bulkRemoveCampaignOpen}
+        onClose={() => setBulkRemoveCampaignOpen(false)}
         selectedIds={[...selectedIds]}
         recordLabel={type === 'lead' ? 'leads' : 'contacts'}
         bulkJobContext={bulkJobModalContext}

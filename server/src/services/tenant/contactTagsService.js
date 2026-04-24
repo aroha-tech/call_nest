@@ -8,13 +8,15 @@ function assertAdminOrManager(user) {
   }
 }
 
-export async function listContactTags(tenantId) {
+export async function listContactTags(tenantId, { includeArchived = false } = {}) {
+  const archivedFilter = includeArchived ? '' : 'AND t.deleted_at IS NULL';
   return query(
     `SELECT t.id, t.tenant_id, t.name, t.created_by, t.created_at, t.updated_at,
+            t.deleted_at,
             u.name AS created_by_name
      FROM contact_tags t
      LEFT JOIN users u ON u.id = t.created_by AND u.tenant_id = t.tenant_id AND u.is_deleted = 0
-     WHERE t.tenant_id = ? AND t.deleted_at IS NULL
+     WHERE t.tenant_id = ? ${archivedFilter}
      ORDER BY t.name ASC`,
     [tenantId]
   );
@@ -59,9 +61,10 @@ export async function createContactTag(tenantId, user, { name } = {}) {
   return row;
 }
 
-async function getTagForTenant(tenantId, tagId) {
+async function getTagForTenant(tenantId, tagId, { includeArchived = false } = {}) {
+  const archivedFilter = includeArchived ? '' : 'AND deleted_at IS NULL';
   const [row] = await query(
-    `SELECT * FROM contact_tags WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1`,
+    `SELECT * FROM contact_tags WHERE id = ? AND tenant_id = ? ${archivedFilter} LIMIT 1`,
     [tagId, tenantId]
   );
   return row || null;
@@ -127,6 +130,55 @@ export async function softDeleteContactTag(tenantId, user, tagId) {
     tagId,
     tenantId,
   ]);
+  return row || null;
+}
+
+export async function hardDeleteArchivedContactTag(tenantId, user, tagId) {
+  assertAdminOrManager(user);
+  const tag = await getTagForTenant(tenantId, tagId, { includeArchived: true });
+  if (!tag) return null;
+  assertCanModifyTag(user, tag);
+  if (!tag.deleted_at) {
+    const err = new Error('Only archived tags can be permanently deleted');
+    err.status = 400;
+    throw err;
+  }
+
+  await query(`DELETE FROM contact_tag_assignments WHERE tenant_id = ? AND tag_id = ?`, [tenantId, tagId]);
+  await query(`DELETE FROM contact_tags WHERE tenant_id = ? AND id = ? LIMIT 1`, [tenantId, tagId]);
+  return { id: Number(tagId), deleted: true };
+}
+
+export async function unarchiveContactTag(tenantId, user, tagId) {
+  assertAdminOrManager(user);
+  const tag = await getTagForTenant(tenantId, tagId, { includeArchived: true });
+  if (!tag) return null;
+  assertCanModifyTag(user, tag);
+  if (!tag.deleted_at) return tag;
+
+  const [dup] = await query(
+    `SELECT id FROM contact_tags
+     WHERE tenant_id = ? AND name = ? AND deleted_at IS NULL AND id != ? LIMIT 1`,
+    [tenantId, tag.name, tagId]
+  );
+  if (dup) {
+    const err = new Error('Another active tag already uses this name');
+    err.status = 400;
+    throw err;
+  }
+
+  await query(
+    `UPDATE contact_tags
+     SET deleted_at = NULL, deleted_by = NULL, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND tenant_id = ? AND deleted_at IS NOT NULL`,
+    [user.id, tagId, tenantId]
+  );
+
+  const [row] = await query(
+    `SELECT id, tenant_id, name, created_by, created_at, updated_at, deleted_at
+     FROM contact_tags WHERE id = ? AND tenant_id = ? LIMIT 1`,
+    [tagId, tenantId]
+  );
   return row || null;
 }
 

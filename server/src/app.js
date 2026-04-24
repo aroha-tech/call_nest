@@ -6,6 +6,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { env } from './config/env.js';
 import { initRedis } from './config/redis.js';
 import { tenantResolver } from './middleware/tenantResolver.js';
+import publicRoutes from './routes/publicRoutes.js';
 
 // Super Admin routes
 import industriesRoutes from './routes/superAdmin/industries.js';
@@ -118,6 +119,9 @@ app.use('/api/whatsapp/webhook', whatsappWebhookRoutes);
 
 // Public Integrations webhooks (before tenantResolver so providers don't need tenant subdomain)
 app.use('/api/integrations/webhook', integrationsWebhookRoutes);
+
+// Public workspace discovery (before tenantResolver; resolver skips /api/public/*)
+app.use('/api/public', publicRoutes);
 
 // Resolve tenant/platform context from subdomain for all API routes
 app.use(tenantResolver);

@@ -17,19 +17,10 @@ import {
   saveCallHistoryVisibleColumnIds,
 } from './callHistoryTableConfig';
 import styles from './DialerSessionCallHistoryPanel.module.scss';
-
-function safeDateTime(v) {
-  if (!v) return '—';
-  try {
-    const d = new Date(v);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-  } catch {
-    return '—';
-  }
-}
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 
 export function DialerSessionCallHistoryPanel({ dialerSessionId }) {
+  const { formatDateTime } = useDateTimeDisplay();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -232,7 +223,7 @@ export function DialerSessionCallHistoryPanel({ dialerSessionId }) {
                   }
                 }}
                 dialSessionNavigateState={location.state}
-                formatWhen={(v) => safeDateTime(v)}
+                formatWhen={formatDateTime}
               />
             </div>
           )}
@@ -257,7 +248,7 @@ export function DialerSessionCallHistoryPanel({ dialerSessionId }) {
         isOpen={Boolean(attemptDetailRow)}
         onClose={() => setAttemptDetailRow(null)}
         row={attemptDetailRow}
-        formatWhen={safeDateTime}
+        formatWhen={formatDateTime}
       />
 
       <LeadColumnSortFilterModal

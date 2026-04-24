@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   gap: $space-2;
-  border: none;
+  border: 1px solid transparent;
   border-radius: $radius-sm;
   font-weight: $font-weight-medium;
   font-size: $font-size-sm;
@@ -59,17 +59,22 @@
 
 // Variants — flat, theme-token driven (light theme: crisp outline secondaries; no heavy 3D chrome)
 .primary {
-  background: var(--color-primary-600);
-  color: #fff;
+  background: var(--color-text-primary);
+  color: var(--color-bg-body);
+  border-color: var(--color-text-primary);
   box-shadow: $shadow-xs;
 
   &:hover:not(:disabled) {
-    background: var(--color-primary-500);
+    background: var(--color-bg-body);
+    color: var(--color-text-primary);
+    border-color: var(--color-text-primary);
     box-shadow: $shadow-sm;
   }
 
   &:active:not(:disabled) {
-    background: var(--color-primary-700);
+    background: var(--color-bg-muted);
+    color: var(--color-text-primary);
+    border-color: var(--color-text-primary);
     box-shadow: none;
     transform: translateY(0.5px);
   }
@@ -98,13 +103,13 @@
 .ghost {
   background: transparent;
   color: var(--color-text-secondary);
-  border: 1px solid transparent;
+  border-color: var(--color-border);
 
   &:hover:not(:disabled) {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 100%);
+    background: var(--color-bg-hover);
     border-color: var(--color-border);
     color: var(--color-text-primary);
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    box-shadow: $shadow-xs;
   }
 
   &:active:not(:disabled) {
@@ -113,27 +118,15 @@
 }
 
 .danger {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--color-danger) 32%, transparent) 0%,
-    color-mix(in srgb, var(--color-danger) 18%, transparent) 100%
-  );
-  color: var(--color-danger);
-  border: 1px solid rgba(239, 68, 68, 0.32);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.06) inset,
-    0 2px 6px rgba(0, 0, 0, 0.22);
+  background: color-mix(in srgb, var(--color-danger) 24%, transparent);
+  color: #fff;
+  border-color: color-mix(in srgb, var(--color-danger) 72%, #000);
+  box-shadow: $shadow-xs;
 
   &:hover:not(:disabled) {
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--color-danger) 42%, transparent) 0%,
-      color-mix(in srgb, var(--color-danger) 26%, transparent) 100%
-    );
-    border-color: rgba(239, 68, 68, 0.45);
-    box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.08) inset,
-      0 3px 10px rgba(239, 68, 68, 0.15);
+    background: color-mix(in srgb, var(--color-danger) 35%, transparent);
+    border-color: color-mix(in srgb, var(--color-danger) 82%, #000);
+    box-shadow: $shadow-sm;
   }
 
   &:active:not(:disabled) {

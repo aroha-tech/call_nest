@@ -2,8 +2,9 @@ import React from 'react';
 import { DEFAULT_PHONE_COUNTRY_CODE } from '../../utils/phoneInput';
 import { CONTACT_FORM_SECTION_IDS } from './contactFormLayout';
 
-function formatRecordDate(iso) {
+function formatRecordDate(iso, formatDateTime) {
   if (iso == null || iso === '') return '—';
+  if (typeof formatDateTime === 'function') return formatDateTime(iso);
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return String(iso);
@@ -62,6 +63,7 @@ export function createContactFormViewSectionRenderers(ctx) {
     loadingCustomFields,
     customFields,
     formatCustomFieldForView,
+    formatDateTime,
   } = ctx;
 
   return {
@@ -72,8 +74,8 @@ export function createContactFormViewSectionRenderers(ctx) {
             Record
           </h2>
           <div className={styles.recordMetaGrid}>
-            <ViewField label="Created">{formatRecordDate(contact.created_at)}</ViewField>
-            <ViewField label="Last updated">{formatRecordDate(contact.updated_at)}</ViewField>
+            <ViewField label="Created">{formatRecordDate(contact.created_at, formatDateTime)}</ViewField>
+            <ViewField label="Last updated">{formatRecordDate(contact.updated_at, formatDateTime)}</ViewField>
           </div>
         </section>
       ) : null,

@@ -32,6 +32,46 @@ export function formatDateTimeDisplay(value, mode) {
   return new Intl.DateTimeFormat(undefined, opts).format(d);
 }
 
+function formatWithMode(value, mode, opts, fallback = '—') {
+  if (value == null || value === '') return fallback;
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return fallback;
+  const m = normalizeDateTimeDisplayMode(mode);
+  if (m === DATETIME_DISPLAY_IST) {
+    return new Intl.DateTimeFormat('en-IN', { ...opts, timeZone: 'Asia/Kolkata' }).format(d);
+  }
+  return new Intl.DateTimeFormat(undefined, opts).format(d);
+}
+
+export function formatDateDisplay(value, mode) {
+  return formatWithMode(value, mode, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+export function formatTimeDisplay(value, mode) {
+  return formatWithMode(value, mode, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+}
+
+export function formatMonthYearDisplay(value, mode) {
+  return formatWithMode(
+    value,
+    mode,
+    {
+      month: 'long',
+      year: 'numeric',
+    },
+    ''
+  );
+}
+
 /** Compact relative time for activity feeds (e.g. "31 seconds ago"). */
 export function formatRelativeTimeShort(iso) {
   const t = new Date(iso).getTime();

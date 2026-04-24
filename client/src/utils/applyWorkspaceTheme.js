@@ -94,10 +94,6 @@ function primaryScaleFromBase(baseHex) {
   return map;
 }
 
-function buildRgba(rgbObj, a) {
-  return `rgba(${rgbObj.r},${rgbObj.g},${rgbObj.b},${a})`;
-}
-
 let appliedKeys = new Set();
 
 function remember(key) {
@@ -129,14 +125,6 @@ export function applyWorkspaceTheme(theme) {
       remember(key);
     }
     const rgb = hexToRgb(theme.primary);
-    root.style.setProperty('--color-border-focus', scale[500]);
-    remember('--color-border-focus');
-    root.style.setProperty('--color-input-border-focus', scale[500]);
-    remember('--color-input-border-focus');
-    root.style.setProperty('--color-focus-ring', buildRgba(rgb, 0.4));
-    remember('--color-focus-ring');
-    root.style.setProperty('--color-primary-500-alpha', buildRgba(rgb, 0.28));
-    remember('--color-primary-500-alpha');
     root.style.setProperty('--color-primary-rgb', `${rgb.r}, ${rgb.g}, ${rgb.b}`);
     remember('--color-primary-rgb');
   }
@@ -154,12 +142,4 @@ export function applyWorkspaceTheme(theme) {
     remember('--font-sans');
   }
 
-  if (theme.gradientStart && /^#[0-9A-Fa-f]{6}$/.test(theme.gradientStart)) {
-    root.style.setProperty('--tenant-gradient-start', theme.gradientStart);
-    remember('--tenant-gradient-start');
-  }
-  if (theme.gradientEnd && /^#[0-9A-Fa-f]{6}$/.test(theme.gradientEnd)) {
-    root.style.setProperty('--tenant-gradient-end', theme.gradientEnd);
-    remember('--tenant-gradient-end');
-  }
 }

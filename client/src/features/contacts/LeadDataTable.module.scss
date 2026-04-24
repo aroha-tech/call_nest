@@ -105,13 +105,14 @@
 }
 
 .displayNameLink {
-  color: var(--color-primary-400);
+  color: var(--color-text-primary);
   font-weight: $font-weight-medium;
   text-decoration: none;
 
   &:hover {
-    color: var(--color-primary-300);
-    text-decoration: underline;
+    color: var(--color-text-primary);
+    text-decoration: none;
+    opacity: 0.92;
   }
 
   &:focus-visible {

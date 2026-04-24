@@ -57,11 +57,16 @@
 /** Match Contacts / Leads: controls align right of toolbar, search grows */
 .toolbarSearchAndBulk {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 10px;
   margin-left: auto;
   min-width: 0;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .toolbarControlBtn {
@@ -75,10 +80,10 @@
 }
 
 .toolbarSearchField {
-  width: 100%;
-  flex: 1;
-  min-width: 200px;
+  flex: 0 1 auto;
+  min-width: 0;
   max-width: 420px;
+  width: auto;
 }
 
 .callsSearch {

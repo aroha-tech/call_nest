@@ -7,14 +7,13 @@ import { Spinner } from '../../components/ui/Spinner';
 import { contactsAPI } from '../../services/contactsAPI';
 import { backgroundJobsAPI } from '../../services/backgroundJobsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
-import { campaignsAPI } from '../../services/campaignsAPI';
 import { useMutation } from '../../hooks/useAsyncData';
 import {
   bulkShouldUseBackgroundJob,
   listFilterPayloadFromExportParams,
 } from './contactBulkBackground';
 
-const NO_CHANGE = '__no_change__';
+const UNSET = '';
 const CLEAR = '__clear__';
 
 function agentRowsToOptions(agents) {
@@ -30,8 +29,8 @@ function agentRowsToOptions(agents) {
  * Bulk assign / unassign contacts (admin + manager).
  * Uses POST /contacts/assign with explicit null vs omitted fields.
  *
- * Admin: choosing "Clear manager and agent" forces agent to clear and hides other agents.
- * Picking a manager filters agents to that manager's team; "No change" shows all agents.
+ * Admin: choosing "No manager" forces "No agent" and hides other agents.
+ * Picking a manager filters agents to that manager's team.
  */
 export function AssignContactsBulkModal({
   isOpen,
@@ -47,11 +46,9 @@ export function AssignContactsBulkModal({
   const role = user?.role ?? 'agent';
   const isAdmin = role === 'admin';
   const [users, setUsers] = useState([]);
-  const [campaigns, setCampaigns] = useState([]);
   const [loadingMeta, setLoadingMeta] = useState(false);
-  const [managerChoice, setManagerChoice] = useState(NO_CHANGE);
-  const [agentChoice, setAgentChoice] = useState(NO_CHANGE);
-  const [campaignChoice, setCampaignChoice] = useState(NO_CHANGE);
+  const [managerChoice, setManagerChoice] = useState(UNSET);
+  const [agentChoice, setAgentChoice] = useState(UNSET);
   const [formError, setFormError] = useState('');
   const [jobQueueing, setJobQueueing] = useState(false);
 
@@ -60,17 +57,10 @@ export function AssignContactsBulkModal({
   const loadMeta = useCallback(async () => {
     setLoadingMeta(true);
     try {
-      const [uRes, cRes] = await Promise.all([
-        tenantUsersAPI.getAll({ page: 1, limit: 500, includeDisabled: false }),
-        campaignsAPI
-          .list({ page: 1, limit: 500, show_paused: true, type: 'static' })
-          .catch(() => ({ data: { data: [] } })),
-      ]);
+      const uRes = await tenantUsersAPI.getAll({ page: 1, limit: 500, includeDisabled: false });
       setUsers(uRes?.data?.data ?? []);
-      setCampaigns(cRes?.data?.data ?? []);
     } catch {
       setUsers([]);
-      setCampaigns([]);
     } finally {
       setLoadingMeta(false);
     }
@@ -79,9 +69,8 @@ export function AssignContactsBulkModal({
   useEffect(() => {
     if (!isOpen) return;
     setFormError('');
-    setManagerChoice(NO_CHANGE);
-    setAgentChoice(NO_CHANGE);
-    setCampaignChoice(NO_CHANGE);
+    setManagerChoice(UNSET);
+    setAgentChoice(UNSET);
     loadMeta();
   }, [isOpen, loadMeta]);
 
@@ -96,10 +85,10 @@ export function AssignContactsBulkModal({
   useEffect(() => {
     if (!isAdmin) return;
     if (managerChoice === CLEAR) return;
-    if (agentChoice === NO_CHANGE || agentChoice === CLEAR) return;
+    if (agentChoice === UNSET || agentChoice === CLEAR) return;
 
     let requiredMgr = null;
-    if (managerChoice !== NO_CHANGE) {
+    if (managerChoice !== UNSET) {
       requiredMgr = Number(managerChoice);
     } else {
       const { isMixed, sharedManagerId, selectionIncomplete } = assignContext || {};
@@ -113,7 +102,7 @@ export function AssignContactsBulkModal({
         String(u.id) === agentChoice &&
         Number(u.manager_id) === requiredMgr
     );
-    if (!ok) setAgentChoice(NO_CHANGE);
+    if (!ok) setAgentChoice(UNSET);
   }, [isAdmin, managerChoice, agentChoice, users, assignContext]);
 
   const managerOptions = useMemo(() => {
@@ -134,7 +123,7 @@ export function AssignContactsBulkModal({
     if (managerChoice === CLEAR) {
       return [];
     }
-    if (managerChoice === NO_CHANGE) {
+    if (managerChoice === UNSET) {
       const { isMixed, sharedManagerId, selectionIncomplete } = assignContext || {};
       if (!isMixed && !selectionIncomplete && typeof sharedManagerId === 'number') {
         return users.filter((u) => u.role === 'agent' && Number(u.manager_id) === sharedManagerId);
@@ -148,11 +137,10 @@ export function AssignContactsBulkModal({
 
   const agentFieldOptions = useMemo(() => {
     if (isAdmin && managerChoice === CLEAR) {
-      return [{ value: CLEAR, label: '— Clear agent (required when there is no manager) —' }];
+      return [{ value: CLEAR, label: '— No agent (required when there is no manager) —' }];
     }
     return [
-      { value: NO_CHANGE, label: '— No change —' },
-      { value: CLEAR, label: '— Clear agent —' },
+      { value: CLEAR, label: '— No agent —' },
       ...agentRowsToOptions(agentsForManagerFilter),
     ];
   }, [isAdmin, managerChoice, agentsForManagerFilter]);
@@ -166,15 +154,9 @@ export function AssignContactsBulkModal({
     if (isAdmin && v === CLEAR) {
       setAgentChoice(CLEAR);
     } else if (isAdmin && prev === CLEAR && v !== CLEAR) {
-      setAgentChoice(NO_CHANGE);
+      setAgentChoice(UNSET);
     }
   };
-
-  const campaignOptions = useMemo(() => {
-    return (campaigns || [])
-      .filter((c) => c.type === 'static')
-      .map((c) => ({ value: String(c.id), label: c.name || '—' }));
-  }, [campaigns]);
 
   const handleSubmit = async () => {
     setFormError('');
@@ -182,29 +164,23 @@ export function AssignContactsBulkModal({
 
     if (isAdmin) {
       if (managerChoice === CLEAR) body.manager_id = null;
-      else if (managerChoice !== NO_CHANGE) body.manager_id = Number(managerChoice);
+      else if (managerChoice !== UNSET) body.manager_id = Number(managerChoice);
     }
 
     if (isAdmin && managerChoice === CLEAR) {
       body.assigned_user_id = null;
     } else if (agentChoice === CLEAR) body.assigned_user_id = null;
-    else if (agentChoice !== NO_CHANGE) body.assigned_user_id = Number(agentChoice);
+    else if (agentChoice !== UNSET) body.assigned_user_id = Number(agentChoice);
 
-    if (campaignChoice === CLEAR) body.campaign_id = null;
-    else if (campaignChoice !== NO_CHANGE) body.campaign_id = Number(campaignChoice);
-
-       const hasOp =
-      body.manager_id !== undefined ||
-      body.assigned_user_id !== undefined ||
-      body.campaign_id !== undefined;
+    const hasOp = body.manager_id !== undefined || body.assigned_user_id !== undefined;
     if (!hasOp) {
-      setFormError('Choose at least one change (manager, agent, or campaign).');
+      setFormError('Choose at least one change (manager or agent).');
       return;
     }
 
-    if (isAdmin && managerChoice === NO_CHANGE) {
+    if (isAdmin && managerChoice === UNSET) {
       const { isMixed, selectionIncomplete } = assignContext || {};
-      if ((isMixed || selectionIncomplete) && agentChoice !== NO_CHANGE && agentChoice !== CLEAR) {
+      if ((isMixed || selectionIncomplete) && agentChoice !== UNSET && agentChoice !== CLEAR) {
         setFormError(
           selectionIncomplete
             ? 'Some selected rows are not on this page. Choose an owning manager, or bulk-assign one page at a time.'
@@ -224,18 +200,15 @@ export function AssignContactsBulkModal({
         : { contact_ids: [...selectedIds] };
       if (isAdmin) {
         if (managerChoice === CLEAR) payload.manager_id = null;
-        else if (managerChoice !== NO_CHANGE) payload.manager_id = Number(managerChoice);
+        else if (managerChoice !== UNSET) payload.manager_id = Number(managerChoice);
       }
       if (isAdmin && managerChoice === CLEAR) {
         payload.assigned_user_id = null;
       } else if (agentChoice === CLEAR) {
         payload.assigned_user_id = null;
-      } else if (agentChoice !== NO_CHANGE) {
+      } else if (agentChoice !== UNSET) {
         payload.assigned_user_id = Number(agentChoice);
       }
-      if (campaignChoice === CLEAR) payload.campaign_id = null;
-      else if (campaignChoice !== NO_CHANGE) payload.campaign_id = Number(campaignChoice);
-
       setJobQueueing(true);
       setFormError('');
       try {
@@ -287,11 +260,10 @@ export function AssignContactsBulkModal({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {formError ? <Alert variant="error">{formError}</Alert> : null}
           <p style={{ margin: 0, fontSize: 13, opacity: 0.85 }}>
-            <strong>Admin:</strong> choose a manager to filter agents to that team. With &quot;No change&quot;, agents are
-            limited to the selected rows&apos; team when all share one manager; otherwise pick an owning manager first.
-            Clearing the manager also clears the agent.
+            <strong>Admin:</strong> choose a manager to filter agents to that team. If all selected rows share one
+            manager, agents are limited to that team. Choosing No manager also sets No agent.
             <br />
-            <strong>Manager:</strong> assign or remove agents on your team; optional campaign.
+            <strong>Manager:</strong> assign or remove agents on your team.
           </p>
 
           {isAdmin ? (
@@ -300,8 +272,8 @@ export function AssignContactsBulkModal({
               value={managerChoice}
               onChange={handleManagerChange}
               options={[
-                { value: NO_CHANGE, label: '— No change —' },
-                { value: CLEAR, label: '— Clear manager and agent —' },
+                { value: UNSET, label: '— Select manager —' },
+                { value: CLEAR, label: '— No manager —' },
                 ...managerOptions,
               ]}
             />
@@ -312,18 +284,10 @@ export function AssignContactsBulkModal({
             value={agentChoice}
             onChange={(e) => setAgentChoice(e.target.value)}
             disabled={agentFieldDisabled}
-            options={agentFieldOptions}
-          />
-
-          <Select
-            label="Campaign (static)"
-            value={campaignChoice}
-            onChange={(e) => setCampaignChoice(e.target.value)}
-            options={[
-              { value: NO_CHANGE, label: '— No change —' },
-              { value: CLEAR, label: '— Clear campaign —' },
-              ...campaignOptions,
-            ]}
+            options={[{ value: UNSET, label: '— Select agent —' }, ...agentFieldOptions.map((o) => ({
+              ...o,
+              label: o.value === CLEAR ? '— No agent —' : o.label,
+            }))]}
           />
         </div>
       )}

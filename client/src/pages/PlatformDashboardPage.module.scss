@@ -318,11 +318,12 @@
 
 .sectionLink {
   font-size: $font-size-sm;
-  color: var(--color-primary-400);
+  color: var(--color-text-primary);
   text-decoration: none;
 
   &:hover {
-    text-decoration: underline;
+    text-decoration: none;
+    opacity: 0.92;
   }
 }
 

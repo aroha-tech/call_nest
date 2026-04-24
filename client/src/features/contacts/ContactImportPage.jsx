@@ -623,7 +623,7 @@ export function ContactImportPage({ type }) {
     <div className={listStyles.page}>
       <PageHeader
         title={title}
-        description="Upload a CSV/XLSX file. We auto-map columns and check duplicates by primary phone."
+        description="Upload a CSV/XLSX file. We auto-map columns and check duplicates by email."
         actions={
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Button variant="secondary" onClick={() => navigate(historyPath)}>
@@ -741,7 +741,7 @@ export function ContactImportPage({ type }) {
                 <div className={styles.stepCard}>
                   <div className={styles.stepTitle}>
                     <div className={styles.stepTitleText}>Import settings</div>
-                    <div className={styles.stepHint}>Duplicates are matched by primary phone.</div>
+                    <div className={styles.stepHint}>Duplicates are matched by email.</div>
                   </div>
 
                   <div className={styles.grid2}>
@@ -753,8 +753,8 @@ export function ContactImportPage({ type }) {
                         setReviewData(null);
                       }}
                       options={[
-                        { value: 'skip', label: 'Skip duplicates (by primary phone)' },
-                        { value: 'update', label: 'Update duplicates (by primary phone)' },
+                        { value: 'skip', label: 'Skip duplicates (by email)' },
+                        { value: 'update', label: 'Update duplicates (by email)' },
                       ]}
                       placeholder="Select mode..."
                     />

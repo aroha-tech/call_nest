@@ -19,6 +19,7 @@ import { FilterOptionsModal } from '../features/contacts/FilterOptionsModal';
 import { BrowseSavedFiltersModal } from '../features/contacts/BrowseSavedFiltersModal';
 import { savedListFiltersAPI } from '../services/savedListFiltersAPI';
 import { ScheduleHubFilterModal } from './ScheduleHubFilterModal';
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 
 function pad2(n) {
   return String(n).padStart(2, '0');
@@ -50,17 +51,6 @@ function IconReset() {
       />
     </svg>
   );
-}
-
-function formatWhen(v) {
-  if (!v) return '—';
-  try {
-    const d = new Date(String(v).replace(' ', 'T'));
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-  } catch {
-    return '—';
-  }
 }
 
 function callbackStatusBadgeVariant(status) {
@@ -110,6 +100,7 @@ function computeTimeFlag(d, { isOpen }) {
 }
 
 export function ScheduleHubPage() {
+  const { formatDateTime } = useDateTimeDisplay();
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAppSelector(selectUser);
   const viewMode = normalizeViewParam(searchParams.get('view'));
@@ -494,7 +485,7 @@ export function ScheduleHubPage() {
                         );
                       })()}
                     </TableCell>
-                    <TableCell>{formatWhen(r.start_at)}</TableCell>
+                    <TableCell>{formatDateTime(String(r.start_at || '').replace(' ', 'T'))}</TableCell>
                     <TableCell noTruncate>{r.title || '—'}</TableCell>
                     <TableCell noTruncate>{r.contact_name || '—'}</TableCell>
                     <TableCell noTruncate>{r.assigned_name || r.assigned_email || '—'}</TableCell>
@@ -633,7 +624,7 @@ export function ScheduleHubPage() {
                         );
                       })()}
                     </TableCell>
-                    <TableCell>{formatWhen(r.scheduled_at)}</TableCell>
+                    <TableCell>{formatDateTime(String(r.scheduled_at || '').replace(' ', 'T'))}</TableCell>
                     <TableCell noTruncate>{r.contact_name || '—'}</TableCell>
                     <TableCell noTruncate>{r.contact_phone || '—'}</TableCell>
                     <TableCell noTruncate>{r.assigned_name || r.assigned_email || '—'}</TableCell>

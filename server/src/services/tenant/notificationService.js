@@ -3,6 +3,11 @@ import { publishTenantRealtimeEvent } from '../../realtime/publishTenantRealtime
 import { resolveRolesForEvent } from './notificationPolicyService.js';
 import { sendPushToUserSubscriptions } from './notificationPushService.js';
 
+/** In-app list, unread badge, mark-read, and dismiss only apply to notifications in this window (older rows stay in DB). */
+const NOTIFICATION_LIST_RETENTION_DAYS = 90;
+
+const LIST_VISIBILITY_SQL = `AND r.dismissed_at IS NULL AND n.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)`;
+
 function normalizePositiveInt(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 1) return null;
@@ -58,8 +63,9 @@ async function computeUnreadCount(tenantId, userId) {
      FROM tenant_notification_recipients r
      INNER JOIN tenant_notifications n ON n.id = r.notification_id
      WHERE r.tenant_id = ? AND r.user_id = ? AND r.deleted_at IS NULL
-       AND n.deleted_at IS NULL AND r.read_at IS NULL`,
-    [tenantId, userId]
+       AND n.deleted_at IS NULL AND r.read_at IS NULL
+       ${LIST_VISIBILITY_SQL}`,
+    [tenantId, userId, NOTIFICATION_LIST_RETENTION_DAYS]
   );
   return Number(row?.unreadCount || 0);
 }
@@ -73,7 +79,7 @@ export async function listNotifications(tenantId, userId, filters = {}) {
   const limit = Math.min(100, Math.max(1, Number(filters.limit || 20)));
   const page = Math.max(1, Number(filters.page || 1));
   const offset = (page - 1) * limit;
-  const params = [tenantId, userId];
+  const params = [tenantId, userId, NOTIFICATION_LIST_RETENTION_DAYS];
   let where = '';
 
   if (filters.module_key) {
@@ -91,7 +97,8 @@ export async function listNotifications(tenantId, userId, filters = {}) {
     `SELECT COUNT(*) AS total
      FROM tenant_notification_recipients r
      INNER JOIN tenant_notifications n ON n.id = r.notification_id
-     WHERE r.tenant_id = ? AND r.user_id = ? AND r.deleted_at IS NULL AND n.deleted_at IS NULL ${where}`,
+     WHERE r.tenant_id = ? AND r.user_id = ? AND r.deleted_at IS NULL AND n.deleted_at IS NULL
+       ${LIST_VISIBILITY_SQL} ${where}`,
     params
   );
 
@@ -113,7 +120,8 @@ export async function listNotifications(tenantId, userId, filters = {}) {
        r.read_at
      FROM tenant_notification_recipients r
      INNER JOIN tenant_notifications n ON n.id = r.notification_id
-     WHERE r.tenant_id = ? AND r.user_id = ? AND r.deleted_at IS NULL AND n.deleted_at IS NULL ${where}
+     WHERE r.tenant_id = ? AND r.user_id = ? AND r.deleted_at IS NULL AND n.deleted_at IS NULL
+       ${LIST_VISIBILITY_SQL} ${where}
      ORDER BY n.id DESC
      LIMIT ${limit} OFFSET ${offset}`,
     params
@@ -133,10 +141,13 @@ export async function markNotificationRead(tenantId, userId, notificationId) {
     throw err;
   }
   await query(
-    `UPDATE tenant_notification_recipients
-     SET read_at = COALESCE(read_at, NOW()), updated_at = NOW()
-     WHERE tenant_id = ? AND user_id = ? AND notification_id = ? AND deleted_at IS NULL`,
-    [tenantId, userId, id]
+    `UPDATE tenant_notification_recipients r
+     INNER JOIN tenant_notifications n ON n.id = r.notification_id
+     SET r.read_at = COALESCE(r.read_at, NOW()), r.updated_at = NOW()
+     WHERE r.tenant_id = ? AND r.user_id = ? AND r.notification_id = ? AND r.deleted_at IS NULL
+       AND r.dismissed_at IS NULL AND n.deleted_at IS NULL
+       AND n.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)`,
+    [tenantId, userId, id, NOTIFICATION_LIST_RETENTION_DAYS]
   );
   await emitUnreadCount(tenantId, userId);
   return { ok: true };
@@ -144,10 +155,61 @@ export async function markNotificationRead(tenantId, userId, notificationId) {
 
 export async function markAllNotificationsRead(tenantId, userId) {
   await query(
-    `UPDATE tenant_notification_recipients
-     SET read_at = COALESCE(read_at, NOW()), updated_at = NOW()
-     WHERE tenant_id = ? AND user_id = ? AND deleted_at IS NULL AND read_at IS NULL`,
-    [tenantId, userId]
+    `UPDATE tenant_notification_recipients r
+     INNER JOIN tenant_notifications n ON n.id = r.notification_id
+     SET r.read_at = COALESCE(r.read_at, NOW()), r.updated_at = NOW()
+     WHERE r.tenant_id = ? AND r.user_id = ? AND r.deleted_at IS NULL AND r.read_at IS NULL
+       AND r.dismissed_at IS NULL AND n.deleted_at IS NULL
+       AND n.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)`,
+    [tenantId, userId, NOTIFICATION_LIST_RETENTION_DAYS]
+  );
+  await emitUnreadCount(tenantId, userId);
+  return { ok: true };
+}
+
+export async function dismissNotification(tenantId, userId, notificationId) {
+  const id = normalizePositiveInt(notificationId);
+  if (!id) {
+    const err = new Error('Invalid notification id');
+    err.status = 400;
+    throw err;
+  }
+  await query(
+    `UPDATE tenant_notification_recipients r
+     INNER JOIN tenant_notifications n ON n.id = r.notification_id
+     SET r.dismissed_at = COALESCE(r.dismissed_at, NOW()), r.updated_at = NOW()
+     WHERE r.tenant_id = ? AND r.user_id = ? AND r.notification_id = ? AND r.deleted_at IS NULL
+       AND r.dismissed_at IS NULL AND n.deleted_at IS NULL
+       AND n.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)`,
+    [tenantId, userId, id, NOTIFICATION_LIST_RETENTION_DAYS]
+  );
+  await emitUnreadCount(tenantId, userId);
+  return { ok: true };
+}
+
+export async function dismissAllNotifications(tenantId, userId, filters = {}) {
+  const params = [tenantId, userId, NOTIFICATION_LIST_RETENTION_DAYS];
+  let where = '';
+
+  if (filters.module_key) {
+    where += ' AND n.module_key = ?';
+    params.push(String(filters.module_key).trim().toLowerCase());
+  }
+  if (filters.status === 'unread') where += ' AND r.read_at IS NULL';
+  if (filters.status === 'read') where += ' AND r.read_at IS NOT NULL';
+  if (filters.severity) {
+    where += ' AND n.severity = ?';
+    params.push(String(filters.severity).trim().toLowerCase());
+  }
+
+  await query(
+    `UPDATE tenant_notification_recipients r
+     INNER JOIN tenant_notifications n ON n.id = r.notification_id
+     SET r.dismissed_at = COALESCE(r.dismissed_at, NOW()), r.updated_at = NOW()
+     WHERE r.tenant_id = ? AND r.user_id = ? AND r.deleted_at IS NULL
+       AND n.deleted_at IS NULL
+       ${LIST_VISIBILITY_SQL} ${where}`,
+    params
   );
   await emitUnreadCount(tenantId, userId);
   return { ok: true };

@@ -265,12 +265,13 @@
 }
 
 .userCountLink {
-  color: var(--color-primary, #2563eb);
+  color: var(--color-text-primary);
   text-decoration: none;
   font-weight: $font-weight-medium;
 
   &:hover {
-    text-decoration: underline;
+    text-decoration: none;
+    opacity: 0.92;
   }
 }
 

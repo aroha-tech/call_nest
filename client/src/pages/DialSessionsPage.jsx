@@ -31,17 +31,7 @@ import {
   saveDialSessionsVisibleColumnIds,
 } from './dialSessionsTableConfig';
 import { TIME_RANGE_PRESET, resolveDialSessionCreatedParams } from '../utils/dateRangePresets';
-
-function safeDateTime(v) {
-  if (!v) return '—';
-  try {
-    const d = new Date(v);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-  } catch {
-    return '—';
-  }
-}
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 
 function IconBlank() {
   return <span style={{ display: 'block', width: 18, height: 18 }} aria-hidden />;
@@ -79,6 +69,7 @@ function IconReset() {
 }
 
 export function DialSessionsPage() {
+  const { formatDateTime } = useDateTimeDisplay();
   const navigate = useNavigate();
   const user = useAppSelector(selectUser);
   const { canAny } = usePermissions();
@@ -582,7 +573,7 @@ export function DialSessionsPage() {
                 onColumnHeaderClick={(col) => {
                   if (col?.sortKey || col?.columnFilterOnly) setColumnPanelCol(col);
                 }}
-                formatWhen={(v) => safeDateTime(v)}
+                formatWhen={formatDateTime}
                 onOpenCallHistory={(r) =>
                   navigate(`/calls/history?dialer_session_id=${encodeURIComponent(String(r?.id ?? ''))}`)
                 }

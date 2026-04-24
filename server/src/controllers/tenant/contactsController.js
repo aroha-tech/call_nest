@@ -364,17 +364,21 @@ export async function create(req, res, next) {
       return res.status(400).json({ error: 'Tenant context required' });
     }
 
-    const { first_name, email, display_name } = req.body || {};
+    const { email, display_name } = req.body || {};
+    const phones = req.body?.phones;
 
     // Validation:
     // - display_name is always required
-    // - either first_name OR email must be provided
+    // - either email OR at least one phone number must be provided
     if (!display_name || !String(display_name).trim()) {
       return res.status(400).json({ error: 'display_name is required' });
     }
 
-    if (!first_name && !email) {
-      return res.status(400).json({ error: 'Either first_name or email is required' });
+    const hasEmail = !!(email && String(email).trim());
+    const hasPhone =
+      Array.isArray(phones) && phones.some((p) => p?.phone && String(p.phone).trim());
+    if (!hasEmail && !hasPhone) {
+      return res.status(400).json({ error: 'Either email or at least one phone number is required' });
     }
 
     const contact = await contactsService.createContact(tenantId, req.user, req.body || {});
@@ -392,19 +396,13 @@ export async function update(req, res, next) {
     }
 
     const payload = req.body || {};
-    const { first_name, email, display_name } = payload;
+    const { display_name } = payload;
 
     // If any of these fields are being changed, enforce the same rules:
     // - display_name cannot be empty if provided
-    // - at least one of first_name or email must be present in final data
+    // - final record must still have email or at least one phone (enforced in contactsService)
     if (display_name !== undefined && !String(display_name).trim()) {
       return res.status(400).json({ error: 'display_name cannot be empty' });
-    }
-
-    // For simplicity, when client wants to clear both first_name and email,
-    // they must still satisfy "either first_name or email" rule.
-    if (first_name === '' && !email) {
-      return res.status(400).json({ error: 'Either first_name or email is required' });
     }
 
     const contact = await contactsService.updateContact(

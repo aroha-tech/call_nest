@@ -21,6 +21,7 @@ import { Badge } from '../components/ui/Badge';
 import { TableDataRegion } from '../components/admin/TableDataRegion';
 import listStyles from '../components/admin/adminDataList.module.scss';
 import { ScriptBodyEditor } from '../features/callScripts/ScriptBodyEditor';
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import styles from './MeetingsPage.module.scss';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -146,15 +147,9 @@ function isProviderReauthError(errorLike) {
   return String(errorLike?.response?.data?.code || '').trim() === 'PROVIDER_REAUTH_REQUIRED';
 }
 
-function formatMeetingWhen(v) {
+function formatMeetingWhen(v, formatDateTime) {
   if (!v) return '—';
-  try {
-    const d = new Date(String(v).replace(' ', 'T'));
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-  } catch {
-    return '—';
-  }
+  return formatDateTime(String(v).replace(' ', 'T'));
 }
 
 function meetingStatusBadgeVariant(status) {
@@ -187,6 +182,7 @@ function meetingChipStatusClass(meeting) {
 }
 
 export function MeetingsPage() {
+  const { formatDateTime, formatDate, formatMonthYear } = useDateTimeDisplay();
   const navigate = useNavigate();
   const { canAny } = usePermissions();
   const canManage = canAny([PERMISSIONS.MEETINGS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]);
@@ -261,7 +257,7 @@ export function MeetingsPage() {
   const [meetingPreviewSaving, setMeetingPreviewSaving] = useState(false);
   const [meetingPreviewError, setMeetingPreviewError] = useState(null);
   const [previewPlaceholderHelp, setPreviewPlaceholderHelp] = useState([]);
-  /** Sub-view when viewing resolved template: 'preview' (HTML) | 'plain' | null */
+  /** Sub-view when viewing resolved template: 'preview' (HTML) | null */
   const [meetingPreviewSubModal, setMeetingPreviewSubModal] = useState(null);
   /** Which resolved modal we are fetching for (for button loading). */
   const [meetingPreviewResolveFor, setMeetingPreviewResolveFor] = useState(null);
@@ -912,7 +908,7 @@ export function MeetingsPage() {
     setMonth0(d.getMonth());
   }
 
-  const monthTitle = new Date(year, month0, 1).toLocaleString(undefined, { month: 'long', year: 'numeric' });
+  const monthTitle = formatMonthYear(new Date(year, month0, 1));
 
   const listTotalPages = Math.max(1, listPagination.totalPages || 1);
 
@@ -1010,12 +1006,7 @@ export function MeetingsPage() {
               const key = toYmd(cell.date);
               const dayMeetings = byDay.get(key) || [];
               const isToday = key === todayYmd;
-              const dayLabel = cell.date.toLocaleDateString(undefined, {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-              });
+              const dayLabel = formatDate(cell.date);
               return (
                 <div
                   key={`${idx}-${key}`}
@@ -1112,8 +1103,8 @@ export function MeetingsPage() {
                             {row.meeting_status || '—'}
                           </Badge>
                         </TableCell>
-                        <TableCell>{formatMeetingWhen(row.start_at)}</TableCell>
-                        <TableCell>{formatMeetingWhen(row.end_at)}</TableCell>
+                        <TableCell>{formatMeetingWhen(row.start_at, formatDateTime)}</TableCell>
+                        <TableCell>{formatMeetingWhen(row.end_at, formatDateTime)}</TableCell>
                         <TableCell>{row.attendee_email || '—'}</TableCell>
                         <TableCell>{row.account_label || row.account_email || '—'}</TableCell>
                       </TableRow>
@@ -1159,13 +1150,8 @@ export function MeetingsPage() {
                 ) : null}
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={openMeetingEmailPreview}
-                  disabled={saving || !form.email_account_id}
-                >
-                  Preview &amp; edit email
+                <Button type="button" variant="secondary" onClick={() => navigate('/settings/meeting-attendee-emails')} disabled={saving}>
+                  Attendee email settings
                 </Button>
                 <Button type="button" variant="ghost" onClick={() => setModalOpen(false)} disabled={saving}>
                   {canManage ? 'Cancel' : 'Close'}
@@ -1573,16 +1559,6 @@ export function MeetingsPage() {
                 >
                   Preview (this meeting)
                 </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => openMeetingPreviewResolvedModal('plain')}
-                  loading={meetingPreviewResolving && meetingPreviewResolveFor === 'plain'}
-                  disabled={meetingPreviewLoading || !!meetingPreviewResolveFor}
-                >
-                  Plain text (this meeting)
-                </Button>
               </div>
             </div>
           </div>
@@ -1614,33 +1590,6 @@ export function MeetingsPage() {
                 className={styles.previewResolvedHtml}
                 dangerouslySetInnerHTML={{ __html: meetingPreviewResolved.body_html || '<p>—</p>' }}
               />
-            </div>
-          </>
-        )}
-      </Modal>
-
-      <Modal
-        isOpen={meetingPreviewOpen && meetingPreviewSubModal === 'plain'}
-        onClose={() => setMeetingPreviewSubModal(null)}
-        title="Plain text — with this meeting"
-        size="md"
-        footer={
-          <ModalFooter>
-            <Button type="button" variant="ghost" onClick={() => setMeetingPreviewSubModal(null)}>
-              Close
-            </Button>
-          </ModalFooter>
-        }
-      >
-        <p className={styles.previewModalHint}>Plain version after merge fields are filled (read-only).</p>
-        {meetingPreviewResolving ? (
-          <p className={styles.listHint}>Updating…</p>
-        ) : (
-          <>
-            <Input label="Subject" value={meetingPreviewResolved.subject} readOnly />
-            <div>
-              <div className={styles.fieldLabel}>Plain text body</div>
-              <pre className={styles.previewResolvedPre}>{meetingPreviewResolved.body_text || '—'}</pre>
             </div>
           </>
         )}

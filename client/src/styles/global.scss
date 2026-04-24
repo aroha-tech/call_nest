@@ -56,22 +56,25 @@ body {
   flex-direction: column;
 }
 
-// Links
+// Links — high-contrast text (avoids default blue on dashboard cards, quick actions, etc.)
 a {
-  color: var(--color-primary-400);
+  color: var(--color-text-primary);
   text-decoration: none;
-  transition: color $transition-fast;
+  transition: color $transition-fast, opacity $transition-fast;
 
   &:hover {
-    color: var(--color-primary-300);
+    color: var(--color-text-primary);
+    text-decoration: none;
+    opacity: 0.92;
   }
 }
 
 :root[data-color-scheme='light'] a {
-  color: var(--color-primary-600);
+  color: var(--color-text-primary);
 
   &:hover {
-    color: var(--color-primary-700);
+    color: var(--color-text-primary);
+    text-decoration: none;
   }
 }
 
@@ -105,8 +108,8 @@ code {
 
 // Selection
 ::selection {
-  background: var(--color-primary-600);
-  color: var(--color-text-inverse);
+  background: var(--color-text-primary);
+  color: var(--color-bg-body);
 }
 
 // Focus outline for keyboard navigation

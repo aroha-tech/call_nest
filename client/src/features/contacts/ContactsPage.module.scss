@@ -1,5 +1,12 @@
 @use '../../styles/variables' as *;
 
+/** Contacts/Leads table toolbar: one row so expandable search grows left beside Actions */
+.contactsTableToolbarTop {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .filterSelect {
   min-width: 200px;
   max-width: 280px;
@@ -17,11 +24,16 @@
 /** Table card: bulk Actions (or dialer “Call selected”) left of search — group aligned right of table toolbar */
 .toolbarSearchAndBulk {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: $space-3;
   margin-left: auto;
   min-width: 0;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .toolbarResetBtn {
@@ -44,7 +56,7 @@
 .toolbarBulkActionsGroup {
   flex-shrink: 0;
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: $space-3;
 }
@@ -55,14 +67,20 @@
 }
 
 .toolbarSearchField {
-  width: 100%;
-  flex: 1;
-  min-width: 200px;
+  flex: 0 1 auto;
+  min-width: 0;
   max-width: 420px;
+  width: auto;
 }
 
 .bulkActionsWrap {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/** Wraps trigger for getBoundingClientRect; portal menu avoids toolbar overflow-x clipping */
+.bulkActionsTriggerMeasure {
   display: inline-flex;
   align-items: center;
 }
@@ -111,16 +129,18 @@
 }
 
 .bulkActionsMenu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
+  position: fixed;
   min-width: 220px;
+  max-width: min(360px, calc(100vw - 16px));
+  max-height: min(70vh, calc(100dvh - 16px));
+  overflow-y: auto;
   background: var(--color-bg-elevated, #111);
   border: 1px solid var(--color-border-subtle);
   border-radius: $radius-lg;
   box-shadow: $shadow-md;
   padding: $space-2;
-  z-index: 20;
+  z-index: 10050;
+  box-sizing: border-box;
 }
 
 .actionsTriggerInner {

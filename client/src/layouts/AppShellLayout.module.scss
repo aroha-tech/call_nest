@@ -16,12 +16,7 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   top: 0;
   bottom: 0;
   width: 240px;
-  background-color: var(--color-shell-sidebar-base);
-  background-image:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.42) 0%, transparent 52%),
-    radial-gradient(ellipse 95% 52% at 50% -6%, rgba(var(--color-primary-rgb), 0.12) 0%, transparent 52%),
-    radial-gradient(ellipse 125% 72% at 50% 112%, rgba(0, 0, 0, 0.55) 0%, transparent 44%),
-    linear-gradient(180deg, var(--color-bg-elevated) 0%, var(--color-shell-sidebar-base) 48%, #06080f 100%);
+  background: var(--color-shell-sidebar-base);
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
@@ -38,7 +33,7 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
 .sidebarHeader {
   padding: $space-4;
   border-bottom: 1px solid var(--color-border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, transparent 100%);
+  background: transparent;
 }
 
 .brandRow {
@@ -78,40 +73,92 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
 
 .navSearch {
   flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
   padding: $space-2 $space-3 $space-3;
 }
 
-.navSearchInner {
+$nav-search-pill-h: 40px;
+$nav-search-pill-icon: 40px;
+$nav-search-pill-ease: cubic-bezier(0.32, 0.72, 0, 1);
+
+.navSearchTrack {
+  width: 100%;
+  max-width: $nav-search-pill-icon;
+  transition: max-width 0.38s $nav-search-pill-ease;
+}
+
+.navSearchTrackOpen {
+  max-width: 100%;
+}
+
+.navSearchPill {
   position: relative;
   display: flex;
-  align-items: center;
-}
-
-.navSearchIcon {
-  position: absolute;
-  left: 10px;
-  z-index: 1;
-  pointer-events: none;
-  font-size: 15px;
-  line-height: 1;
-  color: var(--color-text-tertiary);
-  opacity: 0.75;
-}
-
-.navSearchInput {
+  align-items: stretch;
+  box-sizing: border-box;
   width: 100%;
-  height: 36px;
-  padding: 0 34px 0 34px;
+  height: $nav-search-pill-h;
+  max-height: $nav-search-pill-h;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
+  transition:
+    border-color $transition-fast,
+    box-shadow $transition-fast;
+}
+
+.navSearchTrackOpen .navSearchPill {
+  border-radius: 999px;
+  border: 1px solid var(--color-primary-500);
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  cursor: default;
+
+  &:focus-within {
+    border-color: var(--color-primary-400);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary-500) 22%, transparent);
+  }
+}
+
+.navSearchPillCollapsed {
+  cursor: pointer;
+}
+
+.navSearchPillHasValue {
+  &::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+    top: 5px;
+    right: 6px;
+    left: auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-primary-500);
+  }
+}
+
+.navSearchTrack:not(.navSearchTrackOpen) .navSearchPillHasValue {
+  box-shadow: none;
+}
+
+.navSearchPillInput {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 0 0 $space-4;
   font-family: inherit;
   font-size: $font-size-sm;
   font-weight: $font-weight-medium;
   color: var(--color-text-primary);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--color-border);
-  border-radius: $radius-md;
-  transition: border-color $transition-fast, box-shadow $transition-fast;
+  background: transparent;
+  border: none;
+  border-radius: 0;
 
-  /* If input is ever type="search" again, avoid duplicate clear next to our button */
   &::-webkit-search-cancel-button,
   &::-webkit-search-decoration {
     -webkit-appearance: none;
@@ -125,35 +172,67 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
 
   &:focus {
     outline: none;
-    border-color: color-mix(in srgb, var(--color-primary-500) 55%, var(--color-border));
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary-500) 18%, transparent);
   }
 }
 
-.navSearchClear {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
+.navSearchPillClear {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 28px;
-  height: 28px;
+  height: 100%;
   padding: 0;
-  font-size: 18px;
+  font-size: 12px;
   line-height: 1;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color $transition-fast;
+
+  &:hover {
+    color: var(--color-text-primary);
+  }
+}
+
+.navSearchPillIconBtn {
+  flex: 0 0 $nav-search-pill-icon;
+  width: $nav-search-pill-icon;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
   color: var(--color-text-tertiary);
   background: transparent;
   border: none;
   border-radius: $radius-sm;
   cursor: pointer;
-  transition: color $transition-fast, background $transition-fast;
+  transition:
+    color $transition-fast,
+    background $transition-fast;
 
   &:hover {
-    color: var(--color-text-primary);
-    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-primary-400);
+    background: color-mix(in srgb, var(--color-primary-500) 12%, transparent);
   }
+
+  &:focus-visible {
+    outline: none;
+    background: color-mix(in srgb, var(--color-primary-500) 18%, transparent);
+  }
+}
+
+.navSearchTrackOpen .navSearchPillIconBtn {
+  border-radius: 0;
+}
+
+.navSearchSearchGlyph {
+  font-size: 20px !important;
+  line-height: 1;
+  font-weight: 400 !important;
+  opacity: 0.9;
 }
 
 .navSearchEmpty {
@@ -202,20 +281,20 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   flex-shrink: 0;
   width: 20px;
   height: 20px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
 }
 
 .navItem:hover .navItemIcon,
 .navGroupHeader:hover .navItemIcon {
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
 }
 
 .navItem.navItemActive .navItemIcon {
-  color: var(--color-primary-300);
+  color: var(--color-text-primary);
 }
 
 .navGroupHeader.navGroupActive .navItemIcon {
-  color: var(--color-primary-400);
+  color: var(--color-text-primary);
 }
 
 .navChildIcon {
@@ -233,7 +312,7 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .navChild.navChildActive .navChildIcon {
-  color: var(--color-primary-400);
+  color: var(--color-text-primary);
 }
 
 .navItem {
@@ -264,13 +343,9 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   &.navItemActive {
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--color-primary-600) 22%, transparent) 0%,
-      color-mix(in srgb, var(--color-primary-500) 12%, transparent) 100%
-    );
+    background: var(--color-bg-hover);
     color: var(--color-text-primary);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary-500) 25%, transparent);
+    box-shadow: inset 0 0 0 2px var(--color-text-primary);
 
     .navLabel {
       font-weight: $font-weight-semibold;
@@ -314,7 +389,7 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   &.navGroupActive {
-    color: var(--color-primary-400);
+    color: var(--color-text-primary);
   }
 }
 
@@ -364,13 +439,14 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   &.navChildActive {
-    background: color-mix(in srgb, var(--color-primary-500) 14%, transparent);
-    color: var(--color-primary-400);
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+    box-shadow: inset 0 0 0 2px var(--color-text-primary);
     font-weight: $font-weight-semibold;
   }
 
   &.navChildActive:visited {
-    color: var(--color-primary-400);
+    color: var(--color-text-primary);
   }
 }
 
@@ -380,12 +456,7 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   flex-direction: column;
   min-width: 0;
   width: 100%;
-  background-color: var(--color-bg-body);
-  background-image:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.28) 0%, transparent 14%, transparent 86%, rgba(0, 0, 0, 0.28) 100%),
-    radial-gradient(ellipse 125% 70% at 50% 108%, rgba(0, 0, 0, 0.5) 0%, transparent 46%),
-    radial-gradient(ellipse 100% 56% at 50% -6%, rgba(var(--color-primary-rgb), 0.12) 0%, transparent 52%),
-    linear-gradient(172deg, var(--color-bg-body) 0%, var(--color-bg-surface) 46%, #080b12 100%);
+  background: var(--color-bg-body);
 
   transition: margin-left $shell-sidebar-duration $shell-sidebar-ease;
 
@@ -410,11 +481,7 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   gap: $space-4;
   min-height: 52px;
   padding: $space-2 $space-4;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--color-bg-elevated) 94%, transparent) 0%,
-    color-mix(in srgb, var(--color-bg-body) 96%, transparent) 100%
-  );
+  background: var(--color-bg-elevated);
   border-bottom: 1px solid var(--color-border);
   backdrop-filter: blur(14px);
 
@@ -455,8 +522,9 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   max-width: 100%;
 
   &:hover {
-    color: var(--color-primary-400);
-    text-decoration: underline;
+    color: var(--color-text-primary);
+    text-decoration: none;
+    opacity: 0.92;
   }
 }
 
@@ -486,7 +554,7 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   color: inherit;
 
   &:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--color-primary-500) 65%, transparent);
+    outline: 2px solid var(--color-text-primary);
     outline-offset: 2px;
   }
 }
@@ -536,7 +604,7 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
 
 /* Dark mode active — moon prominent */
 .themeSwitch[aria-checked='true'] .themeSwitchIconMoon {
-  color: #c7d2fe;
+  color: var(--color-text-primary);
   opacity: 1;
 }
 
@@ -558,7 +626,7 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .themeSwitch[aria-checked='true'] .themeSwitchTrack {
-  background: color-mix(in srgb, var(--color-primary-500) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--color-text-primary) 42%, var(--color-border));
 }
 
 .themeSwitch[aria-checked='true'] .themeSwitchThumb {
@@ -570,7 +638,7 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 :global(html[data-color-scheme='light']) .themeSwitch[aria-checked='true'] .themeSwitchTrack {
-  background: color-mix(in srgb, var(--color-primary-500) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-text-primary) 38%, var(--color-border));
 }
 
 .menuBtn {
@@ -593,7 +661,7 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   &:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--color-primary-500) 65%, transparent);
+    outline: 2px solid var(--color-text-primary);
     outline-offset: 2px;
   }
 }
@@ -646,47 +714,63 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   }
 }
 
-// Light appearance: shell chrome (tenant `--color-primary-*` / `--color-primary-rgb` still apply)
+// Light appearance: main column + topbar stay light; sidebar stays a dark rail (own tokens).
 :global(html[data-color-scheme='light']) {
   .sidebar {
-    background-color: #f8fafc;
-    background-image:
-      linear-gradient(90deg, rgba(15, 23, 42, 0.04) 0%, transparent 52%),
-      radial-gradient(ellipse 95% 52% at 50% -6%, rgba(var(--color-primary-rgb), 0.12) 0%, transparent 52%),
-      radial-gradient(ellipse 125% 72% at 50% 112%, rgba(15, 23, 42, 0.06) 0%, transparent 44%),
-      linear-gradient(180deg, #ffffff 0%, #f1f5f9 45%, #f8fafc 100%);
+    background: var(--color-shell-sidebar-base, #000000);
+    border-right-color: rgba(255, 255, 255, 0.22);
+    /* Scoped dark semantics for nav / search / footer (do not leak outside aside) */
+    --color-bg-body: #000000;
+    --color-bg-surface: #000000;
+    --color-bg-elevated: #0a0a0a;
+    --color-bg-subtle: #0a0a0a;
+    --color-bg-muted: #141414;
+    --color-bg-hover: rgba(255, 255, 255, 0.06);
+    --color-bg-active: rgba(255, 255, 255, 0.08);
+    --color-border: rgba(255, 255, 255, 0.2);
+    --color-border-subtle: rgba(255, 255, 255, 0.14);
+    --color-border-strong: rgba(255, 255, 255, 0.3);
+    --color-border-focus: rgba(255, 255, 255, 0.72);
+    --color-text-primary: #f4f7fb;
+    --color-text-secondary: #b8c2d4;
+    --color-text-tertiary: #8b96ab;
+    --color-text-muted: #6b7689;
+    --color-text-placeholder: #8b96ab;
+    --color-text-inverse: #09090b;
+    --color-focus-ring: rgba(255, 255, 255, 0.22);
+    --color-input-bg: #0a0a0a;
+    --color-input-border: rgba(255, 255, 255, 0.22);
+    --color-input-border-hover: rgba(255, 255, 255, 0.34);
+    --color-input-border-focus: rgba(255, 255, 255, 0.78);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
   }
 
   .sidebarHeader {
-    background: linear-gradient(180deg, rgba(15, 23, 42, 0.04) 0%, transparent 100%);
+    background: transparent;
   }
 
   .mainColumn {
-    background-color: #f1f5f9;
-    background-image:
-      linear-gradient(90deg, rgba(15, 23, 42, 0.03) 0%, transparent 14%, transparent 86%, rgba(15, 23, 42, 0.03) 100%),
-      radial-gradient(ellipse 125% 70% at 50% 108%, rgba(15, 23, 42, 0.05) 0%, transparent 46%),
-      radial-gradient(ellipse 100% 56% at 50% -6%, rgba(var(--color-primary-rgb), 0.14) 0%, transparent 52%),
-      linear-gradient(172deg, #f8fafc 0%, #f1f5f9 46%, #eef2f7 100%);
+    background: #ffffff;
   }
 
   .topbar {
-    background: linear-gradient(180deg, rgba(248, 250, 252, 0.97) 0%, rgba(241, 245, 249, 0.98) 100%);
+    background: #ffffff;
   }
 
   .navItem.navItemActive .navItemIcon {
-    color: var(--color-primary-600);
+    color: var(--color-text-primary);
   }
 
   .navGroupHeader.navGroupActive .navItemIcon {
-    color: var(--color-primary-600);
+    color: var(--color-text-primary);
   }
 
   .navChild.navChildActive {
-    color: var(--color-primary-700);
+    color: var(--color-text-primary);
 
     .navChildIcon {
-      color: var(--color-primary-600);
+      color: var(--color-text-primary);
     }
   }
 }

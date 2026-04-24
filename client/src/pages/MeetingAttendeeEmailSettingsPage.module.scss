@@ -1,0 +1,65 @@
+.page {
+  display: grid;
+  gap: 12px;
+}
+
+.alert {
+  margin-bottom: 4px;
+}
+
+.card {
+  display: grid;
+  gap: 14px;
+}
+
+.intro {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tab {
+  border: 1px solid var(--border-color);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.tabActive {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.muted {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.form {
+  display: grid;
+  gap: 12px;
+}
+
+.label {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.hint {
+  margin: 0 0 8px;
+  color: var(--text-secondary);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}

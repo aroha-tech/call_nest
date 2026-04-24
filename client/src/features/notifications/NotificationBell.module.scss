@@ -16,6 +16,11 @@
   background: var(--color-bg-hover);
 }
 
+.bellIcon {
+  display: block;
+  color: var(--color-text-secondary);
+}
+
 .badge {
   position: absolute;
   top: -4px;
@@ -37,8 +42,9 @@
   right: 0;
   top: calc(100% + 8px);
   width: 380px;
-  max-height: 460px;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  max-height: min(460px, calc(100vh - 96px));
   border: 1px solid var(--color-border);
   border-radius: 10px;
   background: var(--color-bg-elevated);
@@ -49,13 +55,53 @@
 .panelHeader {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.panelHeaderActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  justify-content: flex-end;
+}
+
+.panelHeaderBtn {
+  border: 0;
+  background: transparent;
+  color: var(--color-primary-500);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.panelHeaderBtn:hover {
+  background: var(--color-bg-hover);
+}
+
+.panelHeaderBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.panelHeaderBtn:disabled:hover {
+  background: transparent;
 }
 
 .panelTitle {
   font-weight: 600;
+}
+
+.panelScroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .panelList {
@@ -63,12 +109,48 @@
   flex-direction: column;
 }
 
-.item {
-  padding: 10px 12px;
+.itemRow {
+  display: flex;
+  align-items: stretch;
   border-bottom: 1px solid var(--color-border);
+}
+
+.item {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 8px 10px 12px;
   text-decoration: none;
   color: inherit;
   display: block;
+}
+
+.itemDismiss {
+  flex-shrink: 0;
+  width: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 8px 0;
+  border-radius: 6px;
+}
+
+.itemDismiss:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-secondary);
+}
+
+.panelSentinel {
+  height: 1px;
+}
+
+.panelLoadingMore {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  text-align: center;
 }
 
 .itemUnread {
@@ -95,6 +177,8 @@
 .panelFooter {
   padding: 8px 12px;
   text-align: right;
+  flex-shrink: 0;
+  border-top: 1px solid var(--color-border);
 }
 
 .linkBtn {
