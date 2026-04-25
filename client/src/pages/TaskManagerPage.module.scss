@@ -72,6 +72,10 @@
   margin-bottom: $space-5;
 }
 
+.managerSwitchSection {
+  margin-bottom: $space-3;
+}
+
 .assignmentsSectionHead {
   margin-bottom: $space-3;
 }
@@ -374,6 +378,20 @@
 
 .full {
   grid-column: 1 / -1;
+}
+
+.formSectionTitle {
+  margin: 0 0 4px;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+}
+
+.formSectionHint {
+  margin: 0;
+  font-size: $font-size-xs;
+  color: var(--color-text-tertiary);
+  line-height: 1.45;
 }
 
 /* Legacy: formsGrid / card used only if referenced elsewhere */

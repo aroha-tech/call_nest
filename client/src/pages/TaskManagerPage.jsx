@@ -4,6 +4,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
+import { MultiSelectDropdown } from '../components/ui/MultiSelectDropdown';
 import { Alert } from '../components/ui/Alert';
 import { SearchInput } from '../components/ui/SearchInput';
 import { Pagination, PaginationPageSize } from '../components/ui/Pagination';
@@ -14,6 +15,9 @@ import { Badge } from '../components/ui/Badge';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
 import { taskManagerAPI } from '../services/taskManagerAPI';
 import { tenantUsersAPI } from '../services/tenantUsersAPI';
+import { campaignsAPI } from '../services/campaignsAPI';
+import { contactTagsAPI } from '../services/contactTagsAPI';
+import { emailAccountsAPI } from '../services/emailAPI';
 import { usePermissions } from '../hooks/usePermission';
 import { PERMISSIONS } from '../utils/permissionUtils';
 import { useAppSelector } from '../app/hooks';
@@ -21,9 +25,40 @@ import { selectUser } from '../features/auth/authSelectors';
 import listStyles from '../components/admin/adminDataList.module.scss';
 import styles from './TaskManagerPage.module.scss';
 
-const scheduleOptions = [
-  { value: 'one_time', label: 'Single day' },
-  { value: 'date_range', label: 'Date range' },
+const scheduleWindowOptions = [
+  { value: 'current', label: 'Current' },
+  { value: 'upcoming', label: 'Upcoming' },
+];
+
+const duePresetOptions = [
+  { value: 'in_1_day', label: 'In 1 day' },
+  { value: 'in_2_days', label: 'In 2 days' },
+  { value: 'in_3_days', label: 'In 3 days' },
+  { value: 'in_1_week', label: 'In 1 week' },
+  { value: 'in_1_month', label: 'In 1 month' },
+  { value: 'custom', label: 'Custom' },
+];
+
+const taskTypeOptions = [
+  { value: 'todo', label: 'To-do' },
+  { value: 'meeting', label: 'Meeting' },
+  { value: 'call', label: 'Call' },
+  { value: 'deal', label: 'Deal' },
+];
+
+const priorityOptions = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+];
+
+const reminderPresetOptions = [
+  { value: 'none', label: 'None (No reminder)' },
+  { value: '10m', label: '10 minutes before due time' },
+  { value: '30m', label: '30 minutes before due time' },
+  { value: '1h', label: '1 hour before due time' },
+  { value: '1d', label: '1 day before due date' },
+  { value: 'custom', label: 'Custom' },
 ];
 
 function pad2(n) {
@@ -36,6 +71,13 @@ function toYmd(d) {
 
 function addDaysYmd(ymd, delta) {
   const d = new Date(`${ymd}T12:00:00`);
+  d.setDate(d.getDate() + delta);
+  return toYmd(d);
+}
+
+function addDaysToToday(delta) {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
   d.setDate(d.getDate() + delta);
   return toYmd(d);
 }
@@ -85,11 +127,12 @@ function formatStatusLabel(status) {
 
 function assignmentDisplayStatus(assignment, todayYmd) {
   const base = String(assignment?.status || '').toLowerCase();
-  if (['paused', 'cancelled', 'completed'].includes(base)) return base;
+  if (base === 'completed') return 'finished';
+  if (['paused', 'cancelled'].includes(base)) return base;
   const start = String(assignment?.start_date || '').slice(0, 10);
   const end = String(assignment?.end_date || '').slice(0, 10);
   if (start && todayYmd && start > todayYmd) return 'scheduled';
-  if (end && todayYmd && end < todayYmd) return 'ended';
+  if (end && todayYmd && end < todayYmd) return 'finished';
   return base || 'active';
 }
 
@@ -104,6 +147,8 @@ function assignmentStatusVariant(status) {
     case 'scheduled':
       return 'primary';
     case 'ended':
+      return 'muted';
+    case 'finished':
       return 'muted';
     case 'completed':
       return 'success';
@@ -128,7 +173,8 @@ export function TaskManagerPage() {
 
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
-  const [mainTab, setMainTab] = useState('today');
+  const [mainTab, setMainTab] = useState('current');
+  const [managerView, setManagerView] = useState('execution');
   const [templates, setTemplates] = useState([]);
   const [users, setUsers] = useState([]);
   const [agentFilter, setAgentFilter] = useState('');
@@ -149,6 +195,14 @@ export function TaskManagerPage() {
   const [assignments, setAssignments] = useState([]);
   const [deleteAssignmentTarget, setDeleteAssignmentTarget] = useState(null);
   const [deletingAssignment, setDeletingAssignment] = useState(false);
+  const [campaigns, setCampaigns] = useState([]);
+  const [contactTags, setContactTags] = useState([]);
+  const [emailAccounts, setEmailAccounts] = useState([]);
+  const [saveAndAddAnother, setSaveAndAddAnother] = useState(false);
+  const [commentsModalAssignment, setCommentsModalAssignment] = useState(null);
+  const [assignmentComments, setAssignmentComments] = useState([]);
+  const [commentDraft, setCommentDraft] = useState('');
+  const [commentsLoading, setCommentsLoading] = useState(false);
 
   const [templateForm, setTemplateForm] = useState({
     name: '',
@@ -161,10 +215,21 @@ export function TaskManagerPage() {
     template_id: '',
     title: '',
     description: '',
-    assigned_to_user_id: '',
+    assigned_to_user_id: user?.id ? String(user.id) : '',
     start_date: '',
     end_date: '',
-    schedule_type: 'one_time',
+    schedule_window: 'current',
+    task_type: 'todo',
+    priority: 'medium',
+    due_preset: '',
+    reminder_preset: 'none',
+    reminder_custom_value: 15,
+    reminder_custom_unit: 'minutes',
+    reminder_at: '',
+    notes: '',
+    suggestion_campaign_ids: '',
+    suggestion_tag_ids: '',
+    suggestion_email_account_ids: '',
     target_calls: 150,
     target_meetings: 2,
     target_deals: 2,
@@ -174,13 +239,13 @@ export function TaskManagerPage() {
 
   /** Calendar “today” in the browser (must match `task_date` rows in DB). Recomputed each render so it rolls over at midnight. */
   const todayStr = toYmd(new Date());
-  const yesterdayStr = addDaysYmd(todayStr, -1);
-  const historyFromStr = addDaysYmd(todayStr, -120);
 
   const showAgentFilter = canManage && !isAgentRole;
+  const showExecutionBoard = !canManage || managerView === 'execution';
+  const showAssignmentsBoard = canManage && managerView === 'assignments';
   const historyColSpan = showAgentFilter ? 8 : 7;
 
-  // Product rule: if a row exists for today's task_date, show it in Today.
+  // Product rule: if a row exists for today's task_date, show it in Current.
   const effectiveTodayLogs = useMemo(() => todayLogs, [todayLogs]);
 
   const assignmentsForHints = useMemo(() => {
@@ -216,20 +281,73 @@ export function TaskManagerPage() {
     agentFilter,
   ]);
 
-  const templateOptions = useMemo(
-    () => [{ value: '', label: 'No template (custom)' }, ...templates.map((t) => ({ value: String(t.id), label: t.name }))],
-    [templates]
-  );
+  const duePresetOptionsWithDate = useMemo(() => {
+    const map = {
+      in_1_day: 1,
+      in_2_days: 2,
+      in_3_days: 3,
+      in_1_week: 7,
+      in_1_month: 30,
+    };
+    return duePresetOptions.map((opt) => {
+      if (opt.value === 'custom') return { ...opt, label: 'Custom (choose due date below)' };
+      const d = map[opt.value];
+      const target = addDaysToToday(d || 0);
+      return { ...opt, label: `${opt.label} (${target} 23:59 local)` };
+    });
+  }, [todayStr]);
 
   const agentOptions = useMemo(
-    () => [{ value: '', label: 'Select agent' }, ...users.map((u) => ({ value: String(u.id), label: u.name || u.email }))],
-    [users]
+    () => {
+      const roleNow = String(user?.role || '').toLowerCase();
+      const opts = [];
+      if (user?.id) {
+        opts.push({ value: String(user.id), label: 'Self' });
+      }
+      const scopedUsers = users.filter((u) => {
+        const uRole = String(u.role || '').toLowerCase();
+        if (roleNow === 'manager') return ['agent', 'manager'].includes(uRole);
+        return ['agent', 'manager'].includes(uRole);
+      });
+      opts.push(
+        ...scopedUsers
+          .filter((u) => Number(u.id) !== Number(user?.id))
+          .map((u) => ({ value: String(u.id), label: `${u.name || u.email} (${u.role})` }))
+      );
+      return opts;
+    },
+    [users, user]
+  );
+
+  const campaignOptions = useMemo(
+    () => campaigns.map((c) => ({ value: String(c.id), label: c.name || `Campaign #${c.id}` })),
+    [campaigns]
+  );
+  const tagOptions = useMemo(
+    () => contactTags.map((t) => ({ value: String(t.id), label: t.name || `Tag #${t.id}` })),
+    [contactTags]
+  );
+  const emailAccountOptions = useMemo(
+    () =>
+      emailAccounts.map((a) => ({
+        value: String(a.id),
+        label: a.email || a.email_address || a.display_name || `Account #${a.id}`,
+      })),
+    [emailAccounts]
   );
 
   const agentFilterOptions = useMemo(() => {
-    const allLabel = role === 'manager' ? 'All agents in my team' : 'All agents';
-    return [{ value: '', label: allLabel }, ...users.map((u) => ({ value: String(u.id), label: u.name || u.email }))];
-  }, [users, role]);
+    const allLabel = role === 'manager' ? 'All assignees (my team + me)' : 'All assignees';
+    const options = [{ value: '', label: allLabel }];
+    if (user?.id) {
+      options.push({ value: String(user.id), label: `Self (${user.name || user.email || 'Me'})` });
+    }
+    for (const u of users) {
+      if (Number(u.id) === Number(user?.id)) continue;
+      options.push({ value: String(u.id), label: `${u.name || u.email} (${u.role})` });
+    }
+    return options;
+  }, [users, role, user]);
 
   const userIdParam = useMemo(() => {
     if (isAgentRole) return undefined;
@@ -258,21 +376,29 @@ export function TaskManagerPage() {
     setLoadingShell(true);
     setError('');
     try {
-      const adminAgentParam = role === 'admin' ? { role: 'agent' } : {};
       const assignParams = { limit: 200 };
       if (agentFilter) {
         const aid = Number(agentFilter);
         if (Number.isFinite(aid) && aid > 0) assignParams.userId = aid;
       }
-      const [tRes, uRes, aRes] = await Promise.all([
+      const [tRes, uRes, aRes, cRes, tagRes, eaRes] = await Promise.allSettled([
         taskManagerAPI.listTemplates(),
-        tenantUsersAPI.getAll({ ...adminAgentParam, limit: 200, page: 1 }),
+        tenantUsersAPI.getAll({ limit: 200, page: 1 }),
         taskManagerAPI.listAssignments(assignParams),
+        campaignsAPI.list({ page: 1, limit: 200 }),
+        contactTagsAPI.list(),
+        emailAccountsAPI.getAll(false),
       ]);
-      setTemplates(tRes?.data?.data || []);
-      const raw = uRes?.data?.data || [];
-      setUsers(raw.filter((u) => String(u.role || '').toLowerCase() === 'agent'));
-      setAssignments(aRes?.data?.data || []);
+      if (tRes.status !== 'fulfilled' || uRes.status !== 'fulfilled' || aRes.status !== 'fulfilled') {
+        throw new Error('Failed to load task setup data');
+      }
+      setTemplates(tRes.value?.data?.data || []);
+      const raw = uRes.value?.data?.data || [];
+      setUsers(raw.filter((u) => ['agent', 'manager'].includes(String(u.role || '').toLowerCase())));
+      setAssignments(aRes.value?.data?.data || []);
+      setCampaigns(cRes.status === 'fulfilled' ? cRes.value?.data?.data || [] : []);
+      setContactTags(tagRes.status === 'fulfilled' ? tagRes.value?.data?.data || [] : []);
+      setEmailAccounts(eaRes.status === 'fulfilled' ? eaRes.value?.data?.data || [] : []);
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || 'Failed to load catalog');
     } finally {
@@ -284,6 +410,13 @@ export function TaskManagerPage() {
     loadManageCatalog();
   }, [loadManageCatalog]);
 
+  useEffect(() => {
+    if (!assignModalOpen) return;
+    if (assignForm.assigned_to_user_id) return;
+    if (!user?.id) return;
+    setAssignForm((s) => ({ ...s, assigned_to_user_id: String(user.id) }));
+  }, [assignModalOpen, assignForm.assigned_to_user_id, user]);
+
   /** Keep “today” in sync for the hero and Today tab without blocking other tabs. */
   useEffect(() => {
     let cancelled = false;
@@ -291,8 +424,7 @@ export function TaskManagerPage() {
       try {
         const res = await taskManagerAPI.listDailyLogs({
           ...(userIdParam ? { userId: userIdParam } : {}),
-          from: todayStr,
-          to: todayStr,
+          view: 'current',
           limit: 80,
           sort: 'desc',
         });
@@ -315,19 +447,11 @@ export function TaskManagerPage() {
       try {
         const res = await taskManagerAPI.listDailyLogs({
           ...(userIdParam ? { userId: userIdParam } : {}),
-          from: todayStr,
-          to: addDaysYmd(todayStr, 365),
+          view: 'upcoming',
           limit: 150,
           sort: 'asc',
         });
-        if (!cancelled) {
-          const rows = res?.data?.data || [];
-          const filtered = rows.filter((l) => {
-            const day = String(l.task_date || '').slice(0, 10);
-            return day > todayStr;
-          });
-          setUpcomingLogs(filtered);
-        }
+        if (!cancelled) setUpcomingLogs(res?.data?.data || []);
       } catch (e) {
         if (!cancelled) setError(e?.response?.data?.error || e?.message || 'Failed to load upcoming tasks');
       } finally {
@@ -348,8 +472,7 @@ export function TaskManagerPage() {
       try {
         const res = await taskManagerAPI.listDailyLogs({
           ...(userIdParam ? { userId: userIdParam } : {}),
-          from: historyFromStr,
-          to: yesterdayStr,
+          view: 'history',
           page: historyPagination.page,
           limit: historyPagination.limit,
           sort: 'desc',
@@ -376,7 +499,7 @@ export function TaskManagerPage() {
     return () => {
       cancelled = true;
     };
-  }, [mainTab, userIdParam, historyFromStr, yesterdayStr, historyPagination.page, historyPagination.limit]);
+  }, [mainTab, userIdParam, historyPagination.page, historyPagination.limit]);
 
   const filteredHistoryLogs = useMemo(() => {
     if (!historyQuery.trim()) return historyLogs;
@@ -402,8 +525,7 @@ export function TaskManagerPage() {
     try {
       const todayRes = await taskManagerAPI.listDailyLogs({
         ...common,
-        from: todayStr,
-        to: todayStr,
+        view: 'current',
         limit: 80,
         sort: 'desc',
       });
@@ -411,23 +533,16 @@ export function TaskManagerPage() {
       if (mainTab === 'upcoming') {
         const uRes = await taskManagerAPI.listDailyLogs({
           ...common,
-          from: todayStr,
-          to: addDaysYmd(todayStr, 365),
+          view: 'upcoming',
           limit: 150,
           sort: 'asc',
         });
-        const rows = uRes?.data?.data || [];
-        const filtered = rows.filter((l) => {
-          const day = String(l.task_date || '').slice(0, 10);
-          return day > todayStr;
-        });
-        setUpcomingLogs(filtered);
+        setUpcomingLogs(uRes?.data?.data || []);
       }
       if (mainTab === 'history') {
         const hRes = await taskManagerAPI.listDailyLogs({
           ...common,
-          from: historyFromStr,
-          to: yesterdayStr,
+          view: 'history',
           page: historyPagination.page,
           limit: historyPagination.limit,
           sort: 'desc',
@@ -496,49 +611,133 @@ export function TaskManagerPage() {
       setError('Task title is required.');
       return;
     }
-    if (!assignForm.start_date) {
-      setError('Select a date for this task.');
-      return;
-    }
-    if (assignForm.schedule_type === 'date_range' && !assignForm.end_date) {
-      setError('Select an end date for the range.');
-      return;
-    }
     const startDate = assignForm.start_date;
-    const endDate = assignForm.schedule_type === 'date_range' ? assignForm.end_date : assignForm.start_date;
-    if (startDate > endDate) {
-      setError('End date must be on or after the start date.');
+    let computedStartDate = startDate;
+    let endDate = assignForm.end_date;
+    if (assignForm.schedule_window === 'current') {
+      computedStartDate = todayStr;
+      if (!assignForm.due_preset) {
+        setError('Select due date preset for current tasks.');
+        return;
+      }
+      const map = {
+        in_1_day: 1,
+        in_2_days: 2,
+        in_3_days: 3,
+        in_1_week: 7,
+        in_1_month: 30,
+      };
+      const d = map[assignForm.due_preset];
+      if (assignForm.due_preset === 'custom') {
+        if (!assignForm.end_date) {
+          setError('Select a due date for custom option.');
+          return;
+        }
+        endDate = assignForm.end_date;
+      } else {
+        if (!d) {
+          setError('Current tasks require one due date preset.');
+          return;
+        }
+        endDate = addDaysToToday(d);
+      }
+    }
+    if (assignForm.schedule_window === 'upcoming' && !computedStartDate) {
+      setError('Select a start date.');
       return;
+    }
+    if (assignForm.schedule_window === 'upcoming' && !endDate) {
+      setError('Select a due date.');
+      return;
+    }
+    if (computedStartDate > endDate) {
+      setError('Due date must be on or after start date.');
+      return;
+    }
+    if (computedStartDate < todayStr || endDate < todayStr) {
+      setError('Past dates are not allowed.');
+      return;
+    }
+    let targetCalls = Number(assignForm.target_calls || 0);
+    let targetMeetings = Number(assignForm.target_meetings || 0);
+    let targetDeals = Number(assignForm.target_deals || 0);
+    if (assignForm.task_type === 'call') {
+      targetMeetings = 0;
+      targetDeals = 0;
+    } else if (assignForm.task_type === 'meeting') {
+      targetCalls = 0;
+      targetDeals = 0;
+    } else if (assignForm.task_type === 'deal') {
+      targetCalls = 0;
+      targetMeetings = 0;
+    }
+    let reminderAt = null;
+    if (assignForm.reminder_preset !== 'none') {
+      const dueBase = new Date(`${endDate}T23:59:00`);
+      const map = { '10m': 10 * 60 * 1000, '30m': 30 * 60 * 1000, '1h': 60 * 60 * 1000, '1d': 24 * 60 * 60 * 1000 };
+      let delta = map[assignForm.reminder_preset] || 0;
+      if (assignForm.reminder_preset === 'custom') {
+        const v = Math.max(1, Number(assignForm.reminder_custom_value || 1));
+        const unitMs = assignForm.reminder_custom_unit === 'days' ? 86400000 : assignForm.reminder_custom_unit === 'hours' ? 3600000 : 60000;
+        delta = v * unitMs;
+      }
+      reminderAt = new Date(dueBase.getTime() - delta);
     }
     try {
       const payload = {
         ...assignForm,
-        template_id: assignForm.template_id ? Number(assignForm.template_id) : null,
+        template_id: null,
         assigned_to_user_id: assignedToUserId,
-        start_date: startDate,
+        start_date: computedStartDate,
         end_date: endDate,
-        start_at: toLocalStartAt(startDate),
+        start_at: toLocalStartAt(computedStartDate),
         end_at: toLocalEndAt(endDate),
+        description: assignForm.notes || assignForm.description || '',
+        associated_meeting_id: null,
+        reminder_at: reminderAt ? `${toYmd(reminderAt)} ${pad2(reminderAt.getHours())}:${pad2(reminderAt.getMinutes())}:00` : null,
+        schedule_type: assignForm.schedule_window === 'upcoming' ? 'date_range' : 'one_time',
+        target_calls: targetCalls,
+        target_meetings: targetMeetings,
+        target_deals: targetDeals,
+        suggestion_campaign_ids: ['todo', 'call'].includes(assignForm.task_type) ? assignForm.suggestion_campaign_ids : '',
+        suggestion_tag_ids: ['todo', 'call'].includes(assignForm.task_type) ? assignForm.suggestion_tag_ids : '',
+        suggestion_email_account_ids:
+          ['todo', 'meeting'].includes(assignForm.task_type) ? assignForm.suggestion_email_account_ids : '',
+        repeat_enabled: false,
+        repeat_interval_days: null,
         recurring_pattern: null,
       };
       await taskManagerAPI.createAssignment(payload);
       setOk('Assignment published. Daily rows were generated for the selected day(s).');
-      setAssignModalOpen(false);
+      if (!saveAndAddAnother) setAssignModalOpen(false);
       setAssignForm((s) => ({
         ...s,
         template_id: '',
         title: '',
         description: '',
-        assigned_to_user_id: '',
+        assigned_to_user_id: user?.id ? String(user.id) : '',
         start_date: '',
         end_date: '',
-        schedule_type: 'one_time',
+        schedule_window: 'current',
+        task_type: 'todo',
+        priority: 'medium',
+        due_preset: '',
+        reminder_preset: 'none',
+        reminder_custom_value: 15,
+        reminder_custom_unit: 'minutes',
+        reminder_at: '',
+        notes: '',
+        suggestion_campaign_ids: '',
+        suggestion_tag_ids: '',
+        suggestion_email_account_ids: '',
       }));
       await loadManageCatalog();
       await refetchTaskViews();
     } catch (err) {
       const msg = err?.response?.data?.error || err?.message || 'Failed to create assignment';
       setError(msg);
+    } finally {
+      setSaveAndAddAnother(false);
     }
   }
 
@@ -590,29 +789,41 @@ export function TaskManagerPage() {
     }
   }
 
+  async function openCommentsModal(assignment) {
+    setCommentsModalAssignment(assignment);
+    setCommentDraft('');
+    setCommentsLoading(true);
+    try {
+      const res = await taskManagerAPI.listAssignmentComments(assignment.id);
+      setAssignmentComments(res?.data?.data || []);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to load comments');
+      setAssignmentComments([]);
+    } finally {
+      setCommentsLoading(false);
+    }
+  }
+
+  async function submitAssignmentComment() {
+    if (!commentsModalAssignment?.id) return;
+    const text = String(commentDraft || '').trim();
+    if (!text) return;
+    try {
+      await taskManagerAPI.addAssignmentComment(commentsModalAssignment.id, text);
+      setCommentDraft('');
+      const res = await taskManagerAPI.listAssignmentComments(commentsModalAssignment.id);
+      setAssignmentComments(res?.data?.data || []);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to post comment');
+    }
+  }
+
   function openNotesModal(log) {
     setNotesModalLog(log);
     setNotesModalDraft({
       agent: log.agent_note || '',
       manager: log.manager_note || '',
     });
-  }
-
-  function applyTemplateSelection(id) {
-    const t = templates.find((x) => Number(x.id) === Number(id));
-    if (!t) {
-      setAssignForm((s) => ({ ...s, template_id: id }));
-      return;
-    }
-    setAssignForm((s) => ({
-      ...s,
-      template_id: id,
-      title: t.name || s.title,
-      description: t.description || '',
-      target_calls: t.target_calls ?? s.target_calls,
-      target_meetings: t.target_meetings ?? s.target_meetings,
-      target_deals: t.target_deals ?? s.target_deals,
-    }));
   }
 
   function renderTaskCard(log, { showAgent }) {
@@ -710,7 +921,7 @@ export function TaskManagerPage() {
 
   function renderEmpty(kind, extraHints = []) {
     const copy = {
-      today: 'No targets for this day. When a manager assigns you work covering today, it will appear here.',
+      current: 'No tasks are active for today. When an assignment window includes today, it will appear here.',
       upcoming: 'No future scheduled days in the current window. Assignments with later dates show up automatically.',
       history: 'No completed days in this range yet.',
     };
@@ -761,49 +972,63 @@ export function TaskManagerPage() {
         </div>
       </section>
 
-      <div className={styles.toolbar}>
-        <div className={styles.toolbarLeft}>
-          {showAgentFilter ? (
-            <div className={styles.filterWrap}>
-              <Select
-                label="Agent"
-                value={agentFilter}
-                onChange={(e) => setAgentFilter(e.target.value)}
-                options={agentFilterOptions}
-              />
-            </div>
-          ) : null}
-        </div>
-        <div className={styles.toolbarRight}>
-          {(canManage || isAgentRole) ? (
-            <>
-              <Button
-                variant="secondary"
-                className={styles.toolbarBtn}
-                onClick={onSyncAchievements}
-                loading={syncing}
-                disabled={loadingTab}
-              >
-                <MaterialSymbol name="sync" size="sm" />
-                Sync live metrics
-              </Button>
-              {canManage ? (
-                <>
-                  <Button variant="secondary" onClick={() => setTemplateModalOpen(true)} disabled={loadingShell}>
-                    Template library
-                  </Button>
+      {canManage ? (
+        <section className={styles.managerSwitchSection}>
+          <Tabs>
+            <TabList>
+              <Tab isActive={managerView === 'execution'} onClick={() => setManagerView('execution')}>
+                <MaterialSymbol name="dashboard" size="sm" />
+                Execution board
+              </Tab>
+              <Tab isActive={managerView === 'assignments'} onClick={() => setManagerView('assignments')}>
+                <MaterialSymbol name="assignment" size="sm" />
+                Active assignments
+              </Tab>
+            </TabList>
+          </Tabs>
+        </section>
+      ) : null}
+
+      {(showExecutionBoard || showAssignmentsBoard) ? (
+        <div className={styles.toolbar}>
+          <div className={styles.toolbarLeft}>
+            {showAgentFilter ? (
+              <div className={styles.filterWrap}>
+                <Select
+                label="Assignee"
+                  value={agentFilter}
+                  onChange={(e) => setAgentFilter(e.target.value)}
+                  options={agentFilterOptions}
+                />
+              </div>
+            ) : null}
+          </div>
+          <div className={styles.toolbarRight}>
+            {(canManage || isAgentRole) ? (
+              <>
+                <Button
+                  variant="secondary"
+                  className={styles.toolbarBtn}
+                  onClick={onSyncAchievements}
+                  loading={syncing}
+                  disabled={loadingTab}
+                >
+                  <MaterialSymbol name="sync" size="sm" />
+                  Sync live metrics
+                </Button>
+                {canManage && showAssignmentsBoard ? (
                   <Button variant="primary" className={styles.toolbarBtn} onClick={() => setAssignModalOpen(true)} disabled={loadingShell}>
                     <MaterialSymbol name="assignment_add" size="sm" />
                     New assignment
                   </Button>
-                </>
-              ) : null}
-            </>
-          ) : null}
+                ) : null}
+              </>
+            ) : null}
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      {canManage ? (
+      {showAssignmentsBoard ? (
         <section className={styles.assignmentsSection}>
           <div className={styles.assignmentsSectionHead}>
             <h2 className={styles.assignmentsTitle}>Active assignments</h2>
@@ -818,7 +1043,9 @@ export function TaskManagerPage() {
                 <TableHead>
                   <TableRow>
                     <TableHeaderCell>Task</TableHeaderCell>
-                    <TableHeaderCell>Agent</TableHeaderCell>
+                    <TableHeaderCell>Type</TableHeaderCell>
+                    <TableHeaderCell>Priority</TableHeaderCell>
+                    <TableHeaderCell>Assign to</TableHeaderCell>
                     <TableHeaderCell>Dates</TableHeaderCell>
                     <TableHeaderCell>Status</TableHeaderCell>
                     <TableHeaderCell>Targets</TableHeaderCell>
@@ -828,14 +1055,14 @@ export function TaskManagerPage() {
                 <TableBody>
                   {loadingShell ? (
                     <TableRow>
-                      <TableCell colSpan={6} className={styles.muted}>
+                      <TableCell colSpan={8} className={styles.muted}>
                         Loading assignments…
                       </TableCell>
                     </TableRow>
                   ) : null}
                   {!loadingShell && !assignments.length ? (
                     <TableRow>
-                      <TableCell colSpan={6} className={styles.muted}>
+                      <TableCell colSpan={8} className={styles.muted}>
                         No assignments yet. Create one with New assignment.
                       </TableCell>
                     </TableRow>
@@ -844,6 +1071,8 @@ export function TaskManagerPage() {
                     ? assignments.map((a) => (
                         <TableRow key={a.id}>
                           <TableCell>{a.title || '—'}</TableCell>
+                          <TableCell>{formatStatusLabel(a.task_type)}</TableCell>
+                          <TableCell>{formatStatusLabel(a.priority)}</TableCell>
                           <TableCell>{a.assigned_to_name || '—'}</TableCell>
                           <TableCell>
                             <span className={styles.tableMono}>
@@ -862,6 +1091,9 @@ export function TaskManagerPage() {
                             </span>
                           </TableCell>
                           <TableCell align="right">
+                            <Button size="sm" variant="ghost" onClick={() => openCommentsModal(a)}>
+                              Comments
+                            </Button>
                             <Button size="sm" variant="ghost" onClick={() => setDeleteAssignmentTarget(a)}>
                               Remove
                             </Button>
@@ -876,46 +1108,48 @@ export function TaskManagerPage() {
         </section>
       ) : null}
 
-      <Tabs>
-        <TabList>
-          <Tab isActive={mainTab === 'today'} onClick={() => setMainTab('today')}>
-            <MaterialSymbol name="today" size="sm" />
-            Today
-            {effectiveTodayLogs.length ? <span className={styles.tabCount}>{effectiveTodayLogs.length}</span> : null}
-          </Tab>
-          <Tab isActive={mainTab === 'upcoming'} onClick={() => setMainTab('upcoming')}>
-            <MaterialSymbol name="date_range" size="sm" />
-            Upcoming
-            {upcomingLogs.length ? <span className={styles.tabCount}>{upcomingLogs.length}</span> : null}
-          </Tab>
-          <Tab isActive={mainTab === 'history'} onClick={() => setMainTab('history')}>
-            <MaterialSymbol name="history" size="sm" />
-            History
-            {historyPagination.total ? <span className={styles.tabCount}>{historyPagination.total}</span> : null}
-          </Tab>
-        </TabList>
+      {showExecutionBoard ? (
+        <Tabs>
+          <TabList>
+            <Tab isActive={mainTab === 'current'} onClick={() => setMainTab('current')}>
+              <MaterialSymbol name="event_available" size="sm" />
+              Current
+              {effectiveTodayLogs.length ? <span className={styles.tabCount}>{effectiveTodayLogs.length}</span> : null}
+            </Tab>
+            <Tab isActive={mainTab === 'upcoming'} onClick={() => setMainTab('upcoming')}>
+              <MaterialSymbol name="date_range" size="sm" />
+              Upcoming
+              {upcomingLogs.length ? <span className={styles.tabCount}>{upcomingLogs.length}</span> : null}
+            </Tab>
+            <Tab isActive={mainTab === 'history'} onClick={() => setMainTab('history')}>
+              <MaterialSymbol name="history" size="sm" />
+              History
+              {historyPagination.total ? <span className={styles.tabCount}>{historyPagination.total}</span> : null}
+            </Tab>
+          </TabList>
 
-        <TabPanel isActive={mainTab === 'today'}>
-          {!effectiveTodayLogs.length ? renderEmpty('today', todayEmptyHints) : null}
-          {effectiveTodayLogs.length ? (
-            <div className={styles.cardGrid}>
-              {effectiveTodayLogs.map((log) => renderTaskCard(log, { showAgent: showAgentFilter }))}
-            </div>
-          ) : null}
-        </TabPanel>
+          <TabPanel isActive={mainTab === 'current'}>
+            <p className={styles.tabHint}>Tasks in the active window for today ({todayStr}).</p>
+            {!effectiveTodayLogs.length ? renderEmpty('current', todayEmptyHints) : null}
+            {effectiveTodayLogs.length ? (
+              <div className={styles.cardGrid}>
+                {effectiveTodayLogs.map((log) => renderTaskCard(log, { showAgent: showAgentFilter }))}
+              </div>
+            ) : null}
+          </TabPanel>
 
-        <TabPanel isActive={mainTab === 'upcoming'}>
-          <p className={styles.tabHint}>Scheduled future days from active assignments (nearest dates first).</p>
-          {loadingTab ? <p className={styles.muted}>Loading upcoming…</p> : null}
-          {!loadingTab && !upcomingLogs.length ? renderEmpty('upcoming') : null}
-          {!loadingTab && upcomingLogs.length ? (
-            <div className={styles.cardGrid}>{upcomingLogs.map((log) => renderTaskCard(log, { showAgent: showAgentFilter }))}</div>
-          ) : null}
-        </TabPanel>
+          <TabPanel isActive={mainTab === 'upcoming'}>
+            <p className={styles.tabHint}>Tasks with a start date after today are shown here.</p>
+            {loadingTab ? <p className={styles.muted}>Loading upcoming…</p> : null}
+            {!loadingTab && !upcomingLogs.length ? renderEmpty('upcoming') : null}
+            {!loadingTab && upcomingLogs.length ? (
+              <div className={styles.cardGrid}>{upcomingLogs.map((log) => renderTaskCard(log, { showAgent: showAgentFilter }))}</div>
+            ) : null}
+          </TabPanel>
 
-        <TabPanel isActive={mainTab === 'history'}>
-          <p className={styles.tabHint}>Past working days up to yesterday. Search and paginate like a CRM activity list.</p>
-          <div className={listStyles.tableCard}>
+          <TabPanel isActive={mainTab === 'history'}>
+            <p className={styles.tabHint}>Finished task days (end date before today) appear here.</p>
+            <div className={listStyles.tableCard}>
             <div className={listStyles.tableCardToolbarTop}>
               <div className={styles.search}>
                 <SearchInput
@@ -1001,13 +1235,14 @@ export function TaskManagerPage() {
               />
             </div>
           </div>
-        </TabPanel>
-      </Tabs>
+          </TabPanel>
+        </Tabs>
+      ) : null}
 
       <Modal
         isOpen={assignModalOpen}
         onClose={() => setAssignModalOpen(false)}
-        title="New assignment"
+        title="New task"
         size="lg"
         closeOnOverlay
         closeOnEscape
@@ -1019,23 +1254,26 @@ export function TaskManagerPage() {
             <Button variant="primary" type="submit" form="assign-task-form">
               Publish assignment
             </Button>
+            <Button
+              variant="secondary"
+              type="submit"
+              form="assign-task-form"
+              onClick={() => setSaveAndAddAnother(true)}
+            >
+              Create & add another
+            </Button>
           </ModalFooter>
         }
       >
         <form id="assign-task-form" onSubmit={onCreateAssignment} className={styles.modalForm}>
-          <p className={styles.modalLead}>
-            Choose a single day or a date range. Targets roll into daily rows for each day. Managers may only pick agents on their team.
-            Only one task can be assigned to an agent per day — if any day in the selected range already has a task, the save will be blocked.
-          </p>
+          <p className={styles.modalLead}>Create tasks in sequence: who to assign, when it should run, task type, targets, reminders, notes.</p>
           <div className={styles.formGrid}>
+            <div className={styles.full}>
+              <h4 className={styles.formSectionTitle}>1) Assign</h4>
+              <p className={styles.formSectionHint}>Assign user and add a clear title.</p>
+            </div>
             <Select
-              label="Template"
-              value={assignForm.template_id}
-              onChange={(e) => applyTemplateSelection(e.target.value)}
-              options={templateOptions}
-            />
-            <Select
-              label="Agent"
+              label="Assign to"
               value={assignForm.assigned_to_user_id}
               onChange={(e) => setAssignForm((s) => ({ ...s, assigned_to_user_id: e.target.value }))}
               options={agentOptions}
@@ -1049,64 +1287,179 @@ export function TaskManagerPage() {
               />
             </div>
             <div className={styles.full}>
-              <Textarea
-                label="Description"
-                value={assignForm.description}
-                onChange={(e) => setAssignForm((s) => ({ ...s, description: e.target.value }))}
-              />
+              <h4 className={styles.formSectionTitle}>2) Type and priority</h4>
+              <p className={styles.formSectionHint}>Pick task type first, then set priority.</p>
             </div>
             <Select
-              label="Schedule type"
-              value={assignForm.schedule_type}
-              onChange={(e) =>
-                setAssignForm((s) => ({
-                  ...s,
-                  schedule_type: e.target.value,
-                  end_date: e.target.value === 'one_time' ? s.start_date : s.end_date,
-                }))
-              }
-              options={scheduleOptions}
+              label="Type"
+              value={assignForm.task_type}
+              onChange={(e) => setAssignForm((s) => ({ ...s, task_type: e.target.value }))}
+              options={taskTypeOptions}
             />
-            <div />
-            <Input
-              label={assignForm.schedule_type === 'date_range' ? 'Start date' : 'Date'}
-              type="date"
-              value={assignForm.start_date}
-              onChange={(e) =>
-                setAssignForm((s) => ({
-                  ...s,
-                  start_date: e.target.value,
-                  end_date: s.schedule_type === 'one_time' ? e.target.value : s.end_date,
-                }))
-              }
-              required
+            <Select
+              label="Priority"
+              value={assignForm.priority}
+              onChange={(e) => setAssignForm((s) => ({ ...s, priority: e.target.value }))}
+              options={priorityOptions}
             />
-            <Input
-              label="End date"
-              type="date"
-              value={assignForm.end_date}
-              onChange={(e) => setAssignForm((s) => ({ ...s, end_date: e.target.value }))}
-              required={assignForm.schedule_type === 'date_range'}
-              disabled={assignForm.schedule_type !== 'date_range'}
+            <div className={styles.full}>
+              <h4 className={styles.formSectionTitle}>3) Schedule and reminder</h4>
+              <p className={styles.formSectionHint}>Current uses due-in options, upcoming uses start + due date.</p>
+            </div>
+            <Select
+              label="Task window"
+              value={assignForm.schedule_window}
+              onChange={(e) => setAssignForm((s) => ({ ...s, schedule_window: e.target.value }))}
+              options={scheduleWindowOptions}
             />
-            <Input
-              label="Target calls"
-              type="number"
-              value={assignForm.target_calls}
-              onChange={(e) => setAssignForm((s) => ({ ...s, target_calls: Number(e.target.value || 0) }))}
+            {assignForm.schedule_window === 'current' ? (
+              <>
+                <Select
+                  label="Due in"
+                  value={assignForm.due_preset}
+                  onChange={(e) => setAssignForm((s) => ({ ...s, due_preset: e.target.value }))}
+                  options={duePresetOptionsWithDate}
+                />
+                {assignForm.due_preset === 'custom' ? (
+                  <Input
+                    label="Custom due date"
+                    type="date"
+                    value={assignForm.end_date}
+                    min={todayStr}
+                    onChange={(e) => setAssignForm((s) => ({ ...s, end_date: e.target.value }))}
+                    required
+                  />
+                ) : null}
+              </>
+            ) : (
+              <>
+                <Input
+                  label="Start date"
+                  type="date"
+                  value={assignForm.start_date}
+                  min={todayStr}
+                  onChange={(e) => setAssignForm((s) => ({ ...s, start_date: e.target.value }))}
+                  required
+                />
+                <Input
+                  label="Due date"
+                  type="date"
+                  value={assignForm.end_date}
+                  min={assignForm.start_date || todayStr}
+                  onChange={(e) => setAssignForm((s) => ({ ...s, end_date: e.target.value }))}
+                  required
+                />
+              </>
+            )}
+            <Select
+              label="Reminder"
+              value={assignForm.reminder_preset}
+              onChange={(e) => setAssignForm((s) => ({ ...s, reminder_preset: e.target.value }))}
+              options={reminderPresetOptions}
             />
-            <Input
-              label="Target meetings"
-              type="number"
-              value={assignForm.target_meetings}
-              onChange={(e) => setAssignForm((s) => ({ ...s, target_meetings: Number(e.target.value || 0) }))}
-            />
-            <Input
-              label="Target deals"
-              type="number"
-              value={assignForm.target_deals}
-              onChange={(e) => setAssignForm((s) => ({ ...s, target_deals: Number(e.target.value || 0) }))}
-            />
+            {assignForm.reminder_preset === 'custom' ? (
+              <>
+                <Input
+                  label="Remind before"
+                  type="number"
+                  min={1}
+                  value={assignForm.reminder_custom_value}
+                  onChange={(e) => setAssignForm((s) => ({ ...s, reminder_custom_value: Number(e.target.value || 1) }))}
+                />
+                <Select
+                  label="Custom unit"
+                  value={assignForm.reminder_custom_unit}
+                  onChange={(e) => setAssignForm((s) => ({ ...s, reminder_custom_unit: e.target.value }))}
+                  options={[
+                    { value: 'minutes', label: 'Minutes' },
+                    { value: 'hours', label: 'Hours' },
+                    { value: 'days', label: 'Days' },
+                  ]}
+                />
+              </>
+            ) : null}
+            <div className={styles.full}>
+              <h4 className={styles.formSectionTitle}>4) Meeting and targets</h4>
+              <p className={styles.formSectionHint}>
+                {assignForm.task_type === 'todo'
+                  ? 'To-do tracks calls, meetings, and deals.'
+                  : assignForm.task_type === 'meeting'
+                    ? 'Meeting tasks only track meetings.'
+                    : assignForm.task_type === 'call'
+                      ? 'Call tasks only track calls.'
+                      : 'Deal tasks only track deals.'}
+              </p>
+            </div>
+            {assignForm.task_type === 'todo' || assignForm.task_type === 'meeting' ? (
+              <>
+                <div className={styles.full}>
+                  <MultiSelectDropdown
+                    label="Suggested email accounts"
+                    options={emailAccountOptions}
+                    value={assignForm.suggestion_email_account_ids}
+                    onChange={(v) => setAssignForm((s) => ({ ...s, suggestion_email_account_ids: v }))}
+                    placeholder="Select one or more email accounts"
+                  />
+                </div>
+              </>
+            ) : null}
+            {assignForm.task_type === 'todo' || assignForm.task_type === 'call' ? (
+              <>
+                <div className={styles.full}>
+                  <MultiSelectDropdown
+                    label="Suggested campaigns"
+                    options={campaignOptions}
+                    value={assignForm.suggestion_campaign_ids}
+                    onChange={(v) => setAssignForm((s) => ({ ...s, suggestion_campaign_ids: v }))}
+                    placeholder="Select one or more campaigns"
+                  />
+                </div>
+                <div className={styles.full}>
+                  <MultiSelectDropdown
+                    label="Suggested tags"
+                    options={tagOptions}
+                    value={assignForm.suggestion_tag_ids}
+                    onChange={(v) => setAssignForm((s) => ({ ...s, suggestion_tag_ids: v }))}
+                    placeholder="Select one or more tags"
+                  />
+                </div>
+              </>
+            ) : null}
+            {assignForm.task_type === 'todo' || assignForm.task_type === 'call' ? (
+              <Input
+                label="Target calls"
+                type="number"
+                value={assignForm.target_calls}
+                onChange={(e) => setAssignForm((s) => ({ ...s, target_calls: Number(e.target.value || 0) }))}
+              />
+            ) : null}
+            {assignForm.task_type === 'todo' || assignForm.task_type === 'meeting' ? (
+              <Input
+                label="Target meetings"
+                type="number"
+                value={assignForm.target_meetings}
+                onChange={(e) => setAssignForm((s) => ({ ...s, target_meetings: Number(e.target.value || 0) }))}
+              />
+            ) : null}
+            {assignForm.task_type === 'todo' || assignForm.task_type === 'deal' ? (
+              <Input
+                label="Target deals"
+                type="number"
+                value={assignForm.target_deals}
+                onChange={(e) => setAssignForm((s) => ({ ...s, target_deals: Number(e.target.value || 0) }))}
+              />
+            ) : null}
+            <div className={styles.full}>
+              <h4 className={styles.formSectionTitle}>5) Notes</h4>
+              <p className={styles.formSectionHint}>Add context for the assignee.</p>
+            </div>
+            <div className={styles.full}>
+              <Textarea
+                label="Notes"
+                value={assignForm.notes}
+                onChange={(e) => setAssignForm((s) => ({ ...s, notes: e.target.value }))}
+              />
+            </div>
           </div>
         </form>
       </Modal>
@@ -1209,6 +1562,52 @@ export function TaskManagerPage() {
               />
             ) : null}
             {!isAgentRole && !canManage ? <p className={styles.muted}>You do not have access to edit these notes.</p> : null}
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        isOpen={!!commentsModalAssignment}
+        onClose={() => setCommentsModalAssignment(null)}
+        title="Task comments"
+        size="md"
+        closeOnOverlay
+        closeOnEscape
+        footer={
+          <ModalFooter>
+            <Button variant="ghost" onClick={() => setCommentsModalAssignment(null)}>
+              Close
+            </Button>
+            <Button variant="primary" onClick={submitAssignmentComment}>
+              Add comment
+            </Button>
+          </ModalFooter>
+        }
+      >
+        {commentsModalAssignment ? (
+          <div className={styles.modalForm}>
+            <p className={styles.modalLead}>{commentsModalAssignment.title || 'Task'}</p>
+            <Textarea
+              label="New comment"
+              rows={3}
+              value={commentDraft}
+              onChange={(e) => setCommentDraft(e.target.value)}
+              placeholder="Write your update..."
+            />
+            {commentsLoading ? <p className={styles.muted}>Loading comments...</p> : null}
+            {!commentsLoading && assignmentComments.length === 0 ? <p className={styles.muted}>No comments yet.</p> : null}
+            {!commentsLoading && assignmentComments.length > 0 ? (
+              <div>
+                {assignmentComments.map((c) => (
+                  <div key={c.id} className={styles.inlineNoteBlock}>
+                    <div className={styles.inlineNoteLabel}>
+                      {c.author_name || 'User'} · {String(c.created_at || '').replace('T', ' ').slice(0, 16)}
+                    </div>
+                    <div>{c.comment_text}</div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </Modal>

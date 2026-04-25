@@ -6,6 +6,8 @@ export const taskManagerAPI = {
   listAssignments: (params = {}) => axiosInstance.get('/api/tenant/task-manager/assignments', { params }),
   createAssignment: (payload) => axiosInstance.post('/api/tenant/task-manager/assignments', payload),
   deleteAssignment: (id) => axiosInstance.delete(`/api/tenant/task-manager/assignments/${id}`),
+  listAssignmentComments: (id) => axiosInstance.get(`/api/tenant/task-manager/assignments/${id}/comments`),
+  addAssignmentComment: (id, comment) => axiosInstance.post(`/api/tenant/task-manager/assignments/${id}/comments`, { comment }),
   listDailyLogs: (params = {}) => axiosInstance.get('/api/tenant/task-manager/daily-logs', { params }),
   recomputeLogs: (payload = {}) => axiosInstance.post('/api/tenant/task-manager/daily-logs/recompute', payload),
   updateAgentNote: (id, note) => axiosInstance.patch(`/api/tenant/task-manager/daily-logs/${id}/agent-note`, { note }),

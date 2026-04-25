@@ -24,6 +24,8 @@ router.post('/templates', tasksManage, taskManagerController.createTemplate);
 router.get('/assignments', tasksView, taskManagerController.listAssignments);
 router.post('/assignments', tasksManage, taskManagerController.createAssignment);
 router.delete('/assignments/:id', tasksManage, taskManagerController.deleteAssignment);
+router.get('/assignments/:id/comments', tasksView, taskManagerController.listAssignmentComments);
+router.post('/assignments/:id/comments', tasksView, taskManagerController.addAssignmentComment);
 
 router.get('/daily-logs', tasksView, taskManagerController.listDailyLogs);
 router.post('/daily-logs/recompute', tasksView, taskManagerController.recomputeLogs);

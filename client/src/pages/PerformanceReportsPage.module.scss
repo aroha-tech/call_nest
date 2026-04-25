@@ -5,6 +5,47 @@
   width: 100%;
 }
 
+.scopeCard {
+  @include premium-panel;
+  border-radius: $radius-lg;
+  padding: $space-4;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+
+  @media (max-width: 800px) {
+    flex-direction: column;
+  }
+}
+
+.scopeLabel {
+  margin: 0 0 6px;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.scopeTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: $font-weight-semibold;
+}
+
+.scopeHint {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  max-width: 700px;
+}
+
+.viewToggleGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .filtersCard {
   @include premium-panel;
   border-radius: $radius-lg;
@@ -31,6 +72,14 @@
   grid-template-columns: repeat(4, minmax(140px, 1fr));
   gap: 10px;
   margin-bottom: 14px;
+
+  @media (max-width: 980px) {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
 }
 
 .miniCard {
@@ -52,6 +101,12 @@
   font-weight: $font-weight-bold;
 }
 
+.miniHint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
 .sectionCard {
   @include premium-panel;
   border-radius: $radius-lg;
@@ -59,10 +114,116 @@
   margin-bottom: 14px;
 }
 
+.quickInsights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+
+  @media (max-width: 980px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.highlightCard {
+  @include premium-panel;
+  border-radius: $radius-lg;
+  padding: 12px;
+  min-height: 96px;
+}
+
+.highlightLabel {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.highlightTitle {
+  margin: 6px 0 0;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+}
+
+.highlightMeta {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.healthChips {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.healthChip {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-bg-subtle) 84%, transparent);
+}
+
 .sectionTitle {
   margin: 0 0 10px;
   font-size: $font-size-base;
   font-weight: $font-weight-semibold;
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 12px;
+
+  @media (max-width: 980px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.innerCard {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-md;
+  background: color-mix(in srgb, var(--color-bg-subtle) 80%, transparent);
+  padding: 10px;
+}
+
+.momentumList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.momentumRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.momentumHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.progressTrack {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-bg-subtle) 70%, var(--color-border-subtle));
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-primary-500), var(--color-success, #22c55e));
 }
 
 .scoreGrid {
@@ -82,4 +243,11 @@
 
 .actions {
   margin-top: 10px;
+}
+
+.emptyState {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  color: var(--color-text-secondary);
 }

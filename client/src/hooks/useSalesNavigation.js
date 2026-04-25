@@ -62,7 +62,13 @@ const TENANT_ADMIN_NAV_ITEMS = [
   },
   { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
   { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
-  { key: 'dialer', label: 'Dialer', path: '/dialer', permission: PERMISSIONS.DIAL_EXECUTE },
+  {
+    key: 'dialer',
+    label: 'Dialer',
+    path: '/dialer',
+    permission: PERMISSIONS.DIAL_EXECUTE,
+    section: 'Dialer',
+  },
   {
     key: 'call-history',
     label: 'Call history',
@@ -81,7 +87,12 @@ const TENANT_ADMIN_NAV_ITEMS = [
       { key: 'schedule-callbacks', label: 'Callbacks', path: '/schedule/callbacks', permission: PERMISSIONS.SCHEDULE_VIEW },
     ],
   },
-  { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
+  {
+    key: 'reports',
+    label: 'Reports',
+    path: '/reports',
+    permissions: [PERMISSIONS.REPORTS_VIEW, PERMISSIONS.REPORTS_PERFORMANCE_VIEW, PERMISSIONS.SETTINGS_MANAGE],
+  },
   {
     key: 'task-manager',
     label: 'Task Manager',
@@ -92,7 +103,6 @@ const TENANT_ADMIN_NAV_ITEMS = [
   {
     key: 'dialer-workflow',
     label: 'Dialer Workflow',
-    section: 'Dialer',
     permission: PERMISSIONS.DISPOSITIONS_MANAGE,
     children: [
       { key: 'dispositions', label: 'Dispositions', path: '/workflow/dispositions', permission: PERMISSIONS.DISPOSITIONS_MANAGE },
@@ -231,7 +241,13 @@ const MANAGER_NAV_ITEMS = [
     permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
   },
   { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
-  { key: 'dialer', label: 'Dialer', path: '/dialer', permission: PERMISSIONS.DIAL_EXECUTE },
+  {
+    key: 'dialer',
+    label: 'Dialer',
+    path: '/dialer',
+    permission: PERMISSIONS.DIAL_EXECUTE,
+    section: 'Dialer',
+  },
   {
     key: 'call-history',
     label: 'Call history',
@@ -250,7 +266,12 @@ const MANAGER_NAV_ITEMS = [
       { key: 'schedule-callbacks', label: 'Callbacks', path: '/schedule/callbacks', permission: PERMISSIONS.SCHEDULE_VIEW },
     ],
   },
-  { key: 'reports', label: 'Reports', path: '/reports', permission: PERMISSIONS.REPORTS_VIEW },
+  {
+    key: 'reports',
+    label: 'Reports',
+    path: '/reports',
+    permissions: [PERMISSIONS.REPORTS_VIEW, PERMISSIONS.REPORTS_PERFORMANCE_VIEW, PERMISSIONS.SETTINGS_MANAGE],
+  },
   {
     key: 'task-manager',
     label: 'Task Manager',
@@ -262,7 +283,6 @@ const MANAGER_NAV_ITEMS = [
   {
     key: 'dialer-workflow',
     label: 'Dialer Workflow',
-    section: 'Dialer',
     permission: PERMISSIONS.DISPOSITIONS_MANAGE,
     children: [
       { key: 'dispositions', label: 'Dispositions', path: '/workflow/dispositions', permission: PERMISSIONS.DISPOSITIONS_MANAGE },
@@ -364,7 +384,13 @@ const AGENT_NAV_ITEMS = [
     path: '/settings/background-jobs',
     permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
   },
-  { key: 'dialer', label: 'Dialer', path: '/dialer', permission: PERMISSIONS.DIAL_EXECUTE },
+  {
+    key: 'dialer',
+    label: 'Dialer',
+    path: '/dialer',
+    permission: PERMISSIONS.DIAL_EXECUTE,
+    section: 'Dialer',
+  },
   {
     key: 'call-history',
     label: 'Call history',
@@ -383,12 +409,17 @@ const AGENT_NAV_ITEMS = [
       { key: 'schedule-callbacks', label: 'Callbacks', path: '/schedule/callbacks', permission: PERMISSIONS.SCHEDULE_VIEW },
     ],
   },
+  {
+    key: 'my-reports',
+    label: 'My Reports',
+    path: '/reports',
+    permissions: [PERMISSIONS.REPORTS_VIEW, PERMISSIONS.REPORTS_PERFORMANCE_VIEW, PERMISSIONS.SETTINGS_MANAGE],
+  },
   { key: 'task-manager', label: 'Task Manager', path: '/task-manager', permission: PERMISSIONS.TASKS_VIEW },
   { key: 'workflow-map', label: 'Workflow', path: '/workflow/map', permission: PERMISSIONS.DASHBOARD_VIEW },
   {
     key: 'dialer-workflow',
     label: 'Dialer Workflow',
-    section: 'Dialer',
     // workflow.view (after migration) or dial.execute — all agents can open read-only workflow screens
     permissions: [PERMISSIONS.WORKFLOW_VIEW, PERMISSIONS.DIAL_EXECUTE],
     children: [

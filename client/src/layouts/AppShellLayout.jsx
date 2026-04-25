@@ -63,6 +63,30 @@ function filterNavMenuBySearch(items, query) {
     .filter(Boolean);
 }
 
+function groupNavItemsBySection(items) {
+  const groups = [];
+  let currentSection = 'Main';
+  let currentItems = [];
+
+  const pushCurrent = () => {
+    if (currentItems.length > 0) {
+      groups.push({ section: currentSection, items: currentItems });
+      currentItems = [];
+    }
+  };
+
+  for (const item of items) {
+    if (item.section && item.section !== currentSection) {
+      pushCurrent();
+      currentSection = item.section;
+    }
+    currentItems.push(item);
+  }
+  pushCurrent();
+
+  return groups;
+}
+
 function ThemeSunIcon() {
   return (
     <svg viewBox="0 0 24 24" width={11} height={11} aria-hidden fill="none">
@@ -177,13 +201,15 @@ export function AppShellLayout({ children }) {
   }, []);
   const [expandedGroups, setExpandedGroups] = useState({});
   const [navSearchQuery, setNavSearchQuery] = useState('');
-  const [navSearchOpen, setNavSearchOpen] = useState(false);
-  const navSearchRootRef = useRef(null);
   const navSearchInputRef = useRef(null);
 
   const filteredNavItems = useMemo(
     () => filterNavMenuBySearch(items, navSearchQuery),
     [items, navSearchQuery]
+  );
+  const navSections = useMemo(
+    () => groupNavItemsBySection(filteredNavItems),
+    [filteredNavItems]
   );
 
   const navExpandedGroups = useMemo(() => {
@@ -216,23 +242,6 @@ export function AppShellLayout({ children }) {
       setExpandedGroups((prev) => ({ ...prev, [activeParentKey]: true }));
     }
   }, [activeParentKey]);
-
-  useEffect(() => {
-    if (navSearchOpen) {
-      navSearchInputRef.current?.focus();
-    }
-  }, [navSearchOpen]);
-
-  useEffect(() => {
-    if (!navSearchOpen) return;
-    const onPointerDown = (e) => {
-      if (navSearchRootRef.current && !navSearchRootRef.current.contains(e.target)) {
-        setNavSearchOpen(false);
-      }
-    };
-    document.addEventListener('pointerdown', onPointerDown, true);
-    return () => document.removeEventListener('pointerdown', onPointerDown, true);
-  }, [navSearchOpen]);
 
   const closeSidebarIfMobileOverlay = () => {
     if (!isDesktopSidebarBreakpoint()) setSidebarOpen(false);
@@ -268,57 +277,46 @@ export function AppShellLayout({ children }) {
             <span className={styles.tenant}>{workspaceSubtitle}</span>
           )}
         </div>
-        <div className={styles.navSearch} ref={navSearchRootRef}>
-          <div
-            className={`${styles.navSearchTrack} ${navSearchOpen ? styles.navSearchTrackOpen : ''}`}
-          >
-            <div
-              className={`${styles.navSearchPill} ${!navSearchOpen ? styles.navSearchPillCollapsed : ''} ${navSearchQuery.trim() && !navSearchOpen ? styles.navSearchPillHasValue : ''}`}
-            >
-              {navSearchOpen ? (
-                <>
-                  <input
-                    ref={navSearchInputRef}
-                    type="text"
-                    inputMode="search"
-                    className={styles.navSearchPillInput}
-                    placeholder="Search menu…"
-                    value={navSearchQuery}
-                    onChange={(e) => setNavSearchQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        e.preventDefault();
-                        setNavSearchOpen(false);
-                      }
-                    }}
-                    aria-label="Search menu"
-                    autoComplete="off"
-                    spellCheck="false"
-                  />
-                  {navSearchQuery.trim() ? (
-                    <button
-                      type="button"
-                      className={styles.navSearchPillClear}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setNavSearchQuery('');
-                        navSearchInputRef.current?.focus();
-                      }}
-                      aria-label="Clear menu search"
-                    >
-                      ✕
-                    </button>
-                  ) : null}
-                </>
+        <div className={styles.navSearch}>
+          <div className={`${styles.navSearchTrack} ${styles.navSearchTrackOpen}`}>
+            <div className={styles.navSearchPill}>
+              <input
+                ref={navSearchInputRef}
+                type="text"
+                inputMode="search"
+                className={styles.navSearchPillInput}
+                placeholder="Search menu…"
+                value={navSearchQuery}
+                onChange={(e) => setNavSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setNavSearchQuery('');
+                  }
+                }}
+                aria-label="Search menu"
+                autoComplete="off"
+                spellCheck="false"
+              />
+              {navSearchQuery.trim() ? (
+                <button
+                  type="button"
+                  className={styles.navSearchPillClear}
+                  onClick={() => {
+                    setNavSearchQuery('');
+                    navSearchInputRef.current?.focus();
+                  }}
+                  aria-label="Clear menu search"
+                >
+                  ✕
+                </button>
               ) : null}
               <button
                 type="button"
                 className={styles.navSearchPillIconBtn}
-                onClick={() => {
-                  if (!navSearchOpen) setNavSearchOpen(true);
-                }}
-                aria-label={navSearchOpen ? 'Menu search' : 'Open menu search'}
-                aria-expanded={navSearchOpen}
+                onClick={() => navSearchInputRef.current?.focus()}
+                aria-label="Focus menu search"
+                aria-expanded="true"
               >
                 <MaterialSymbol name="search" size="sm" className={styles.navSearchSearchGlyph} />
               </button>
@@ -329,36 +327,40 @@ export function AppShellLayout({ children }) {
           {filteredNavItems.length === 0 && navSearchQuery.trim() ? (
             <div className={styles.navSearchEmpty}>No menu items match</div>
           ) : null}
-          {filteredNavItems.map((item) => (
-            <Fragment key={item.key}>
-              {item.section ? (
-                <div className={styles.navSectionLabel}>{item.section}</div>
-              ) : null}
-              {item.children ? (
-                <NavGroup
-                  item={item}
-                  activeKey={activeKey}
-                  activeParentKey={activeParentKey}
-                  onPrimaryNavFollow={closeSidebarIfMobileOverlay}
-                  expandedGroups={navExpandedGroups}
-                  toggleGroup={toggleGroup}
-                />
-              ) : (
-                <Link
-                  to={item.path}
-                  className={`${styles.navItem} ${activeKey === item.key ? styles.navItemActive : ''}`}
-                  onClick={(e) => {
-                    if (isModifiedClick(e)) return;
-                    closeSidebarIfMobileOverlay();
-                  }}
-                >
-                  <span className={styles.navItemMain}>
-                    <NavIcon navKey={item.key} className={styles.navItemIcon} />
-                    <span className={styles.navLabel}>{item.label}</span>
-                  </span>
-                </Link>
-              )}
-            </Fragment>
+          {navSections.map((sectionGroup) => (
+            <section className={styles.navSection} key={sectionGroup.section}>
+              <div className={styles.navSectionLabel}>{sectionGroup.section}</div>
+              <div className={styles.navSectionBox}>
+                {sectionGroup.items.map((item) => (
+                  <Fragment key={item.key}>
+                    {item.children ? (
+                      <NavGroup
+                        item={item}
+                        activeKey={activeKey}
+                        activeParentKey={activeParentKey}
+                        onPrimaryNavFollow={closeSidebarIfMobileOverlay}
+                        expandedGroups={navExpandedGroups}
+                        toggleGroup={toggleGroup}
+                      />
+                    ) : (
+                      <Link
+                        to={item.path}
+                        className={`${styles.navItem} ${activeKey === item.key ? styles.navItemActive : ''}`}
+                        onClick={(e) => {
+                          if (isModifiedClick(e)) return;
+                          closeSidebarIfMobileOverlay();
+                        }}
+                      >
+                        <span className={styles.navItemMain}>
+                          <NavIcon navKey={item.key} className={styles.navItemIcon} />
+                          <span className={styles.navLabel}>{item.label}</span>
+                        </span>
+                      </Link>
+                    )}
+                  </Fragment>
+                ))}
+              </div>
+            </section>
           ))}
         </nav>
         <SidebarUserPanel onNavigate={closeSidebarIfMobileOverlay} />

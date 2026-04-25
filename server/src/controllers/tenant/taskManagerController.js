@@ -112,6 +112,29 @@ export async function listNoteHistory(req, res, next) {
   }
 }
 
+export async function addAssignmentComment(req, res, next) {
+  try {
+    const data = await taskManagerService.addAssignmentComment(
+      getTenantId(req),
+      req.user,
+      req.params.id,
+      req.body?.comment
+    );
+    res.status(201).json({ data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function listAssignmentComments(req, res, next) {
+  try {
+    const data = await taskManagerService.listAssignmentComments(getTenantId(req), req.user, req.params.id);
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function rolewiseSummary(req, res, next) {
   try {
     const data = await taskManagerService.getRolewiseSummary(getTenantId(req), req.user, req.query || {});

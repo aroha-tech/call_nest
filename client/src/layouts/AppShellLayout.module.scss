@@ -74,7 +74,7 @@ $shell-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
 .navSearch {
   flex-shrink: 0;
   display: flex;
-  justify-content: flex-end;
+  justify-content: stretch;
   padding: $space-2 $space-3 $space-3;
 }
 
@@ -84,8 +84,7 @@ $nav-search-pill-ease: cubic-bezier(0.32, 0.72, 0, 1);
 
 .navSearchTrack {
   width: 100%;
-  max-width: $nav-search-pill-icon;
-  transition: max-width 0.38s $nav-search-pill-ease;
+  max-width: 100%;
 }
 
 .navSearchTrackOpen {
@@ -257,13 +256,19 @@ $nav-search-pill-ease: cubic-bezier(0.32, 0.72, 0, 1);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-text-tertiary);
-  padding: $space-3 $space-3 $space-2;
-  margin-top: $space-1;
+  padding: 0 $space-2;
+  margin-bottom: $space-2;
+}
 
-  &:first-child {
-    margin-top: 0;
-    padding-top: 0;
-  }
+.navSection {
+  margin-bottom: $space-3;
+}
+
+.navSectionBox {
+  border-top: 1px solid var(--color-border-subtle);
+  border-radius: 0;
+  padding: $space-2 0 0;
+  background: transparent;
 }
 
 .navItemMain {

@@ -1,6 +1,9 @@
 import { query } from '../../config/db.js';
 import { createAndDispatchNotification } from './notificationService.js';
 
+const TASK_TYPE_VALUES = new Set(['todo', 'meeting', 'call', 'deal']);
+const PRIORITY_VALUES = new Set(['low', 'medium', 'high']);
+
 function n(v, d = 0) {
   const x = Number(v);
   return Number.isFinite(x) ? x : d;
@@ -34,6 +37,37 @@ function mysqlDateTime(v) {
   if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(normalized)) return `${normalized}:00`;
   if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(normalized)) return normalized;
   return null;
+}
+
+function normalizeTaskType(v) {
+  const x = String(v || '').trim().toLowerCase();
+  return TASK_TYPE_VALUES.has(x) ? x : 'todo';
+}
+
+function normalizePriority(v) {
+  const x = String(v || '').trim().toLowerCase();
+  return PRIORITY_VALUES.has(x) ? x : 'medium';
+}
+
+function normalizeIdArray(v) {
+  if (v == null) return [];
+  let arr = v;
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if (!s) return [];
+    try {
+      arr = JSON.parse(s);
+    } catch {
+      arr = s.split(',').map((x) => x.trim());
+    }
+  }
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  for (const x of arr) {
+    const id = Number(x);
+    if (Number.isFinite(id) && id > 0) out.push(Math.floor(id));
+  }
+  return [...new Set(out)];
 }
 
 function assertCanManageTasks(user) {
@@ -345,16 +379,21 @@ export async function createAssignment(tenantId, actingUser, payload) {
     `SELECT id, role, manager_id FROM users WHERE tenant_id = ? AND id = ? AND is_deleted = 0 LIMIT 1`,
     [tenantId, assignedTo]
   );
-  if (!assignee || String(assignee.role || '').toLowerCase() !== 'agent') {
-    const err = new Error('Assignment can only be made to agent');
+  if (!assignee || !['agent', 'manager', 'admin'].includes(String(assignee.role || '').toLowerCase())) {
+    const err = new Error('Invalid assignee');
     err.status = 400;
     throw err;
   }
   const actorRole = String(actingUser?.role || '').toLowerCase();
-  if (actorRole === 'manager' && Number(assignee.manager_id) !== Number(actingUser.id)) {
-    const err = new Error('Managers can only assign tasks to agents on their team');
-    err.status = 403;
-    throw err;
+  const assigneeRole = String(assignee.role || '').toLowerCase();
+  if (actorRole === 'manager') {
+    const isSelf = Number(assignee.id) === Number(actingUser.id);
+    const isOwnAgent = assigneeRole === 'agent' && Number(assignee.manager_id) === Number(actingUser.id);
+    if (!(isSelf || isOwnAgent)) {
+      const err = new Error('Managers can assign only to self or their agents');
+      err.status = 403;
+      throw err;
+    }
   }
   const startDate = dateOnly(payload?.start_date);
   const endDate = dateOnly(payload?.end_date || payload?.start_date);
@@ -387,16 +426,67 @@ export async function createAssignment(tenantId, actingUser, payload) {
     err.status = 400;
     throw err;
   }
+  const taskType = normalizeTaskType(payload?.task_type);
+  const priority = normalizePriority(payload?.priority);
+  const duePreset = payload?.due_preset ? String(payload.due_preset).trim().slice(0, 40) : null;
+  const associatedMeetingId = Number(payload?.associated_meeting_id);
+  const meetingId = Number.isFinite(associatedMeetingId) && associatedMeetingId > 0 ? associatedMeetingId : null;
+  const reminderAt = mysqlDateTime(payload?.reminder_at);
+  const repeatEnabled = payload?.repeat_enabled === true ? 1 : 0;
+  const suggestionCampaignIds = taskType === 'todo' || taskType === 'call' ? normalizeIdArray(payload?.suggestion_campaign_ids) : [];
+  const suggestionTagIds = taskType === 'todo' || taskType === 'call' ? normalizeIdArray(payload?.suggestion_tag_ids) : [];
+  const suggestionEmailAccountIds =
+    taskType === 'todo' || taskType === 'meeting' ? normalizeIdArray(payload?.suggestion_email_account_ids) : [];
+  const repeatIntervalDaysRaw = Number(payload?.repeat_interval_days);
+  const repeatIntervalDays =
+    repeatEnabled && Number.isFinite(repeatIntervalDaysRaw) && repeatIntervalDaysRaw > 0
+      ? Math.min(365, Math.floor(repeatIntervalDaysRaw))
+      : null;
+
+  if (meetingId) {
+    const [meeting] = await query(
+      `SELECT id
+       FROM tenant_meetings
+       WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL
+       LIMIT 1`,
+      [tenantId, meetingId]
+    );
+    if (!meeting) {
+      const err = new Error('Associated meeting not found');
+      err.status = 404;
+      throw err;
+    }
+  }
+
+  const inputCalls = Math.max(0, n(payload?.target_calls, template?.target_calls || 0));
+  let inputMeetings = Math.max(0, n(payload?.target_meetings, template?.target_meetings || 0));
+  const inputDeals = Math.max(0, n(payload?.target_deals, template?.target_deals || 0));
+  if (taskType === 'meeting' && meetingId) inputMeetings = Math.max(1, inputMeetings);
+  const targetCalls = taskType === 'call' || taskType === 'todo' ? inputCalls : 0;
+  const targetMeetings = taskType === 'meeting' || taskType === 'todo' ? inputMeetings : 0;
+  const targetDeals = taskType === 'deal' || taskType === 'todo' ? inputDeals : 0;
+
   const result = await query(
     `INSERT INTO task_assignments (
-      tenant_id, template_id, title, description, assigned_to_user_id, assigned_by_user_id, schedule_type, recurring_pattern,
+      tenant_id, template_id, title, description, task_type, priority, due_preset, associated_meeting_id, reminder_at,
+      suggestion_campaign_ids, suggestion_tag_ids, suggestion_email_account_ids, repeat_enabled, repeat_interval_days, assigned_to_user_id, assigned_by_user_id, schedule_type, recurring_pattern,
       start_date, end_date, start_at, end_at, target_calls, target_meetings, target_deals, status, created_by, updated_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON), CAST(? AS JSON), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
       template?.id || null,
       title,
       payload?.description ? String(payload.description).trim() : template?.description || null,
+      taskType,
+      priority,
+      duePreset,
+      meetingId,
+      reminderAt,
+      JSON.stringify(suggestionCampaignIds),
+      JSON.stringify(suggestionTagIds),
+      JSON.stringify(suggestionEmailAccountIds),
+      repeatEnabled,
+      repeatIntervalDays,
       assignedTo,
       actingUser.id,
       ['one_time', 'date_range', 'recurring'].includes(payload?.schedule_type) ? payload.schedule_type : 'one_time',
@@ -407,9 +497,9 @@ export async function createAssignment(tenantId, actingUser, payload) {
       endDate,
       startAt,
       endAt,
-      Math.max(0, n(payload?.target_calls, template?.target_calls || 0)),
-      Math.max(0, n(payload?.target_meetings, template?.target_meetings || 0)),
-      Math.max(0, n(payload?.target_deals, template?.target_deals || 0)),
+      targetCalls,
+      targetMeetings,
+      targetDeals,
       'active',
       actingUser.id,
       actingUser.id,
@@ -427,11 +517,27 @@ export async function createAssignment(tenantId, actingUser, payload) {
     title: `New task assigned: ${row?.title || 'Task'}`,
     body: row?.start_date ? `From ${row.start_date} to ${row.end_date}` : '',
     assignedUserId: row?.assigned_to_user_id,
+    recipientUserIds: row?.assigned_to_user_id ? [Number(row.assigned_to_user_id)] : [],
     entityType: 'task_assignment',
     entityId: row?.id,
     ctaPath: '/task-manager',
     eventHash: `task:assigned:${tenantId}:${row?.id}`,
   });
+  if (reminderAt) {
+    await createAndDispatchNotification(tenantId, actingUser.id, {
+      moduleKey: 'tasks',
+      eventType: 'task_reminder_scheduled',
+      severity: 'normal',
+      title: `Reminder set for task: ${row?.title || 'Task'}`,
+      body: `Reminder at ${reminderAt}`,
+      assignedUserId: row?.assigned_to_user_id,
+      recipientUserIds: row?.assigned_to_user_id ? [Number(row.assigned_to_user_id)] : [],
+      entityType: 'task_assignment',
+      entityId: row?.id,
+      ctaPath: '/task-manager',
+      eventHash: `task:reminder:scheduled:${tenantId}:${row?.id}:${reminderAt}`,
+    });
+  }
   return row;
 }
 
@@ -489,16 +595,21 @@ export async function deleteAssignment(tenantId, actingUser, assignmentId) {
     `SELECT id, role, manager_id FROM users WHERE tenant_id = ? AND id = ? AND is_deleted = 0 LIMIT 1`,
     [tenantId, row.assigned_to_user_id]
   );
-  if (!assignee || String(assignee.role || '').toLowerCase() !== 'agent') {
+  if (!assignee || !['agent', 'manager', 'admin'].includes(String(assignee.role || '').toLowerCase())) {
     const err = new Error('Invalid assignee');
     err.status = 400;
     throw err;
   }
   const actorRole = String(actingUser?.role || '').toLowerCase();
-  if (actorRole === 'manager' && Number(assignee.manager_id) !== Number(actingUser.id)) {
-    const err = new Error('Managers can only delete tasks for agents on their team');
-    err.status = 403;
-    throw err;
+  const assigneeRole = String(assignee.role || '').toLowerCase();
+  if (actorRole === 'manager') {
+    const isSelf = Number(assignee.id) === Number(actingUser.id);
+    const isOwnAgent = assigneeRole === 'agent' && Number(assignee.manager_id) === Number(actingUser.id);
+    if (!(isSelf || isOwnAgent)) {
+      const err = new Error('Managers can only delete tasks for self or agents on their team');
+      err.status = 403;
+      throw err;
+    }
   }
   const uid = actingUser?.id ?? null;
   await query(
@@ -616,12 +727,13 @@ export async function recomputeLogs(tenantId, actingUser, { from, to, userId, lo
     }
   }
   const logs = await query(
-    `SELECT l.id, l.user_id, l.task_date, l.target_calls, l.target_meetings, l.target_deals, l.is_locked
+    `SELECT l.id, l.assignment_id, l.user_id, l.task_date, l.target_calls, l.target_meetings, l.target_deals, l.is_locked, l.status
      FROM daily_task_logs l
      INNER JOIN users u ON u.id = l.user_id AND u.tenant_id = l.tenant_id AND u.is_deleted = 0
      WHERE ${where.join(' AND ')} ${us.sql}`,
     [...params, ...us.params]
   );
+  const nowYmd = dateOnly(new Date());
   for (const log of logs) {
     if (Number(log.is_locked) === 1) continue;
     const achieved = await computeAchievementForDay(tenantId, log.user_id, dateOnly(log.task_date));
@@ -633,6 +745,7 @@ export async function recomputeLogs(tenantId, actingUser, { from, to, userId, lo
     const completion = completionPercent(targets, achieved);
     const score = scoreFromWeights(targets, achieved, cfg);
     const status = logStatus(targets, achieved);
+    const oldStatus = String(log.status || '').toLowerCase();
     await query(
       `UPDATE daily_task_logs
        SET achieved_calls = ?, achieved_meetings = ?, achieved_deals = ?, completion_percent = ?, score = ?, status = ?, updated_by = ?
@@ -649,6 +762,106 @@ export async function recomputeLogs(tenantId, actingUser, { from, to, userId, lo
         log.id,
       ]
     );
+    const taskDate = dateOnly(log.task_date);
+    if (taskDate && oldStatus !== status && taskDate <= nowYmd && (status === 'achieved' || status === 'missed')) {
+      await createAndDispatchNotification(tenantId, actingUser?.id, {
+        moduleKey: 'tasks',
+        eventType: status === 'achieved' ? 'task_completed' : 'task_missed',
+        severity: status === 'achieved' ? 'normal' : 'high',
+        title: status === 'achieved' ? 'Task completed' : 'Task missed',
+        body: `Task date ${taskDate}`,
+        assignedUserId: log.user_id,
+        recipientUserIds: log.user_id ? [Number(log.user_id)] : [],
+        entityType: 'daily_task_log',
+        entityId: log.id,
+        ctaPath: '/task-manager',
+        eventHash: `task:${status}:${tenantId}:${log.id}:${taskDate}`,
+      });
+    }
+  }
+  const reminderRows = await query(
+    `SELECT id, title, assigned_to_user_id, reminder_at
+     FROM task_assignments
+     WHERE tenant_id = ?
+       AND deleted_at IS NULL
+       AND status IN ('active', 'paused')
+       AND reminder_at IS NOT NULL
+       AND reminder_sent_at IS NULL
+       AND reminder_at <= NOW()`,
+    [tenantId]
+  );
+  for (const row of reminderRows) {
+    await createAndDispatchNotification(tenantId, actingUser?.id, {
+      moduleKey: 'tasks',
+      eventType: 'task_reminder',
+      severity: 'normal',
+      title: `Task reminder: ${row.title || 'Task'}`,
+      body: row.reminder_at ? `Reminder at ${String(row.reminder_at).replace('T', ' ').slice(0, 16)}` : null,
+      assignedUserId: row.assigned_to_user_id,
+      recipientUserIds: row.assigned_to_user_id ? [Number(row.assigned_to_user_id)] : [],
+      entityType: 'task_assignment',
+      entityId: row.id,
+      ctaPath: '/task-manager',
+      eventHash: `task:reminder:${tenantId}:${row.id}:${String(row.reminder_at || '').slice(0, 16)}`,
+    });
+    await query(
+      `UPDATE task_assignments
+       SET reminder_sent_at = NOW(), updated_by = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE tenant_id = ? AND id = ? AND reminder_sent_at IS NULL`,
+      [actingUser?.id ?? null, tenantId, row.id]
+    );
+  }
+  const actorRole = String(actingUser?.role || '').toLowerCase();
+  if (!['admin', 'manager'].includes(actorRole)) return { updated: logs.length };
+  const repeatCandidates = await query(
+    `SELECT id, title, description, task_type, priority, due_preset, associated_meeting_id, assigned_to_user_id,
+            assigned_by_user_id, schedule_type, recurring_pattern, end_date, target_calls, target_meetings, target_deals,
+            repeat_interval_days
+     FROM task_assignments
+     WHERE tenant_id = ?
+       AND deleted_at IS NULL
+       AND status = 'active'
+       AND repeat_enabled = 1
+       AND repeat_interval_days IS NOT NULL
+       AND end_date < CURDATE()`,
+    [tenantId]
+  );
+  for (const src of repeatCandidates) {
+    const [dup] = await query(
+      `SELECT id
+       FROM task_assignments
+       WHERE tenant_id = ?
+         AND deleted_at IS NULL
+         AND assigned_to_user_id = ?
+         AND title = ?
+         AND start_date = DATE_ADD(?, INTERVAL ? DAY)
+       LIMIT 1`,
+      [tenantId, src.assigned_to_user_id, src.title, src.end_date, Number(src.repeat_interval_days)]
+    );
+    if (dup?.id) continue;
+    const nextStart = dateOnly(
+      new Date(new Date(`${dateOnly(src.end_date)}T12:00:00`).getTime() + Number(src.repeat_interval_days) * 86400000)
+    );
+    if (!nextStart) continue;
+    const payload = {
+      template_id: null,
+      title: src.title,
+      description: src.description,
+      task_type: src.task_type,
+      priority: src.priority,
+      due_preset: src.due_preset,
+      associated_meeting_id: src.associated_meeting_id,
+      assigned_to_user_id: src.assigned_to_user_id,
+      schedule_type: 'one_time',
+      start_date: nextStart,
+      end_date: nextStart,
+      target_calls: src.target_calls,
+      target_meetings: src.target_meetings,
+      target_deals: src.target_deals,
+      repeat_enabled: true,
+      repeat_interval_days: src.repeat_interval_days,
+    };
+    await createAssignment(tenantId, { ...actingUser, id: src.assigned_by_user_id || actingUser?.id }, payload);
   }
   return { updated: logs.length };
 }
@@ -656,10 +869,12 @@ export async function recomputeLogs(tenantId, actingUser, { from, to, userId, lo
 export async function listDailyLogs(
   tenantId,
   actingUser,
-  { from, to, userId, page = 1, limit = 20, sort = 'desc' } = {}
+  { from, to, userId, page = 1, limit = 20, sort = 'desc', view } = {}
 ) {
   await backfillDailyLogsInRange(tenantId, actingUser, { from, to, userId });
   const us = buildUserScope(actingUser);
+  const todayYmd = dateOnly(new Date());
+  const viewMode = String(view || '').toLowerCase();
   const where = ['l.tenant_id = ?', 'l.deleted_at IS NULL'];
   const params = [tenantId];
   if (from) {
@@ -674,6 +889,18 @@ export async function listDailyLogs(
     where.push('l.user_id = ?');
     params.push(Number(userId));
   }
+  if (viewMode === 'current' && todayYmd) {
+    where.push('l.task_date = ?');
+    where.push('COALESCE(DATE(a.start_at), a.start_date) <= ?');
+    where.push('COALESCE(DATE(a.end_at), a.end_date) >= ?');
+    params.push(todayYmd, todayYmd, todayYmd);
+  } else if (viewMode === 'upcoming' && todayYmd) {
+    where.push('COALESCE(DATE(a.start_at), a.start_date) > ?');
+    params.push(todayYmd);
+  } else if (viewMode === 'history' && todayYmd) {
+    where.push('l.task_date < ?');
+    params.push(todayYmd);
+  }
   const lim = Math.max(1, Math.min(100, Number(limit) || 20));
   const pg = Math.max(1, Number(page) || 1);
   const offset = (pg - 1) * lim;
@@ -683,12 +910,19 @@ export async function listDailyLogs(
     `SELECT COUNT(*) AS c
      FROM daily_task_logs l
      INNER JOIN users u ON u.id = l.user_id AND u.tenant_id = l.tenant_id AND u.is_deleted = 0
+     LEFT JOIN task_assignments a ON a.id = l.assignment_id AND a.tenant_id = l.tenant_id AND a.deleted_at IS NULL
      WHERE ${where.join(' AND ')} ${us.sql}`,
     [...params, ...us.params]
   );
   const rows = await query(
     `SELECT l.*, u.name AS user_name, u.role AS user_role, a.title AS assignment_title,
-            a.start_at AS assignment_start_at, a.end_at AS assignment_end_at
+            a.start_date AS assignment_start_date, a.end_date AS assignment_end_date,
+            a.start_at AS assignment_start_at, a.end_at AS assignment_end_at,
+            CASE
+              WHEN COALESCE(DATE(a.start_at), a.start_date) > CURDATE() THEN 'upcoming'
+              WHEN l.task_date < CURDATE() THEN 'history'
+              ELSE 'current'
+            END AS window_status
      FROM daily_task_logs l
      INNER JOIN users u ON u.id = l.user_id AND u.tenant_id = l.tenant_id AND u.is_deleted = 0
      LEFT JOIN task_assignments a ON a.id = l.assignment_id AND a.tenant_id = l.tenant_id AND a.deleted_at IS NULL
@@ -773,6 +1007,81 @@ export async function listNoteHistory(tenantId, actingUser, logId) {
     [tenantId, id]
   );
   return rows;
+}
+
+export async function addAssignmentComment(tenantId, actingUser, assignmentId, commentText) {
+  const id = Number(assignmentId);
+  if (!Number.isFinite(id) || id <= 0) {
+    const err = new Error('Invalid assignment id');
+    err.status = 400;
+    throw err;
+  }
+  const text = String(commentText || '').trim();
+  if (!text) {
+    const err = new Error('comment is required');
+    err.status = 400;
+    throw err;
+  }
+  const [assignment] = await query(
+    `SELECT id, title, assigned_to_user_id
+     FROM task_assignments
+     WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL
+     LIMIT 1`,
+    [tenantId, id]
+  );
+  if (!assignment) {
+    const err = new Error('Assignment not found');
+    err.status = 404;
+    throw err;
+  }
+  await query(
+    `INSERT INTO task_assignment_comments (tenant_id, assignment_id, comment_text, created_by, updated_by)
+     VALUES (?, ?, ?, ?, ?)`,
+    [tenantId, id, text, actingUser?.id ?? null, actingUser?.id ?? null]
+  );
+  await createAndDispatchNotification(tenantId, actingUser?.id, {
+    moduleKey: 'tasks',
+    eventType: 'task_comment_added',
+    severity: 'normal',
+    title: `New comment on task: ${assignment.title || 'Task'}`,
+    body: text.slice(0, 180),
+    assignedUserId: assignment.assigned_to_user_id,
+    recipientUserIds: assignment.assigned_to_user_id ? [Number(assignment.assigned_to_user_id)] : [],
+    entityType: 'task_assignment',
+    entityId: assignment.id,
+    ctaPath: '/task-manager',
+    eventHash: `task:comment:${tenantId}:${assignment.id}:${Date.now()}`,
+  });
+  return { ok: true };
+}
+
+export async function listAssignmentComments(tenantId, actingUser, assignmentId) {
+  const id = Number(assignmentId);
+  if (!Number.isFinite(id) || id <= 0) {
+    const err = new Error('Invalid assignment id');
+    err.status = 400;
+    throw err;
+  }
+  const [assignment] = await query(
+    `SELECT id, assigned_to_user_id
+     FROM task_assignments
+     WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL
+     LIMIT 1`,
+    [tenantId, id]
+  );
+  if (!assignment) return [];
+  const role = String(actingUser?.role || '').toLowerCase();
+  if (role === 'agent' && Number(assignment.assigned_to_user_id) !== Number(actingUser?.id)) {
+    return [];
+  }
+  return query(
+    `SELECT c.id, c.comment_text, c.created_at, u.name AS author_name
+     FROM task_assignment_comments c
+     LEFT JOIN users u ON u.id = c.created_by AND u.tenant_id = c.tenant_id
+     WHERE c.tenant_id = ? AND c.assignment_id = ? AND c.deleted_at IS NULL
+     ORDER BY c.created_at DESC, c.id DESC`,
+    [tenantId, id]
+  );
 }
 
 export async function getRolewiseSummary(tenantId, actingUser, { from, to, userId } = {}) {

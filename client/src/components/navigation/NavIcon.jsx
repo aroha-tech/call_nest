@@ -311,6 +311,16 @@ function IconSettings() {
   );
 }
 
+function IconClipboardCheck() {
+  return (
+    <Icon>
+      <rect x="5" y="4" width="14" height="18" rx="2" />
+      <path d="M9 4.5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 4.5V6H9V4.5Z" />
+      <path d="m9.2 14.2 2.2 2.2 4.2-4.2" />
+    </Icon>
+  );
+}
+
 function IconBuilding2() {
   return (
     <Icon>
@@ -438,6 +448,7 @@ const NAV_ICON_MAP = {
   deals: IconDeals,
   activities: IconPulse,
   reports: IconBarChart,
+  'task-manager': IconClipboardCheck,
   dispositions: IconListTree,
   'dialing-sets': IconGitBranch,
   'dialer-resources': IconFileText,
