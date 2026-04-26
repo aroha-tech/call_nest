@@ -11,6 +11,7 @@ import { Select } from '../components/ui/Select';
 import { Alert } from '../components/ui/Alert';
 import { Spinner } from '../components/ui/Spinner';
 import { Modal, ModalFooter, ConfirmModal } from '../components/ui/Modal';
+import { SlidePanel } from '../components/ui/SlidePanel';
 import { dealsAPI } from '../services/dealsAPI';
 import { opportunitiesAPI } from '../services/opportunitiesAPI';
 import { contactsAPI } from '../services/contactsAPI';
@@ -740,11 +741,13 @@ export function DealsPage() {
       )}
 
       {dealModal && (
-        <Modal
+        <SlidePanel
           isOpen
           size="lg"
           title={dealModal.mode === 'create' ? 'New pipeline' : 'Edit pipeline'}
           onClose={() => !saving && setDealModal(null)}
+          closeOnOverlay={!saving}
+          closeOnEscape={!saving}
         >
           <form onSubmit={saveDeal} className={styles.modalForm}>
             <p className={styles.modalHint}>
@@ -792,13 +795,13 @@ export function DealsPage() {
               </Button>
             </ModalFooter>
           </form>
-        </Modal>
+        </SlidePanel>
       )}
 
       {stageModal && (
         <Modal
           isOpen
-          size="lg"
+          size="md"
           title={stageModal.mode === 'create' ? 'New stage' : 'Edit stage'}
           onClose={() => !saving && setStageModal(null)}
         >
@@ -835,7 +838,14 @@ export function DealsPage() {
       )}
 
       {boardAddModal && (
-        <Modal isOpen size="lg" title="New deal" onClose={() => !saving && setBoardAddModal(null)}>
+        <SlidePanel
+          isOpen
+          size="xl"
+          title="New deal"
+          onClose={() => !saving && setBoardAddModal(null)}
+          closeOnOverlay={!saving}
+          closeOnEscape={!saving}
+        >
           <form onSubmit={saveBoardDeal} className={styles.modalForm}>
             <div className={styles.modalFields}>
               <div className={styles.stageFormGrid}>
@@ -910,7 +920,7 @@ export function DealsPage() {
               </Button>
             </ModalFooter>
           </form>
-        </Modal>
+        </SlidePanel>
       )}
 
       <ConfirmModal

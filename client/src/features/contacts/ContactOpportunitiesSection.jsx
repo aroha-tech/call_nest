@@ -7,6 +7,7 @@ import { Select } from '../../components/ui/Select';
 import { Input } from '../../components/ui/Input';
 import { Alert } from '../../components/ui/Alert';
 import { Modal, ModalFooter, ConfirmModal } from '../../components/ui/Modal';
+import { SlidePanel } from '../../components/ui/SlidePanel';
 import { opportunitiesAPI } from '../../services/opportunitiesAPI';
 import { dealsAPI } from '../../services/dealsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
@@ -409,7 +410,14 @@ export function ContactOpportunitiesSection({ contactId, contactType, accountNam
       ) : null}
 
       {addOpen && (
-        <Modal isOpen title="New deal" onClose={() => !saving && setAddOpen(false)} size="lg">
+        <SlidePanel
+          isOpen
+          title="New deal"
+          onClose={() => !saving && setAddOpen(false)}
+          size="xl"
+          closeOnOverlay={!saving}
+          closeOnEscape={!saving}
+        >
           <form onSubmit={handleAdd}>
             <h3 className={styles.subsectionTitle}>Deal information</h3>
             <div className={styles.formGrid}>
@@ -525,11 +533,18 @@ export function ContactOpportunitiesSection({ contactId, contactType, accountNam
               </Button>
             </ModalFooter>
           </form>
-        </Modal>
+        </SlidePanel>
       )}
 
       {editOpp && editForm && (
-        <Modal isOpen title="Deal details" onClose={() => !saving && setEditOpp(null)} size="lg">
+        <SlidePanel
+          isOpen
+          title="Deal details"
+          onClose={() => !saving && setEditOpp(null)}
+          size="xl"
+          closeOnOverlay={!saving}
+          closeOnEscape={!saving}
+        >
           <form onSubmit={handleEditSave}>
             <h3 className={styles.subsectionTitle}>Deal information</h3>
             <div className={styles.formGrid}>
@@ -630,7 +645,7 @@ export function ContactOpportunitiesSection({ contactId, contactType, accountNam
               </Button>
             </ModalFooter>
           </form>
-        </Modal>
+        </SlidePanel>
       )}
 
       {moveOpp && (

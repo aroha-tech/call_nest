@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
 import { Input } from '../components/ui/Input';
 import { Modal, ModalFooter, ConfirmModal } from '../components/ui/Modal';
+import { SlidePanel } from '../components/ui/SlidePanel';
 import { Alert } from '../components/ui/Alert';
 import { meetingsAPI } from '../services/meetingsAPI';
 import { emailAccountsAPI } from '../services/emailAPI';
@@ -1134,11 +1135,13 @@ export function MeetingsPage() {
           : ' The list is sorted by start time (newest first) and supports search across title, attendee, location, and notes.'}
       </p>
 
-      <Modal
+      <SlidePanel
         isOpen={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
         title={editing ? 'Edit meeting' : 'New meeting'}
-        size="lg"
+        size="xl"
+        closeOnOverlay={!saving}
+        closeOnEscape={!saving}
         footer={
           <ModalFooter>
             <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
@@ -1395,7 +1398,7 @@ export function MeetingsPage() {
             />
           </div>
         </form>
-      </Modal>
+      </SlidePanel>
 
       <Modal
         isOpen={pickerOpen}
@@ -1477,7 +1480,7 @@ export function MeetingsPage() {
         </div>
       </Modal>
 
-      <Modal
+      <SlidePanel
         isOpen={meetingPreviewOpen}
         onClose={() => {
           if (meetingPreviewSaving || meetingPreviewLoading) return;
@@ -1486,7 +1489,9 @@ export function MeetingsPage() {
           setMeetingPreviewOpen(false);
         }}
         title={`Attendee email — ${meetingPreviewKindLabel(meetingPreviewKind)}`}
-        size="lg"
+        size="xl"
+        closeOnOverlay={!meetingPreviewSaving && !meetingPreviewLoading}
+        closeOnEscape={!meetingPreviewSaving && !meetingPreviewLoading}
         footer={
           <ModalFooter>
             <Button
@@ -1563,7 +1568,7 @@ export function MeetingsPage() {
             </div>
           </div>
         )}
-      </Modal>
+      </SlidePanel>
 
       <Modal
         isOpen={meetingPreviewOpen && meetingPreviewSubModal === 'preview'}
@@ -1605,11 +1610,13 @@ export function MeetingsPage() {
         loading={saving}
       />
 
-      <Modal
+      <SlidePanel
         isOpen={templateModalOpen}
         onClose={() => !templateSaving && setTemplateModalOpen(false)}
         title="Meeting notification emails"
-        size="lg"
+        size="wide"
+        closeOnOverlay={!templateSaving}
+        closeOnEscape={!templateSaving}
         footer={
           <ModalFooter>
             <Button type="button" variant="ghost" onClick={() => setTemplateModalOpen(false)} disabled={templateSaving}>
@@ -1731,7 +1738,7 @@ export function MeetingsPage() {
             )}
           </div>
         )}
-      </Modal>
+      </SlidePanel>
 
       <ConfirmModal
         isOpen={!!resetTemplateKind}

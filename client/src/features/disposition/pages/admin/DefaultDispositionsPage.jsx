@@ -6,7 +6,8 @@ import { Select } from '../../../../components/ui/Select';
 import { Checkbox } from '../../../../components/ui/Checkbox';
 import { SearchInput } from '../../../../components/ui/SearchInput';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../../../components/ui/Table';
-import { Modal, ConfirmModal, ModalFooter } from '../../../../components/ui/Modal';
+import { ConfirmModal, ModalFooter } from '../../../../components/ui/Modal';
+import { SlidePanel } from '../../../../components/ui/SlidePanel';
 import { StatusBadge, Badge } from '../../../../components/ui/Badge';
 import { IconButton } from '../../../../components/ui/IconButton';
 import { EditIcon, PauseIcon, PlayIcon, TrashIcon } from '../../../../components/ui/ActionIcons';
@@ -389,11 +390,13 @@ export function DefaultDispositionsPage() {
       )}
 
       {/* Create/Edit Modal */}
-      <Modal
+      <SlidePanel
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={editingItem ? 'Edit Disposition' : 'Create Disposition'}
-        size="lg"
+        size="xl"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
@@ -504,7 +507,7 @@ export function DefaultDispositionsPage() {
             )}
           </div>
         </form>
-      </Modal>
+      </SlidePanel>
 
       <ConfirmModal
         isOpen={!!toggleItem}

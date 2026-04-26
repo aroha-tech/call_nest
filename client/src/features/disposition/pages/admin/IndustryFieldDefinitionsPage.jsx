@@ -13,7 +13,8 @@ import {
   TableCell,
   TableHeaderCell,
 } from '../../../../components/ui/Table';
-import { Modal, ModalFooter } from '../../../../components/ui/Modal';
+import { ModalFooter } from '../../../../components/ui/Modal';
+import { SlidePanel } from '../../../../components/ui/SlidePanel';
 import { IconButton } from '../../../../components/ui/IconButton';
 import { EditIcon, TrashIcon } from '../../../../components/ui/ActionIcons';
 import { useAsyncData, useMutation } from '../../../../hooks/useAsyncData';
@@ -240,10 +241,13 @@ export function IndustryFieldDefinitionsView({ industryId }) {
         </TableDataRegion>
       </div>
 
-      <Modal
+      <SlidePanel
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editing ? 'Edit industry field' : 'Add industry field'}
+        size="lg"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" type="button" onClick={() => setModalOpen(false)}>
@@ -318,7 +322,7 @@ export function IndustryFieldDefinitionsView({ industryId }) {
             onChange={(e) => setForm((p) => ({ ...p, is_active: e.target.checked }))}
           />
         </form>
-      </Modal>
+      </SlidePanel>
     </>
   );
 

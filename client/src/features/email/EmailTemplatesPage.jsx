@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { Modal, ConfirmModal, ModalFooter } from '../../components/ui/Modal';
+import { SlidePanel } from '../../components/ui/SlidePanel';
 import { IconButton } from '../../components/ui/IconButton';
 import { EditIcon, PauseIcon, PlayIcon, TrashIcon } from '../../components/ui/ActionIcons';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -289,11 +290,13 @@ export function EmailTemplatesPage() {
         )}
       </TableDataRegion>
 
-      <Modal
+      <SlidePanel
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={editingItem ? 'Edit Template' : 'Add Template'}
-        size="lg"
+        size="wide"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
@@ -408,7 +411,7 @@ export function EmailTemplatesPage() {
             options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
           />
         </form>
-      </Modal>
+      </SlidePanel>
 
       <Modal
         isOpen={showPreviewModal}

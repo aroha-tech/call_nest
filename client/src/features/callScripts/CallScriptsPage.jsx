@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/Input';
 import { Checkbox } from '../../components/ui/Checkbox';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { Modal, ConfirmModal, ModalFooter } from '../../components/ui/Modal';
+import { SlidePanel } from '../../components/ui/SlidePanel';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { IconButton } from '../../components/ui/IconButton';
 import { ViewIcon, EditIcon, PauseIcon, PlayIcon, TrashIcon, StarIcon } from '../../components/ui/ActionIcons';
@@ -399,11 +400,13 @@ export function CallScriptsPage() {
         )}
       </div>
 
-      <Modal
+      <SlidePanel
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={editingId ? 'Edit Script' : 'Add Script'}
-        size="lg"
+        size="wide"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
@@ -459,7 +462,7 @@ export function CallScriptsPage() {
             </div>
           </div>
         </form>
-      </Modal>
+      </SlidePanel>
 
       <Modal
         isOpen={showPreviewModal}
@@ -481,11 +484,13 @@ export function CallScriptsPage() {
         />
       </Modal>
 
-      <Modal
+      <SlidePanel
         isOpen={!!viewScript}
         onClose={() => setViewScript(null)}
         title={viewScript ? `View: ${viewScript.script_name}` : 'View script'}
-        size="lg"
+        size="wide"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setViewScript(null)}>
@@ -507,7 +512,7 @@ export function CallScriptsPage() {
             }}
           />
         )}
-      </Modal>
+      </SlidePanel>
 
       <ConfirmModal
         isOpen={!!toggleTarget}

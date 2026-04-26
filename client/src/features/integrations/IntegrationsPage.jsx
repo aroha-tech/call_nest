@@ -8,7 +8,8 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { Alert } from '../../components/ui/Alert';
-import { Modal, ModalFooter } from '../../components/ui/Modal';
+import { ModalFooter } from '../../components/ui/Modal';
+import { SlidePanel } from '../../components/ui/SlidePanel';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import styles from './IntegrationsPage.module.scss';
@@ -202,11 +203,13 @@ export function IntegrationsPage() {
         </div>
       </div>
 
-      <Modal
+      <SlidePanel
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={editing ? 'Edit Integration' : 'Add Integration'}
-        size="xl"
+        size="wide"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setShowModal(false)} disabled={saving}>
@@ -286,7 +289,7 @@ export function IntegrationsPage() {
             Example: <code>{"{\"access_token\":\"...\",\"page_id\":\"...\"}"}</code>
           </div>
         </div>
-      </Modal>
+      </SlidePanel>
     </div>
   );
 }

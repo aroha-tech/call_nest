@@ -11,6 +11,7 @@ import { Pagination, PaginationPageSize } from '../components/ui/Pagination';
 import { SearchInput } from '../components/ui/SearchInput';
 import { TableDataRegion } from '../components/admin/TableDataRegion';
 import { ConfirmModal, Modal, ModalFooter } from '../components/ui/Modal';
+import { SlidePanel } from '../components/ui/SlidePanel';
 import listStyles from '../components/admin/adminDataList.module.scss';
 import { scheduleHubAPI } from '../services/scheduleHubAPI';
 import styles from './MeetingsPage.module.scss';
@@ -679,7 +680,7 @@ export function ScheduleCallbacksPage() {
         </div>
       )}
 
-      <Modal
+      <SlidePanel
         isOpen={callbackModalOpen}
         onClose={() => {
           if (callbackSaving) return;
@@ -687,7 +688,9 @@ export function ScheduleCallbacksPage() {
           setEditingCallback(null);
         }}
         title={editingCallback?.id ? 'Edit callback' : 'Schedule callback'}
-        size="lg"
+        size="xl"
+        closeOnOverlay={!callbackSaving}
+        closeOnEscape={!callbackSaving}
         footer={
           <ModalFooter>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', width: '100%' }}>
@@ -849,7 +852,7 @@ export function ScheduleCallbacksPage() {
             <Textarea label="Outcome notes" value={formOutcomeNotes} onChange={(e) => setFormOutcomeNotes(e.target.value)} rows={3} />
           </div>
         </div>
-      </Modal>
+      </SlidePanel>
 
       <Modal
         isOpen={pickerOpen}

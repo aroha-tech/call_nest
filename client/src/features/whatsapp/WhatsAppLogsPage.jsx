@@ -2,7 +2,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Select } from '../../components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
-import { Modal, ModalFooter } from '../../components/ui/Modal';
+import { ModalFooter } from '../../components/ui/Modal';
+import { SlidePanel } from '../../components/ui/SlidePanel';
 import { Button } from '../../components/ui/Button';
 import { IconButton } from '../../components/ui/IconButton';
 import { ViewIcon } from '../../components/ui/ActionIcons';
@@ -183,11 +184,13 @@ export function WhatsAppLogsPage() {
         </div>
       </div>
 
-      <Modal
+      <SlidePanel
         isOpen={!!selectedLog}
         onClose={() => setSelectedLog(null)}
         title="API log details"
-        size="lg"
+        size="xl"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setSelectedLog(null)}>Close</Button>
@@ -225,7 +228,7 @@ export function WhatsAppLogsPage() {
             )}
           </div>
         )}
-      </Modal>
+      </SlidePanel>
     </div>
   );
 }

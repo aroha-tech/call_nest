@@ -9,6 +9,7 @@ import { Spinner } from '../components/ui/Spinner';
 import { Select } from '../components/ui/Select';
 import { Input } from '../components/ui/Input';
 import { Modal, ModalFooter } from '../components/ui/Modal';
+import { SlidePanel } from '../components/ui/SlidePanel';
 import { callsAPI } from '../services/callsAPI';
 import { dialerSessionsAPI } from '../services/dialerSessionsAPI';
 import { dealsAPI } from '../services/dealsAPI';
@@ -2256,7 +2257,7 @@ export function DialerSessionPage() {
               />
             </div>
           </Modal>
-          <Modal
+          <SlidePanel
             isOpen={meetingModalOpen}
             onClose={() => {
               if (actionModalSaving) return;
@@ -2264,7 +2265,9 @@ export function DialerSessionPage() {
               setDispositionActionFlow(null);
             }}
             title="Schedule meeting"
-            size="lg"
+            size="xl"
+            closeOnOverlay={!actionModalSaving}
+            closeOnEscape={!actionModalSaving}
             footer={
               <ModalFooter>
                 <Button
@@ -2395,7 +2398,7 @@ export function DialerSessionPage() {
                 onChange={(e) => setMeetingForm((prev) => ({ ...prev, description: e.target.value }))}
               />
             </div>
-          </Modal>
+          </SlidePanel>
         </>
       ) : null}
 

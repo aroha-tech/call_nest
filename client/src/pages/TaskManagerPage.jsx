@@ -10,6 +10,7 @@ import { SearchInput } from '../components/ui/SearchInput';
 import { Pagination, PaginationPageSize } from '../components/ui/Pagination';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '../components/ui/Table';
 import { Modal, ModalFooter, ConfirmModal } from '../components/ui/Modal';
+import { SlidePanel } from '../components/ui/SlidePanel';
 import { Tabs, TabList, Tab, TabPanel } from '../components/ui/Tabs';
 import { Badge } from '../components/ui/Badge';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
@@ -1239,11 +1240,11 @@ export function TaskManagerPage() {
         </Tabs>
       ) : null}
 
-      <Modal
+      <SlidePanel
         isOpen={assignModalOpen}
         onClose={() => setAssignModalOpen(false)}
         title="New task"
-        size="lg"
+        size="xl"
         closeOnOverlay
         closeOnEscape
         footer={
@@ -1462,7 +1463,7 @@ export function TaskManagerPage() {
             </div>
           </div>
         </form>
-      </Modal>
+      </SlidePanel>
 
       <Modal
         isOpen={templateModalOpen}

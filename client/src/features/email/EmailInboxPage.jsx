@@ -2,7 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
-import { Modal, ModalFooter } from '../../components/ui/Modal';
+import { ModalFooter } from '../../components/ui/Modal';
+import { SlidePanel } from '../../components/ui/SlidePanel';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
@@ -169,11 +170,13 @@ export function EmailInboxPage() {
         </div>
       </div>
 
-      <Modal
+      <SlidePanel
         isOpen={!!selectedMessage}
         onClose={() => setSelectedMessage(null)}
         title={selectedMessage?.subject || 'Email'}
-        size="lg"
+        size="xl"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setSelectedMessage(null)}>Close</Button>
@@ -195,13 +198,15 @@ export function EmailInboxPage() {
             </div>
           </div>
         )}
-      </Modal>
+      </SlidePanel>
 
-      <Modal
+      <SlidePanel
         isOpen={showCompose}
         onClose={() => setShowCompose(false)}
         title="Compose"
-        size="lg"
+        size="xl"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setShowCompose(false)}>Cancel</Button>
@@ -246,7 +251,7 @@ export function EmailInboxPage() {
             />
           </div>
         </form>
-      </Modal>
+      </SlidePanel>
     </div>
   );
 }

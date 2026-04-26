@@ -6,6 +6,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { Modal, ModalFooter } from '../../components/ui/Modal';
+import { SlidePanel } from '../../components/ui/SlidePanel';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
@@ -611,10 +612,13 @@ export function WhatsAppMessagesPage() {
         )}
       </Modal>
 
-      <Modal
+      <SlidePanel
         isOpen={showSendModal}
         onClose={() => setShowSendModal(false)}
         title="Send message"
+        size="xl"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setShowSendModal(false)}>Cancel</Button>
@@ -811,7 +815,7 @@ export function WhatsAppMessagesPage() {
             </>
           )}
         </form>
-      </Modal>
+      </SlidePanel>
     </div>
   );
 }

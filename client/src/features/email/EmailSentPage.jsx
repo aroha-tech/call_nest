@@ -4,6 +4,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { Modal, ModalFooter } from '../../components/ui/Modal';
+import { SlidePanel } from '../../components/ui/SlidePanel';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
 import { SearchInput } from '../../components/ui/SearchInput';
@@ -397,11 +398,13 @@ export function EmailSentPage() {
         </div>
       </div>
 
-      <Modal
+      <SlidePanel
         isOpen={!!selectedMessage}
         onClose={() => setSelectedMessage(null)}
         title={selectedMessage?.subject || 'Email'}
-        size="lg"
+        size="xl"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setSelectedMessage(null)}>Close</Button>
@@ -431,13 +434,15 @@ export function EmailSentPage() {
             </div>
           </div>
         )}
-      </Modal>
+      </SlidePanel>
 
-      <Modal
+      <SlidePanel
         isOpen={showCompose}
         onClose={() => setShowCompose(false)}
         title="Compose"
-        size="lg"
+        size="wide"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setShowCompose(false)}>Cancel</Button>
@@ -586,7 +591,7 @@ export function EmailSentPage() {
             </>
           )}
         </form>
-      </Modal>
+      </SlidePanel>
 
       <Modal
         isOpen={showPreviewModal}

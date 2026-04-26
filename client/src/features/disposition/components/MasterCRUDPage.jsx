@@ -7,6 +7,7 @@ import { Input } from '../../../components/ui/Input';
 import { SearchInput } from '../../../components/ui/SearchInput';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../../components/ui/Table';
 import { Modal, ConfirmModal, ModalFooter } from '../../../components/ui/Modal';
+import { SlidePanel } from '../../../components/ui/SlidePanel';
 import { IconButton } from '../../../components/ui/IconButton';
 import { EditIcon, PauseIcon, PlayIcon, TrashIcon } from '../../../components/ui/ActionIcons';
 import { EmptyState } from '../../../components/ui/EmptyState';
@@ -42,6 +43,8 @@ export function MasterCRUDPage({
   emptyTitle = 'No items yet',
   emptyDescription = 'Create your first item to get started.',
   getItemLabel,
+  /** 'auto' uses a left slide panel when the form has many fields; 'modal' | 'slidePanel' forces one surface. */
+  formSurface = 'auto',
 }) {
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -154,6 +157,11 @@ export function MasterCRUDPage({
   /** Table uses auto layout + content width — do not inject % widths (they fight horizontal scroll on narrow screens). */
   const columnsForTable = columnsWithStatus;
 
+  const useSlidePanel =
+    formSurface === 'slidePanel' ||
+    (formSurface === 'auto' && formFields.length >= 6);
+  const FormSurface = useSlidePanel ? SlidePanel : Modal;
+
   return (
     <div className={styles.page}>
       <PageHeader
@@ -261,10 +269,12 @@ export function MasterCRUDPage({
         )}
       </div>
 
-      <Modal
+      <FormSurface
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={editingItem ? 'Edit Item' : 'Create New Item'}
+        size={useSlidePanel ? 'xl' : 'md'}
+        {...(useSlidePanel ? { closeOnOverlay: true, closeOnEscape: true } : {})}
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setShowModal(false)}>
@@ -311,7 +321,7 @@ export function MasterCRUDPage({
             );
           })}
         </form>
-      </Modal>
+      </FormSurface>
 
       {/* Toggle Active/Inactive Confirmation */}
       <ConfirmModal

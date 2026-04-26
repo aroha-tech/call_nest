@@ -5,7 +5,8 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Alert } from '../../components/ui/Alert';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
-import { Modal, ModalFooter } from '../../components/ui/Modal';
+import { ModalFooter } from '../../components/ui/Modal';
+import { SlidePanel } from '../../components/ui/SlidePanel';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { Pagination, PaginationPageSize } from '../../components/ui/Pagination';
@@ -313,11 +314,13 @@ export function EmailCampaignsPage() {
         </div>
       </div>
 
-      <Modal
+      <SlidePanel
         isOpen={showCreate}
         onClose={() => setShowCreate(false)}
         title="Create Email Campaign"
-        size="lg"
+        size="xl"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setShowCreate(false)}>
@@ -379,7 +382,7 @@ export function EmailCampaignsPage() {
             </small>
           </div>
         </form>
-      </Modal>
+      </SlidePanel>
     </div>
   );
 }

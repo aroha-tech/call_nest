@@ -4,7 +4,8 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
-import { Modal, ConfirmModal, ModalFooter } from '../../components/ui/Modal';
+import { ConfirmModal, ModalFooter } from '../../components/ui/Modal';
+import { SlidePanel } from '../../components/ui/SlidePanel';
 import { IconButton } from '../../components/ui/IconButton';
 import { EditIcon, PauseIcon, PlayIcon, TrashIcon, RefreshIcon } from '../../components/ui/ActionIcons';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -408,10 +409,13 @@ export function EmailAccountsPage() {
         )}
       </TableDataRegion>
 
-      <Modal
+      <SlidePanel
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={editingItem ? 'Edit Email Account' : 'Add Email Account'}
+        size="xl"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
@@ -496,7 +500,7 @@ export function EmailAccountsPage() {
             options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
           />
         </form>
-      </Modal>
+      </SlidePanel>
 
       <ConfirmModal isOpen={!!confirmAction && confirmAction.action === 'activate'} onClose={() => setConfirmAction(null)} onConfirm={handleActivateConfirm} title="Activate Email Account" message={`Activate account ${confirmAction?.name}?`} confirmText="Activate" loading={activateMutation.loading} />
       <ConfirmModal isOpen={!!confirmAction && confirmAction.action === 'deactivate'} onClose={() => setConfirmAction(null)} onConfirm={handleDeactivateConfirm} title="Deactivate Email Account" message={`Deactivate account ${confirmAction?.name}?`} confirmText="Deactivate" loading={deactivateMutation.loading} />

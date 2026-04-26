@@ -1,0 +1,129 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 150ms ease;
+
+  @include sm {
+    padding: 0;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0.92;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.panel {
+  background: var(--color-bg-elevated);
+  border-left: 1px solid var(--color-border);
+  box-shadow: $shadow-xl;
+  height: 100%;
+  max-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  animation: slideFromRight 220ms ease;
+  @include custom-scrollbar;
+
+  &.md {
+    @include sm {
+      max-width: min(440px, 100vw);
+    }
+  }
+
+  &.lg {
+    @include sm {
+      max-width: min(560px, 100vw);
+    }
+  }
+
+  &.xl {
+    @include sm {
+      max-width: min(720px, 100vw);
+    }
+  }
+
+  &.wide {
+    @include sm {
+      max-width: min(900px, 100vw);
+    }
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-3;
+  padding: $space-4 $space-5;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: $radius-sm;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all $transition-fast;
+  font-size: $font-size-sm;
+  flex-shrink: 0;
+
+  &:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+  }
+}
+
+.body {
+  padding: $space-5;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  @include custom-scrollbar;
+}
+
+.footer {
+  padding: $space-4 $space-5;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}

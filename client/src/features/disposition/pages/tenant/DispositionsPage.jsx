@@ -7,6 +7,7 @@ import { Checkbox } from '../../../../components/ui/Checkbox';
 import { SearchInput } from '../../../../components/ui/SearchInput';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../../../components/ui/Table';
 import { Modal, ConfirmModal, ModalFooter } from '../../../../components/ui/Modal';
+import { SlidePanel } from '../../../../components/ui/SlidePanel';
 import { StatusBadge, Badge } from '../../../../components/ui/Badge';
 import { IconButton } from '../../../../components/ui/IconButton';
 import { ViewIcon, EditIcon, PauseIcon, PlayIcon, TrashIcon } from '../../../../components/ui/ActionIcons';
@@ -447,11 +448,13 @@ export function DispositionsPage({ readOnly = false }) {
       </div>
 
       {/* Read-only: same layout as edit/add, all fields disabled, Close only */}
-      <Modal
+      <SlidePanel
         isOpen={!!viewItem}
         onClose={() => setViewItem(null)}
         title="View disposition"
-        size="lg"
+        size="xl"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setViewItem(null)}>
@@ -585,14 +588,16 @@ export function DispositionsPage({ readOnly = false }) {
             </div>
           </div>
         )}
-      </Modal>
+      </SlidePanel>
 
-      {/* Create/Edit Modal */}
-      <Modal
+      {/* Create/Edit */}
+      <SlidePanel
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={editingItem ? 'Edit Disposition' : 'Create Disposition'}
-        size="lg"
+        size="xl"
+        closeOnOverlay
+        closeOnEscape
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
@@ -691,7 +696,7 @@ export function DispositionsPage({ readOnly = false }) {
             )}
           </div>
         </form>
-      </Modal>
+      </SlidePanel>
 
       {/* Clone Modal */}
       <Modal

@@ -21,6 +21,7 @@ import {
   TableHeaderCell,
 } from '../../components/ui/Table';
 import { Modal, ModalFooter, ConfirmModal } from '../../components/ui/Modal';
+import { SlidePanel } from '../../components/ui/SlidePanel';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
@@ -743,11 +744,12 @@ export function CampaignsPage() {
         </div>
       </div>
 
-      <Modal
+      <SlidePanel
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editing ? 'Edit campaign' : 'New campaign'}
-        size="lg"
+        size="wide"
+        closeOnOverlay
         closeOnEscape
         footer={
           <ModalFooter>
@@ -885,7 +887,7 @@ export function CampaignsPage() {
             </p>
           ) : null}
         </div>
-      </Modal>
+      </SlidePanel>
 
       <Modal
         isOpen={previewOpen}

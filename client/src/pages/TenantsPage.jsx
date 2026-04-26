@@ -13,7 +13,8 @@ import {
   TableCell,
   TableHeaderCell,
 } from '../components/ui/Table';
-import { Modal, ModalFooter } from '../components/ui/Modal';
+import { ModalFooter } from '../components/ui/Modal';
+import { SlidePanel } from '../components/ui/SlidePanel';
 import { SearchInput } from '../components/ui/SearchInput';
 import { StatusBadge } from '../components/ui/Badge';
 import { IconButton } from '../components/ui/IconButton';
@@ -709,11 +710,13 @@ export function TenantsPage() {
         </div>
       </div>
 
-      <Modal
+      <SlidePanel
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editing ? 'Edit Tenant' : 'Add Tenant'}
-        size="lg"
+        size="xl"
+        closeOnOverlay
+        closeOnEscape
       >
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.formSection}>
@@ -938,7 +941,7 @@ export function TenantsPage() {
             </Button>
           </ModalFooter>
         </form>
-      </Modal>
+      </SlidePanel>
     </div>
   );
 }

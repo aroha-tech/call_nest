@@ -13,7 +13,8 @@ import {
   TableCell,
   TableHeaderCell,
 } from '../components/ui/Table';
-import { Modal, ModalFooter } from '../components/ui/Modal';
+import { ModalFooter } from '../components/ui/Modal';
+import { SlidePanel } from '../components/ui/SlidePanel';
 import { SearchInput } from '../components/ui/SearchInput';
 import { StatusBadge } from '../components/ui/Badge';
 import { IconButton } from '../components/ui/IconButton';
@@ -413,11 +414,13 @@ export function UsersPage() {
         </div>
       </div>
 
-      <Modal
+      <SlidePanel
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editing ? 'Edit User' : 'Add User'}
         size="lg"
+        closeOnOverlay
+        closeOnEscape
       >
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.formSection}>
@@ -507,7 +510,7 @@ export function UsersPage() {
             </Button>
           </ModalFooter>
         </form>
-      </Modal>
+      </SlidePanel>
     </div>
   );
 }
