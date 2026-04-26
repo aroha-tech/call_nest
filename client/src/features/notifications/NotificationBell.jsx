@@ -55,12 +55,13 @@ export function NotificationBell() {
     return () => disconnect();
   }, [user?.id]);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      refreshUnread();
-    }, 15000);
-    return () => clearInterval(timer);
-  }, []);
+  function handleBellToggle() {
+    setOpen((prev) => {
+      const next = !prev;
+      if (next) refreshUnread();
+      return next;
+    });
+  }
 
   async function handleMarkRead(id) {
     try {
@@ -113,7 +114,7 @@ export function NotificationBell() {
 
   return (
     <div className={styles.bellWrap}>
-      <button type="button" className={styles.bellBtn} onClick={() => setOpen((v) => !v)} aria-label="Notifications">
+      <button type="button" className={styles.bellBtn} onClick={handleBellToggle} aria-label="Notifications">
         <svg className={styles.bellIcon} viewBox="0 0 24 24" width={22} height={22} aria-hidden fill="none">
           <path
             d="M12 3a5.5 5.5 0 0 0-5.5 5.5c0 2.02-.396 3.744-1.136 5.07-.37.663-.786 1.17-1.182 1.548A8.3 8.3 0 0 1 4 16.5h16a8.3 8.3 0 0 1-1.182-1.382c-.396-.378-.812-.885-1.182-1.548-.74-1.326-1.136-3.05-1.136-5.07A5.5 5.5 0 0 0 12 3Z"

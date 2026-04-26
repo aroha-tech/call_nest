@@ -1,0 +1,339 @@
+{
+  "info": {
+    "_postman_id": "b3bbf67e-38cc-4d6d-ae42-bb7d9f27e4b0",
+    "name": "Call Nest Public Dialer API v1",
+    "description": "Postman collection for CRM-agnostic Public Dialer API v1.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000" },
+    { "key": "apiKey", "value": "cn_live_replace_me" },
+    { "key": "tenantJwt", "value": "replace_with_tenant_bearer_jwt" },
+    { "key": "outboxId", "value": "1" },
+    { "key": "callAttemptId", "value": "1" },
+    { "key": "providerCallId", "value": "demo-provider-call-001" },
+    { "key": "zohoContactId", "value": "zoho-contact-001" },
+    { "key": "exotelWebhookToken", "value": "replace_exotel_webhook_token" },
+    { "key": "knowlarityWebhookToken", "value": "replace_knowlarity_webhook_token" },
+    { "key": "ozonetelWebhookToken", "value": "replace_ozonetel_webhook_token" }
+  ],
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      { "key": "key", "value": "x-api-key", "type": "string" },
+      { "key": "value", "value": "{{apiKey}}", "type": "string" },
+      { "key": "in", "value": "header", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "Dialer",
+      "item": [
+        {
+          "name": "Upsert Contacts",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_crm\": \"generic_crm\",\n  \"default_country_code\": \"+91\",\n  \"contacts\": [\n    {\n      \"external_id\": \"crm-contact-001\",\n      \"display_name\": \"John Demo\",\n      \"phone\": \"+919900000000\",\n      \"email\": \"john@example.com\",\n      \"notes\": \"Imported from CRM\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/v1/dialer/contacts/upsert",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "v1", "dialer", "contacts", "upsert"]
+            }
+          }
+        },
+        {
+          "name": "Click To Call",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_crm\": \"generic_crm\",\n  \"external_contact_id\": \"crm-contact-001\",\n  \"provider\": \"exotel\",\n  \"notes\": \"CRM click to call\",\n  \"callback_url\": \"https://example-crm.com/webhooks/callnest\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/v1/dialer/calls/click-to-call",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "v1", "dialer", "calls", "click-to-call"]
+            }
+          }
+        },
+        {
+          "name": "Call Lifecycle Update",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider_call_id\": \"{{providerCallId}}\",\n  \"status\": \"completed\",\n  \"duration_sec\": 63\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/v1/dialer/calls/lifecycle",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "v1", "dialer", "calls", "lifecycle"]
+            }
+          }
+        },
+        {
+          "name": "Activity Writeback",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"call_attempt_id\": {{callAttemptId}},\n  \"notes\": \"Connected and follow-up scheduled\",\n  \"disposition_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/v1/dialer/activities/writeback",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "v1", "dialer", "activities", "writeback"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "Process Outbox",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"limit\": 25\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/v1/dialer/events/process",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "v1", "dialer", "events", "process"]
+            }
+          }
+        },
+        {
+          "name": "List Delivery Logs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/public/v1/dialer/events/deliveries?limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "v1", "dialer", "events", "deliveries"],
+              "query": [{ "key": "limit", "value": "50" }]
+            }
+          }
+        },
+        {
+          "name": "Replay Outbox Event",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/public/v1/dialer/events/replay/{{outboxId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "v1", "dialer", "events", "replay", "{{outboxId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Zoho",
+      "item": [
+        {
+          "name": "Zoho Contacts Sync",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"default_country_code\": \"+91\",\n  \"data\": [\n    {\n      \"id\": \"{{zohoContactId}}\",\n      \"First_Name\": \"Jane\",\n      \"Last_Name\": \"Doe\",\n      \"Phone\": \"+919955555555\",\n      \"Email\": \"jane.doe@example.com\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/v1/dialer/providers/zoho/contacts/sync",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "v1", "dialer", "providers", "zoho", "contacts", "sync"]
+            }
+          }
+        },
+        {
+          "name": "Zoho Click To Call",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"zoho_contact_id\": \"{{zohoContactId}}\",\n  \"notes\": \"Clicked from Zoho record\",\n  \"provider\": \"exotel\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/v1/dialer/providers/zoho/calls/click-to-call",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "v1", "dialer", "providers", "zoho", "calls", "click-to-call"]
+            }
+          }
+        },
+        {
+          "name": "Zoho Activity Writeback",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"call_attempt_id\": {{callAttemptId}},\n  \"notes\": \"Outcome synced to Zoho\",\n  \"disposition_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/v1/dialer/providers/zoho/activities/writeback",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "v1", "dialer", "providers", "zoho", "activities", "writeback"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Telephony Webhooks",
+      "item": [
+        {
+          "name": "Exotel Status Callback",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-exotel-token", "value": "{{exotelWebhookToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"CallSid\": \"{{providerCallId}}\",\n  \"CallStatus\": \"completed\",\n  \"CallDuration\": 63\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/telephony/exotel/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "telephony", "exotel", "status"]
+            }
+          }
+        },
+        {
+          "name": "Knowlarity Status Callback",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-knowlarity-token", "value": "{{knowlarityWebhookToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"call_id\": \"{{providerCallId}}\",\n  \"status\": \"completed\",\n  \"duration\": 58\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/telephony/knowlarity/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "telephony", "knowlarity", "status"]
+            }
+          }
+        },
+        {
+          "name": "Ozonetel Status Callback",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-ozonetel-token", "value": "{{ozonetelWebhookToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ucid\": \"{{providerCallId}}\",\n  \"status\": \"completed\",\n  \"duration\": 71\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/telephony/ozonetel/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "telephony", "ozonetel", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Internal Connector (JWT)",
+      "item": [
+        {
+          "name": "Internal Upsert Contacts",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tenantJwt}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_crm\": \"internal_crm\",\n  \"contacts\": [\n    {\n      \"external_id\": \"internal-contact-001\",\n      \"display_name\": \"Internal User\",\n      \"phone\": \"+919911111111\",\n      \"email\": \"internal.user@example.com\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tenant/integrations/internal-crm/contacts/upsert",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tenant", "integrations", "internal-crm", "contacts", "upsert"]
+            }
+          }
+        },
+        {
+          "name": "Internal Click To Call",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tenantJwt}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_crm\": \"internal_crm\",\n  \"external_contact_id\": \"internal-contact-001\",\n  \"provider\": \"exotel\",\n  \"notes\": \"Internal CRM click to call\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tenant/integrations/internal-crm/calls/click-to-call",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tenant", "integrations", "internal-crm", "calls", "click-to-call"]
+            }
+          }
+        },
+        {
+          "name": "Internal Lifecycle Update",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tenantJwt}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider_call_id\": \"{{providerCallId}}\",\n  \"status\": \"completed\",\n  \"duration_sec\": 45\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tenant/integrations/internal-crm/calls/lifecycle",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tenant", "integrations", "internal-crm", "calls", "lifecycle"]
+            }
+          }
+        },
+        {
+          "name": "Internal Activity Writeback",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tenantJwt}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"call_attempt_id\": {{callAttemptId}},\n  \"notes\": \"Internal CRM outcome\",\n  \"disposition_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tenant/integrations/internal-crm/activities/writeback",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tenant", "integrations", "internal-crm", "activities", "writeback"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

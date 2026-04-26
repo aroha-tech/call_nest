@@ -1,5 +1,8 @@
 import { query } from '../../config/db.js';
-import { getTelephonyProvider } from './telephony/telephonyProviderRegistry.js';
+import {
+  getDefaultTelephonyProviderCode,
+  getTelephonyProvider,
+} from './telephony/telephonyProviderRegistry.js';
 import * as opportunitiesService from './opportunitiesService.js';
 import { loadDispositionCallApplyMeta } from './dispositionApplyDealHelper.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
@@ -277,7 +280,13 @@ async function bumpContactCounters(tenantId, contactId, phoneId) {
 export async function startCallForContact(
   tenantId,
   user,
-  { contact_id, contact_phone_id = null, provider = 'dummy', notes = null, dialer_session_id = null } = {}
+  {
+    contact_id,
+    contact_phone_id = null,
+    provider = getDefaultTelephonyProviderCode(),
+    notes = null,
+    dialer_session_id = null,
+  } = {}
 ) {
   const cid = Number(contact_id);
   if (!cid) {
@@ -372,7 +381,11 @@ export async function startCallForContact(
   };
 }
 
-export async function startCallsBulk(tenantId, user, { contact_ids = [], provider = 'dummy' } = {}) {
+export async function startCallsBulk(
+  tenantId,
+  user,
+  { contact_ids = [], provider = getDefaultTelephonyProviderCode() } = {}
+) {
   const ids = Array.isArray(contact_ids)
     ? [...new Set(contact_ids.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))].slice(0, 100)
     : [];

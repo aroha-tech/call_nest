@@ -1,0 +1,482 @@
+openapi: 3.0.3
+info:
+  title: Call Nest Public Dialer API v1
+  version: "1.0.0"
+  description: |
+    CRM-agnostic public API v1 for integrating external CRMs with Call Nest dialer.
+    All endpoints require API-key auth via `x-api-key` header.
+servers:
+  - url: https://your-domain.com
+    description: Production
+  - url: http://localhost:4000
+    description: Local development
+tags:
+  - name: Dialer
+  - name: Events
+  - name: Zoho
+  - name: InternalConnector
+security:
+  - ApiKeyAuth: []
+paths:
+  /api/public/v1/dialer/contacts/upsert:
+    post:
+      tags: [Dialer]
+      summary: Upsert contacts/leads from external CRM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactsUpsertRequest"
+      responses:
+        "201":
+          description: Contacts accepted and processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/public/v1/dialer/calls/click-to-call:
+    post:
+      tags: [Dialer]
+      summary: Start outbound call for contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClickToCallRequest"
+      responses:
+        "201":
+          description: Call started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/public/v1/dialer/calls/lifecycle:
+    post:
+      tags: [Dialer]
+      summary: Push call lifecycle status update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LifecycleRequest"
+      responses:
+        "200":
+          description: Status accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/public/v1/dialer/activities/writeback:
+    post:
+      tags: [Dialer]
+      summary: Write notes/disposition back to call attempt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WritebackRequest"
+      responses:
+        "200":
+          description: Activity written
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/public/v1/dialer/events/process:
+    post:
+      tags: [Events]
+      summary: Process outbox events for current tenant app
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+      responses:
+        "200":
+          description: Processing summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/public/v1/dialer/events/deliveries:
+    get:
+      tags: [Events]
+      summary: List outbound webhook delivery logs
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: Delivery logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/public/v1/dialer/events/replay/{outboxId}:
+    post:
+      tags: [Events]
+      summary: Replay one outbox event
+      parameters:
+        - in: path
+          name: outboxId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Replay enqueued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "404":
+          description: Outbox record not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/public/v1/dialer/providers/zoho/contacts/sync:
+    post:
+      tags: [Zoho]
+      summary: Sync Zoho contacts into Call Nest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                default_country_code:
+                  type: string
+                  example: "+91"
+                data:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        "201":
+          description: Sync accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /api/public/v1/dialer/providers/zoho/calls/click-to-call:
+    post:
+      tags: [Zoho]
+      summary: Start Zoho click-to-call
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [zoho_contact_id]
+              properties:
+                zoho_contact_id:
+                  type: string
+                notes:
+                  type: string
+                provider:
+                  type: string
+      responses:
+        "201":
+          description: Call started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /api/public/v1/dialer/providers/zoho/activities/writeback:
+    post:
+      tags: [Zoho]
+      summary: Write call result back for Zoho flow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WritebackRequest"
+      responses:
+        "200":
+          description: Writeback done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /api/tenant/integrations/internal-crm/contacts/upsert:
+    post:
+      tags: [InternalConnector]
+      summary: Internal CRM upsert contacts via shared dialer connector core
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactsUpsertRequest"
+      responses:
+        "201":
+          description: Contacts accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/tenant/integrations/internal-crm/calls/click-to-call:
+    post:
+      tags: [InternalConnector]
+      summary: Internal CRM click-to-call via shared dialer connector core
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClickToCallRequest"
+      responses:
+        "201":
+          description: Call started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/tenant/integrations/internal-crm/calls/lifecycle:
+    post:
+      tags: [InternalConnector]
+      summary: Internal CRM lifecycle updates via shared dialer connector core
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LifecycleRequest"
+      responses:
+        "200":
+          description: Lifecycle status accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/tenant/integrations/internal-crm/activities/writeback:
+    post:
+      tags: [InternalConnector]
+      summary: Internal CRM activity writeback via shared dialer connector core
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WritebackRequest"
+      responses:
+        "200":
+          description: Activity written
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    BadRequest:
+      description: Invalid payload
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Invalid or missing API key
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Missing required scope
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    OkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        data:
+          type: object
+          additionalProperties: true
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Invalid payload
+    ContactPayload:
+      type: object
+      required: [display_name, phone]
+      properties:
+        external_id:
+          type: string
+        display_name:
+          type: string
+        phone:
+          type: string
+          example: "+919900000000"
+        email:
+          type: string
+          format: email
+        notes:
+          type: string
+    ContactsUpsertRequest:
+      type: object
+      required: [external_crm]
+      properties:
+        external_crm:
+          type: string
+          example: zoho_crm
+        default_country_code:
+          type: string
+          example: "+91"
+        contacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContactPayload"
+        leads:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContactPayload"
+    ClickToCallRequest:
+      type: object
+      properties:
+        contact_id:
+          type: integer
+        external_contact_id:
+          type: string
+        external_crm:
+          type: string
+        provider:
+          type: string
+          default: exotel
+        notes:
+          type: string
+        callback_url:
+          type: string
+          format: uri
+    LifecycleRequest:
+      type: object
+      required: [provider_call_id, status]
+      properties:
+        provider_call_id:
+          type: string
+        status:
+          type: string
+          enum: [queued, ringing, answered, completed, failed, no_answer, busy]
+        duration_sec:
+          type: integer
+          minimum: 0
+    WritebackRequest:
+      type: object
+      required: [call_attempt_id]
+      properties:
+        call_attempt_id:
+          type: integer
+        notes:
+          type: string
+        disposition_id:
+          type: integer

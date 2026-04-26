@@ -42,6 +42,10 @@ export function IntegrationsPage() {
   const [submitError, setSubmitError] = useState('');
 
   const [users, setUsers] = useState([]);
+  const [apps, setApps] = useState([]);
+  const [newAppName, setNewAppName] = useState('');
+  const [newAppScopes, setNewAppScopes] = useState('contacts.write,calls.write,events.read,activities.write');
+  const [generatedApiKey, setGeneratedApiKey] = useState('');
 
   const defaultForm = useMemo(
     () => ({
@@ -101,9 +105,17 @@ export function IntegrationsPage() {
     setUsers(list);
   }, []);
 
+  const fetchApps = useCallback(async () => {
+    const res = await integrationsAPI.listApps();
+    setApps(res?.data?.data ?? []);
+  }, []);
+
   React.useEffect(() => {
     fetchUsers().catch(() => setUsers([]));
   }, [fetchUsers]);
+  React.useEffect(() => {
+    fetchApps().catch(() => setApps([]));
+  }, [fetchApps]);
 
   const webhookBaseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -134,6 +146,27 @@ export function IntegrationsPage() {
     } else {
       setSubmitError(result?.error || 'Save failed');
     }
+  };
+
+  const handleCreateApp = async () => {
+    const scopes = newAppScopes
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
+    const res = await integrationsAPI.createApp({
+      name: newAppName.trim(),
+      provider_code: 'generic_crm',
+      scopes,
+    });
+    setGeneratedApiKey(res?.data?.data?.api_key || '');
+    setNewAppName('');
+    fetchApps().catch(() => {});
+  };
+
+  const handleRotateAppKey = async (appId) => {
+    const res = await integrationsAPI.rotateAppKey(appId);
+    setGeneratedApiKey(res?.data?.data?.api_key || '');
+    fetchApps().catch(() => {});
   };
 
   return (
@@ -200,6 +233,53 @@ export function IntegrationsPage() {
               </TableBody>
             </Table>
           )}
+        </div>
+      </div>
+
+      <div className={listStyles.tableCard} style={{ marginTop: 16 }}>
+        <div className={listStyles.tableCardBody} style={{ padding: 16 }}>
+          <h3 style={{ marginTop: 0 }}>Public CRM API Apps</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 10, marginBottom: 12 }}>
+            <Input label="App name" value={newAppName} onChange={(e) => setNewAppName(e.target.value)} placeholder="e.g. Zoho Production" />
+            <Input
+              label="Scopes (comma separated)"
+              value={newAppScopes}
+              onChange={(e) => setNewAppScopes(e.target.value)}
+              placeholder="contacts.write,calls.write,events.read,activities.write"
+            />
+            <div style={{ display: 'flex', alignItems: 'end' }}>
+              <Button onClick={handleCreateApp} disabled={!newAppName.trim()}>
+                Create App Key
+              </Button>
+            </div>
+          </div>
+          {generatedApiKey ? <Alert variant="warning">Copy API key now: <code>{generatedApiKey}</code></Alert> : null}
+          <Table variant="adminList">
+            <TableHead>
+              <TableRow>
+                <TableHeaderCell>Name</TableHeaderCell>
+                <TableHeaderCell>Provider</TableHeaderCell>
+                <TableHeaderCell>Key Hint</TableHeaderCell>
+                <TableHeaderCell>Rate Limit</TableHeaderCell>
+                <TableHeaderCell width="180px" align="center">Actions</TableHeaderCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(apps || []).map((app) => (
+                <TableRow key={app.id}>
+                  <TableCell>{app.name}</TableCell>
+                  <TableCell>{app.provider_code}</TableCell>
+                  <TableCell>{app.api_key_hint || '-'}</TableCell>
+                  <TableCell>{app.requests_per_minute || 120}/min</TableCell>
+                  <TableCell align="center">
+                    <Button size="sm" variant="ghost" onClick={() => handleRotateAppKey(app.id)}>
+                      Rotate Key
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       </div>
 

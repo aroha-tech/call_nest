@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Call Nest CRM Dialer - Settings</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; max-width: 720px; }
+      label { display: block; margin-top: 12px; font-weight: 600; }
+      input { width: 100%; padding: 8px; margin-top: 6px; box-sizing: border-box; }
+      button { margin-top: 16px; padding: 8px 14px; cursor: pointer; }
+      .muted { color: #555; font-size: 12px; margin-top: 8px; }
+      .ok { color: #0a7f2e; margin-top: 10px; }
+      .err { color: #b42318; margin-top: 10px; }
+    </style>
+  </head>
+  <body>
+    <h2>Call Nest CRM Dialer Settings</h2>
+    <label>
+      API Base URL
+      <input id="baseUrl" placeholder="http://localhost:4000" />
+    </label>
+    <label>
+      API Key
+      <input id="apiKey" placeholder="cn_live_..." />
+    </label>
+    <label>
+      Provider
+      <input id="provider" placeholder="exotel" />
+    </label>
+    <label>
+      Default Country Code
+      <input id="defaultCountryCode" placeholder="+91" />
+    </label>
+    <label>
+      <input id="autoUpsertBeforeCall" type="checkbox" style="width:auto" />
+      Auto upsert contact before call
+    </label>
+    <label>
+      <input id="allowUnknownCrmHosts" type="checkbox" style="width:auto" />
+      Allow unknown CRM hosts
+    </label>
+    <label>
+      Allowed host suffixes (comma separated)
+      <input id="allowedHostSuffixes" placeholder="zoho.com,hubspot.com,salesforce.com" />
+    </label>
+    <button id="saveBtn">Save</button>
+    <button id="clearLogsBtn" type="button">Clear Logs</button>
+    <div id="status" class="muted"></div>
+    <div id="logs" class="muted" style="margin-top:10px; max-height: 220px; overflow:auto; white-space:pre-wrap;"></div>
+    <p class="muted">Works across CRM pages by detecting phone numbers and injecting Call buttons.</p>
+    <script src="options.js"></script>
+  </body>
+  </html>

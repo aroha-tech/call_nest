@@ -52,6 +52,10 @@ import whatsappWebhookRoutes from './routes/whatsappWebhook.js';
 import emailModuleRoutes from './routes/tenant/email.js';
 import templateVariablesRoutes from './routes/templateVariables.js';
 import integrationsWebhookRoutes from './routes/integrationsWebhook.js';
+import dialerPublicRoutes from './routes/public/dialerPublic.js';
+import exotelWebhookRoutes from './routes/public/exotelWebhook.js';
+import knowlarityWebhookRoutes from './routes/public/knowlarityWebhook.js';
+import ozonetelWebhookRoutes from './routes/public/ozonetelWebhook.js';
 import callsRoutes from './routes/tenant/calls.js';
 import dialerSessionsRoutes from './routes/tenant/dialerSessions.js';
 import savedListFiltersRoutes from './routes/tenant/savedListFilters.js';
@@ -123,6 +127,10 @@ app.use('/api/integrations/webhook', integrationsWebhookRoutes);
 
 // Public workspace discovery (before tenantResolver; resolver skips /api/public/*)
 app.use('/api/public', publicRoutes);
+app.use('/api/public/v1/dialer', dialerPublicRoutes);
+app.use('/api/public/telephony/exotel', exotelWebhookRoutes);
+app.use('/api/public/telephony/knowlarity', knowlarityWebhookRoutes);
+app.use('/api/public/telephony/ozonetel', ozonetelWebhookRoutes);
 
 // Resolve tenant/platform context from subdomain for all API routes
 app.use(tenantResolver);

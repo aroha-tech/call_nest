@@ -157,6 +157,42 @@ export const env = {
     }
     return path.join(serverRoot, 'data', 'background-jobs');
   })(),
+  /** Telephony provider defaults and Twilio credentials (for TELEPHONY_DEFAULT_PROVIDER=twilio). */
+  telephony: {
+    defaultProvider: process.env.TELEPHONY_DEFAULT_PROVIDER || 'exotel',
+    exotelSid: process.env.EXOTEL_SID || '',
+    exotelApiKey: process.env.EXOTEL_API_KEY || '',
+    exotelApiToken: process.env.EXOTEL_API_TOKEN || '',
+    exotelSubdomain: process.env.EXOTEL_SUBDOMAIN || '',
+    exotelCallerId: process.env.EXOTEL_CALLER_ID || '',
+    /** Optional shared token for Exotel webhook verification (x-exotel-token). */
+    exotelWebhookToken: process.env.EXOTEL_WEBHOOK_TOKEN || '',
+    twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || '',
+    twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || '',
+    twilioFromNumber: process.env.TWILIO_FROM_NUMBER || '',
+    twilioCallUrl: process.env.TWILIO_CALL_URL || '',
+    twilioStatusCallbackUrl: process.env.TWILIO_STATUS_CALLBACK_URL || '',
+    knowlarityApiUrl: process.env.KNOWLARITY_API_URL || '',
+    knowlarityApiKey: process.env.KNOWLARITY_API_KEY || '',
+    knowlarityAuthToken: process.env.KNOWLARITY_AUTH_TOKEN || '',
+    knowlarityKNumber: process.env.KNOWLARITY_K_NUMBER || '',
+    knowlarityCountryCode: process.env.KNOWLARITY_COUNTRY_CODE || 'IN',
+    knowlarityCallerId: process.env.KNOWLARITY_CALLER_ID || '',
+    knowlarityWebhookToken: process.env.KNOWLARITY_WEBHOOK_TOKEN || '',
+    myoperatorApiUrl: process.env.MYOPERATOR_API_URL || '',
+    myoperatorAuthToken: process.env.MYOPERATOR_AUTH_TOKEN || '',
+    myoperatorAgentNumber: process.env.MYOPERATOR_AGENT_NUMBER || '',
+    myoperatorCustomerNumberField: process.env.MYOPERATOR_CUSTOMER_NUMBER_FIELD || 'customer_number',
+    myoperatorCallerId: process.env.MYOPERATOR_CALLER_ID || '',
+    ozonetelApiUrl: process.env.OZONETEL_API_URL || '',
+    ozonetelApiKey: process.env.OZONETEL_API_KEY || '',
+    ozonetelAuthToken: process.env.OZONETEL_AUTH_TOKEN || '',
+    ozonetelUserName: process.env.OZONETEL_USERNAME || '',
+    ozonetelAgentId: process.env.OZONETEL_AGENT_ID || '',
+    ozonetelCampaignName: process.env.OZONETEL_CAMPAIGN_NAME || '',
+    ozonetelCallerId: process.env.OZONETEL_CALLER_ID || '',
+    ozonetelWebhookToken: process.env.OZONETEL_WEBHOOK_TOKEN || '',
+  },
 };
 
 /**

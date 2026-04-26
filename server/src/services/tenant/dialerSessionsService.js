@@ -2,6 +2,7 @@ import { query, withConnection } from '../../config/db.js';
 import { startCallForContact } from './callsService.js';
 import { enrichDispositionsForDialerSession } from './dispositionApplyDealHelper.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
+import { getDefaultTelephonyProviderCode } from './telephony/telephonyProviderRegistry.js';
 
 function normalizeIds(arr, max = 200) {
   if (!Array.isArray(arr)) return [];
@@ -11,7 +12,12 @@ function normalizeIds(arr, max = 200) {
 export async function createSession(
   tenantId,
   user,
-  { contact_ids = [], provider = 'dummy', dialing_set_id = null, call_script_id = null } = {}
+  {
+    contact_ids = [],
+    provider = getDefaultTelephonyProviderCode(),
+    dialing_set_id = null,
+    call_script_id = null,
+  } = {}
 ) {
   const rawIds = normalizeIds(contact_ids, 500);
   if (rawIds.length === 0) {
@@ -72,7 +78,7 @@ export async function createSession(
     `INSERT INTO dialer_sessions (
        tenant_id, created_by_user_id, user_session_no, provider, status, started_at, ended_at, paused_at, paused_seconds, dialing_set_id, call_script_id
      ) VALUES (?, ?, ?, ?, 'ready', NULL, NULL, NULL, 0, ?, ?)`,
-    [tenantId, uid, userSessionNo, String(provider || 'dummy'), dialingSetId, callScriptId]
+    [tenantId, uid, userSessionNo, String(provider || getDefaultTelephonyProviderCode()), dialingSetId, callScriptId]
   );
   const sessionId = result.insertId;
 
@@ -82,7 +88,7 @@ export async function createSession(
     summary: `Dialer session #${userSessionNo} started (${ids.length} contact(s) queued)`,
     payload_json: {
       session_id: sessionId,
-      provider: String(provider || 'dummy'),
+        provider: String(provider || getDefaultTelephonyProviderCode()),
       queue_size: ids.length,
     },
   });
@@ -942,7 +948,7 @@ async function runCallNextAfterLock(tenantId, user, sid) {
     const attempt = await startCallForContact(tenantId, user, {
       contact_id: next.contact_id,
       contact_phone_id: next.contact_phone_id != null ? next.contact_phone_id : null,
-      provider: session.provider || 'dummy',
+      provider: session.provider || getDefaultTelephonyProviderCode(),
       dialer_session_id: sid,
     });
     await query(

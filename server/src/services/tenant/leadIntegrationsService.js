@@ -6,6 +6,8 @@ const ALLOWED_PROVIDERS = [
   'justdial',
   'indiamart',
   'real_estate_portal',
+  'zoho_crm',
+  'generic_crm',
 ];
 
 function normalizeProviderCode(providerCode) {
@@ -25,9 +27,11 @@ export async function listIntegrations(tenantId) {
       id,
       tenant_id,
       provider_code,
+      provider_type,
       provider_account_name,
       provider_account_name AS account_name,
       tokens_json,
+      connector_config_json,
       webhook_secret,
       default_owner_user_id,
       default_country_code,
@@ -66,7 +70,9 @@ export async function upsertIntegration(tenantId, user, payload) {
   }
 
   const providerAccountName = String(payload?.provider_account_name || 'default').trim();
+  const providerType = String(payload?.provider_type || 'lead_capture').trim().toLowerCase() || 'lead_capture';
   const tokensJson = payload?.tokens_json ?? {};
+  const connectorConfigJson = payload?.connector_config_json ?? null;
   const webhookSecret = payload?.webhook_secret ?? null;
   const defaultOwnerUserId = payload?.default_owner_user_id ?? null;
   const defaultCountryCode = String(payload?.default_country_code || '+91').trim() || '+91';
@@ -95,13 +101,26 @@ export async function upsertIntegration(tenantId, user, payload) {
     await query(
       `UPDATE lead_integrations
        SET tokens_json = ?,
+           connector_config_json = ?,
            webhook_secret = ?,
+           provider_type = ?,
            default_owner_user_id = ?,
            default_country_code = ?,
            is_active = ?,
            updated_by = ?
        WHERE id = ? AND tenant_id = ?`,
-      [JSON.stringify(safeTokens), webhookSecret, defaultOwnerUserId, defaultCountryCode, isActive, nowUserId, id, tenantId]
+      [
+        JSON.stringify(safeTokens),
+        connectorConfigJson ? JSON.stringify(connectorConfigJson) : null,
+        webhookSecret,
+        providerType,
+        defaultOwnerUserId,
+        defaultCountryCode,
+        isActive,
+        nowUserId,
+        id,
+        tenantId,
+      ]
     );
 
     return getIntegrationById(tenantId, id);
@@ -111,8 +130,10 @@ export async function upsertIntegration(tenantId, user, payload) {
     `INSERT INTO lead_integrations (
        tenant_id,
        provider_code,
+       provider_type,
        provider_account_name,
        tokens_json,
+       connector_config_json,
        webhook_secret,
        default_owner_user_id,
        default_country_code,
@@ -123,8 +144,10 @@ export async function upsertIntegration(tenantId, user, payload) {
     [
       tenantId,
       providerCode,
+      providerType,
       providerAccountName,
       JSON.stringify(safeTokens),
+      connectorConfigJson ? JSON.stringify(connectorConfigJson) : null,
       webhookSecret,
       defaultOwnerUserId,
       defaultCountryCode,

@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Call Nest CRM Dialer",
+  "description": "PhoneBurner-style click-to-call extension for multiple CRM websites using Call Nest Public Dialer API v1.",
+  "version": "0.1.0",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": ["https://*/*", "http://*/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*/*", "http://*/*"],
+      "js": ["crmAdapters.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options.html",
+  "action": {
+    "default_title": "Call Nest CRM Dialer",
+    "default_popup": "popup.html"
+  }
+}
