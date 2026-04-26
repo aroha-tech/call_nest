@@ -11,11 +11,13 @@ import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown';
 import { Alert } from '../../components/ui/Alert';
 import { Spinner } from '../../components/ui/Spinner';
 import { ConfirmModal } from '../../components/ui/Modal';
+import { ViewIcon, EditIcon, BlacklistIcon } from '../../components/ui/ActionIcons';
 import { contactsAPI } from '../../services/contactsAPI';
 import { tenantIndustryFieldsAPI } from '../../services/tenantIndustryFieldsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
 import { campaignsAPI } from '../../services/campaignsAPI';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
+import { contactBlacklistAPI } from '../../services/contactBlacklistAPI';
 import { ContactOpportunitiesSection } from './ContactOpportunitiesSection';
 import { ContactCallHistorySection } from './ContactCallHistorySection';
 import { useContactStatusesOptions } from '../disposition/hooks/useMasterData';
@@ -198,6 +200,11 @@ export function ContactFormPage({ defaultType }) {
   const [displayNameTouched, setDisplayNameTouched] = useState(false);
   const [convertTypeOpen, setConvertTypeOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [blacklistConfirmOpen, setBlacklistConfirmOpen] = useState(false);
+  const [blacklistScope, setBlacklistScope] = useState('record');
+  const [blacklistPhoneE164, setBlacklistPhoneE164] = useState('');
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actionsMenuRef = useRef(null);
   const [agentDeleteFlags, setAgentDeleteFlags] = useState(null);
   const didApplyNewStatusDefault = useRef(false);
   const editSnapshotRef = useRef(null);
@@ -252,6 +259,7 @@ export function ContactFormPage({ defaultType }) {
   const updateMutation = useMutation((payload) => contactsAPI.update(id, payload));
   const convertTypeMutation = useMutation((nextType) => contactsAPI.update(id, { type: nextType }));
   const deleteMutation = useMutation((delId) => contactsAPI.remove(delId, { deleted_source: 'manual' }));
+  const blacklistMutation = useMutation((payload) => contactBlacklistAPI.add(payload));
 
   const fetchCustomFields = useCallback(async () => {
     setLoadingCustomFields(true);
@@ -367,6 +375,7 @@ export function ContactFormPage({ defaultType }) {
     if (type === 'lead') return agentDeleteFlags.agent_can_delete_leads;
     return agentDeleteFlags.agent_can_delete_contacts;
   }, [isNew, canDeleteRBAC, role, agentDeleteFlags, type]);
+  const isBlacklistedContact = !!contact?.is_blacklisted_contact;
 
   useEffect(() => {
     didApplyNewStatusDefault.current = false;
@@ -375,6 +384,23 @@ export function ContactFormPage({ defaultType }) {
   useEffect(() => {
     editSnapshotRef.current = null;
   }, [id]);
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const onDocClick = (event) => {
+      if (actionsMenuRef.current?.contains(event.target)) return;
+      setActionsOpen(false);
+    };
+    const onEsc = (event) => {
+      if (event.key === 'Escape') setActionsOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [actionsOpen]);
 
   useLayoutEffect(() => {
     if (isNew) {
@@ -409,6 +435,7 @@ export function ContactFormPage({ defaultType }) {
             number: parts.national,
             label: p.label || 'mobile',
             is_primary: !!p.is_primary,
+            is_blacklisted: !!p.is_blacklisted_number,
           };
         })
       : [{ country_code: DEFAULT_PHONE_COUNTRY_CODE, number: '', label: 'mobile', is_primary: true }];
@@ -963,6 +990,17 @@ export function ContactFormPage({ defaultType }) {
     setConvertTypeOpen,
     canConvertRecordType,
     formatDateTime,
+    canBlacklistPhone: !isNew && isEditing,
+    onBlacklistPhone: (phoneE164) => {
+      if (!phoneE164) return;
+      setBlacklistPhoneE164(phoneE164);
+      setBlacklistScope('number');
+      setBlacklistConfirmOpen(true);
+    },
+    onOpenBlacklistPageForPhone: (phoneE164) => {
+      if (!phoneE164) return;
+      navigate(`/blacklist?search=${encodeURIComponent(phoneE164)}`);
+    },
   });
 
   const renderEditSection = (sectionId) => editSectionRenderers[sectionId]?.() ?? null;
@@ -1058,22 +1096,6 @@ export function ContactFormPage({ defaultType }) {
                 <Button variant="ghost" onClick={() => navigate(-1)}>
                   Back
                 </Button>
-                {canOpenActivity ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() =>
-                      navigate(
-                        isLeadRoute
-                          ? `/leads/${encodeURIComponent(String(id))}/activity`
-                          : `/contacts/${encodeURIComponent(String(id))}/activity`
-                      )
-                    }
-                  >
-                    Activity
-                  </Button>
-                ) : null}
                 <div className={styles.viewEditToggle} role="group" aria-label="View or edit record">
                   <Button
                     type="button"
@@ -1083,7 +1105,10 @@ export function ContactFormPage({ defaultType }) {
                     onClick={isEditing ? handleCancelEdit : undefined}
                     aria-current={!isEditing ? 'true' : undefined}
                   >
-                    View
+                    <span className={styles.viewEditToggleLabel}>
+                      <ViewIcon className={styles.viewEditToggleGlyph} />
+                      View
+                    </span>
                   </Button>
                   <Button
                     type="button"
@@ -1093,42 +1118,107 @@ export function ContactFormPage({ defaultType }) {
                     onClick={!isEditing ? handleEnterEdit : undefined}
                     aria-current={isEditing ? 'true' : undefined}
                   >
-                    Edit
+                    <span className={styles.viewEditToggleLabel}>
+                      <EditIcon className={styles.viewEditToggleGlyph} />
+                      Edit
+                    </span>
                   </Button>
                 </div>
-                {canDelete ? (
-                  <Button
-                    type="button"
-                    variant="danger"
-                    size="sm"
-                    onClick={() => setDeleteConfirmOpen(true)}
-                  >
-                    Delete
+                <div className={styles.headerMenuWrap} ref={actionsMenuRef}>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setActionsOpen((v) => !v)}>
+                    <span className={styles.actionsButtonInner}>
+                      Actions
+                      <span className={styles.actionsButtonChevron} aria-hidden>
+                        ▾
+                      </span>
+                    </span>
                   </Button>
-                ) : null}
-                {isEditing ? (
-                  <>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setLayoutEditMode((v) => !v)}>
-                      {layoutEditMode ? 'Done arranging' : 'Arrange sections'}
-                    </Button>
-                    {layoutEditMode ? (
-                      <Button
+                  {actionsOpen ? (
+                    <div className={styles.headerMenu}>
+                      {canOpenActivity ? (
+                        <button
+                          type="button"
+                          className={styles.headerMenuItem}
+                          onClick={() => {
+                            setActionsOpen(false);
+                            navigate(
+                              isLeadRoute
+                                ? `/leads/${encodeURIComponent(String(id))}/activity`
+                                : `/contacts/${encodeURIComponent(String(id))}/activity`
+                            );
+                          }}
+                        >
+                          <span className={styles.headerMenuItemIcon} aria-hidden>🕘</span>
+                          Activity
+                        </button>
+                      ) : null}
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="sm"
+                        className={styles.headerMenuItem}
+                        disabled={isBlacklistedContact}
                         onClick={() => {
-                          setFormColumns(
-                            reconcileContactFormColumns(
-                              createDefaultContactFormLayout(type),
-                              formLayoutVisibility,
-                              type
-                            )
-                          );
+                          setActionsOpen(false);
+                          setBlacklistScope('record');
+                          setBlacklistConfirmOpen(true);
                         }}
                       >
-                        Reset layout
-                      </Button>
-                    ) : null}
+                        <span className={styles.headerMenuItemIcon} aria-hidden>
+                          <BlacklistIcon className={styles.headerMenuGlyph} />
+                        </span>
+                        {isBlacklistedContact ? 'Already blacklisted' : 'Add to blacklist'}
+                      </button>
+                      {isEditing ? (
+                        <>
+                          <button
+                            type="button"
+                            className={styles.headerMenuItem}
+                            onClick={() => {
+                              setActionsOpen(false);
+                              setLayoutEditMode((v) => !v);
+                            }}
+                          >
+                            <span className={styles.headerMenuItemIcon} aria-hidden>🧩</span>
+                            {layoutEditMode ? 'Done arranging' : 'Arrange sections'}
+                          </button>
+                          {layoutEditMode ? (
+                            <button
+                              type="button"
+                              className={styles.headerMenuItem}
+                              onClick={() => {
+                                setActionsOpen(false);
+                                setFormColumns(
+                                  reconcileContactFormColumns(
+                                    createDefaultContactFormLayout(type),
+                                    formLayoutVisibility,
+                                    type
+                                  )
+                                );
+                              }}
+                            >
+                              <span className={styles.headerMenuItemIcon} aria-hidden>↺</span>
+                              Reset layout
+                            </button>
+                          ) : null}
+                        </>
+                      ) : null}
+                      {canDelete ? (
+                        <button
+                          type="button"
+                          className={`${styles.headerMenuItem} ${styles.headerMenuItemDanger}`}
+                          onClick={() => {
+                            setActionsOpen(false);
+                            setDeleteConfirmOpen(true);
+                          }}
+                        >
+                          <span className={styles.headerMenuItemIcon} aria-hidden>🗑</span>
+                          Delete
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+                {isEditing ? (
+                  <>
                     <Button variant="ghost" onClick={handleCancelEdit}>
                       Cancel
                     </Button>
@@ -1245,6 +1335,45 @@ export function ContactFormPage({ defaultType }) {
         message={`Are you sure you want to delete "${contact?.display_name || formData?.display_name || formData?.first_name || formData?.email || 'this record'}"? This removes it from your workspace lists.`}
         confirmText="Delete"
         loading={deleteMutation.loading}
+      />
+
+      <ConfirmModal
+        isOpen={blacklistConfirmOpen}
+        onClose={() => {
+          if (!blacklistMutation.loading) setBlacklistConfirmOpen(false);
+        }}
+        onConfirm={async () => {
+          if (!id || id === 'new') return;
+          const payload =
+            blacklistScope === 'number'
+              ? {
+                  block_scope: 'number',
+                  contact_id: Number(id),
+                  phone_e164: blacklistPhoneE164 || null,
+                  reason: 'Added from record actions',
+                }
+              : {
+                  block_scope: contact?.type === 'lead' ? 'lead' : 'contact',
+                  contact_id: Number(id),
+                  reason: 'Added from record actions',
+                };
+          const result = await blacklistMutation.mutate(payload);
+          if (result?.success) {
+            setBlacklistConfirmOpen(false);
+            setBlacklistPhoneE164('');
+            await refetchContact();
+          } else if (result?.error) {
+            setSubmitError(result.error);
+          }
+        }}
+        title={blacklistScope === 'number' ? 'Blacklist number' : `Blacklist ${type === 'lead' ? 'Lead' : 'Contact'}`}
+        message={
+          blacklistScope === 'number'
+            ? `Blacklist "${blacklistPhoneE164 || 'this number'}" for this tenant?`
+            : `Blacklist "${contact?.display_name || formData?.display_name || 'this record'}" for this tenant?`
+        }
+        confirmText="Add to blacklist"
+        loading={blacklistMutation.loading}
       />
 
       {!isNew && contact ? (

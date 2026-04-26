@@ -463,3 +463,25 @@
 .actionMenuItemDanger {
   color: var(--color-danger, #c00);
 }
+
+.actionMenuItemWithIcon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.blockedPill {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #8b1d1d;
+  background: #fde8e8;
+}
+
+.blacklistTextStrong {
+  color: #8b1d1d;
+  font-weight: 600;
+}

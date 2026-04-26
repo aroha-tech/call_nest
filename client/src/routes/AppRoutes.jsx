@@ -46,6 +46,7 @@ import { ContactTagsPage } from '../features/contacts/ContactTagsPage';
 import { ContactFormPage } from '../features/contacts/ContactFormPage';
 import { ContactImportPage } from '../features/contacts/ContactImportPage';
 import { ContactImportHistoryPage } from '../features/contacts/ContactImportHistoryPage';
+import { ContactBlacklistPage } from '../features/contacts/ContactBlacklistPage';
 import { BackgroundJobsPage } from '../pages/BackgroundJobsPage';
 import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
 import { TenantCompanySettingsPage } from '../pages/TenantCompanySettingsPage';
@@ -481,6 +482,16 @@ function TenantRoutes() {
           <ProtectedRoute permission={PERMISSIONS.CONTACTS_READ}>
             <AppShellLayout>
               <ContactsPage type="contact" />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/blacklist"
+        element={
+          <ProtectedRoute permissions={[PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ]}>
+            <AppShellLayout>
+              <ContactBlacklistPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

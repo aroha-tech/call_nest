@@ -398,6 +398,28 @@ function IconCalendar() {
   );
 }
 
+/** Tenant blacklist (blocked leads/contacts/numbers). */
+function IconBlacklist() {
+  return (
+    <Icon>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+    </Icon>
+  );
+}
+
+/** Meeting-related attendee / invitation emails (settings). */
+function IconMeetingAttendeeEmails() {
+  return (
+    <Icon>
+      <rect x="4" y="3" width="16" height="5" rx="1" />
+      <path d="M7 3v3M17 3v3M4 6h16" />
+      <rect width="18" height="11" x="3" y="10" rx="2" />
+      <path d="m3 13 9 5 9-5" />
+    </Icon>
+  );
+}
+
 /** Meetings — calendar with highlighted event row */
 function IconMeetings() {
   return (
@@ -471,6 +493,8 @@ const NAV_ICON_MAP = {
   'contact-tags': IconTags,
   integrations: IconPlug,
   'background-jobs': IconBackgroundTasks,
+  blacklist: IconBlacklist,
+  'meeting-attendee-emails': IconMeetingAttendeeEmails,
 };
 
 /**

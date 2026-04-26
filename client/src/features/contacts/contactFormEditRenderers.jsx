@@ -121,6 +121,9 @@ export function createContactFormEditSectionRenderers(ctx) {
     setConvertTypeOpen,
     canConvertRecordType,
     formatDateTime,
+    canBlacklistPhone,
+    onBlacklistPhone,
+    onOpenBlacklistPageForPhone,
   } = ctx;
 
   return {
@@ -415,6 +418,9 @@ export function createContactFormEditSectionRenderers(ctx) {
               (formData.phones || []).map((x, i) => (i === idx ? null : (x.label || 'mobile').toLowerCase())).filter(Boolean)
             );
             const labelOptionsForRow = PHONE_LABEL_OPTIONS.filter((o) => !used.has(o.value) || o.value === (p.label || 'mobile'));
+            const normalizedCc = normalizeCallingCode(p.country_code || DEFAULT_PHONE_COUNTRY_CODE);
+            const normalizedNumber = clampNationalDigits(p.number || '');
+            const phoneE164 = normalizedNumber ? `${normalizedCc}${normalizedNumber}` : '';
             return (
               <div key={idx} className={`${styles.phoneRow} ${styles.phoneRowCompact}`}>
                 <div className={styles.phoneCc}>
@@ -457,6 +463,29 @@ export function createContactFormEditSectionRenderers(ctx) {
                   />
                 </div>
                 <div className={styles.phoneTail}>
+                  {p.is_blacklisted ? <span className={styles.phoneBlockedHint}>Blocked</span> : null}
+                  {canBlacklistPhone && !p.is_blacklisted ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={!phoneE164}
+                      onClick={() => onBlacklistPhone?.(phoneE164)}
+                    >
+                      Blacklist number
+                    </Button>
+                  ) : null}
+                  {canBlacklistPhone && p.is_blacklisted ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={!phoneE164}
+                      onClick={() => onOpenBlacklistPageForPhone?.(phoneE164)}
+                    >
+                      View blacklist
+                    </Button>
+                  ) : null}
                   <label className={styles.primaryCheck}>
                     <input
                       type="checkbox"

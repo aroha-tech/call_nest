@@ -171,6 +171,7 @@ export async function list(req, res, next) {
     }
 
     const { search = '', page = '1', limit = '20', type, status_id } = req.query;
+    const exclude_blacklisted = String(req.query.exclude_blacklisted || '').trim().toLowerCase();
     const touch_status = req.query.touch_status ? String(req.query.touch_status).trim().toLowerCase() : undefined;
     const min_call_count =
       req.query.min_call_count === undefined || req.query.min_call_count === null || String(req.query.min_call_count).trim() === ''
@@ -220,6 +221,7 @@ export async function list(req, res, next) {
       sortBy,
       sortDir,
       columnFilters,
+      excludeBlacklisted: ['1', 'true', 'yes'].includes(exclude_blacklisted),
     });
 
     res.json(result);
@@ -236,6 +238,7 @@ export async function listIds(req, res, next) {
     }
 
     const { search = '', type, status_id } = req.query;
+    const exclude_blacklisted = String(req.query.exclude_blacklisted || '').trim().toLowerCase();
     const touch_status = req.query.touch_status ? String(req.query.touch_status).trim().toLowerCase() : undefined;
     const min_call_count =
       req.query.min_call_count === undefined || req.query.min_call_count === null || String(req.query.min_call_count).trim() === ''
@@ -282,6 +285,7 @@ export async function listIds(req, res, next) {
       campaignIdsFilter,
       filterTagIds,
       columnFilters,
+      excludeBlacklisted: ['1', 'true', 'yes'].includes(exclude_blacklisted),
     });
 
     res.json(result);

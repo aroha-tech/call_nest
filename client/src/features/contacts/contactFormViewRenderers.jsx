@@ -193,7 +193,7 @@ export function createContactFormViewSectionRenderers(ctx) {
           {(formData.phones || []).map((p, idx) => {
             const num = String(p.number || '').trim();
             const line = num
-              ? `${p.country_code || DEFAULT_PHONE_COUNTRY_CODE} ${num} · ${phoneLabelText(p.label)}${p.is_primary ? ' · Primary' : ''}`
+              ? `${p.country_code || DEFAULT_PHONE_COUNTRY_CODE} ${num} · ${phoneLabelText(p.label)}${p.is_primary ? ' · Primary' : ''}${p.is_blacklisted ? ' · Blocked' : ''}`
               : `${p.country_code || DEFAULT_PHONE_COUNTRY_CODE} (no number) · ${phoneLabelText(p.label)}`;
             return (
               <li key={idx} className={styles.viewPhoneItem}>

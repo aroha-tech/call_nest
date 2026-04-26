@@ -372,6 +372,7 @@ export async function syncContactsManagerForAgent(tenantId, agentUserId, newMana
 const CONTACT_LIST_SORT_COLUMNS = {
   display_name: 'c.display_name',
   primary_phone: 'p.phone',
+  blacklist_status: '(CASE WHEN EXISTS (SELECT 1 FROM contact_blacklist_entries bsc WHERE bsc.tenant_id = c.tenant_id AND bsc.deleted_at IS NULL AND bsc.contact_id = c.id) OR EXISTS (SELECT 1 FROM contact_blacklist_entries bsn WHERE bsn.tenant_id = c.tenant_id AND bsn.deleted_at IS NULL AND bsn.phone_e164 IS NOT NULL AND (bsn.phone_e164 = p.phone OR EXISTS (SELECT 1 FROM contact_phones cpn2 WHERE cpn2.tenant_id = c.tenant_id AND cpn2.contact_id = c.id AND cpn2.phone = bsn.phone_e164))) THEN 1 ELSE 0 END)',
   email: 'c.email',
   tag_names: 'tag_names',
   campaign_name: 'cam.name',
@@ -436,6 +437,7 @@ const CONTACT_LIST_JOIN_FROM = `
 const COLUMN_FILTER_FIELDS = new Set([
   'display_name',
   'primary_phone',
+  'blacklist_status',
   'email',
   'tag_names',
   'campaign_name',
@@ -670,6 +672,51 @@ function applyContactListColumnFilters(whereClauses, params, rules) {
           params.push(ends(value));
         }
         break;
+      case 'blacklist_status': {
+        const blkExpr = `(
+          EXISTS (
+            SELECT 1
+            FROM contact_blacklist_entries bsc
+            WHERE bsc.tenant_id = c.tenant_id
+              AND bsc.deleted_at IS NULL
+              AND bsc.contact_id = c.id
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM contact_blacklist_entries bsn
+            WHERE bsn.tenant_id = c.tenant_id
+              AND bsn.deleted_at IS NULL
+              AND bsn.phone_e164 IS NOT NULL
+              AND (
+                bsn.phone_e164 = p.phone
+                OR EXISTS (
+                  SELECT 1
+                  FROM contact_phones cpn
+                  WHERE cpn.tenant_id = c.tenant_id
+                    AND cpn.contact_id = c.id
+                    AND cpn.phone = bsn.phone_e164
+                )
+              )
+          )
+        )`;
+        if (op === 'empty') {
+          whereClauses.push(`NOT ${blkExpr}`);
+        } else if (op === 'not_empty') {
+          whereClauses.push(blkExpr);
+        } else {
+          const v = String(value || '').trim().toLowerCase();
+          const wantsBlocked = ['blocked', 'blacklisted', 'yes', 'true', '1'].includes(v);
+          const wantsActive = ['active', 'not blocked', 'clear', 'no', 'false', '0'].includes(v);
+          if (op === 'contains' || op === 'starts_with' || op === 'ends_with') {
+            if (wantsBlocked) whereClauses.push(blkExpr);
+            else if (wantsActive) whereClauses.push(`NOT ${blkExpr}`);
+          } else if (op === 'not_contains') {
+            if (wantsBlocked) whereClauses.push(`NOT ${blkExpr}`);
+            else if (wantsActive) whereClauses.push(blkExpr);
+          }
+        }
+        break;
+      }
       case 'email':
         if (op === 'empty') {
           whereClauses.push(`(c.email IS NULL OR TRIM(c.email) = '')`);
@@ -978,6 +1025,7 @@ async function prepareContactListFinalWhere(
     filterTagIds,
     columnFilters,
     touchStatus,
+    excludeBlacklisted = false,
   }
 ) {
   const { whereSQL, params } = buildOwnershipWhere(user);
@@ -1041,6 +1089,30 @@ async function prepareContactListFinalWhere(
   const normalizedColumnFilters = normalizeContactListColumnFilters(columnFilters, allowedIndustryFieldKeys);
   applyContactListColumnFilters(whereClauses, params, normalizedColumnFilters);
 
+  if (excludeBlacklisted) {
+    whereClauses.push(
+      `NOT EXISTS (
+        SELECT 1
+        FROM contact_blacklist_entries b
+        WHERE b.tenant_id = c.tenant_id
+          AND b.deleted_at IS NULL
+          AND (
+            b.contact_id = c.id
+            OR (
+              b.phone_e164 IS NOT NULL
+              AND EXISTS (
+                SELECT 1
+                FROM contact_phones cp_blk
+                WHERE cp_blk.tenant_id = c.tenant_id
+                  AND cp_blk.contact_id = c.id
+                  AND cp_blk.phone = b.phone_e164
+              )
+            )
+          )
+      )`
+    );
+  }
+
   const finalWhere = `WHERE ${whereClauses.join(' AND ')}`;
   return { finalWhere, params };
 }
@@ -1070,6 +1142,7 @@ export async function listContacts(
     sortDir,
     columnFilters,
     touchStatus,
+    excludeBlacklisted = false,
   } = {}
 ) {
   const pageNum = parseInt(page, 10) || 1;
@@ -1097,6 +1170,7 @@ export async function listContacts(
     filterTagIds,
     columnFilters,
     touchStatus,
+    excludeBlacklisted,
   });
 
   const [countRow] = await query(
@@ -1152,6 +1226,30 @@ export async function listContacts(
         c.last_called_at,
         c.call_count_total,
         c.created_at
+        ,
+        EXISTS (
+          SELECT 1
+          FROM contact_blacklist_entries b
+          WHERE b.tenant_id = c.tenant_id
+            AND b.deleted_at IS NULL
+            AND b.contact_id = c.id
+        ) AS is_blacklisted_contact,
+        EXISTS (
+          SELECT 1
+          FROM contact_blacklist_entries bpn
+          WHERE bpn.tenant_id = c.tenant_id
+            AND bpn.deleted_at IS NULL
+            AND bpn.phone_e164 IS NOT NULL
+            AND (
+              bpn.phone_e164 = p.phone
+              OR EXISTS (
+                SELECT 1 FROM contact_phones cpn
+                WHERE cpn.tenant_id = c.tenant_id
+                  AND cpn.contact_id = c.id
+                  AND cpn.phone = bpn.phone_e164
+              )
+            )
+        ) AS has_blacklisted_number
      ${CONTACT_LIST_JOIN_FROM}
      ${finalWhere}
      ORDER BY ${orderBySQL}
@@ -1376,6 +1474,14 @@ export async function getContactById(id, tenantId, user) {
         c.call_count_total,
         c.created_at,
         c.updated_at
+        ,
+        EXISTS (
+          SELECT 1
+          FROM contact_blacklist_entries b
+          WHERE b.tenant_id = c.tenant_id
+            AND b.deleted_at IS NULL
+            AND b.contact_id = c.id
+        ) AS is_blacklisted_contact
      FROM contacts c
      LEFT JOIN contact_phones p
        ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id
@@ -1393,7 +1499,14 @@ export async function getContactById(id, tenantId, user) {
   }
 
   const phones = await query(
-    `SELECT id, phone, label, is_primary, created_at
+    `SELECT id, phone, label, is_primary, created_at,
+        EXISTS (
+          SELECT 1
+          FROM contact_blacklist_entries b
+          WHERE b.tenant_id = contact_phones.tenant_id
+            AND b.deleted_at IS NULL
+            AND b.phone_e164 = contact_phones.phone
+        ) AS is_blacklisted_number
      FROM contact_phones
      WHERE tenant_id = ? AND contact_id = ?
      ORDER BY is_primary DESC, id ASC`,

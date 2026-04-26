@@ -79,6 +79,7 @@ export function mergeApplicableLeadColumnsWithIndustryFields(applicableBase, def
 const ALL_LEAD_COLUMNS = [
   { id: 'display_name', label: 'Display name', sortKey: 'display_name', category: 'default' },
   { id: 'primary_phone', label: 'Primary phone', sortKey: 'primary_phone', category: 'default' },
+  { id: 'blacklist_status', label: 'Blacklist', sortKey: 'blacklist_status', category: 'default' },
   { id: 'email', label: 'Email', sortKey: 'email', category: 'default' },
   { id: 'tag_names', label: 'Tag', sortKey: 'tag_names', category: 'default' },
   { id: 'status_name', label: 'Status', sortKey: 'status_name', category: 'default' },
@@ -127,6 +128,7 @@ export function getDefaultVisibleLeadColumnIds(applicable) {
   const order = [
     'display_name',
     'primary_phone',
+    'blacklist_status',
     'email',
     'tag_names',
     'type',

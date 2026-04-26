@@ -78,6 +78,7 @@ import {
 } from './ListActionsMenuIcons';
 import { savedListFiltersAPI } from '../../services/savedListFiltersAPI';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
+import { contactBlacklistAPI } from '../../services/contactBlacklistAPI';
 import { industryFieldColumnId } from './industryFieldColumnIds';
 import { isNoListFilter, normalizeListFilterAll } from '../../utils/listFilterNarrowing';
 
@@ -517,6 +518,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [deleteItem, setDeleteItem] = useState(null);
+  const [blacklistItem, setBlacklistItem] = useState(null);
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const [bulkDeleteQueueing, setBulkDeleteQueueing] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -1053,6 +1055,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
         ...(type === 'contact' && contactColumnFilters.length > 0
           ? { column_filters: contactColumnFilters }
           : {}),
+        ...(isDialer && type === 'lead' ? { exclude_blacklisted: true } : {}),
       }),
     [
       searchQuery,
@@ -1066,6 +1069,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
       contactSortBy,
       contactSortDir,
       contactColumnFilters,
+      isDialer,
     ]
   );
 
@@ -1241,6 +1245,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
   const createMutation = useMutation((payload) => contactsAPI.create(payload));
   const updateMutation = useMutation((id, payload) => contactsAPI.update(id, payload));
   const deleteMutation = useMutation((id) => contactsAPI.remove(id, { deleted_source: 'manual' }));
+  const blacklistMutation = useMutation((payload) => contactBlacklistAPI.add(payload));
   const bulkDeleteMutation = useMutation((ids) => contactsAPI.removeBulk(ids, { deleted_source: 'manual' }));
   const assignMutation = useMutation((body) => contactsAPI.assign(body));
 
@@ -1491,6 +1496,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
         ...filterParamsForApi,
         ...(type === 'lead' && leadColumnFilters.length > 0 ? { column_filters: leadColumnFilters } : {}),
         ...(type === 'contact' && contactColumnFilters.length > 0 ? { column_filters: contactColumnFilters } : {}),
+        ...(isDialer && type === 'lead' ? { exclude_blacklisted: true } : {}),
       });
       const { ids = [], total = 0, truncated, cap } = res?.data ?? {};
       if (truncated) {
@@ -1515,6 +1521,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
     filterParamsForApi,
     leadColumnFilters,
     contactColumnFilters,
+    isDialer,
   ]);
 
   const handleFilterModalApply = useCallback(
@@ -1995,6 +2002,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
                 onView={isDialer ? undefined : (c) => navigate(`/leads/${c.id}?mode=view`)}
                 onEdit={(c) => navigate(`/leads/${c.id}?mode=edit`)}
                 onDelete={setDeleteItem}
+                onBlacklist={(c) => setBlacklistItem({ row: c })}
                 showDialerCall={isDialer}
                 onDialerCall={(c) => openStartModal([c.id])}
                 displayNameLinkTo={(c) => `/leads/${c.id}?mode=view`}
@@ -2021,6 +2029,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
                 onView={(c) => navigate(`/contacts/${c.id}?mode=view`)}
                 onEdit={(c) => navigate(`/contacts/${c.id}?mode=edit`)}
                 onDelete={setDeleteItem}
+                onBlacklist={(c) => setBlacklistItem({ row: c })}
                 displayNameLinkTo={(c) => `/contacts/${c.id}?mode=view`}
               />
             )}
@@ -2060,6 +2069,32 @@ export function ContactsPage({ type, mode = 'crm' }) {
       />
 
       {/* Dialer start modal removed (setup is now a standalone page). */}
+
+      <ConfirmModal
+        isOpen={!!blacklistItem}
+        onClose={() => setBlacklistItem(null)}
+        onConfirm={async () => {
+          if (!blacklistItem?.row) return;
+          const row = blacklistItem.row;
+          const scope = row.type === 'lead' ? 'lead' : 'contact';
+          const payload = {
+            block_scope: scope,
+            contact_id: row.id,
+            reason: 'Added from list actions',
+          };
+          const result = await blacklistMutation.mutate(payload);
+          if (result?.success) {
+            setBlacklistItem(null);
+            refetch();
+          }
+        }}
+        title={`Blacklist ${type === 'lead' ? 'Lead' : 'Contact'}`}
+        message={
+          `Add "${blacklistItem?.row?.display_name || blacklistItem?.row?.email || 'this record'}" to blacklist?`
+        }
+        confirmText="Add to blacklist"
+        loading={blacklistMutation.loading}
+      />
 
       <ConfirmModal
         isOpen={!!deleteItem}

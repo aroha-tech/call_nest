@@ -13,9 +13,45 @@ export async function createSession(
   user,
   { contact_ids = [], provider = 'dummy', dialing_set_id = null, call_script_id = null } = {}
 ) {
-  const ids = normalizeIds(contact_ids, 500);
-  if (ids.length === 0) {
+  const rawIds = normalizeIds(contact_ids, 500);
+  if (rawIds.length === 0) {
     const err = new Error('contact_ids must be a non-empty array');
+    err.status = 400;
+    throw err;
+  }
+
+  const placeholders = rawIds.map(() => '?').join(',');
+  const visibleRows = await query(
+    `SELECT c.id
+     FROM contacts c
+     WHERE c.tenant_id = ?
+       AND c.deleted_at IS NULL
+       AND c.id IN (${placeholders})
+       AND NOT EXISTS (
+         SELECT 1
+         FROM contact_blacklist_entries b
+         WHERE b.tenant_id = c.tenant_id
+           AND b.deleted_at IS NULL
+           AND (
+             b.contact_id = c.id
+             OR (
+               b.phone_e164 IS NOT NULL
+               AND EXISTS (
+                 SELECT 1
+                 FROM contact_phones cp
+                 WHERE cp.tenant_id = c.tenant_id
+                   AND cp.contact_id = c.id
+                   AND cp.phone = b.phone_e164
+               )
+             )
+           )
+       )`,
+    [tenantId, ...rawIds]
+  );
+  const allowedSet = new Set(visibleRows.map((r) => Number(r.id)));
+  const ids = rawIds.filter((id) => allowedSet.has(Number(id)));
+  if (ids.length === 0) {
+    const err = new Error('Selected leads are blacklisted or unavailable for dialing');
     err.status = 400;
     throw err;
   }

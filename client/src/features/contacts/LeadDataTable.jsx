@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
 import { IconButton } from '../../components/ui/IconButton';
-import { EditIcon, TrashIcon, ViewIcon, RowActionGroup } from '../../components/ui/ActionIcons';
+import { EditIcon, TrashIcon, ViewIcon, BlacklistIcon, RowActionGroup } from '../../components/ui/ActionIcons';
 import { Button } from '../../components/ui/Button';
 
 import styles from './LeadDataTable.module.scss';
@@ -14,7 +14,17 @@ import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 
 const ACTION_MENU_MIN_W = 160;
 
-function LeadRowActionsMenu({ useMenu, onView, canUpdate, canDelete, onEdit, onDelete, scrollContainerRef }) {
+function LeadRowActionsMenu({
+  useMenu,
+  onView,
+  canUpdate,
+  canDelete,
+  canBlacklist,
+  onEdit,
+  onDelete,
+  onBlacklistRecord,
+  scrollContainerRef,
+}) {
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
   const wrapRef = useRef(null);
@@ -98,6 +108,11 @@ function LeadRowActionsMenu({ useMenu, onView, canUpdate, canDelete, onEdit, onD
             <TrashIcon />
           </IconButton>
         )}
+        {canBlacklist && (
+          <IconButton size="sm" title="Add to blacklist" onClick={onBlacklistRecord}>
+            <BlacklistIcon />
+          </IconButton>
+        )}
       </RowActionGroup>
     );
   }
@@ -156,6 +171,22 @@ function LeadRowActionsMenu({ useMenu, onView, canUpdate, canDelete, onEdit, onD
                 </button>
               </li>
             ) : null}
+            {canBlacklist ? (
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={`${styles.actionMenuItem} ${styles.actionMenuItemWithIcon}`}
+                  onClick={() => {
+                    onBlacklistRecord?.();
+                    setOpen(false);
+                  }}
+                >
+                  <BlacklistIcon />
+                  Add to blacklist
+                </button>
+              </li>
+            ) : null}
           </ul>,
           document.body
         )
@@ -206,6 +237,7 @@ export function LeadDataTable({
   canDelete,
   onEdit,
   onDelete,
+  onBlacklist,
   tableScrollContainerRef,
   showDialerCall = false,
   onDialerCall,
@@ -258,7 +290,7 @@ export function LeadDataTable({
         return (
           <Link
             to={to}
-            className={styles.displayNameLink}
+            className={`${styles.displayNameLink} ${c.is_blacklisted_contact ? styles.blacklistTextStrong : ''}`}
             onClick={(e) => e.stopPropagation()}
           >
             {text}
@@ -266,7 +298,20 @@ export function LeadDataTable({
         );
       }
       case 'primary_phone':
-        return c.primary_phone || '—';
+        return (
+          <span className={c.has_blacklisted_number ? styles.blacklistTextStrong : ''}>
+            {c.primary_phone || '—'}
+            {c.has_blacklisted_number ? <span className={styles.blockedPill}>Blocked</span> : null}
+          </span>
+        );
+      case 'blacklist_status': {
+        const contactBlocked = !!c.is_blacklisted_contact;
+        const numberBlocked = !!c.has_blacklisted_number;
+        if (contactBlocked && numberBlocked) return <span className={styles.blacklistTextStrong}>Contact + number</span>;
+        if (contactBlocked) return <span className={styles.blacklistTextStrong}>Contact blocked</span>;
+        if (numberBlocked) return <span className={styles.blacklistTextStrong}>Number blocked</span>;
+        return 'Active';
+      }
       case 'email':
         return c.email || '—';
       case 'tag_names':
@@ -429,8 +474,10 @@ export function LeadDataTable({
                 onView={onView ? () => onView(c) : undefined}
                 canUpdate={canUpdate}
                 canDelete={canDelete}
+                canBlacklist={!!onBlacklist}
                 onEdit={() => onEdit(c)}
                 onDelete={() => onDelete(c)}
+                onBlacklistRecord={() => onBlacklist?.(c, 'record')}
                 scrollContainerRef={tableScrollContainerRef}
               />
             </TableCell>

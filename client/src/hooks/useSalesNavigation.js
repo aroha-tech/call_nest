@@ -61,6 +61,13 @@ const TENANT_ADMIN_NAV_ITEMS = [
     permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
   },
   { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
+  {
+    key: 'blacklist',
+    label: 'Blacklist',
+    path: '/blacklist',
+    permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
+    section: 'Compliance',
+  },
   { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
   {
     key: 'dialer',
@@ -229,6 +236,13 @@ const MANAGER_NAV_ITEMS = [
   },
   { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
   {
+    key: 'blacklist',
+    label: 'Blacklist',
+    path: '/blacklist',
+    permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
+    section: 'Compliance',
+  },
+  {
     key: 'contact-tags',
     label: 'Contact tags',
     path: '/settings/contact-tags',
@@ -378,6 +392,14 @@ const AGENT_NAV_ITEMS = [
     permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
   },
   { key: 'contacts', label: 'Contacts', path: '/contacts', permission: PERMISSIONS.CONTACTS_READ },
+  {
+    key: 'blacklist',
+    label: 'Blacklist',
+    path: '/blacklist',
+    permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
+    section: 'Compliance',
+  },
+
   {
     key: 'background-jobs',
     label: 'Background tasks',

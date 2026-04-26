@@ -93,6 +93,7 @@ function filterPlaceholderForColumn(sortKey) {
   const map = {
     email: 'e.g. @gmail.com or partial address',
     primary_phone: 'Digits or partial number',
+    blacklist_status: 'blocked, active, yes, no',
     tag_names: 'Tag name or part of it',
     status_name: 'Status name (e.g. New, Contacted)',
     campaign_name: 'Campaign name',

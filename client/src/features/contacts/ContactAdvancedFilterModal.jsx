@@ -42,6 +42,7 @@ function IconPropertyRules() {
 const FIELD_OPTIONS = [
   { value: 'display_name', label: 'Name / display' },
   { value: 'primary_phone', label: 'Primary phone' },
+  { value: 'blacklist_status', label: 'Blacklist status' },
   { value: 'email', label: 'Email' },
   { value: 'type', label: 'Record type' },
   { value: 'source', label: 'Source' },
