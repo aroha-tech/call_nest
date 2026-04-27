@@ -249,9 +249,10 @@ export function DefaultDispositionsPage() {
     <div className={styles.page}>
       <PageHeader
         title="Default Dispositions"
+        titleIcon="rule_settings"
         description="Disposition templates that can be cloned by tenants"
         actions={
-          <Button onClick={openCreateModal}>+ Add Disposition</Button>
+          <Button onClick={openCreateModal}>Add disposition</Button>
         }
       />
 
@@ -476,7 +477,7 @@ export function DefaultDispositionsPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <label style={{ fontWeight: 500, fontSize: '14px' }}>Actions (max 3)</label>
               {formData?.actions?.length < 3 && (
-                <Button type="button" variant="secondary" size="sm" onClick={handleAddAction}>+ Add Action</Button>
+                <Button type="button" variant="secondary" size="sm" onClick={handleAddAction}>Add action</Button>
               )}
             </div>
             

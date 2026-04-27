@@ -1,5 +1,5 @@
 import React from 'react';
-import { Spinner } from '../ui/Spinner';
+import { Skeleton } from '../ui/Skeleton';
 import listStyles from './adminDataList.module.scss';
 
 /**
@@ -17,12 +17,24 @@ export function TableDataRegion({ loading, hasCompletedInitialFetch, children, c
           aria-busy="true"
           aria-label="Loading"
         >
-          <Spinner size="lg" />
+          <div className={listStyles.tableSkeletonOverlay}>
+            <Skeleton height={14} />
+            <Skeleton height={14} width="92%" />
+            <Skeleton height={14} width="86%" />
+            <Skeleton height={14} width="90%" />
+          </div>
         </div>
       ) : null}
       {showFirstOnlySpinner ? (
-        <div className={listStyles.firstLoadSpinnerWrap}>
-          <Spinner size="lg" />
+        <div className={listStyles.firstLoadSkeletonWrap}>
+          <div className={listStyles.tableSkeletonBlock}>
+            <Skeleton height={16} width="28%" />
+            <Skeleton height={16} width="100%" />
+            <Skeleton height={16} width="96%" />
+            <Skeleton height={16} width="92%" />
+            <Skeleton height={16} width="94%" />
+            <Skeleton height={16} width="88%" />
+          </div>
         </div>
       ) : (
         children

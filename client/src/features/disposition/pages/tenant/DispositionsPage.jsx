@@ -304,6 +304,7 @@ export function DispositionsPage({ readOnly = false }) {
     <div className={styles.page}>
       <PageHeader
         title="Dispositions"
+        titleIcon="rule"
         description={
           readOnly
             ? 'View call outcome dispositions (read-only).'
@@ -317,7 +318,7 @@ export function DispositionsPage({ readOnly = false }) {
                   Import from Template
                 </Button>
               )}
-              <Button onClick={openCreateModal}>+ Add Disposition</Button>
+              <Button onClick={openCreateModal}>Add disposition</Button>
             </div>
           ) : undefined
         }
@@ -637,7 +638,7 @@ export function DispositionsPage({ readOnly = false }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <label style={{ fontWeight: 500, fontSize: '14px' }}>Actions (max 3)</label>
               {(formData.actions || []).length < 3 && (
-                <Button type="button" variant="secondary" size="sm" onClick={handleAddAction}>+ Add Action</Button>
+                <Button type="button" variant="secondary" size="sm" onClick={handleAddAction}>Add action</Button>
               )}
             </div>
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px', marginBottom: '12px', lineHeight: 1.45 }}>

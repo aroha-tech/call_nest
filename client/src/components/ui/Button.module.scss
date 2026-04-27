@@ -7,12 +7,17 @@
   justify-content: center;
   gap: $space-2;
   border: 1px solid transparent;
-  border-radius: $radius-sm;
-  font-weight: $font-weight-medium;
+  border-radius: $radius-md;
+  font-weight: $font-weight-semibold;
   font-size: $font-size-sm;
   line-height: 1;
   white-space: nowrap;
-  transition: all $transition-fast;
+  transition:
+    border-color $transition-fast,
+    background $transition-fast,
+    color $transition-fast,
+    box-shadow $transition-fast,
+    transform $transition-fast;
   cursor: pointer;
   user-select: none;
 
@@ -36,65 +41,66 @@
 }
 
 .sm {
-  height: 34px;
-  min-height: 34px;
+  height: 32px;
+  min-height: 32px;
   padding: 0 $space-4;
   font-size: $font-size-xs;
   border-radius: $radius-md;
 }
 
 .md {
-  height: 36px;
-  min-height: 36px;
+  height: 34px;
+  min-height: 34px;
   padding: 0 $space-5;
   font-size: $font-size-sm;
   border-radius: $radius-md;
 }
 
 .lg {
-  height: 40px;
+  height: 38px;
   padding: 0 $space-5;
   font-size: $font-size-base;
 }
 
 // Variants — flat, theme-token driven (light theme: crisp outline secondaries; no heavy 3D chrome)
 .primary {
-  background: var(--color-text-primary);
-  color: var(--color-bg-body);
-  border-color: var(--color-text-primary);
+  background: linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 100%);
+  color: #ffffff;
+  border-color: var(--color-primary-600);
   box-shadow: $shadow-xs;
 
   &:hover:not(:disabled) {
-    background: var(--color-bg-body);
-    color: var(--color-text-primary);
-    border-color: var(--color-text-primary);
+    background: linear-gradient(135deg, var(--color-primary-700) 0%, var(--color-primary-600) 100%);
+    color: #ffffff;
+    border-color: var(--color-primary-700);
     box-shadow: $shadow-sm;
   }
 
   &:active:not(:disabled) {
-    background: var(--color-bg-muted);
-    color: var(--color-text-primary);
-    border-color: var(--color-text-primary);
+    background: var(--color-primary-700);
+    color: #ffffff;
+    border-color: var(--color-primary-700);
     box-shadow: none;
     transform: translateY(0.5px);
   }
 }
 
 .secondary {
-  background: var(--color-bg-subtle);
-  color: var(--color-text-primary);
-  border: 1px solid var(--color-border-strong);
-  box-shadow: $shadow-xs;
+  background: var(--color-bg-elevated);
+  color: var(--color-accent-brand);
+  border: 1px solid color-mix(in srgb, var(--color-primary-600) 34%, var(--color-border-subtle));
+  box-shadow: none;
 
   &:hover:not(:disabled) {
-    background: var(--color-bg-surface);
-    border-color: var(--color-border-strong);
+    background: var(--color-accent-brand-subtle);
+    border-color: color-mix(in srgb, var(--color-primary-600) 54%, var(--color-border-subtle));
+    color: var(--color-accent-brand);
     box-shadow: $shadow-sm;
   }
 
   &:active:not(:disabled) {
-    background: var(--color-bg-muted);
-    border-color: var(--color-border-strong);
+    background: color-mix(in srgb, var(--color-primary-600) 24%, transparent);
+    border-color: color-mix(in srgb, var(--color-primary-600) 60%, transparent);
     box-shadow: none;
     transform: translateY(0.5px);
   }
@@ -103,11 +109,11 @@
 .ghost {
   background: transparent;
   color: var(--color-text-secondary);
-  border-color: var(--color-border);
+  border-color: var(--color-border-subtle);
 
   &:hover:not(:disabled) {
     background: var(--color-bg-hover);
-    border-color: var(--color-border);
+    border-color: var(--color-border-strong);
     color: var(--color-text-primary);
     box-shadow: $shadow-xs;
   }
@@ -118,14 +124,14 @@
 }
 
 .danger {
-  background: color-mix(in srgb, var(--color-danger) 24%, transparent);
-  color: #fff;
-  border-color: color-mix(in srgb, var(--color-danger) 72%, #000);
+  background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 42%, transparent);
   box-shadow: $shadow-xs;
 
   &:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-danger) 35%, transparent);
-    border-color: color-mix(in srgb, var(--color-danger) 82%, #000);
+    background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+    border-color: color-mix(in srgb, var(--color-danger) 56%, transparent);
     box-shadow: $shadow-sm;
   }
 

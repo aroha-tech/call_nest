@@ -1,6 +1,7 @@
 import React from 'react';
 import { DEFAULT_PHONE_COUNTRY_CODE } from '../../utils/phoneInput';
 import { CONTACT_FORM_SECTION_IDS } from './contactFormLayout';
+import { SectionHeader } from '../../components/ui/SectionIcon';
 
 function formatRecordDate(iso, formatDateTime) {
   if (iso == null || iso === '') return '—';
@@ -70,9 +71,12 @@ export function createContactFormViewSectionRenderers(ctx) {
     [CONTACT_FORM_SECTION_IDS.RECORD]: () =>
       !isNew && contact ? (
         <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-record">
-          <h2 id="view-section-record" className={styles.sectionTitle}>
-            Record
-          </h2>
+          <SectionHeader
+            title="Record Information"
+            icon="description"
+            color="blue"
+            id="view-section-record"
+          />
           <div className={styles.recordMetaGrid}>
             <ViewField label="Created">{formatRecordDate(contact.created_at, formatDateTime)}</ViewField>
             <ViewField label="Last updated">{formatRecordDate(contact.updated_at, formatDateTime)}</ViewField>
@@ -82,9 +86,12 @@ export function createContactFormViewSectionRenderers(ctx) {
 
     [CONTACT_FORM_SECTION_IDS.IDENTITY]: () => (
       <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-identity">
-        <h2 id="view-section-identity" className={styles.sectionTitle}>
-          {isLeadRoute ? 'Lead details' : 'Contact details'}
-        </h2>
+        <SectionHeader
+          title={isLeadRoute ? 'Lead Details' : 'Contact Details'}
+          icon="person"
+          color="blue"
+          id="view-section-identity"
+        />
         <div className={styles.fieldGridDense}>
           <ViewField label="First name">{formatViewText(formData.first_name)}</ViewField>
           <ViewField label="Last name">{formatViewText(formData.last_name)}</ViewField>
@@ -119,9 +126,12 @@ export function createContactFormViewSectionRenderers(ctx) {
 
     [CONTACT_FORM_SECTION_IDS.LOCATION]: () => (
       <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-location">
-        <h2 id="view-section-location" className={styles.sectionTitle}>
-          Location
-        </h2>
+        <SectionHeader
+          title="Location Details"
+          icon="location_on"
+          color="green"
+          id="view-section-location"
+        />
         <div className={styles.fieldGridDense}>
           <ViewField label="Address line 1" className={styles.fullWidthFieldDense}>
             {formatViewText(formData.address)}
@@ -142,9 +152,12 @@ export function createContactFormViewSectionRenderers(ctx) {
         className={`${styles.section} ${styles.sectionCompact}`}
         aria-labelledby="view-section-tags-notes-status"
       >
-        <h2 id="view-section-tags-notes-status" className={styles.sectionTitle}>
-          Tags, notes &amp; status
-        </h2>
+        <SectionHeader
+          title="Tags, Notes & Status"
+          icon="sell"
+          color="orange"
+          id="view-section-tags-notes-status"
+        />
 
         <div className={styles.formSubsection}>
           <h3 className={styles.formSubsectionTitle}>Tags</h3>
@@ -186,9 +199,12 @@ export function createContactFormViewSectionRenderers(ctx) {
 
     [CONTACT_FORM_SECTION_IDS.PHONES]: () => (
       <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-phones">
-        <h2 id="view-section-phones" className={styles.sectionTitle}>
-          Phone numbers
-        </h2>
+        <SectionHeader
+          title="Contact Information"
+          icon="phone"
+          color="purple"
+          id="view-section-phones"
+        />
         <ul className={styles.viewPhoneList}>
           {(formData.phones || []).map((p, idx) => {
             const num = String(p.number || '').trim();
@@ -208,9 +224,12 @@ export function createContactFormViewSectionRenderers(ctx) {
     [CONTACT_FORM_SECTION_IDS.ASSIGNMENT]: () =>
       !isNew && (role === 'admin' || role === 'manager') ? (
         <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-assign">
-          <h2 id="view-section-assign" className={styles.sectionTitle}>
-            Assignment
-          </h2>
+          <SectionHeader
+            title="Assignment"
+            icon="assignment_ind"
+            color="cyan"
+            id="view-section-assign"
+          />
           <div className={styles.fieldGridDense}>
             {role === 'admin' ? <ViewField label="Manager">{managerDisplay}</ViewField> : null}
             <ViewField label="Assigned agent">{agentDisplay}</ViewField>
@@ -221,9 +240,12 @@ export function createContactFormViewSectionRenderers(ctx) {
 
     [CONTACT_FORM_SECTION_IDS.INDUSTRY]: () => (
       <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-industry">
-        <h2 id="view-section-industry" className={styles.sectionTitle}>
-          Industry fields
-        </h2>
+        <SectionHeader
+          title="Industry Fields"
+          icon="folder_open"
+          color="blue"
+          id="view-section-industry"
+        />
         {!loadingIndustryFields && industryFieldDefs.length === 0 ? (
           <p className={styles.customEmpty}>No industry fields for this workspace.</p>
         ) : null}
@@ -239,9 +261,12 @@ export function createContactFormViewSectionRenderers(ctx) {
 
     [CONTACT_FORM_SECTION_IDS.CUSTOM]: () => (
       <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="view-section-custom">
-        <h2 id="view-section-custom" className={styles.sectionTitle}>
-          Custom fields
-        </h2>
+        <SectionHeader
+          title="Custom Fields"
+          icon="grid_view"
+          color="purple"
+          id="view-section-custom"
+        />
         {!loadingCustomFields && customFields.length === 0 ? (
           <p className={styles.customEmpty}>No custom fields configured for this tenant.</p>
         ) : null}

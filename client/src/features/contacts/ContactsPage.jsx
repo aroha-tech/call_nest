@@ -1822,6 +1822,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
     <div className={listStyles.page}>
       <PageHeader
         title={isDialer ? 'Dialer' : tableTitle}
+        titleIcon={isDialer ? 'dialpad' : type === 'lead' ? 'group' : 'contacts'}
         description={
           isDialer
             ? 'Select leads and start a dialer session.'
@@ -1833,6 +1834,10 @@ export function ContactsPage({ type, mode = 'crm' }) {
           isDialer ? (
             <Button variant="secondary" onClick={() => navigate('/calls/history')}>
               Call history
+            </Button>
+          ) : canRead ? (
+            <Button variant="secondary" onClick={() => setExportCsvOpen(true)}>
+              Export
             </Button>
           ) : null
         }
@@ -1862,6 +1867,18 @@ export function ContactsPage({ type, mode = 'crm' }) {
           }
         >
           <div className={listStyles.tableCardToolbarLeft}>
+            {canRead ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className={pageStyles.toolbarFilterBtn}
+                onClick={() => setFilterOptionsOpen(true)}
+              >
+                <IconFilter />
+                Add filter
+              </Button>
+            ) : null}
             {showRowCheckboxes && contacts.length > 0 ? (
               <div className={listStyles.bulkToolbarSlot}>
                 {selectedIds.size > 0 ? (
@@ -1934,6 +1951,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
             <SearchInput
               value={searchQuery}
               onSearch={handleSearch}
+              expandable={false}
               className={pageStyles.toolbarSearchField}
               placeholder="Search... (press Enter)"
             />

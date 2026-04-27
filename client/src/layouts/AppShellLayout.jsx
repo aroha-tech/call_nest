@@ -141,6 +141,7 @@ function NavGroup({ item, activeKey, activeParentKey, onPrimaryNavFollow, expand
       <button
         type="button"
         className={`${styles.navGroupHeader} ${isActive ? styles.navGroupActive : ''}`}
+        data-nav-key={item.key}
         onClick={() => toggleGroup(item.key)}
         aria-expanded={isExpanded}
       >
@@ -157,6 +158,7 @@ function NavGroup({ item, activeKey, activeParentKey, onPrimaryNavFollow, expand
               key={child.key}
               to={child.path}
               className={`${styles.navChild} ${activeKey === child.key ? styles.navChildActive : ''}`}
+              data-nav-key={child.key}
               onClick={(e) => {
                 if (isModifiedClick(e)) return;
                 onPrimaryNavFollow?.();
@@ -346,6 +348,7 @@ export function AppShellLayout({ children }) {
                       <Link
                         to={item.path}
                         className={`${styles.navItem} ${activeKey === item.key ? styles.navItemActive : ''}`}
+                        data-nav-key={item.key}
                         onClick={(e) => {
                           if (isModifiedClick(e)) return;
                           closeSidebarIfMobileOverlay();

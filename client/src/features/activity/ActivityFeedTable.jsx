@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { MaterialSymbol } from '../../components/ui/MaterialSymbol';
 import { formatDateTimeDisplay, formatRelativeTimeShort } from '../../utils/dateTimeDisplay';
 import {
@@ -14,6 +15,7 @@ import {
 const STATUS_VARIANT_TO_CLASS = {
   teal: 'activityStatusTeal',
   blue: 'activityStatusBlue',
+  green: 'activityStatusGreen',
   purple: 'activityStatusPurple',
   amber: 'activityStatusAmber',
   rose: 'activityStatusRose',
@@ -86,11 +88,13 @@ export function ActivityFeedTable({ rows, tableStyles, dtMode, navigate }) {
                       <MaterialSymbol name={iconName} size="sm" className={tableStyles.activityIconGlyph} />
                     </div>
                     <div className={tableStyles.activityDetailText}>
-                      <span
-                        className={it.href ? tableStyles.activityRowTitle : tableStyles.activityRowTitleStatic}
-                      >
-                        {it.title}
-                      </span>
+                      {it.href ? (
+                        <Link to={it.href} className={tableStyles.activityRowTitleLink} onClick={(e) => e.stopPropagation()}>
+                          {it.title}
+                        </Link>
+                      ) : (
+                        <span className={tableStyles.activityRowTitleStatic}>{it.title}</span>
+                      )}
                       <span className={tableStyles.activityRowSubtitle}>{subtitle}</span>
                     </div>
                   </div>
@@ -119,9 +123,19 @@ export function ActivityFeedTable({ rows, tableStyles, dtMode, navigate }) {
                   <span className={tableStyles.activityValue}>{valueColumnForActivity(it)}</span>
                 </td>
                 <td className={`${tableStyles.activityTd} ${tableStyles.activityTdWhen}`.trim()}>
-                  <span className={tableStyles.activityWhen} title={formatDateTimeDisplay(it.at, dtMode)}>
-                    {formatRelativeTimeShort(it.at)}
-                  </span>
+                  <div className={tableStyles.activityWhenCell}>
+                    <span className={tableStyles.activityWhen} title={formatDateTimeDisplay(it.at, dtMode)}>
+                      {formatRelativeTimeShort(it.at)}
+                    </span>
+                    <button
+                      type="button"
+                      className={tableStyles.activityRowMenuBtn}
+                      aria-label="Row actions"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MaterialSymbol name="more_horiz" size="sm" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             );

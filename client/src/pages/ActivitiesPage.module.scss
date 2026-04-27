@@ -25,8 +25,8 @@
   margin-bottom: 16px;
   padding: 16px;
   border-radius: 8px;
-  background: var(--color-bg-surface, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.08));
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .filterRow {
@@ -99,7 +99,7 @@
 .table th,
 .table td {
   padding: 10px 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--color-border-subtle);
   text-align: left;
   vertical-align: top;
 }

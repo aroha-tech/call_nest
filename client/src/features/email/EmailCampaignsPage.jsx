@@ -202,7 +202,7 @@ export function EmailCampaignsPage() {
       <PageHeader
         title="Email Campaigns"
         description="Create and queue bulk email campaigns from connected accounts."
-        actions={<Button onClick={() => setShowCreate(true)}>+ New Campaign</Button>}
+        actions={<Button onClick={() => setShowCreate(true)}>Add campaign</Button>}
       />
 
       {error && <Alert variant="error">{error}</Alert>}
@@ -245,7 +245,7 @@ export function EmailCampaignsPage() {
                 title="No campaigns found"
                 description="Create your first bulk email campaign."
                 action={() => setShowCreate(true)}
-                actionLabel="New Campaign"
+                actionLabel="Add campaign"
               />
             </div>
           ) : (

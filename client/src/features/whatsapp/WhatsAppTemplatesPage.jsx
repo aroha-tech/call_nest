@@ -381,7 +381,7 @@ export function WhatsAppTemplatesPage() {
               {moduleEnabled && (
                 <Button variant="secondary" onClick={openFetchModal}>Fetch from provider</Button>
               )}
-              <Button onClick={openCreate}>+ Add Template</Button>
+              <Button onClick={openCreate}>Add template</Button>
             </div>
           ) : null
         }
@@ -428,7 +428,7 @@ export function WhatsAppTemplatesPage() {
                 : 'No templates yet. A manager or admin can add templates when they are ready.'
             }
             action={canManageTemplates ? openCreate : undefined}
-            actionLabel={canManageTemplates ? 'Add Template' : undefined}
+            actionLabel={canManageTemplates ? 'Add template' : undefined}
           />
         ) : (
           <div className={listStyles.tableScrollAreaNatural}>
@@ -610,9 +610,9 @@ export function WhatsAppTemplatesPage() {
               </div>
             ))}
             <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              <Button type="button" variant="ghost" size="sm" onClick={() => addComponentOfType('HEADER')}>+ HEADER</Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => addComponentOfType('BODY')}>+ BODY</Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => addComponentOfType('FOOTER')}>+ FOOTER</Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => addComponentOfType('HEADER')}>Add header</Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => addComponentOfType('BODY')}>Add body</Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => addComponentOfType('FOOTER')}>Add footer</Button>
             </div>
           </div>
         </form>

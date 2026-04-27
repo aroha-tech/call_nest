@@ -4,15 +4,15 @@
 .chartsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: $space-5;
-  margin-bottom: $space-8;
+  gap: $space-4;
+  margin-bottom: $space-5;
 }
 
 .card {
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border-subtle);
-  border-radius: $radius-xl;
-  padding: $space-5;
+  border-radius: $radius-lg;
+  padding: $space-4;
   min-height: 0;
   position: relative;
   overflow: hidden;
@@ -22,14 +22,14 @@
     position: absolute;
     inset-inline: 0;
     top: 0;
-    height: 3px;
-    background: var(--color-text-primary);
-    opacity: 1;
+    height: 2px;
+    background: var(--color-primary-600);
+    opacity: 0.9;
   }
 }
 
 .cardTitle {
-  font-size: $font-size-sm;
+  font-size: $font-size-base;
   font-weight: $font-weight-semibold;
   color: var(--color-text-primary);
   margin: 0 0 $space-1;
@@ -37,7 +37,7 @@
 }
 
 .cardHint {
-  font-size: $font-size-2xs;
+  font-size: $font-size-xs;
   color: var(--color-text-secondary);
   margin: 0 0 $space-4;
   line-height: 1.45;
@@ -87,7 +87,7 @@
 }
 
 .hBarTrack {
-  height: 10px;
+  height: 8px;
   background: var(--color-bg-subtle);
   border-radius: $radius-full;
   overflow: hidden;
@@ -97,13 +97,17 @@
   height: 100%;
   min-width: 2px;
   border-radius: $radius-full;
-  background: var(--color-text-primary);
+  background: linear-gradient(90deg, var(--color-primary-600), var(--color-primary-500));
   transition: width 0.45s ease, filter $transition-fast, box-shadow $transition-fast;
 }
 
 .hBarRowAlt .hBarFill {
-  background: var(--color-text-primary);
-  opacity: 0.72;
+  background: linear-gradient(90deg, #0ea5e9, #22d3ee);
+  opacity: 1;
+}
+
+.hBarRow:nth-child(3) .hBarFill {
+  background: linear-gradient(90deg, #14b8a6, #10b981);
 }
 
 .hBarValue {
@@ -176,7 +180,7 @@
 }
 
 .donutCenterValue {
-  font-size: $font-size-xl;
+  font-size: $font-size-lg;
   font-weight: $font-weight-bold;
   color: var(--color-text-primary);
   line-height: 1;
@@ -204,7 +208,7 @@
   display: flex;
   align-items: center;
   gap: $space-2;
-  font-size: $font-size-xs;
+  font-size: $font-size-sm;
   color: var(--color-text-secondary);
   border-radius: $radius-sm;
   padding: 2px 4px;
@@ -222,8 +226,8 @@
 }
 
 .legendSwatch {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: $radius-sm;
   flex-shrink: 0;
 }
@@ -280,14 +284,14 @@
   width: 100%;
   max-width: 32px;
   border-radius: $radius-sm $radius-sm 2px 2px;
-  background: var(--color-text-primary);
+  background: linear-gradient(180deg, var(--color-primary-500), var(--color-primary-700));
   opacity: 0.9;
   transition: height 0.45s ease, filter $transition-fast, transform $transition-fast, box-shadow $transition-fast;
 }
 
 .sparkBarAlt {
-  background: var(--color-text-primary);
-  opacity: 0.65;
+  background: linear-gradient(180deg, #14b8a6, #0f766e);
+  opacity: 1;
 }
 
 .sparkBarActive {

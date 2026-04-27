@@ -331,7 +331,7 @@ export function IndustryFieldDefinitionsView({ industryId }) {
       <div className={styles.embeddedBar}>
         <h2 className={styles.embeddedTitle}>Fields for {title}</h2>
         <Button type="button" onClick={openCreate}>
-          + Add field
+          Add field
         </Button>
       </div>
       {main}

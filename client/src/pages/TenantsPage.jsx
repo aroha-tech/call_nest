@@ -489,6 +489,7 @@ export function TenantsPage() {
       <div className={listStyles.page}>
         <PageHeader
           title="Tenants"
+          titleIcon="apartment"
           description="Manage platform tenants and module access"
           actions={
             <Button variant="primary" onClick={openCreate}>
@@ -603,7 +604,7 @@ export function TenantsPage() {
             <div className={listStyles.tableCardToolbarLeft}>
               <PaginationPageSize limit={pagination.limit} onLimitChange={handleLimitChange} />
               <Checkbox
-                label="Include disabled"
+                label="Show inactive"
                 checked={showDisabled}
                 onChange={(e) => {
                   setShowDisabled(e.target.checked);

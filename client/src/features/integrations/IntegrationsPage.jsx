@@ -4,6 +4,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { IconButton } from '../../components/ui/IconButton';
 import { EditIcon, RowActionGroup } from '../../components/ui/ActionIcons';
+import { MaterialSymbol } from '../../components/ui/MaterialSymbol';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../../components/ui/Table';
@@ -173,8 +174,9 @@ export function IntegrationsPage() {
     <div className={listStyles.page}>
       <PageHeader
         title="Integrations"
+        titleIcon="hub"
         description="Connect providers, store tokens, receive leads via webhook."
-        actions={<Button onClick={openCreate}>+ Add Integration</Button>}
+        actions={<Button onClick={openCreate}>Add integration</Button>}
       />
 
       {error && <Alert variant="error">{error}</Alert>}
@@ -236,10 +238,15 @@ export function IntegrationsPage() {
         </div>
       </div>
 
-      <div className={listStyles.tableCard} style={{ marginTop: 16 }}>
-        <div className={listStyles.tableCardBody} style={{ padding: 16 }}>
-          <h3 style={{ marginTop: 0 }}>Public CRM API Apps</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 10, marginBottom: 12 }}>
+      <div className={`${listStyles.tableCard} ${styles.appsCard}`.trim()}>
+        <div className={listStyles.tableCardBody}>
+          <div className={styles.appsHeader}>
+            <span className={styles.appsHeaderIcon} aria-hidden="true">
+              <MaterialSymbol name="key" size="sm" />
+            </span>
+            <h3 className={styles.appsTitle}>Public CRM API Apps</h3>
+          </div>
+          <div className={styles.appsFormGrid}>
             <Input label="App name" value={newAppName} onChange={(e) => setNewAppName(e.target.value)} placeholder="e.g. Zoho Production" />
             <Input
               label="Scopes (comma separated)"
@@ -247,7 +254,7 @@ export function IntegrationsPage() {
               onChange={(e) => setNewAppScopes(e.target.value)}
               placeholder="contacts.write,calls.write,events.read,activities.write"
             />
-            <div style={{ display: 'flex', alignItems: 'end' }}>
+            <div className={styles.appsCreateAction}>
               <Button onClick={handleCreateApp} disabled={!newAppName.trim()}>
                 Create App Key
               </Button>

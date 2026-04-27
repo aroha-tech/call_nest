@@ -60,6 +60,18 @@
   line-height: 1.35;
 }
 
+.activityTitleLink {
+  font-weight: 600;
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-primary);
+  line-height: 1.35;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: none;
+  }
+}
+
 .activitySub {
   margin-top: 2px;
   font-size: var(--font-size-xs, 0.75rem);
@@ -102,4 +114,24 @@
   font-size: var(--font-size-xs, 0.75rem);
   color: var(--color-text-secondary, #94a3b8);
   white-space: nowrap;
+}
+
+.rowMenuBtn {
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg-subtle);
+    border-color: var(--color-border-subtle);
+    color: var(--color-text-secondary);
+  }
 }

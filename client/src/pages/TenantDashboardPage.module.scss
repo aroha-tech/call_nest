@@ -4,9 +4,11 @@
 .page {
   box-sizing: border-box;
   width: 100%;
-  max-width: 1400px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: $space-5 $space-5 $space-10;
+  padding: 12px;
+  background: var(--color-bg-muted);
+  border-radius: 12px;
 }
 
 .hero {
@@ -14,29 +16,36 @@
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: $space-5;
-  margin-bottom: $space-6;
+  gap: 16px;
+  margin-bottom: 12px;
 }
 
 .heroTitles {
   min-width: 0;
 }
 
+.heroKicker {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+}
+
 .heroTitle {
-  font-size: $font-size-2xl;
+  font-size: 30px;
   font-weight: $font-weight-bold;
   color: var(--color-text-primary);
-  letter-spacing: -0.02em;
-  margin: 0 0 $space-2;
-  line-height: $line-height-tight;
+  letter-spacing: -0.03em;
+  margin: 0 0 4px;
+  line-height: 1.18;
 }
 
 .heroSubtitle {
   margin: 0;
-  font-size: $font-size-sm;
+  font-size: 11px;
   color: var(--color-text-tertiary);
-  line-height: $line-height-relaxed;
-  max-width: 42rem;
+  line-height: 1.45;
+  max-width: 48rem;
 }
 
 .heroActions {
@@ -44,7 +53,7 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: $space-2;
+  gap: 10px;
 }
 
 .heroToolbar {
@@ -52,7 +61,7 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: $space-2;
+  gap: 10px;
 }
 
 .heroToolbarRange {
@@ -62,16 +71,16 @@
 .rangePill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 0 12px 0 10px;
-  border-radius: $radius-md;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 12px 0 11px;
+  border-radius: 10px;
   border: 1px solid var(--color-border-subtle);
   background: var(--color-bg-elevated);
   color: var(--color-text-primary);
   font-family: inherit;
-  font-size: $font-size-xs;
-  font-weight: $font-weight-bold;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
   transition: border-color $transition-fast, background $transition-fast;
 
@@ -97,9 +106,9 @@
   max-width: min(360px, 92vw);
   padding: $space-3 $space-4;
   border-radius: $radius-md;
-  background: var(--color-time-range-panel-bg);
+  background: var(--color-bg-elevated);
   border: 1px solid var(--color-border-subtle);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.2);
 }
 
 .rangeDropdownActions {
@@ -116,20 +125,48 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   padding: 0;
-  border-radius: $radius-md;
-  border: 2px solid var(--color-text-primary);
+  border-radius: 10px;
+  border: 1px solid var(--color-border-subtle);
   cursor: pointer;
-  background: var(--color-bg-body);
+  background: var(--color-bg-elevated);
   color: var(--color-text-primary);
   box-shadow: none;
   transition: background $transition-fast, transform $transition-fast;
 
   &:hover {
-    background: var(--color-text-primary);
-    color: var(--color-bg-body);
+    background: var(--color-bg-subtle);
+    color: var(--color-text-primary);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.toolbarBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border-subtle);
+  cursor: pointer;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: none;
+  transition: background $transition-fast, transform $transition-fast, border-color $transition-fast;
+
+  &:hover {
+    background: var(--color-bg-subtle);
+    border-color: var(--color-border-strong);
   }
 
   &:active {
@@ -140,8 +177,8 @@
 .kpiGrid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: $space-3;
-  margin-bottom: $space-6;
+  gap: 8px;
+  margin-bottom: 8px;
 
   @media (max-width: 1200px) {
     grid-template-columns: repeat(3, 1fr);
@@ -155,20 +192,20 @@
 .kpiCard {
   display: flex;
   flex-direction: column;
-  gap: $space-2;
-  padding: $space-4;
-  border-radius: $radius-lg;
+  gap: 4px;
+  padding: 10px 11px;
+  border-radius: 12px;
   text-decoration: none;
   color: inherit;
-  @include premium-panel;
-  transition: border-color $transition-normal, box-shadow $transition-normal, transform $transition-fast;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  transition: border-color $transition-normal, box-shadow $transition-normal, transform $transition-fast, background $transition-fast;
   min-width: 0;
 
   &:hover {
     border-color: var(--color-border-strong);
-    box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.06) inset,
-      0 8px 28px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
     transform: translateY(-1px);
   }
 }
@@ -178,8 +215,8 @@
 
   &:hover {
     transform: none;
-    border-color: var(--color-border);
-    box-shadow: none;
+    border-color: var(--color-border-subtle);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
   }
 }
 
@@ -187,7 +224,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: $space-2;
+  gap: 8px;
+  margin-bottom: 4px;
 }
 
 .kpiIcon {
@@ -200,59 +238,128 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: $radius-md;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
 }
 
-.kpiMatLeaderboard,
-.kpiMatContacts,
-.kpiMatCampaign,
-.kpiMatEvent,
-.kpiMatEmail,
+// Colorful KPI card icon styles matching modern SaaS design
+.kpiMatLeaderboard {
+  background: color-mix(in srgb, #6366f1 18%, transparent);
+  color: #818cf8;
+}
+
+.kpiMatContacts {
+  background: color-mix(in srgb, #22c55e 18%, transparent);
+  color: #4ade80;
+}
+
+.kpiMatCampaign {
+  background: color-mix(in srgb, #10b981 18%, transparent);
+  color: #34d399;
+}
+
+.kpiMatEvent {
+  background: color-mix(in srgb, #22c55e 18%, transparent);
+  color: #4ade80;
+}
+
+.kpiMatEmail {
+  background: color-mix(in srgb, #a855f7 18%, transparent);
+  color: #c084fc;
+}
+
 .kpiMatCall {
-  background: var(--color-bg-subtle);
-  color: var(--color-text-primary);
-  border: 1px solid var(--color-border-strong);
+  background: color-mix(in srgb, #22c55e 18%, transparent);
+  color: #4ade80;
+}
+
+// Light theme adjustments for KPI icons
+:root[data-color-scheme='light'] {
+  .kpiMatLeaderboard {
+    background: color-mix(in srgb, #6366f1 12%, transparent);
+    color: #4f46e5;
+  }
+
+  .kpiMatContacts {
+    background: color-mix(in srgb, #22c55e 12%, transparent);
+    color: #16a34a;
+  }
+
+  .kpiMatCampaign {
+    background: color-mix(in srgb, #10b981 12%, transparent);
+    color: #059669;
+  }
+
+  .kpiMatEvent {
+    background: color-mix(in srgb, #22c55e 12%, transparent);
+    color: #16a34a;
+  }
+
+  .kpiMatEmail {
+    background: color-mix(in srgb, #a855f7 12%, transparent);
+    color: #9333ea;
+  }
+
+  .kpiMatCall {
+    background: color-mix(in srgb, #22c55e 12%, transparent);
+    color: #16a34a;
+  }
 }
 
 .kpiBadge {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: $font-weight-bold;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-text-primary);
-  background: var(--color-bg-subtle);
-  border: 1px solid var(--color-border-strong);
-  padding: 2px 6px;
+  letter-spacing: 0.04em;
+  color: #166534;
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  padding: 3px 7px;
   border-radius: $radius-full;
 }
 
 .kpiValue {
-  font-size: $font-size-2xl;
+  font-size: 31px;
   font-weight: $font-weight-bold;
   color: var(--color-text-primary);
   letter-spacing: -0.02em;
-  line-height: $line-height-tight;
+  line-height: 1.05;
 }
 
 .kpiLabel {
-  font-size: $font-size-xs;
+  font-size: 10px;
   font-weight: $font-weight-medium;
   color: var(--color-text-secondary);
 }
 
 .kpiHint {
-  font-size: $font-size-2xs;
-  color: var(--color-text-muted);
+  font-size: 9px;
+  color: var(--color-text-tertiary);
+  line-height: 1.3;
+}
+
+.kpiTrendUp {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.kpiTrendDown {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.kpiTrendFlat {
+  color: var(--color-text-tertiary);
+  font-weight: 600;
 }
 
 .mainGrid {
   display: grid;
-  grid-template-columns: 1fr 340px;
-  gap: $space-5;
+  grid-template-columns: 1fr 360px;
+  gap: 8px;
   align-items: start;
-  margin-bottom: $space-6;
+  margin-bottom: 8px;
 
   @media (max-width: 1024px) {
     grid-template-columns: 1fr;
@@ -260,10 +367,12 @@
 }
 
 .panel {
-  border-radius: $radius-lg;
-  padding: $space-4 $space-5;
-  @include premium-panel;
-  margin-bottom: $space-4;
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  margin-bottom: 8px;
 
   &:last-child {
     margin-bottom: 0;
@@ -274,8 +383,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: $space-3;
-  margin-bottom: $space-4;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .panelTitle {
@@ -284,7 +393,7 @@
   font-weight: $font-weight-semibold;
   color: var(--color-text-primary);
   letter-spacing: 0.02em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .panelTitleWithIcon {
@@ -292,15 +401,39 @@
   align-items: center;
   gap: 6px;
   margin: 0;
-  font-size: $font-size-sm;
+  font-size: 15px;
   font-weight: $font-weight-semibold;
   color: var(--color-text-primary);
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  text-transform: none;
 }
 
 .panelTitleIcon {
   color: var(--color-text-primary);
+}
+
+.sectionIconChip :global(.material-symbols-outlined),
+.sectionIconChip .panelTitleIcon {
+  color: inherit;
+}
+
+.sectionIconChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+}
+
+.sectionIconChipPurple {
+  color: #6d5ce8;
+  background: color-mix(in srgb, #6d5ce8 14%, transparent);
+}
+
+.sectionIconChipGreen {
+  color: #16a34a;
+  background: color-mix(in srgb, #16a34a 14%, transparent);
 }
 
 .panelTitleAnchor {
@@ -341,9 +474,9 @@
 }
 
 .panelLink {
-  font-size: $font-size-xs;
-  font-weight: $font-weight-semibold;
-  color: var(--color-text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-primary-600);
   text-decoration: none;
   white-space: nowrap;
 
@@ -359,22 +492,22 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: $space-2;
+  gap: 6px;
 }
 
 /* Fixed three-row viewport for dashboard meetings / callbacks / connected calls */
 .dashboardListSlots {
-  min-height: calc(3 * 4.75rem + 2 * #{$space-2});
+  min-height: calc(3 * 4.2rem + 2 * 6px);
 }
 
 .dashboardSlotRow {
-  min-height: 4.75rem;
+  min-height: 4.2rem;
   box-sizing: border-box;
 }
 
 /* Invisible spacer: keeps 3-row height without a box (no border/background) */
 .dashboardSlotSpacer {
-  min-height: 4.75rem;
+  min-height: 4.2rem;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -400,20 +533,28 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: $space-3;
-  padding: $space-3;
-  border-radius: $radius-md;
-  background: rgba(0, 0, 0, 0.18);
-  border: 1px solid var(--color-border-strong);
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .meetingTime {
-  font-size: $font-size-2xs;
+  font-size: 10px;
   font-weight: $font-weight-bold;
   color: var(--color-text-primary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  flex: 0 0 52px;
+  flex: 0 0 66px;
+}
+
+.upcomingTimeBadge {
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #6d5ce8 10%, transparent);
+  color: #5b4bd6;
+  line-height: 1.2;
 }
 
 .callbackTimeOverdue {
@@ -436,15 +577,16 @@
 }
 
 .meetingTitle {
-  font-size: $font-size-sm;
+  font-size: 12px;
   font-weight: $font-weight-semibold;
   color: var(--color-text-primary);
-  margin: 0 0 2px;
+  margin: 0 0 1px;
+  line-height: 1.22;
 }
 
 .meetingMeta {
-  font-size: $font-size-2xs;
-  color: var(--color-text-muted);
+  font-size: 10px;
+  color: var(--color-text-secondary);
   margin: 0;
 }
 
@@ -453,20 +595,20 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
-  border-radius: $radius-sm;
-  font-size: $font-size-2xs;
+  padding: 4px 8px;
+  border-radius: 9px;
+  font-size: 11px;
   font-weight: $font-weight-semibold;
-  background: var(--color-bg-body);
+  background: var(--color-bg-elevated);
   color: var(--color-text-primary);
-  border: 2px solid var(--color-text-primary);
+  border: 1px solid var(--color-border-strong);
   text-decoration: none;
   transition: background $transition-fast, border-color $transition-fast;
 
   &:hover {
-    background: var(--color-text-primary);
-    color: var(--color-bg-body);
-    border-color: var(--color-text-primary);
+    background: var(--color-bg-subtle);
+    color: var(--color-text-primary);
+    border-color: var(--color-border-strong);
   }
 }
 
@@ -491,8 +633,64 @@
   color: var(--color-text-secondary);
   background: var(--color-bg-subtle);
   border: 1px solid var(--color-border-subtle);
-  padding: 4px 8px;
-  border-radius: $radius-sm;
+  padding: 3px 7px;
+  border-radius: 8px;
+}
+
+.connectedEmpty {
+  min-height: calc(3 * 4.2rem + 2 * 6px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.connectedEmptyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  color: #16a34a;
+  background: color-mix(in srgb, #16a34a 12%, transparent);
+}
+
+.connectedEmptyText {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+.connectedEmptyLink {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-primary-600);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: none;
+    opacity: 0.92;
+  }
+}
+
+:global(html[data-color-scheme='light']) {
+  .panelLink,
+  .panelLink:visited,
+  .panelLink:active,
+  .connectedEmptyLink,
+  .connectedEmptyLink:visited,
+  .connectedEmptyLink:active,
+  .activityHistoryLink,
+  .activityHistoryLink:visited,
+  .activityHistoryLink:active,
+  .inlineDashLink,
+  .inlineDashLink:visited,
+  .inlineDashLink:active {
+    color: #5b4bd6 !important;
+  }
 }
 
 .tableWrap {
@@ -632,12 +830,12 @@
 // —— Recent activity (rich table) ——
 .activityFeedPanel {
   box-sizing: border-box;
-  margin-bottom: $space-4;
-  padding: $space-5;
-  border-radius: $radius-lg;
-  border: 1px solid var(--color-border-strong);
+  margin-bottom: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border-subtle);
   background: var(--color-bg-elevated);
-  box-shadow: none;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
 }
 
 .activityFeedHead {
@@ -645,13 +843,40 @@
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: $space-4;
-  margin-bottom: $space-4;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.activityFeedTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.activityFeedTitleIcon {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: $radius-full;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+.activityFeedTitleIconGlyph {
+  font-size: 18px !important;
+  width: 18px;
+  height: 18px;
 }
 
 .activityFeedTitleMain {
-  margin: 0 0 $space-1;
-  font-size: $font-size-lg;
+  margin: 0;
+  font-size: 18px;
   font-weight: $font-weight-bold;
   color: var(--color-text-primary);
   letter-spacing: -0.02em;
@@ -660,7 +885,7 @@
 .activityFeedSub {
   margin: 0;
   max-width: 36rem;
-  font-size: $font-size-2xs;
+  font-size: 11px;
   color: var(--color-text-secondary);
   line-height: $line-height-relaxed;
 }
@@ -676,11 +901,11 @@
   font-weight: $font-weight-bold;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 8px 14px;
+  padding: 6px 12px;
   border-radius: $radius-full;
-  border: 2px solid var(--color-border-strong);
-  background: var(--color-bg-body);
-  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
   cursor: pointer;
   font-family: inherit;
   transition:
@@ -688,22 +913,34 @@
     background $transition-fast,
     color $transition-fast,
     box-shadow $transition-fast;
+
+  &:hover {
+    border-color: var(--color-border-strong);
+    color: var(--color-text-primary);
+    background: var(--color-bg-subtle);
+  }
 }
 
 .activityTabActive {
-  border-color: var(--color-text-primary);
-  color: var(--color-bg-body);
-  background: var(--color-text-primary);
-  box-shadow: none;
+  border-color: #7c3aed;
+  color: #ffffff;
+  background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+
+  &:hover {
+    border-color: #7c3aed;
+    color: #ffffff;
+    background: linear-gradient(135deg, #6d28d9 0%, #4f46e5 100%);
+  }
 }
 
 .activityTableScroll {
-  margin-top: $space-2;
-  max-height: 440px;
+  margin-top: 6px;
+  max-height: 360px;
   overflow: auto;
   border-radius: $radius-md;
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
 }
 
 .activityTable {
@@ -716,15 +953,15 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 10px 12px;
+  padding: 9px 10px;
   text-align: left;
   font-size: 10px;
   font-weight: $font-weight-bold;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   background: var(--color-bg-subtle);
-  border-bottom: 1px solid var(--color-border-strong);
+  border-bottom: 1px solid var(--color-border-subtle);
   white-space: nowrap;
 }
 
@@ -746,7 +983,7 @@
   cursor: pointer;
 
   &:hover {
-    background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+    background: var(--color-bg-subtle);
   }
 
   &:focus-visible {
@@ -756,7 +993,7 @@
 }
 
 .activityTd {
-  padding: 14px 12px;
+  padding: 10px;
   vertical-align: middle;
   color: var(--color-text-primary);
 }
@@ -776,8 +1013,8 @@
 .activityIconWrap {
   box-sizing: border-box;
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   border-radius: $radius-full;
   display: flex;
   align-items: center;
@@ -785,21 +1022,101 @@
 }
 
 .activityIconGlyph {
-  font-size: 20px !important;
-  width: 20px;
-  height: 20px;
+  font-size: 17px !important;
+  width: 17px;
+  height: 17px;
 }
 
-.activityIconCall,
-.activityIconWa,
-.activityIconEmail,
-.activityIconTeam,
-.activityIconWorkspace,
-.activityIconCampaign,
+// Colorful activity feed icons
+.activityIconCall {
+  background: color-mix(in srgb, #22c55e 18%, transparent);
+  color: #4ade80;
+  border: none;
+}
+
+.activityIconWa {
+  background: color-mix(in srgb, #25d366 18%, transparent);
+  color: #25d366;
+  border: none;
+}
+
+.activityIconEmail {
+  background: color-mix(in srgb, #a855f7 18%, transparent);
+  color: #c084fc;
+  border: none;
+}
+
+.activityIconTeam {
+  background: color-mix(in srgb, #0ea5e9 18%, transparent);
+  color: #38bdf8;
+  border: none;
+}
+
+.activityIconWorkspace {
+  background: color-mix(in srgb, #6366f1 18%, transparent);
+  color: #818cf8;
+  border: none;
+}
+
+.activityIconCampaign {
+  background: color-mix(in srgb, #f97316 18%, transparent);
+  color: #fb923c;
+  border: none;
+}
+
 .activityIconCrm {
-  background: var(--color-bg-subtle);
-  color: var(--color-text-primary);
-  border: 1px solid var(--color-border-strong);
+  background: color-mix(in srgb, #06b6d4 18%, transparent);
+  color: #22d3ee;
+  border: none;
+}
+
+.activityIconSettings {
+  background: color-mix(in srgb, #14b8a6 18%, transparent);
+  color: #14b8a6;
+  border: none;
+}
+
+// Light theme adjustments for activity icons
+:root[data-color-scheme='light'] {
+  .activityIconCall {
+    background: color-mix(in srgb, #22c55e 12%, transparent);
+    color: #16a34a;
+  }
+
+  .activityIconWa {
+    background: color-mix(in srgb, #25d366 12%, transparent);
+    color: #128c7e;
+  }
+
+  .activityIconEmail {
+    background: color-mix(in srgb, #a855f7 12%, transparent);
+    color: #9333ea;
+  }
+
+  .activityIconTeam {
+    background: color-mix(in srgb, #0ea5e9 12%, transparent);
+    color: #0284c7;
+  }
+
+  .activityIconWorkspace {
+    background: color-mix(in srgb, #6366f1 12%, transparent);
+    color: #4f46e5;
+  }
+
+  .activityIconCampaign {
+    background: color-mix(in srgb, #f97316 12%, transparent);
+    color: #ea580c;
+  }
+
+  .activityIconCrm {
+    background: color-mix(in srgb, #06b6d4 12%, transparent);
+    color: #0891b2;
+  }
+
+  .activityIconSettings {
+    background: color-mix(in srgb, #14b8a6 12%, transparent);
+    color: #0f766e;
+  }
 }
 
 .activityDetailText {
@@ -809,27 +1126,38 @@
   gap: 4px;
 }
 
-.activityRowTitle {
-  font-size: $font-size-sm;
+.activityRowTitleLink {
+  font-size: $font-size-base;
   font-weight: $font-weight-semibold;
   color: var(--color-text-primary);
   line-height: $line-height-tight;
+  text-decoration: none;
+
+  &:hover {
+    color: var(--color-text-primary);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent-brand);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
 
-.activityTrClick:hover .activityRowTitle {
+.activityTrClick:hover .activityRowTitleLink {
   color: var(--color-text-primary);
-  text-decoration: none;
 }
 
 .activityRowTitleStatic {
-  font-size: $font-size-sm;
+  font-size: $font-size-base;
   font-weight: $font-weight-semibold;
   color: var(--color-text-primary);
   line-height: $line-height-tight;
 }
 
 .activityRowSubtitle {
-  font-size: $font-size-2xs;
+  font-size: $font-size-xs;
   color: var(--color-text-secondary);
   line-height: $line-height-relaxed;
 }
@@ -837,7 +1165,7 @@
 .activityStatus {
   display: inline-flex;
   align-items: center;
-  padding: 5px 11px;
+  padding: 4px 9px;
   border-radius: $radius-full;
   font-size: 10px;
   font-weight: $font-weight-bold;
@@ -851,32 +1179,44 @@
 
 .activityStatusTeal {
   border-color: #14b8a6;
-  background: color-mix(in srgb, #14b8a6 12%, var(--color-bg-subtle));
+  background: color-mix(in srgb, #14b8a6 18%, var(--color-bg-subtle));
+  color: #0f766e;
 }
 
 .activityStatusBlue {
   border-color: #2563eb;
-  background: color-mix(in srgb, #2563eb 12%, var(--color-bg-subtle));
+  background: color-mix(in srgb, #2563eb 18%, var(--color-bg-subtle));
+  color: #1d4ed8;
+}
+
+.activityStatusGreen {
+  border-color: #22c55e;
+  background: color-mix(in srgb, #22c55e 18%, var(--color-bg-subtle));
+  color: #15803d;
 }
 
 .activityStatusPurple {
   border-color: #7c3aed;
-  background: color-mix(in srgb, #7c3aed 12%, var(--color-bg-subtle));
+  background: color-mix(in srgb, #7c3aed 18%, var(--color-bg-subtle));
+  color: #6d28d9;
 }
 
 .activityStatusAmber {
   border-color: #d97706;
-  background: color-mix(in srgb, #d97706 12%, var(--color-bg-subtle));
+  background: color-mix(in srgb, #d97706 18%, var(--color-bg-subtle));
+  color: #b45309;
 }
 
 .activityStatusRose {
   border-color: #e11d48;
-  background: color-mix(in srgb, #e11d48 12%, var(--color-bg-subtle));
+  background: color-mix(in srgb, #e11d48 18%, var(--color-bg-subtle));
+  color: #be123c;
 }
 
 .activityStatusSlate {
   border-color: #64748b;
-  background: color-mix(in srgb, #64748b 12%, var(--color-bg-subtle));
+  background: color-mix(in srgb, #64748b 18%, var(--color-bg-subtle));
+  color: #475569;
 }
 
 .activityMember {
@@ -888,8 +1228,8 @@
 
 .activityAvatar {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: $radius-full;
   display: flex;
   align-items: center;
@@ -901,7 +1241,7 @@
 }
 
 .activityMemberName {
-  font-size: $font-size-xs;
+  font-size: 12px;
   font-weight: $font-weight-medium;
   color: var(--color-text-primary);
   min-width: 0;
@@ -923,10 +1263,48 @@
 }
 
 .activityWhen {
-  font-size: $font-size-2xs;
+  font-size: 11px;
   font-weight: $font-weight-semibold;
   color: var(--color-text-secondary);
   white-space: nowrap;
+}
+
+.activityWhenCell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.activityRowMenuBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: $radius-full;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background $transition-fast,
+    border-color $transition-fast,
+    color $transition-fast;
+
+  &:hover {
+    background: var(--color-bg-subtle);
+    border-color: var(--color-border-subtle);
+    color: var(--color-text-secondary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-text-primary);
+    outline-offset: 2px;
+  }
 }
 
 .activityFeedFooter {
@@ -941,7 +1319,7 @@
   display: inline-flex;
   align-items: center;
   gap: $space-2;
-  font-size: $font-size-sm;
+  font-size: $font-size-base;
   font-weight: $font-weight-bold;
   color: var(--color-text-primary);
   text-decoration: none;
@@ -950,7 +1328,7 @@
   &:hover {
     color: var(--color-text-primary);
     text-decoration: none;
-    opacity: 0.92;
+    opacity: 0.95;
   }
 }
 
@@ -1007,7 +1385,7 @@
 .quickGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: $space-2;
+  gap: 6px;
 }
 
 .quickPrimary {
@@ -1019,22 +1397,22 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: $space-1;
-  padding: $space-3 $space-2;
-  border-radius: $radius-md;
-  font-size: $font-size-xs;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  font-size: 11px;
   font-weight: $font-weight-semibold;
   text-decoration: none;
   text-align: center;
-  border: 2px solid var(--color-border-strong);
-  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
   color: var(--color-text-primary);
   transition: border-color $transition-fast, background $transition-fast, color $transition-fast;
 
   &:hover {
-    border-color: var(--color-text-primary);
-    background: var(--color-text-primary);
-    color: var(--color-bg-body);
+    border-color: var(--color-border-strong);
+    background: var(--color-bg-subtle);
+    color: var(--color-text-primary);
     text-decoration: none;
   }
 }
@@ -1044,28 +1422,79 @@
 }
 
 .quickBtnCta {
-  background: var(--color-bg-body);
+  background: var(--color-bg-elevated);
   color: var(--color-text-primary);
-  border: 2px solid var(--color-text-primary);
+  border: 1px solid color-mix(in srgb, var(--color-primary-600) 24%, var(--color-border-subtle));
   box-shadow: none;
 
   &:hover {
-    background: var(--color-text-primary);
-    color: var(--color-bg-body);
-    border-color: var(--color-text-primary);
+    background: color-mix(in srgb, var(--color-primary-600) 5%, var(--color-bg-elevated));
+    color: var(--color-text-primary);
+    border-color: color-mix(in srgb, var(--color-primary-600) 34%, var(--color-border-strong));
     text-decoration: none;
   }
 }
 
+.quickBtnAddLead {
+  background: color-mix(in srgb, var(--color-primary-600) 6%, var(--color-bg-elevated));
+}
+
+.quickIconPurple {
+  color: #6366f1;
+}
+
+.quickIconGreen {
+  color: #16a34a;
+}
+
+.quickIconOrange {
+  color: #ea580c;
+}
+
+:global(html[data-color-scheme='dark']) {
+  .sectionIconChipPurple {
+    color: #a78bfa;
+    background: color-mix(in srgb, #a78bfa 20%, transparent);
+  }
+
+  .sectionIconChipGreen {
+    color: #4ade80;
+    background: color-mix(in srgb, #4ade80 20%, transparent);
+  }
+
+  .upcomingTimeBadge {
+    color: #c4b5fd;
+    background: color-mix(in srgb, #a78bfa 18%, transparent);
+  }
+
+  .connectedEmptyIcon {
+    color: #4ade80;
+    background: color-mix(in srgb, #4ade80 18%, transparent);
+  }
+
+  .connectedEmptyLink {
+    color: #a78bfa;
+  }
+
+  .activityStatusTeal,
+  .activityStatusBlue,
+  .activityStatusPurple,
+  .activityStatusAmber,
+  .activityStatusRose,
+  .activityStatusSlate {
+    color: var(--color-text-primary);
+  }
+}
+
 .insightsSection {
-  margin-top: $space-8;
+  margin-top: 14px;
 }
 
 .secondaryGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: $space-6;
-  margin-top: $space-6;
+  margin-top: 14px;
 
   @media (max-width: 900px) {
     grid-template-columns: 1fr;
@@ -1205,6 +1634,50 @@
   align-items: center;
   justify-content: center;
   min-height: 280px;
+}
+
+.dashboardSkeletonWrap {
+  display: grid;
+  gap: $space-4;
+}
+
+.dashboardSkeletonHero {
+  display: grid;
+  gap: $space-2;
+  padding: $space-2 0;
+}
+
+.dashboardSkeletonKpis {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: $space-3;
+
+  @media (max-width: 1200px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  @media (max-width: 720px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.dashboardSkeletonCard {
+  border-radius: $radius-md;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+  padding: $space-3;
+  display: grid;
+  gap: $space-2;
+}
+
+.dashboardSkeletonGrid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: $space-3;
+
+  @media (max-width: 960px) {
+    grid-template-columns: 1fr;
+  }
 }
 
 .error {

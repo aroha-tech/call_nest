@@ -43,9 +43,9 @@ export function activityIconForKind(kind) {
     case 'call':
       return { name: 'call', wrap: 'activityIconCall' };
     case 'dialer':
-      return { name: 'phone_in_talk', wrap: 'activityIconCall' };
+      return { name: 'call', wrap: 'activityIconCall' };
     case 'settings':
-      return { name: 'tune', wrap: 'activityIconCrm' };
+      return { name: 'tune', wrap: 'activityIconSettings' };
     case 'whatsapp':
       return { name: 'chat', wrap: 'activityIconWa' };
     case 'email':
@@ -63,38 +63,53 @@ export function activityIconForKind(kind) {
 
 export function statusBadgeForActivity(kind, title) {
   const t = String(title || '');
+  const lower = t.toLowerCase();
+
+  /** Fixed palette: green = ops/dialer/success, blue = outbound comms, teal = product/setup, purple = growth, amber = campaigns, rose = destructive, slate = neutral CRM edits */
+  function fromTitleHeuristics() {
+    if (/dialer session|dialer defaults|dialer queue|dialer/i.test(lower)) return { label: 'Dialer', variant: 'green' };
+    if (/email sent|sent:|whatsapp sent|message sent/i.test(lower)) return { label: 'Sent', variant: 'blue' };
+    if (/call (attempt|log)|connected call|disposition/i.test(lower)) return { label: 'Call', variant: 'green' };
+    if (/meeting|calendar|invite/i.test(lower)) return { label: 'Meeting', variant: 'purple' };
+    if (/campaign|blast|sequence/i.test(lower)) return { label: 'Campaign', variant: 'amber' };
+    if (
+      /pipeline|disposition|dialing set|call script|whatsapp account|email account|workspace settings|delete policy|integration|api key|webhook|tenant theme|branding/i.test(
+        lower
+      )
+    ) {
+      return { label: 'Settings', variant: 'teal' };
+    }
+    if (/csv import|import\(/i.test(lower)) return { label: 'Import', variant: 'purple' };
+    if (/bulk deleted|deleted:/i.test(lower)) return { label: 'Deleted', variant: 'rose' };
+    if (/tag\(s\)/i.test(lower)) return { label: 'Tags', variant: 'slate' };
+    if (/updated assignment for|reassign|assignment/i.test(lower)) return { label: 'Assignment', variant: 'slate' };
+    if (/deleted|archived|removed/i.test(lower)) return { label: 'Archived', variant: 'rose' };
+    if (/created|registered|added/i.test(lower)) return { label: 'Created', variant: 'purple' };
+    if (/updated|edit|changed|modified/i.test(lower)) return { label: 'Updated', variant: 'blue' };
+    return null;
+  }
+
   switch (kind) {
     case 'call':
-      return { label: 'Completed', variant: 'teal' };
+      return { label: 'Completed', variant: 'green' };
+    case 'dialer':
+      return { label: 'Dialer', variant: 'green' };
     case 'whatsapp':
     case 'email':
       return { label: 'Sent', variant: 'blue' };
     case 'teammate':
-      return { label: 'New member', variant: 'purple' };
+      return { label: 'Team', variant: 'purple' };
     case 'workspace':
       return { label: 'Setup', variant: 'teal' };
     case 'campaign':
       return { label: 'Campaign', variant: 'amber' };
-    case 'dialer':
-      return { label: 'Dialer', variant: 'teal' };
     case 'settings':
-      return { label: 'Settings', variant: 'slate' };
-    default:
-      if (/dialer session|dialer defaults/i.test(t)) return { label: 'Dialer', variant: 'teal' };
-      if (
-        /pipeline|disposition|dialing set|call script|whatsapp account|email account|workspace settings|delete policy/i.test(
-          t
-        )
-      ) {
-        return { label: 'Settings', variant: 'slate' };
-      }
-      if (/csv import|import\(/i.test(t)) return { label: 'Import', variant: 'purple' };
-      if (/bulk deleted|deleted:/i.test(t)) return { label: 'Deleted', variant: 'rose' };
-      if (/tag\(s\)/i.test(t)) return { label: 'Tags', variant: 'slate' };
-      if (/updated assignment for/i.test(t)) return { label: 'Assignment', variant: 'slate' };
-      if (/deleted|archived|removed/i.test(t)) return { label: 'Archived', variant: 'rose' };
-      if (/created|registered|added/i.test(t)) return { label: 'Created', variant: 'purple' };
-      return { label: 'Updated', variant: 'slate' };
+      return { label: 'Settings', variant: 'teal' };
+    default: {
+      const h = fromTitleHeuristics();
+      if (h) return h;
+      return { label: 'Updated', variant: 'blue' };
+    }
   }
 }
 

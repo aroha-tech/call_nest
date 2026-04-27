@@ -6,6 +6,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { Spinner } from '../components/ui/Spinner';
+import { Skeleton } from '../components/ui/Skeleton';
 import { Select } from '../components/ui/Select';
 import { Input } from '../components/ui/Input';
 import { Modal, ModalFooter } from '../components/ui/Modal';
@@ -1272,7 +1273,12 @@ export function DialerSessionPage() {
 
       {loading && !session ? (
         <div className={styles.loadingCenter}>
-          <Spinner size="lg" />
+          <div style={{ width: 'min(860px, 100%)', display: 'grid', gap: 12 }}>
+            <Skeleton width="38%" height={18} />
+            <Skeleton width="100%" height={56} />
+            <Skeleton width="100%" height={56} />
+            <Skeleton width="100%" height={220} />
+          </div>
         </div>
       ) : null}
 

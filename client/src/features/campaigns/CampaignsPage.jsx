@@ -509,6 +509,7 @@ export function CampaignsPage() {
     <div className={listStyles.page}>
       <PageHeader
         title="Campaigns"
+        titleIcon="campaign"
         description={
           role === 'agent'
             ? 'Campaigns you can access—open one to work assigned records.'
@@ -516,7 +517,7 @@ export function CampaignsPage() {
         }
         actions={
           isAdmin && canCreate ? (
-            <Button onClick={openCreate}>+ New campaign</Button>
+            <Button onClick={openCreate}>Add campaign</Button>
           ) : null
         }
       />

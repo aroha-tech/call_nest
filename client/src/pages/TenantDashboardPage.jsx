@@ -5,6 +5,7 @@ import { selectUser } from '../features/auth/authSelectors';
 import { usePermissions } from '../hooks/usePermission';
 import { tenantDashboardAPI } from '../services/tenantAPI';
 import { Spinner } from '../components/ui/Spinner';
+import { Skeleton } from '../components/ui/Skeleton';
 import { Button } from '../components/ui/Button';
 import { TenantDataCharts } from '../components/dashboard/DashboardDataCharts';
 import { PERMISSIONS } from '../utils/permissionUtils';
@@ -69,7 +70,16 @@ function isPendingCallbackOverdue(scheduledAt) {
   return d.getTime() < Date.now();
 }
 
-function ExecutiveKpiCard({ matIcon, matWrapClass, label, value, hint, to, badge, static: isStatic }) {
+function greetingByHour(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 5) return 'Good night';
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  if (hour < 21) return 'Good evening';
+  return 'Good night';
+}
+
+function ExecutiveKpiCard({ matIcon, matWrapClass, label, value, hint, hintClassName, to, badge, static: isStatic }) {
   const inner = (
     <>
       <div className={styles.kpiIconRow}>
@@ -80,7 +90,7 @@ function ExecutiveKpiCard({ matIcon, matWrapClass, label, value, hint, to, badge
       </div>
       <span className={styles.kpiValue}>{value}</span>
       <span className={styles.kpiLabel}>{label}</span>
-      {hint ? <span className={styles.kpiHint}>{hint}</span> : null}
+      {hint ? <span className={`${styles.kpiHint} ${hintClassName || ''}`.trim()}>{hint}</span> : null}
     </>
   );
   const cls = `${styles.kpiCard} ${isStatic ? styles.kpiCardStatic : ''}`;
@@ -113,6 +123,7 @@ export function TenantDashboardPage() {
   const [activityFeedFilter, setActivityFeedFilter] = useState('all');
   const [rangeMenuOpen, setRangeMenuOpen] = useState(false);
   const rangeWrapRef = useRef(null);
+  const [nowTs, setNowTs] = useState(Date.now());
 
   const role = user?.role ?? 'agent';
   const dtMode = user?.datetimeDisplayMode ?? 'ist_fixed';
@@ -136,6 +147,11 @@ export function TenantDashboardPage() {
     document.addEventListener('mousedown', handleDocMouseDown);
     return () => document.removeEventListener('mousedown', handleDocMouseDown);
   }, [rangeMenuOpen]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowTs(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (rangePreset === TIME_RANGE_PRESET.ALL_TIME) {
@@ -220,6 +236,26 @@ export function TenantDashboardPage() {
   }
 
   const dashboardTitle = role === 'agent' ? 'My dashboard' : 'Executive dashboard';
+  const greeting = useMemo(() => {
+    const baseName = String(user?.name || '').trim();
+    const first = baseName ? baseName.split(/\s+/)[0] : 'Agent';
+    return `${greetingByHour(new Date(nowTs))}, ${first}!`;
+  }, [user?.name, nowTs]);
+
+  function trendHint(trend) {
+    const pct = Number(trend?.pct ?? 0);
+    const direction = String(trend?.direction || 'flat');
+    if (direction === 'up') return `\u2191 ${pct}%   vs last 7 days`;
+    if (direction === 'down') return `\u2193 ${pct}%   vs last 7 days`;
+    return `\u2014 ${pct}%   vs last 7 days`;
+  }
+
+  function trendHintClass(trend) {
+    const direction = String(trend?.direction || 'flat');
+    if (direction === 'up') return styles.kpiTrendUp;
+    if (direction === 'down') return styles.kpiTrendDown;
+    return styles.kpiTrendFlat;
+  }
 
   const subtitle = useMemo(() => {
     if (!data) return '';
@@ -259,8 +295,27 @@ export function TenantDashboardPage() {
   if (loading) {
     return (
       <div className={styles.page}>
-        <div className={styles.loading}>
-          <Spinner size="lg" />
+        <div className={styles.dashboardSkeletonWrap} aria-label="Loading dashboard">
+          <div className={styles.dashboardSkeletonHero}>
+            <Skeleton width="34%" height={14} />
+            <Skeleton width="48%" height={30} />
+            <Skeleton width="62%" height={14} />
+          </div>
+          <div className={styles.dashboardSkeletonKpis}>
+            {Array.from({ length: 6 }, (_, i) => (
+              <div key={`kpi-skel-${i}`} className={styles.dashboardSkeletonCard}>
+                <Skeleton width={28} height={28} circle />
+                <Skeleton width="56%" height={22} />
+                <Skeleton width="68%" height={12} />
+                <Skeleton width="74%" height={11} />
+              </div>
+            ))}
+          </div>
+          <div className={styles.dashboardSkeletonGrid}>
+            <Skeleton width="100%" height={220} />
+            <Skeleton width="100%" height={220} />
+            <Skeleton width="100%" height={220} />
+          </div>
         </div>
       </div>
     );
@@ -303,7 +358,8 @@ export function TenantDashboardPage() {
     <div className={styles.page}>
       <header className={styles.hero}>
         <div className={styles.heroTitles}>
-          <h1 className={styles.heroTitle}>{dashboardTitle}</h1>
+          <p className={styles.heroKicker}>Here&apos;s what&apos;s happening in your workspace today.</p>
+          <h1 className={styles.heroTitle}>{greeting}</h1>
           <p className={styles.heroSubtitle}>{subtitle}</p>
         </div>
         <div className={styles.heroActions}>
@@ -364,12 +420,13 @@ export function TenantDashboardPage() {
             </div>
             <button
               type="button"
-              className={styles.iconToolBtn}
-              title="Export PDF"
-              aria-label="Export PDF"
+              className={styles.toolbarBtn}
+              title="Export"
+              aria-label="Export"
               onClick={() => showToast('PDF export will be available in a future update.', 'info')}
             >
-              <MaterialSymbol name="download" size="md" />
+              <MaterialSymbol name="download" size="sm" />
+              <span>Export</span>
             </button>
           </div>
         </div>
@@ -382,6 +439,8 @@ export function TenantDashboardPage() {
             matWrapClass={styles.kpiMatLeaderboard}
             label="New leads"
             value={(data?.leadsTotal ?? 0).toLocaleString()}
+            hint={trendHint(data?.leadsTrend)}
+            hintClassName={trendHintClass(data?.leadsTrend)}
             to="/leads"
           />
           <ExecutiveKpiCard
@@ -389,6 +448,8 @@ export function TenantDashboardPage() {
             matWrapClass={styles.kpiMatContacts}
             label="Contacts"
             value={(data?.contactsTotal ?? 0).toLocaleString()}
+            hint={trendHint(data?.contactsTrend)}
+            hintClassName={trendHintClass(data?.contactsTrend)}
             to="/contacts"
           />
           {showCampaignKpi ? (
@@ -416,7 +477,8 @@ export function TenantDashboardPage() {
             matWrapClass={styles.kpiMatEvent}
             label="Meetings"
             value={meetingsMetric.toLocaleString()}
-            hint={data?.dateRange ? 'Starts in range' : 'Upcoming scheduled'}
+            hint={trendHint(data?.meetingsTrend)}
+            hintClassName={trendHintClass(data?.meetingsTrend)}
             to={canMeetings ? DASHBOARD_MEETINGS_PATH : undefined}
             static={!canMeetings}
           />
@@ -425,7 +487,8 @@ export function TenantDashboardPage() {
             matWrapClass={styles.kpiMatEmail}
             label="Emails sent"
             value={emailsTotal.toLocaleString()}
-            hint={canEmail ? 'Outbound, sent' : 'No email access'}
+            hint={canEmail ? trendHint(data?.emailsTrend) : 'No email access'}
+            hintClassName={canEmail ? trendHintClass(data?.emailsTrend) : undefined}
             to={canEmail ? '/email' : undefined}
             static={!canEmail}
           />
@@ -434,7 +497,8 @@ export function TenantDashboardPage() {
             matWrapClass={styles.kpiMatCall}
             label="Calls logged"
             value={(callsToday.count ?? 0).toLocaleString()}
-            hint={`Today, ${avgToday} avg`}
+            hint={trendHint(data?.callsTrend)}
+            hintClassName={trendHintClass(data?.callsTrend)}
             to={canCallHistory ? '/calls/history' : undefined}
             static={!canCallHistory}
           />
@@ -443,11 +507,13 @@ export function TenantDashboardPage() {
         <div className={styles.mainGrid}>
           <div>
             {canMeetings ? (
-              <section className={styles.panel}>
+              <section className={`${styles.panel} ${styles.upcomingPanel}`}>
                 <div className={styles.panelHead}>
                   <h2 className={styles.panelTitleWithIcon}>
                     <Link to={DASHBOARD_MEETINGS_PATH} className={styles.panelTitleAnchor}>
-                      <MaterialSymbol name="event_upcoming" size="sm" className={styles.panelTitleIcon} />
+                      <span className={`${styles.sectionIconChip} ${styles.sectionIconChipPurple}`}>
+                        <MaterialSymbol name="event_upcoming" size="sm" className={styles.panelTitleIcon} />
+                      </span>
                       Upcoming meetings
                     </Link>
                   </h2>
@@ -465,7 +531,9 @@ export function TenantDashboardPage() {
                           : null;
                       return (
                         <li key={m.id} className={`${styles.meetingRow} ${styles.dashboardSlotRow}`}>
-                          <span className={styles.meetingTime}>{formatMeetingSlot(m.start_at, dtMode)}</span>
+                          <span className={`${styles.meetingTime} ${styles.upcomingTimeBadge}`}>
+                            {formatMeetingSlot(m.start_at, dtMode)}
+                          </span>
                           <div className={styles.meetingBody}>
                             <p className={styles.meetingTitle}>{m.title || 'Meeting'}</p>
                             <p className={styles.meetingMeta}>
@@ -523,17 +591,21 @@ export function TenantDashboardPage() {
               </section>
             ) : null}
 
-            <section className={styles.panel}>
+            <section className={`${styles.panel} ${styles.connectedPanel}`}>
               <div className={styles.panelHead}>
                 <h2 className={styles.panelTitleWithIcon}>
                   {canCallHistory ? (
                     <Link to="/calls/history" className={styles.panelTitleAnchor}>
-                      <MaterialSymbol name="phone_callback" size="sm" className={styles.panelTitleIcon} />
+                      <span className={`${styles.sectionIconChip} ${styles.sectionIconChipGreen}`}>
+                        <MaterialSymbol name="phone_callback" size="sm" className={styles.panelTitleIcon} />
+                      </span>
                       Connected calls
                     </Link>
                   ) : (
                     <>
-                      <MaterialSymbol name="phone_callback" size="sm" className={styles.panelTitleIcon} />
+                      <span className={`${styles.sectionIconChip} ${styles.sectionIconChipGreen}`}>
+                        <MaterialSymbol name="phone_callback" size="sm" className={styles.panelTitleIcon} />
+                      </span>
                       Connected calls
                     </>
                   )}
@@ -543,66 +615,69 @@ export function TenantDashboardPage() {
                   <span className={styles.callStatPill}>{avgToday} avg</span>
                 </div>
               </div>
-              <ul className={`${styles.meetingList} ${styles.dashboardListSlots}`}>
-                {Array.from({ length: DASHBOARD_LIST_SLOT_COUNT }, (_, slot) => {
-                  const row = callsPreview[slot];
-                  if (row) {
-                    const cp = contactPath(row);
-                    const name = row.display_name?.trim() || `Contact #${row.contact_id}`;
-                    return (
-                      <li key={row.id} className={`${styles.meetingRow} ${styles.dashboardSlotRow}`}>
-                        <span className={styles.meetingTime}>
-                          {formatDateTimeDisplay(row.started_at, dtMode)}
-                        </span>
-                        <div className={styles.meetingBody}>
-                          <p className={styles.meetingTitle}>
-                            {cp ? (
-                              <Link to={cp} className={styles.leadLink}>
-                                {name}
-                              </Link>
-                            ) : (
-                              name
-                            )}
-                          </p>
-                          <p className={styles.meetingMeta}>
-                            {formatDurationSec(row.duration_sec)} ·{' '}
-                            <span className={styles.dispoPill}>
-                              {row.disposition_name?.trim() || '—'}
-                            </span>
-                          </p>
-                        </div>
-                        {cp ? (
-                          <Link to={cp} className={styles.joinBtn}>
-                            <span className={styles.joinBtnInner}>
-                              <MaterialSymbol name="person" size="sm" />
-                              Contact
-                            </span>
-                          </Link>
-                        ) : canCallHistory ? (
-                          <Link to="/calls/history" className={styles.joinBtn}>
-                            <span className={styles.joinBtnInner}>
-                              <MaterialSymbol name="history" size="sm" />
-                              History
-                            </span>
-                          </Link>
-                        ) : null}
-                      </li>
-                    );
-                  }
-                  const emptyFirst = slot === 0 && !recentConnectedCalls.length;
-                  return (
-                    <li
-                      key={`calls-slot-${slot}`}
-                      className={styles.dashboardSlotSpacer}
-                      aria-hidden={!emptyFirst}
-                    >
-                      {emptyFirst ? (
-                        <span className={styles.slotEmptyHint}>No connected calls in your scope yet.</span>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
+              {recentConnectedCalls.length === 0 ? (
+                <div className={styles.connectedEmpty}>
+                  <span className={styles.connectedEmptyIcon}>
+                    <MaterialSymbol name="call" size="xl" />
+                  </span>
+                  <p className={styles.connectedEmptyText}>No connected calls in your scope yet.</p>
+                  {canCallHistory ? (
+                    <Link to="/calls/history" className={styles.connectedEmptyLink}>
+                      View full call history {'\u2192'}
+                    </Link>
+                  ) : null}
+                </div>
+              ) : (
+                <ul className={`${styles.meetingList} ${styles.dashboardListSlots}`}>
+                  {Array.from({ length: DASHBOARD_LIST_SLOT_COUNT }, (_, slot) => {
+                    const row = callsPreview[slot];
+                    if (row) {
+                      const cp = contactPath(row);
+                      const name = row.display_name?.trim() || `Contact #${row.contact_id}`;
+                      return (
+                        <li key={row.id} className={`${styles.meetingRow} ${styles.dashboardSlotRow}`}>
+                          <span className={styles.meetingTime}>
+                            {formatDateTimeDisplay(row.started_at, dtMode)}
+                          </span>
+                          <div className={styles.meetingBody}>
+                            <p className={styles.meetingTitle}>
+                              {cp ? (
+                                <Link to={cp} className={styles.leadLink}>
+                                  {name}
+                                </Link>
+                              ) : (
+                                name
+                              )}
+                            </p>
+                            <p className={styles.meetingMeta}>
+                              {formatDurationSec(row.duration_sec)} ·{' '}
+                              <span className={styles.dispoPill}>
+                                {row.disposition_name?.trim() || '—'}
+                              </span>
+                            </p>
+                          </div>
+                          {cp ? (
+                            <Link to={cp} className={styles.joinBtn}>
+                              <span className={styles.joinBtnInner}>
+                                <MaterialSymbol name="person" size="sm" />
+                                Contact
+                              </span>
+                            </Link>
+                          ) : canCallHistory ? (
+                            <Link to="/calls/history" className={styles.joinBtn}>
+                              <span className={styles.joinBtnInner}>
+                                <MaterialSymbol name="history" size="sm" />
+                                History
+                              </span>
+                            </Link>
+                          ) : null}
+                        </li>
+                      );
+                    }
+                    return <li key={`calls-slot-${slot}`} className={styles.dashboardSlotSpacer} aria-hidden />;
+                  })}
+                </ul>
+              )}
               {canCallHistory ? (
                 <Link
                   to="/calls/history"
@@ -617,17 +692,21 @@ export function TenantDashboardPage() {
           </div>
 
           <div className={styles.sideStack}>
-            <section className={styles.panel}>
+            <section className={`${styles.panel} ${styles.pendingPanel}`}>
               <div className={styles.panelHead}>
                 <h2 className={styles.panelTitleWithIcon}>
                   {can(PERMISSIONS.SCHEDULE_VIEW) ? (
                     <Link to="/schedule/callbacks" className={styles.panelTitleAnchor}>
-                      <MaterialSymbol name="ring_volume" size="sm" className={styles.panelTitleIcon} />
+                      <span className={`${styles.sectionIconChip} ${styles.sectionIconChipPurple}`}>
+                        <MaterialSymbol name="ring_volume" size="sm" className={styles.panelTitleIcon} />
+                      </span>
                       Pending callbacks
                     </Link>
                   ) : (
                     <>
-                      <MaterialSymbol name="ring_volume" size="sm" className={styles.panelTitleIcon} />
+                      <span className={`${styles.sectionIconChip} ${styles.sectionIconChipPurple}`}>
+                        <MaterialSymbol name="ring_volume" size="sm" className={styles.panelTitleIcon} />
+                      </span>
                       Pending callbacks
                     </>
                   )}
@@ -768,42 +847,77 @@ export function TenantDashboardPage() {
               )}
             </section>
 
-            <section className={styles.panel}>
+            <section className={`${styles.panel} ${styles.quickActionsPanel}`}>
               <div className={styles.panelHead}>
-                <h2 className={styles.panelTitle}>Quick actions</h2>
+                <h2 className={styles.panelTitleWithIcon}>
+                  <span className={`${styles.sectionIconChip} ${styles.sectionIconChipPurple}`}>
+                    <MaterialSymbol name="bolt" size="sm" className={styles.panelTitleIcon} />
+                  </span>
+                  Quick actions
+                </h2>
               </div>
               <div className={styles.quickGrid}>
                 {can(PERMISSIONS.LEADS_CREATE) ? (
-                  <Link to="/leads" className={`${styles.quickBtn} ${styles.quickBtnCta} ${styles.quickPrimary}`}>
-                    <MaterialSymbol name="person_add" size="md" className={styles.quickBtnMat} />
+                  <Link
+                    to="/leads"
+                    className={`${styles.quickBtn} ${styles.quickBtnCta} ${styles.quickPrimary} ${styles.quickBtnAddLead}`}
+                  >
+                    <MaterialSymbol
+                      name="person_add"
+                      size="md"
+                      className={`${styles.quickBtnMat} ${styles.quickIconPurple}`}
+                    />
                     <span>Add lead</span>
                   </Link>
                 ) : (
-                  <Link to="/leads" className={`${styles.quickBtn} ${styles.quickBtnCta} ${styles.quickPrimary}`}>
-                    <MaterialSymbol name="person_add" size="md" className={styles.quickBtnMat} />
+                  <Link
+                    to="/leads"
+                    className={`${styles.quickBtn} ${styles.quickBtnCta} ${styles.quickPrimary} ${styles.quickBtnAddLead}`}
+                  >
+                    <MaterialSymbol
+                      name="person_add"
+                      size="md"
+                      className={`${styles.quickBtnMat} ${styles.quickIconPurple}`}
+                    />
                     <span>View leads</span>
                   </Link>
                 )}
                 {canAny([PERMISSIONS.LEADS_READ, PERMISSIONS.CONTACTS_READ]) ? (
                   <Link to="/campaigns" className={styles.quickBtn}>
-                    <MaterialSymbol name="send" size="md" className={styles.quickBtnMat} />
+                    <MaterialSymbol
+                      name="send"
+                      size="md"
+                      className={`${styles.quickBtnMat} ${styles.quickIconGreen}`}
+                    />
                     <span>Start campaign</span>
                   </Link>
                 ) : null}
                 {canDial ? (
                   <Link to="/dialer" className={styles.quickBtn}>
-                    <MaterialSymbol name="phone_forwarded" size="md" className={styles.quickBtnMat} />
+                    <MaterialSymbol
+                      name="phone_forwarded"
+                      size="md"
+                      className={`${styles.quickBtnMat} ${styles.quickIconGreen}`}
+                    />
                     <span>Log call</span>
                   </Link>
                 ) : canCallHistory ? (
                   <Link to="/calls/history" className={styles.quickBtn}>
-                    <MaterialSymbol name="phone_forwarded" size="md" className={styles.quickBtnMat} />
+                    <MaterialSymbol
+                      name="phone_forwarded"
+                      size="md"
+                      className={`${styles.quickBtnMat} ${styles.quickIconGreen}`}
+                    />
                     <span>Call history</span>
                   </Link>
                 ) : null}
                 {canMeetings ? (
-                  <Link to={DASHBOARD_MEETINGS_PATH} className={styles.quickBtn}>
-                    <MaterialSymbol name="calendar_month" size="md" className={styles.quickBtnMat} />
+                  <Link to={DASHBOARD_MEETINGS_PATH} className={`${styles.quickBtn} ${styles.quickPrimary}`}>
+                    <MaterialSymbol
+                      name="calendar_month"
+                      size="md"
+                      className={`${styles.quickBtnMat} ${styles.quickIconOrange}`}
+                    />
                     <span>Meeting</span>
                   </Link>
                 ) : null}
@@ -815,7 +929,12 @@ export function TenantDashboardPage() {
         <section className={styles.activityFeedPanel}>
           <div className={styles.activityFeedHead}>
             <div>
-              <h2 className={styles.activityFeedTitleMain}>Recent activity</h2>
+              <div className={styles.activityFeedTitleRow}>
+                <span className={styles.activityFeedTitleIcon} aria-hidden="true">
+                  <MaterialSymbol name="graphic_eq" size="sm" className={styles.activityFeedTitleIconGlyph} />
+                </span>
+                <h2 className={styles.activityFeedTitleMain}>Recent activity</h2>
+              </div>
               <p className={styles.activityFeedSub}>
                 Live feed from your workspace (role-scoped). Open a row to view the record.
               </p>

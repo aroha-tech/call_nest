@@ -5,7 +5,7 @@ import { selectUser } from '../../features/auth/authSelectors';
 import { usePermissions } from '../../hooks/usePermission';
 import { callsAPI } from '../../services/callsAPI';
 import { Alert } from '../../components/ui/Alert';
-import { Spinner } from '../../components/ui/Spinner';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { Button } from '../../components/ui/Button';
 import { MaterialSymbol } from '../../components/ui/MaterialSymbol';
 import { formatDateTimeDisplay, formatRelativeTimeShort } from '../../utils/dateTimeDisplay';
@@ -253,7 +253,12 @@ export function ContactCallHistorySection({ contactId }) {
         <div className={styles.panel}>
           <div className={styles.tableScroll} aria-busy="true">
             <div className={styles.containerLoading}>
-              <Spinner size="sm" /> Loading…
+              <div style={{ width: '100%', display: 'grid', gap: 10 }}>
+                <Skeleton width="30%" height={14} />
+                <Skeleton width="100%" height={36} />
+                <Skeleton width="100%" height={36} />
+                <Skeleton width="100%" height={36} />
+              </div>
             </div>
           </div>
         </div>
@@ -414,7 +419,8 @@ export function ContactCallHistorySection({ contactId }) {
             </span>
             {loadingMore ? (
               <span className={styles.footerLoading}>
-                <Spinner size="sm" /> Loading more…
+                <Skeleton width={16} height={16} circle />
+                <Skeleton width={96} height={12} />
               </span>
             ) : null}
           </div>

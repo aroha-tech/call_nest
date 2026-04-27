@@ -5,8 +5,8 @@
 .overviewCard {
   padding: 16px 18px;
   border-radius: 10px;
-  background: var(--color-bg-surface, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.08));
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
   margin-bottom: 16px;
 }
 
@@ -110,8 +110,8 @@
   margin-bottom: 16px;
   padding: 18px 20px;
   border-radius: 12px;
-  border: 1px solid var(--color-border-strong, rgba(255, 255, 255, 0.2));
-  background: var(--color-bg-elevated, rgba(0, 0, 0, 0.35));
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
   box-shadow: none;
 }
 
@@ -137,9 +137,9 @@
   letter-spacing: 0.08em;
   padding: 8px 14px;
   border-radius: 999px;
-  border: 2px solid var(--color-border-strong, rgba(255, 255, 255, 0.2));
-  background: var(--color-bg-body, #000000);
-  color: var(--color-text-primary, #f8fafc);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
   cursor: pointer;
   font-family: inherit;
   transition:
@@ -149,9 +149,9 @@
 }
 
 .caTabActive {
-  border-color: var(--color-text-primary, #f8fafc);
-  color: var(--color-bg-body, #000000);
-  background: var(--color-text-primary, #f8fafc);
+  border-color: #7c3aed;
+  color: #ffffff;
+  background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
   box-shadow: none;
 }
 
@@ -170,8 +170,8 @@
   max-height: min(520px, 70vh);
   overflow: auto;
   border-radius: 8px;
-  border: 1px solid var(--color-border-strong, rgba(255, 255, 255, 0.2));
-  background: var(--color-bg-surface, rgba(0, 0, 0, 0.25));
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
 }
 
 .caTable {
@@ -252,9 +252,9 @@
 .caIconDialer,
 .caIconDeal,
 .caIconCrm {
-  background: var(--color-bg-subtle, rgba(255, 255, 255, 0.06));
-  color: var(--color-text-primary, #f8fafc);
-  border: 1px solid var(--color-border-strong, rgba(255, 255, 255, 0.22));
+  background: var(--color-bg-subtle);
+  color: var(--color-accent-brand);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .caDetailText {
@@ -446,12 +446,13 @@
 .caFooterLink {
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-text-muted, #9ca3af);
+  color: var(--color-accent-brand);
   text-decoration: none;
   transition: color 0.15s ease;
 
   &:hover {
-    color: var(--color-primary-400, #818cf8);
+    color: var(--color-accent-brand);
+    text-decoration: none;
   }
 }
 

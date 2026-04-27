@@ -12,6 +12,7 @@ import { Select } from '../components/ui/Select';
 import { PasswordField } from '../features/auth/components/PasswordField';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
+import { SectionIcon } from '../components/ui/SectionIcon';
 import styles from './ProfilePage.module.scss';
 
 const ROLE_LABELS = {
@@ -169,174 +170,246 @@ export function ProfilePage() {
     <div className={styles.page}>
       <PageHeader
         title="Profile"
+        titleIcon="account_circle"
         description="Name, date/time display, and password. Email change with verification is planned."
       />
-      <form className={styles.card} onSubmit={handleSubmit} noValidate>
-        <div className={styles.hero}>
-          <div className={styles.avatarLarge} aria-hidden={photo ? undefined : true}>
-            {photo ? (
-              <img src={photo} alt="" className={styles.avatarImg} />
-            ) : (
-              <span>{initials}</span>
-            )}
-          </div>
-          <div className={styles.heroText}>
-            <h2 className={styles.displayName}>{displayName}</h2>
-            <div className={styles.emailBlock}>
-              <span className={styles.emailLabel}>Email</span>
-              <p className={styles.emailValue} title={user.email}>
-                {user.email}
-              </p>
-              <p className={styles.emailHint}>Email cannot be changed here yet.</p>
+      <div className={styles.layout}>
+        <aside className={styles.leftColumn}>
+          <section className={styles.card}>
+            <div className={styles.hero}>
+              <div className={styles.avatarLarge} aria-hidden={photo ? undefined : true}>
+                {photo ? (
+                  <img src={photo} alt="" className={styles.avatarImg} />
+                ) : (
+                  <span>{initials}</span>
+                )}
+              </div>
+              <div className={styles.heroText}>
+                <h2 className={styles.displayName}>{displayName}</h2>
+                <p className={styles.roleBadge}>{roleLabel(user.role, user.isPlatformAdmin)}</p>
+                <div className={styles.emailBlock}>
+                  <span className={styles.emailLabel}>Email</span>
+                  <p className={styles.emailValue} title={user.email}>
+                    {user.email}
+                  </p>
+                  <p className={styles.emailHint}>Email cannot be changed here yet.</p>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </section>
 
-        {apiError && (
-          <Alert variant="error" className={styles.alert} display="inline">
-            {apiError}
-          </Alert>
-        )}
+          <section className={styles.card}>
+            <div className={styles.infoCardHeader}>
+              <SectionIcon icon="menu_book" color="purple" size="sm" />
+              <h3 className={styles.managerCardTitle}>Instructions</h3>
+            </div>
+            <p className={styles.managerCardBody}>Guidelines and important information for this workspace.</p>
+            <ul className={styles.instructionList}>
+              <li>Getting started</li>
+              <li>Dialer guide</li>
+              <li>Lead management</li>
+              <li>Best practices</li>
+            </ul>
+          </section>
+        </aside>
 
-        {user.role === 'agent' && !user.isPlatformAdmin && tenant?.id != null && (
-          <div className={styles.managerCard}>
-            <h3 className={styles.managerCardTitle}>Your manager</h3>
-            {user.manager === undefined ? (
-              <p className={styles.managerCardBody}>
-                Sign out and sign in again to load your manager details.
-              </p>
-            ) : user.manager && (user.manager.email || user.manager.name) ? (
-              <>
-                <p className={styles.managerCardBody}>
-                  Your manager is your main point of contact for leads, assignments, and questions about your
-                  work in this workspace. Reach them by email below.
-                </p>
-                <p className={styles.managerName}>{getManagerDisplayLabel(user.manager)}</p>
-                {user.manager.email ? (
-                  <a className={styles.managerMailto} href={`mailto:${user.manager.email}`}>
-                    {user.manager.email}
-                  </a>
-                ) : null}
-              </>
-            ) : (
-              <p className={styles.managerCardBody}>
-                You do not have one main manager right now. Any manager in your workspace can assign leads to you or
-                work with you on leads.
-              </p>
+        <main className={styles.mainColumn}>
+          <form className={styles.card} onSubmit={handleSubmit} noValidate>
+            {apiError && (
+              <Alert variant="error" className={styles.alert} display="inline">
+                {apiError}
+              </Alert>
             )}
-          </div>
-        )}
 
-        <div className={styles.form}>
-          <Input
-            id="profile-name"
-            label="Full name"
-            name="name"
-            autoComplete="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            error={fieldErrors.name}
-            placeholder="Your name"
-          />
+            <div className={styles.infoCardHeader}>
+              <SectionIcon icon="person" color="blue" size="sm" />
+              <h3 className={styles.managerCardTitle}>Profile information</h3>
+            </div>
 
-          <Select
-            id="profile-datetime-mode"
-            label="Dates and times"
-            placeholder="Choose display"
-            value={datetimeDisplayMode}
-            onChange={(e) => setDatetimeDisplayMode(e.target.value)}
-            options={[
-              {
-                value: DATETIME_DISPLAY_IST,
-                label: 'India (IST) — DD/MM/YYYY, 12-hour with seconds',
-              },
-              {
-                value: DATETIME_DISPLAY_BROWSER,
-                label: 'This device — use my system timezone and formats',
-              },
-            ]}
-          />
-          <p className={styles.fieldHint}>
-            Applies to lists and details across the app. Default is India (IST).
-          </p>
+            {user.role === 'agent' && !user.isPlatformAdmin && tenant?.id != null && (
+              <div className={styles.managerCard}>
+                <div className={styles.managerCardHeader}>
+                  <SectionIcon icon="supervisor_account" color="cyan" size="sm" />
+                  <h3 className={styles.managerCardTitle}>Your manager</h3>
+                </div>
+                {user.manager === undefined ? (
+                  <p className={styles.managerCardBody}>
+                    Sign out and sign in again to load your manager details.
+                  </p>
+                ) : user.manager && (user.manager.email || user.manager.name) ? (
+                  <>
+                    <p className={styles.managerCardBody}>
+                      Your manager is your main point of contact for leads, assignments, and questions about your
+                      work in this workspace. Reach them by email below.
+                    </p>
+                    <p className={styles.managerName}>{getManagerDisplayLabel(user.manager)}</p>
+                    {user.manager.email ? (
+                      <a className={styles.managerMailto} href={`mailto:${user.manager.email}`}>
+                        {user.manager.email}
+                      </a>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className={styles.managerCardBody}>
+                    You do not have one main manager right now. Any manager in your workspace can assign leads to you
+                    or work with you on leads.
+                  </p>
+                )}
+              </div>
+            )}
 
-          {!passwordFlowOpen && (
-            <div className={styles.changePwdTrigger}>
-              <Button type="button" variant="secondary" onClick={() => setPasswordFlowOpen(true)}>
-                Change password
+            <div className={styles.form}>
+              <Input
+                id="profile-name"
+                label="Full name"
+                name="name"
+                autoComplete="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                error={fieldErrors.name}
+                placeholder="Your name"
+              />
+
+              <Select
+                id="profile-datetime-mode"
+                label="Dates and times"
+                placeholder="Choose display"
+                value={datetimeDisplayMode}
+                onChange={(e) => setDatetimeDisplayMode(e.target.value)}
+                options={[
+                  {
+                    value: DATETIME_DISPLAY_IST,
+                    label: 'India (IST) — DD/MM/YYYY, 12-hour with seconds',
+                  },
+                  {
+                    value: DATETIME_DISPLAY_BROWSER,
+                    label: 'This device — use my system timezone and formats',
+                  },
+                ]}
+              />
+              <p className={styles.fieldHint}>
+                Applies to lists and details across the app. Default is India (IST).
+              </p>
+
+              {!passwordFlowOpen && (
+                <div className={styles.changePwdTrigger}>
+                  <Button type="button" variant="secondary" onClick={() => setPasswordFlowOpen(true)}>
+                    Change password
+                  </Button>
+                </div>
+              )}
+
+              {passwordFlowOpen && (
+                <div className={styles.passwordSection}>
+                  <div className={styles.passwordSectionHeader}>
+                    <div className={styles.passwordSectionTitle}>
+                      <SectionIcon icon="lock" color="orange" size="sm" />
+                      <h3 className={styles.sectionTitle}>Change password</h3>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setApiError(null);
+                        closePasswordFlow();
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                  <p className={styles.sectionHint}>
+                    Enter your current password and choose a new one (at least 8 characters).
+                  </p>
+                  <PasswordField
+                    id="profile-current-password"
+                    label="Current password"
+                    name="currentPassword"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    error={fieldErrors.currentPassword}
+                  />
+                  <PasswordField
+                    id="profile-new-password"
+                    label="New password"
+                    name="newPassword"
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    error={fieldErrors.newPassword}
+                  />
+                  <PasswordField
+                    id="profile-confirm-password"
+                    label="Confirm new password"
+                    name="confirmPassword"
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    error={fieldErrors.confirmPassword}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className={styles.actions}>
+              <Button type="submit" variant="primary" loading={saving} disabled={saving}>
+                Save changes
               </Button>
             </div>
-          )}
+          </form>
 
-          {passwordFlowOpen && (
-            <div className={styles.passwordSection}>
-              <div className={styles.passwordSectionHeader}>
-                <h3 className={styles.sectionTitle}>Change password</h3>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setApiError(null);
-                    closePasswordFlow();
-                  }}
-                >
-                  Cancel
-                </Button>
+          <section className={styles.card}>
+            <div className={styles.infoCardHeader}>
+              <SectionIcon icon="badge" color="green" size="sm" />
+              <h3 className={styles.managerCardTitle}>Account details</h3>
+            </div>
+            <dl className={styles.details}>
+              <div className={styles.detailRow}>
+                <dt>Role</dt>
+                <dd>{roleLabel(user.role, user.isPlatformAdmin)}</dd>
               </div>
-              <p className={styles.sectionHint}>
-                Enter your current password and choose a new one (at least 8 characters).
-              </p>
-              <PasswordField
-                id="profile-current-password"
-                label="Current password"
-                name="currentPassword"
-                autoComplete="current-password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                error={fieldErrors.currentPassword}
-              />
-              <PasswordField
-                id="profile-new-password"
-                label="New password"
-                name="newPassword"
-                autoComplete="new-password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                error={fieldErrors.newPassword}
-              />
-              <PasswordField
-                id="profile-confirm-password"
-                label="Confirm new password"
-                name="confirmPassword"
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                error={fieldErrors.confirmPassword}
-              />
-            </div>
-          )}
-        </div>
+              {tenant?.id != null && (
+                <div className={styles.detailRow}>
+                  <dt>Workspace</dt>
+                  <dd>ID {tenant.id}</dd>
+                </div>
+              )}
+            </dl>
+          </section>
+        </main>
 
-        <div className={styles.actions}>
-          <Button type="submit" variant="primary" loading={saving} disabled={saving}>
-            Save changes
-          </Button>
-        </div>
-
-        <dl className={styles.details}>
-          <div className={styles.detailRow}>
-            <dt>Role</dt>
-            <dd>{roleLabel(user.role, user.isPlatformAdmin)}</dd>
-          </div>
-          {tenant?.id != null && (
-            <div className={styles.detailRow}>
-              <dt>Workspace</dt>
-              <dd>ID {tenant.id}</dd>
+        <aside className={styles.rightColumn}>
+          <section className={styles.card}>
+            <div className={styles.infoCardHeader}>
+              <SectionIcon icon="credit_card" color="indigo" size="sm" />
+              <h3 className={styles.managerCardTitle}>Billing &amp; plan</h3>
             </div>
-          )}
-        </dl>
-      </form>
+            <p className={styles.planTitle}>Current plan</p>
+            <p className={styles.planValue}>Workspace Plan</p>
+            <p className={styles.planHint}>Billing information and usage metrics will appear here.</p>
+            <Button type="button" variant="secondary" size="sm">
+              Manage plan
+            </Button>
+          </section>
+
+          <section className={styles.card}>
+            <div className={styles.infoCardHeader}>
+              <SectionIcon icon="extension" color="emerald" size="sm" />
+              <h3 className={styles.managerCardTitle}>Add-ons</h3>
+            </div>
+            <ul className={styles.instructionList}>
+              <li>Power Dialer</li>
+              <li>WhatsApp Integration</li>
+              <li>Advanced Reports</li>
+              <li>API Access</li>
+            </ul>
+            <Button type="button" variant="secondary" size="sm">
+              Browse add-ons
+            </Button>
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }

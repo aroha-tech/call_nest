@@ -23,6 +23,24 @@
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
+.heroKicker {
+  margin: 0 0 $space-1;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  color: var(--color-text-tertiary);
+}
+
+.sectionTitleIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: $radius-sm;
+  color: var(--color-primary-300);
+  background: color-mix(in srgb, #6366f1 16%, transparent);
+}
+
 .dateFilter {
   margin-bottom: $space-6;
   padding: $space-5 $space-6;
@@ -515,6 +533,9 @@
 }
 
 .platformActivityChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 9px;
   font-weight: $font-weight-bold;
   text-transform: uppercase;
@@ -524,6 +545,10 @@
   background: rgba(var(--color-primary-rgb), 0.12);
   color: var(--color-primary-400);
   flex-shrink: 0;
+}
+
+.platformActivityChipIcon {
+  opacity: 0.9;
 }
 
 .platformActivityTitle {

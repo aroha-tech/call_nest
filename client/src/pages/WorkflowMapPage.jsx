@@ -15,6 +15,7 @@ export function WorkflowMapPage({ variant }) {
       <div className={styles.intro}>
         <PageHeader
           title="Workflow"
+          titleIcon="account_tree"
           description={
             isPlatform
               ? 'How tenants, masters, dialer defaults, and platform users connect.'

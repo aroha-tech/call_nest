@@ -13,7 +13,7 @@ export function SearchInput({
   placeholder = 'Search... (press Enter)',
   className = '',
   /** When true, icon-only until opened; field clips open/closed from the right with animation. */
-  expandable = true,
+  expandable = false,
 }) {
   const [localValue, setLocalValue] = useState(value ?? '');
   const [expanded, setExpanded] = useState(false);

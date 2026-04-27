@@ -4,3 +4,14 @@
   min-width: 180px;
   max-width: 280px;
 }
+
+.campaignNameLink {
+  color: var(--color-accent-brand);
+  text-decoration: none;
+  font-weight: 600;
+
+  &:hover {
+    color: var(--color-accent-brand);
+    text-decoration: none;
+  }
+}

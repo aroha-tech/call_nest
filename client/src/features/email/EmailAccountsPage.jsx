@@ -298,7 +298,7 @@ export function EmailAccountsPage() {
               <Button variant="secondary" onClick={handleConnectOutlook} loading={oauthLoading === 'outlook'} disabled={!!oauthLoading}>
                 Connect with Microsoft
               </Button>
-              <Button onClick={openCreate}>+ Add Account</Button>
+              <Button onClick={openCreate}>Add account</Button>
             </>
           ) : null
         }
@@ -328,7 +328,7 @@ export function EmailAccountsPage() {
                 : 'No accounts are configured yet. Ask an admin to connect email.'
             }
             action={canManageAccounts ? openCreate : undefined}
-            actionLabel={canManageAccounts ? 'Add Account' : undefined}
+            actionLabel={canManageAccounts ? 'Add account' : undefined}
           />
         ) : (
           <div className={listStyles.tableScrollAreaNatural}>

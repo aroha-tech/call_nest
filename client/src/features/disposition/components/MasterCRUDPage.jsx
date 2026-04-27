@@ -167,7 +167,7 @@ export function MasterCRUDPage({
       <PageHeader
         title={title}
         description={description}
-        actions={<Button onClick={openCreateModal}>+ Add New</Button>}
+        actions={<Button onClick={openCreateModal}>Add new</Button>}
       />
 
       {error && <Alert variant="error">{error}</Alert>}
@@ -204,7 +204,7 @@ export function MasterCRUDPage({
                 title={search ? 'No results found' : emptyTitle}
                 description={search ? 'Try a different search term.' : emptyDescription}
                 action={!search ? openCreateModal : undefined}
-                actionLabel={!search ? 'Add New' : undefined}
+                actionLabel={!search ? 'Add new' : undefined}
               />
             </div>
           ) : (

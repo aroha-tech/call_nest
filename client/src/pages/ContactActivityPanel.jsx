@@ -5,8 +5,8 @@ import { selectUser } from '../features/auth/authSelectors';
 import { usePermissions } from '../hooks/usePermission';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { Spinner } from '../components/ui/Spinner';
 import { Alert } from '../components/ui/Alert';
+import { Skeleton } from '../components/ui/Skeleton';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
 import { PERMISSIONS } from '../utils/permissionUtils';
 import { sanitizeAttemptNotesForDisplay } from '../utils/callAttemptNotesDisplay';
@@ -557,8 +557,10 @@ export function ContactActivityPanel({
   if (loading) {
     return (
       <div className={styles.wrap} aria-busy="true">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Spinner size="sm" /> Loading activity…
+        <div style={{ display: 'grid', gap: 10, width: 'min(960px, 100%)' }}>
+          <Skeleton width="32%" height={14} />
+          <Skeleton width="100%" height={120} />
+          <Skeleton width="100%" height={120} />
         </div>
       </div>
     );
@@ -739,7 +741,8 @@ export function ContactActivityPanel({
 
         {lazyTimeline && timelineMeta.loading && !timelineMeta.loaded ? (
           <div className={styles.timelineLoadingRow} aria-busy="true">
-            <Spinner size="sm" /> Building timeline…
+            <Skeleton width={20} height={20} circle />
+            <Skeleton width="34%" height={12} />
           </div>
         ) : null}
 
@@ -870,7 +873,8 @@ export function ContactActivityPanel({
                     <div ref={sentinelRef} className={styles.caInfiniteSentinel} aria-hidden />
                     {timelineMeta.loadingMore ? (
                       <div className={styles.caPanelLoadingRow} aria-busy="true">
-                        <Spinner size="sm" /> Loading more…
+                        <Skeleton width={20} height={20} circle />
+                        <Skeleton width="24%" height={12} />
                       </div>
                     ) : null}
                   </>

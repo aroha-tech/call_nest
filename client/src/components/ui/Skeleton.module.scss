@@ -1,0 +1,32 @@
+@use '../../styles/variables' as *;
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: $radius-sm;
+  background: color-mix(in srgb, var(--color-text-tertiary) 18%, var(--color-bg-subtle));
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--color-bg-elevated) 75%, transparent) 45%,
+    transparent 100%
+  );
+  animation: skeletonShimmer 1.25s ease-in-out infinite;
+}
+
+.skeletonCircle {
+  border-radius: $radius-full;
+}
+
+@keyframes skeletonShimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}

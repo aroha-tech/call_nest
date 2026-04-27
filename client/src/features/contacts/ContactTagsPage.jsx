@@ -147,7 +147,7 @@ export function ContactTagsPage() {
       <PageHeader
         title="Contact tags"
         description="Shared org tags. Admin and tag-creating managers can archive; everyone can assign on leads and contacts."
-        actions={<Button onClick={openCreate}>+ New tag</Button>}
+        actions={<Button onClick={openCreate}>Add tag</Button>}
       />
 
       {error && <Alert variant="error">{error}</Alert>}

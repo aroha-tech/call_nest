@@ -156,6 +156,116 @@ async function getOutboundSentEmailCount(tenantId, actingUser, range) {
   return Number(row?.total ?? 0);
 }
 
+function buildTrend(currentCount, previousCount) {
+  const current = Number(currentCount ?? 0);
+  const previous = Number(previousCount ?? 0);
+  if (previous <= 0) {
+    if (current <= 0) return { pct: 0, direction: 'flat' };
+    return { pct: 100, direction: 'up' };
+  }
+  const deltaPct = ((current - previous) / previous) * 100;
+  const rounded = Math.round(Math.abs(deltaPct));
+  if (deltaPct > 0) return { pct: rounded, direction: 'up' };
+  if (deltaPct < 0) return { pct: rounded, direction: 'down' };
+  return { pct: 0, direction: 'flat' };
+}
+
+async function getContactTrendForScope(tenantId, type, scopeSql = '', scopeParams = []) {
+  const [row] = await query(
+    `SELECT
+      SUM(CASE
+        WHEN c.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+         AND c.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+        THEN 1 ELSE 0
+      END) AS current_period,
+      SUM(CASE
+        WHEN c.created_at >= DATE_SUB(CURDATE(), INTERVAL 13 DAY)
+         AND c.created_at < DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+        THEN 1 ELSE 0
+      END) AS previous_period
+     FROM contacts c
+     WHERE c.tenant_id = ?
+       AND c.deleted_at IS NULL
+       AND c.type = ?${scopeSql}`,
+    [tenantId, type, ...scopeParams]
+  );
+  return buildTrend(Number(row?.current_period ?? 0), Number(row?.previous_period ?? 0));
+}
+
+async function getMeetingsTrendForScope(tenantId, role, userId) {
+  const ms = meetingAgentScope(role, userId);
+  const [row] = await query(
+    `SELECT
+      SUM(CASE
+        WHEN m.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+         AND m.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+        THEN 1 ELSE 0
+      END) AS current_period,
+      SUM(CASE
+        WHEN m.created_at >= DATE_SUB(CURDATE(), INTERVAL 13 DAY)
+         AND m.created_at < DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+        THEN 1 ELSE 0
+      END) AS previous_period
+     FROM tenant_meetings m
+     WHERE m.tenant_id = ?
+       AND m.deleted_at IS NULL
+       AND m.meeting_status IN ('scheduled','rescheduled')${ms.sql}`,
+    [tenantId, ...ms.params]
+  );
+  return buildTrend(Number(row?.current_period ?? 0), Number(row?.previous_period ?? 0));
+}
+
+async function getCallTrendForScope(tenantId, role, userId) {
+  const cs = callAttemptScope(role, userId);
+  const [row] = await query(
+    `SELECT
+      SUM(CASE
+        WHEN COALESCE(cca.started_at, cca.created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+         AND COALESCE(cca.started_at, cca.created_at) < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+        THEN 1 ELSE 0
+      END) AS current_period,
+      SUM(CASE
+        WHEN COALESCE(cca.started_at, cca.created_at) >= DATE_SUB(CURDATE(), INTERVAL 13 DAY)
+         AND COALESCE(cca.started_at, cca.created_at) < DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+        THEN 1 ELSE 0
+      END) AS previous_period
+     FROM contact_call_attempts cca
+     WHERE cca.tenant_id = ?${cs.sql}`,
+    [tenantId, ...cs.params]
+  );
+  return buildTrend(Number(row?.current_period ?? 0), Number(row?.previous_period ?? 0));
+}
+
+async function getOutboundEmailTrendForScope(tenantId, actingUser) {
+  const baseParams = [tenantId];
+  let scopeSql = '';
+  if (actingUser?.role !== 'admin') {
+    const ids = await getCreatedByUserIdsForScope(tenantId, actingUser);
+    if (!ids?.length) return { pct: 0, direction: 'flat' };
+    scopeSql = ` AND em.created_by IN (${ids.map(() => '?').join(',')})`;
+    baseParams.push(...ids);
+  }
+  const [row] = await query(
+    `SELECT
+      SUM(CASE
+        WHEN em.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+         AND em.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+        THEN 1 ELSE 0
+      END) AS current_period,
+      SUM(CASE
+        WHEN em.created_at >= DATE_SUB(CURDATE(), INTERVAL 13 DAY)
+         AND em.created_at < DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+        THEN 1 ELSE 0
+      END) AS previous_period
+     FROM email_messages em
+     WHERE em.tenant_id = ?
+       AND em.direction = 'outbound'
+       AND em.status = 'sent'${scopeSql}`,
+    baseParams
+  );
+  return buildTrend(Number(row?.current_period ?? 0), Number(row?.previous_period ?? 0));
+}
+
 async function getAdminDashboard(tenantId, actingUser, range) {
   const u = drParams(range);
   const c = drParamsAlias(range, 'c');
@@ -220,6 +330,11 @@ async function getAdminDashboard(tenantId, actingUser, range) {
     callsToday,
     emailsTotal,
     meetingsMetric,
+    leadsTrend,
+    contactsTrend,
+    meetingsTrend,
+    emailsTrend,
+    callsTrend,
   ] = await Promise.all([
     listUpcomingMeetings(tenantId, actingUser, 6),
     listDashboardPendingCallbacks(tenantId, actingUser, 6),
@@ -227,6 +342,11 @@ async function getAdminDashboard(tenantId, actingUser, range) {
     getCallsTodayStats(tenantId, actingUser),
     getOutboundSentEmailCount(tenantId, actingUser, range),
     meetingsKpiCount(tenantId, actingUser, range),
+    getContactTrendForScope(tenantId, 'lead'),
+    getContactTrendForScope(tenantId, 'contact'),
+    getMeetingsTrendForScope(tenantId, actingUser?.role, actingUser?.id),
+    getOutboundEmailTrendForScope(tenantId, actingUser),
+    getCallTrendForScope(tenantId, actingUser?.role, actingUser?.id),
   ]);
 
   return {
@@ -249,12 +369,26 @@ async function getAdminDashboard(tenantId, actingUser, range) {
     recentConnectedCalls,
     callsToday,
     emailsTotal,
+    leadsTrend,
+    contactsTrend,
+    meetingsTrend,
+    emailsTrend,
+    callsTrend,
     recentUsers: recentUsers.map(mapUserRow),
   };
 }
 
 async function getManagerDashboard(tenantId, actingUser, range) {
   const managerId = actingUser?.id;
+  const managerScopeSql = ` AND (
+      c.manager_id = ?
+      OR c.assigned_user_id = ?
+      OR c.assigned_user_id IN (
+        SELECT id FROM users u
+        WHERE u.tenant_id = ? AND u.is_deleted = 0 AND u.role = 'agent' AND u.manager_id = ?
+      )
+    )`;
+  const managerScopeParams = [managerId, managerId, tenantId, managerId];
   const u = drParams(range);
   const [teamAgentsRow] = await query(
     `SELECT COUNT(*) AS total FROM users
@@ -265,29 +399,13 @@ async function getManagerDashboard(tenantId, actingUser, range) {
   const c = drParamsAlias(range, 'c');
   const [leadsRow] = await query(
     `SELECT COUNT(*) AS total FROM contacts c
-     WHERE c.tenant_id = ? AND c.deleted_at IS NULL AND c.type = 'lead'
-     AND (
-       c.manager_id = ?
-       OR c.assigned_user_id = ?
-       OR c.assigned_user_id IN (
-         SELECT id FROM users u
-         WHERE u.tenant_id = ? AND u.is_deleted = 0 AND u.role = 'agent' AND u.manager_id = ?
-       )
-     )${c.clause}`,
+     WHERE c.tenant_id = ? AND c.deleted_at IS NULL AND c.type = 'lead'${managerScopeSql}${c.clause}`,
     [tenantId, managerId, managerId, tenantId, managerId, ...c.params]
   );
 
   const [contactsRow] = await query(
     `SELECT COUNT(*) AS total FROM contacts c
-     WHERE c.tenant_id = ? AND c.deleted_at IS NULL AND c.type = 'contact'
-     AND (
-       c.manager_id = ?
-       OR c.assigned_user_id = ?
-       OR c.assigned_user_id IN (
-         SELECT id FROM users u
-         WHERE u.tenant_id = ? AND u.is_deleted = 0 AND u.role = 'agent' AND u.manager_id = ?
-       )
-     )${c.clause}`,
+     WHERE c.tenant_id = ? AND c.deleted_at IS NULL AND c.type = 'contact'${managerScopeSql}${c.clause}`,
     [tenantId, managerId, managerId, tenantId, managerId, ...c.params]
   );
 
@@ -326,6 +444,11 @@ async function getManagerDashboard(tenantId, actingUser, range) {
     callsToday,
     emailsTotal,
     meetingsMetric,
+    leadsTrend,
+    contactsTrend,
+    meetingsTrend,
+    emailsTrend,
+    callsTrend,
   ] = await Promise.all([
     listUpcomingMeetings(tenantId, actingUser, 6),
     listDashboardPendingCallbacks(tenantId, actingUser, 6),
@@ -333,6 +456,11 @@ async function getManagerDashboard(tenantId, actingUser, range) {
     getCallsTodayStats(tenantId, actingUser),
     getOutboundSentEmailCount(tenantId, actingUser, range),
     meetingsKpiCount(tenantId, actingUser, range),
+    getContactTrendForScope(tenantId, 'lead', managerScopeSql, managerScopeParams),
+    getContactTrendForScope(tenantId, 'contact', managerScopeSql, managerScopeParams),
+    getMeetingsTrendForScope(tenantId, actingUser?.role, actingUser?.id),
+    getOutboundEmailTrendForScope(tenantId, actingUser),
+    getCallTrendForScope(tenantId, actingUser?.role, actingUser?.id),
   ]);
 
   return {
@@ -355,24 +483,29 @@ async function getManagerDashboard(tenantId, actingUser, range) {
     recentConnectedCalls,
     callsToday,
     emailsTotal,
+    leadsTrend,
+    contactsTrend,
+    meetingsTrend,
+    emailsTrend,
+    callsTrend,
     recentUsers: recentUsers.map(mapUserRow),
   };
 }
 
 async function getAgentDashboard(tenantId, actingUser, range) {
   const agentId = actingUser?.id;
+  const agentScopeSql = ' AND (c.assigned_user_id = ? OR c.created_by = ?)';
+  const agentScopeParams = [agentId, agentId];
   const c = drParamsAlias(range, 'c');
   const [myLeadsRow] = await query(
     `SELECT COUNT(*) AS total FROM contacts c
-     WHERE c.tenant_id = ? AND c.deleted_at IS NULL AND c.type = 'lead'
-     AND (c.assigned_user_id = ? OR c.created_by = ?)${c.clause}`,
+     WHERE c.tenant_id = ? AND c.deleted_at IS NULL AND c.type = 'lead'${agentScopeSql}${c.clause}`,
     [tenantId, agentId, agentId, ...c.params]
   );
 
   const [myContactsRow] = await query(
     `SELECT COUNT(*) AS total FROM contacts c
-     WHERE c.tenant_id = ? AND c.deleted_at IS NULL AND c.type = 'contact'
-     AND (c.assigned_user_id = ? OR c.created_by = ?)${c.clause}`,
+     WHERE c.tenant_id = ? AND c.deleted_at IS NULL AND c.type = 'contact'${agentScopeSql}${c.clause}`,
     [tenantId, agentId, agentId, ...c.params]
   );
 
@@ -383,6 +516,11 @@ async function getAgentDashboard(tenantId, actingUser, range) {
     callsToday,
     emailsTotal,
     meetingsMetric,
+    leadsTrend,
+    contactsTrend,
+    meetingsTrend,
+    emailsTrend,
+    callsTrend,
   ] = await Promise.all([
     listUpcomingMeetings(tenantId, actingUser, 6),
     listDashboardPendingCallbacks(tenantId, actingUser, 6),
@@ -390,6 +528,11 @@ async function getAgentDashboard(tenantId, actingUser, range) {
     getCallsTodayStats(tenantId, actingUser),
     getOutboundSentEmailCount(tenantId, actingUser, range),
     meetingsKpiCount(tenantId, actingUser, range),
+    getContactTrendForScope(tenantId, 'lead', agentScopeSql, agentScopeParams),
+    getContactTrendForScope(tenantId, 'contact', agentScopeSql, agentScopeParams),
+    getMeetingsTrendForScope(tenantId, actingUser?.role, actingUser?.id),
+    getOutboundEmailTrendForScope(tenantId, actingUser),
+    getCallTrendForScope(tenantId, actingUser?.role, actingUser?.id),
   ]);
 
   return {
@@ -408,6 +551,11 @@ async function getAgentDashboard(tenantId, actingUser, range) {
     recentConnectedCalls,
     callsToday,
     emailsTotal,
+    leadsTrend,
+    contactsTrend,
+    meetingsTrend,
+    emailsTrend,
+    callsTrend,
     recentUsers: [],
   };
 }

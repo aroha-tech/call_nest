@@ -299,7 +299,7 @@ export function CampaignFilterBuilder({
         size="sm"
         onClick={() => onChange([...rules, defaultRule()])}
       >
-        + Add rule
+        Add rule
       </Button>
     </div>
   );

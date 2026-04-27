@@ -69,7 +69,7 @@ export function FilterOptionsModal({ isOpen, onClose, onCreateNew, onBrowseExist
                 onCreateNew?.();
               }}
             >
-              + Add new filter
+              Add new filter
             </button>
           </div>
           <div

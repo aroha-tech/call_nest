@@ -917,12 +917,18 @@ export function MeetingsPage() {
     <div className={styles.page}>
       <PageHeader
         title="Meetings"
+        titleIcon="event"
         description="Meetings from connected email—add attendees and track status."
         actions={
           canManage ? (
-            <Button type="button" onClick={openCreate} disabled={!hasEmailAccounts}>
-              + Add meeting
-            </Button>
+            <div className={styles.headerActions}>
+              <Button type="button" variant="secondary" onClick={openEmailTemplatesModal}>
+                Email templates
+              </Button>
+              <Button type="button" onClick={openCreate} disabled={!hasEmailAccounts}>
+                Add meeting
+              </Button>
+            </div>
           ) : undefined
         }
       />
@@ -1159,6 +1165,16 @@ export function MeetingsPage() {
                 <Button type="button" variant="ghost" onClick={() => setModalOpen(false)} disabled={saving}>
                   {canManage ? 'Cancel' : 'Close'}
                 </Button>
+                {canManage ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={openMeetingEmailPreview}
+                    disabled={!form.email_account_id || saving}
+                  >
+                    Preview & edit email
+                  </Button>
+                ) : null}
                 {canManage ? (
                   <Button type="submit" form="meeting-form" loading={saving} disabled={!canSaveMeeting}>
                     Save

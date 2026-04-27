@@ -5,10 +5,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: none;
-  border-radius: $radius-sm;
+  border: 1px solid transparent;
+  border-radius: $radius-md;
   cursor: pointer;
-  transition: all $transition-fast;
+  transition: border-color $transition-fast, background $transition-fast, color $transition-fast;
   flex-shrink: 0;
 
   &:disabled {
@@ -41,21 +41,24 @@
 
 .ghost {
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--color-text-tertiary);
 
   &:hover:not(:disabled) {
-    background: var(--color-bg-hover);
-    color: var(--color-text-primary);
+    background: var(--color-bg-subtle);
+    border-color: var(--color-border-subtle);
+    color: var(--color-accent-brand);
   }
 }
 
 .subtle {
-  background: var(--color-bg-subtle);
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border-subtle);
   color: var(--color-text-secondary);
 
   &:hover:not(:disabled) {
-    background: var(--color-bg-muted);
-    color: var(--color-text-primary);
+    background: var(--color-bg-subtle);
+    border-color: var(--color-border-strong);
+    color: var(--color-accent-brand);
   }
 }
 

@@ -39,6 +39,7 @@ function normalizeTabFromParams(searchParams, role) {
 function statusVariantToBadgeVariant(variant) {
   const m = {
     teal: 'success',
+    green: 'success',
     blue: 'primary',
     purple: 'primary',
     amber: 'warning',
@@ -222,7 +223,17 @@ export function ActivityHistoryPage() {
                               <MaterialSymbol name={iconName} size="sm" className={dashStyles.activityIconGlyph} />
                             </div>
                             <div className={styles.activityText}>
-                              <div className={styles.activityTitle}>{it.title}</div>
+                              {it.href ? (
+                                <Link
+                                  to={it.href}
+                                  className={styles.activityTitleLink}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {it.title}
+                                </Link>
+                              ) : (
+                                <div className={styles.activityTitle}>{it.title}</div>
+                              )}
                               <div className={styles.activitySub}>{subtitle}</div>
                             </div>
                           </div>
@@ -254,6 +265,9 @@ export function ActivityHistoryPage() {
                           <span className={styles.whenCell} title={formatDateTimeDisplay(it.at, dtMode)}>
                             {formatRelativeTimeShort(it.at)}
                           </span>
+                          <button type="button" className={styles.rowMenuBtn} aria-label="Row actions">
+                            <MaterialSymbol name="more_horiz" size="sm" />
+                          </button>
                         </TableCell>
                       </TableRow>
                     );

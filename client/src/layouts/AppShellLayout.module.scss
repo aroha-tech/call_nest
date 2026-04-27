@@ -284,22 +284,31 @@ $nav-search-pill-ease: cubic-bezier(0.32, 0.72, 0, 1);
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  color: var(--color-text-secondary);
+  width: 22px;
+  height: 22px;
+  border-radius: $radius-md;
+  padding: 3px;
+  color: var(--color-accent-brand);
+  background: color-mix(in srgb, var(--color-accent-brand) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent-brand) 28%, transparent);
+  transition: background $transition-fast, box-shadow $transition-fast, color $transition-fast;
 }
 
 .navItem:hover .navItemIcon,
 .navGroupHeader:hover .navItemIcon {
-  color: var(--color-text-primary);
+  color: var(--color-accent-brand);
 }
 
 .navItem.navItemActive .navItemIcon {
-  color: var(--color-text-primary);
+  color: var(--color-accent-brand);
+  background: color-mix(in srgb, var(--color-accent-brand) 24%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--color-accent-brand) 42%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--color-accent-brand) 18%, transparent);
 }
 
 .navGroupHeader.navGroupActive .navItemIcon {
-  color: var(--color-text-primary);
+  color: var(--color-accent-brand);
 }
 
 .navChildIcon {
@@ -307,17 +316,26 @@ $nav-search-pill-ease: cubic-bezier(0.32, 0.72, 0, 1);
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  color: var(--color-text-muted);
+  width: 20px;
+  height: 20px;
+  border-radius: $radius-sm;
+  padding: 2px;
+  color: var(--color-accent-brand);
+  background: color-mix(in srgb, var(--color-accent-brand) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent-brand) 24%, transparent);
+  transition: background $transition-fast, box-shadow $transition-fast, color $transition-fast;
 }
 
 .navChild:hover .navChildIcon {
-  color: var(--color-text-secondary);
+  color: var(--color-accent-brand);
 }
 
 .navChild.navChildActive .navChildIcon {
-  color: var(--color-text-primary);
+  color: var(--color-accent-brand);
+  background: color-mix(in srgb, var(--color-accent-brand) 22%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--color-accent-brand) 38%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--color-accent-brand) 14%, transparent);
 }
 
 .navItem {
@@ -348,9 +366,9 @@ $nav-search-pill-ease: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   &.navItemActive {
-    background: var(--color-bg-hover);
+    background: color-mix(in srgb, var(--nav-accent, var(--color-text-primary)) 14%, transparent);
     color: var(--color-text-primary);
-    box-shadow: inset 0 0 0 2px var(--color-text-primary);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nav-accent, var(--color-text-primary)) 45%, transparent);
 
     .navLabel {
       font-weight: $font-weight-semibold;
@@ -395,6 +413,7 @@ $nav-search-pill-ease: cubic-bezier(0.32, 0.72, 0, 1);
 
   &.navGroupActive {
     color: var(--color-text-primary);
+    background: color-mix(in srgb, var(--nav-accent, var(--color-text-primary)) 10%, transparent);
   }
 }
 
@@ -444,15 +463,22 @@ $nav-search-pill-ease: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   &.navChildActive {
-    background: var(--color-bg-hover);
+    background: color-mix(in srgb, var(--nav-accent, var(--color-text-primary)) 14%, transparent);
     color: var(--color-text-primary);
-    box-shadow: inset 0 0 0 2px var(--color-text-primary);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nav-accent, var(--color-text-primary)) 45%, transparent);
     font-weight: $font-weight-semibold;
   }
 
   &.navChildActive:visited {
     color: var(--color-text-primary);
   }
+}
+
+/* Single accent for entire sidebar */
+.navItem,
+.navGroupHeader,
+.navChild {
+  --nav-accent: var(--color-accent-brand);
 }
 
 .mainColumn {

@@ -523,7 +523,7 @@ export function ContactAdvancedFilterModal({
             onClick={addRow}
             disabled={!canAddPropertyRow}
           >
-            + Add property
+            Add property
           </Button>
         </div>
       </div>

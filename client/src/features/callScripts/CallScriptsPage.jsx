@@ -255,7 +255,7 @@ export function CallScriptsPage() {
             ? 'Create scripts with variables like {{contact_first_name}} for use in the dialer.'
             : 'View team scripts. You can add scripts and edit only scripts you created.'
         }
-        actions={canAddScript ? <Button onClick={openCreate}>+ Add Script</Button> : undefined}
+        actions={canAddScript ? <Button onClick={openCreate}>Add script</Button> : undefined}
       />
 
       {error && <Alert variant="error">{error}</Alert>}
@@ -288,7 +288,7 @@ export function CallScriptsPage() {
                 title={search || showInactive ? 'No results found' : 'No call scripts yet'}
                 description={search || showInactive ? 'Try another search or clear filters.' : 'Add scripts for calls; use variables for dynamic text.'}
                 action={canAddScript && !search && !showInactive ? openCreate : undefined}
-                actionLabel="Add Script"
+                actionLabel="Add script"
               />
             </div>
           ) : (

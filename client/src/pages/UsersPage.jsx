@@ -259,6 +259,7 @@ export function UsersPage() {
       <div className={listStyles.page}>
         <PageHeader
           title="Users"
+          titleIcon="group"
           description="Manage platform users across tenants"
           actions={
             <Button variant="primary" onClick={openCreate}>
@@ -329,7 +330,7 @@ export function UsersPage() {
             <div className={listStyles.tableCardToolbarLeft}>
               <PaginationPageSize limit={pagination.limit} onLimitChange={handleLimitChange} />
               <Checkbox
-                label="Include disabled"
+                label="Show inactive"
                 checked={showDisabled}
                 onChange={(e) => {
                   setShowDisabled(e.target.checked);

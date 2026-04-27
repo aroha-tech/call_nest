@@ -301,7 +301,7 @@ export function DialingSetsPage({ readOnly = false }) {
               <div className={styles.detailHeader}>
                 <h3>{selectedSet.name}</h3>
                 {!readOnly && (
-                  <Button size="sm" onClick={() => setShowDispoModal(true)}>+ Add Disposition</Button>
+                  <Button size="sm" onClick={() => setShowDispoModal(true)}>Add disposition</Button>
                 )}
               </div>
               <div className={styles.detailContent}>

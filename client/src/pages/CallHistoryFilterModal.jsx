@@ -371,7 +371,7 @@ export function CallHistoryFilterModal({
             onClick={addRow}
             disabled={!canAddPropertyRow}
           >
-            + Add property
+            Add property
           </Button>
         </div>
       </div>

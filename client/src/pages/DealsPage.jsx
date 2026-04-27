@@ -9,7 +9,7 @@ import { EditIcon, TrashIcon, RowActionGroup } from '../components/ui/ActionIcon
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Alert } from '../components/ui/Alert';
-import { Spinner } from '../components/ui/Spinner';
+import { Skeleton } from '../components/ui/Skeleton';
 import { Modal, ModalFooter, ConfirmModal } from '../components/ui/Modal';
 import { SlidePanel } from '../components/ui/SlidePanel';
 import { dealsAPI } from '../services/dealsAPI';
@@ -485,7 +485,11 @@ export function DealsPage() {
     return (
       <div className={styles.page}>
         <PageHeader title="Deals" description="Pipelines and board by stage." />
-        <Spinner size="lg" />
+        <div style={{ width: 'min(980px, 100%)', display: 'grid', gap: 12 }}>
+          <Skeleton width="30%" height={14} />
+          <Skeleton width="100%" height={46} />
+          <Skeleton width="100%" height={320} />
+        </div>
       </div>
     );
   }
@@ -680,7 +684,12 @@ export function DealsPage() {
               </Button>
             </div>
           </div>
-          {boardLoading && <Spinner />}
+          {boardLoading ? (
+            <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
+              <Skeleton width="100%" height={48} />
+              <Skeleton width="100%" height={240} />
+            </div>
+          ) : null}
           {!boardLoading && boardData && (
             <div className={styles.boardRoot}>
               <div className={styles.boardScroll}>

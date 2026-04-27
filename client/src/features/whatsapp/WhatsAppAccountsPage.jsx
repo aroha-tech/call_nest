@@ -280,7 +280,7 @@ export function WhatsAppAccountsPage() {
             ? 'Connect and manage WhatsApp Business API accounts'
             : 'View connected WhatsApp accounts. Only an admin can add or edit connections.'
         }
-        actions={canManageAccounts ? <Button onClick={openCreate}>+ Add Account</Button> : null}
+        actions={canManageAccounts ? <Button onClick={openCreate}>Add account</Button> : null}
       />
 
       {error && <Alert variant="error">{error}</Alert>}
@@ -305,7 +305,7 @@ export function WhatsAppAccountsPage() {
                 : 'No accounts are configured yet. Ask an admin to connect WhatsApp.'
             }
             action={canManageAccounts ? openCreate : undefined}
-            actionLabel={canManageAccounts ? 'Add Account' : undefined}
+            actionLabel={canManageAccounts ? 'Add account' : undefined}
           />
         ) : (
           <Table>

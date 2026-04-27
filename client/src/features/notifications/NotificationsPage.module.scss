@@ -20,19 +20,19 @@
 }
 
 .list {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
   overflow: hidden;
 }
 
 .item {
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-subtle);
   padding: 12px;
   background: var(--color-bg-elevated);
 }
 
 .itemUnread {
-  background: color-mix(in srgb, var(--color-primary-500) 9%, transparent);
+  background: color-mix(in srgb, var(--color-primary-600) 10%, transparent);
 }
 
 .itemTop {
@@ -84,12 +84,12 @@
 .openLink {
   font-size: 14px;
   font-weight: 500;
-  color: var(--color-primary-500);
+  color: var(--color-accent-brand);
   text-decoration: none;
 }
 
 .openLink:hover {
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 .infiniteSentinel {

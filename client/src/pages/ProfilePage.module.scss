@@ -3,16 +3,36 @@
 .page {
   box-sizing: border-box;
   width: 100%;
-  max-width: 640px;
+  max-width: 1400px;
   margin-inline: auto;
 }
 
+.layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 280px;
+  gap: $space-4;
+  align-items: start;
+  margin-top: $space-4;
+
+  @media (max-width: 1200px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.leftColumn,
+.mainColumn,
+.rightColumn {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+}
+
 .card {
-  margin-top: $space-5;
   padding: $space-5;
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
   border-radius: $radius-md;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
 .hero {
@@ -55,6 +75,18 @@
   color: var(--color-text-primary);
 }
 
+.roleBadge {
+  display: inline-flex;
+  margin: $space-2 0 0;
+  font-size: $font-size-2xs;
+  font-weight: $font-weight-semibold;
+  color: var(--color-chip-purple-text);
+  background: color-mix(in srgb, var(--color-chip-purple-border) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-chip-purple-border) 54%, transparent);
+  border-radius: $radius-full;
+  padding: 4px 10px;
+}
+
 .emailBlock {
   margin-top: $space-3;
 }
@@ -89,12 +121,26 @@
   margin-bottom: $space-4;
   padding: $space-4;
   border-radius: $radius-md;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-secondary);
+}
+
+.infoCardHeader {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  margin-bottom: $space-3;
+}
+
+.managerCardHeader {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  margin-bottom: $space-2;
 }
 
 .managerCardTitle {
-  margin: 0 0 $space-2;
+  margin: 0;
   font-size: $font-size-sm;
   font-weight: $font-weight-semibold;
   color: var(--color-text-primary);
@@ -159,6 +205,12 @@
   gap: $space-3;
 }
 
+.passwordSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+}
+
 .sectionTitle {
   margin: 0;
   font-size: $font-size-sm;
@@ -177,9 +229,8 @@
 }
 
 .details {
-  margin: $space-5 0 0;
-  padding-top: $space-4;
-  border-top: 1px solid var(--color-border);
+  margin: 0;
+  padding-top: $space-1;
   display: flex;
   flex-direction: column;
   gap: $space-3;
@@ -201,4 +252,33 @@
     margin: 0;
     color: var(--color-text-primary);
   }
+}
+
+.instructionList {
+  margin: $space-2 0 0;
+  padding-left: $space-4;
+  color: var(--color-text-secondary);
+  font-size: $font-size-sm;
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
+.planTitle {
+  margin: 0;
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+}
+
+.planValue {
+  margin: $space-1 0 0;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+}
+
+.planHint {
+  margin: $space-2 0 $space-4;
+  font-size: $font-size-xs;
+  color: var(--color-text-secondary);
 }

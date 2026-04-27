@@ -4,6 +4,7 @@ import { Input } from '../../components/ui/Input';
 import { Select, SelectOncePick } from '../../components/ui/Select';
 import { Checkbox } from '../../components/ui/Checkbox';
 import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown';
+import { SectionHeader } from '../../components/ui/SectionIcon';
 import {
   DEFAULT_PHONE_COUNTRY_CODE,
   PHONE_NATIONAL_MAX_DIGITS,
@@ -130,9 +131,12 @@ export function createContactFormEditSectionRenderers(ctx) {
     [CONTACT_FORM_SECTION_IDS.RECORD]: () =>
       !isNew && contact ? (
         <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-record">
-          <h2 id="contact-section-record" className={styles.sectionTitle}>
-            Record
-          </h2>
+          <SectionHeader
+            title="Record Information"
+            icon="description"
+            color="blue"
+            id="contact-section-record"
+          />
           <div className={styles.recordMetaGrid}>
             <RecordViewField styles={styles} label="Created">
               {formatRecordDate(contact.created_at, formatDateTime)}
@@ -153,9 +157,12 @@ export function createContactFormEditSectionRenderers(ctx) {
 
     [CONTACT_FORM_SECTION_IDS.IDENTITY]: () => (
       <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-identity">
-        <h2 id="contact-section-identity" className={styles.sectionTitle}>
-          {isLeadRoute ? 'Lead details' : 'Contact details'}
-        </h2>
+        <SectionHeader
+          title={isLeadRoute ? 'Lead Details' : 'Contact Details'}
+          icon="person"
+          color="blue"
+          id="contact-section-identity"
+        />
         {showFormHints ? (
           <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
             Display name required; add an email or at least one phone. Display name follows first + last until you edit it.
@@ -233,9 +240,12 @@ export function createContactFormEditSectionRenderers(ctx) {
 
     [CONTACT_FORM_SECTION_IDS.LOCATION]: () => (
       <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-location">
-        <h2 id="contact-section-location" className={styles.sectionTitle}>
-          Location
-        </h2>
+        <SectionHeader
+          title="Location Details"
+          icon="location_on"
+          color="green"
+          id="contact-section-location"
+        />
         {showFormHints ? (
           <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
             Street, city, and country used in lists and export.
@@ -280,9 +290,12 @@ export function createContactFormEditSectionRenderers(ctx) {
         className={`${styles.section} ${styles.sectionCompact}`}
         aria-labelledby="contact-section-tags-notes-status"
       >
-        <h2 id="contact-section-tags-notes-status" className={styles.sectionTitle}>
-          Tags, notes &amp; status
-        </h2>
+        <SectionHeader
+          title="Tags, Notes & Status"
+          icon="sell"
+          color="orange"
+          id="contact-section-tags-notes-status"
+        />
 
         <div className={styles.formSubsection}>
           <h3 className={styles.formSubsectionTitle}>Tags</h3>
@@ -383,9 +396,12 @@ export function createContactFormEditSectionRenderers(ctx) {
       <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-phones">
         <div className={styles.sectionHeader}>
           <div className={styles.sectionHeaderText}>
-            <h2 id="contact-section-phones" className={styles.sectionTitle}>
-              Phone numbers
-            </h2>
+            <SectionHeader
+              title="Contact Information"
+              icon="phone"
+              color="purple"
+              id="contact-section-phones"
+            />
             {showFormHints ? (
               <p className={`${styles.sectionDesc} ${styles.sectionDescTight}`}>
                 One label per row; one primary when possible. Either an email (above) or at least one number is required.
@@ -408,7 +424,7 @@ export function createContactFormEditSectionRenderers(ctx) {
               }));
             }}
           >
-            + Add phone
+            Add phone
           </Button>
         </div>
 
@@ -532,9 +548,12 @@ export function createContactFormEditSectionRenderers(ctx) {
       <>
         {role === 'admin' && isNew ? (
           <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-ownership">
-            <h2 id="contact-section-ownership" className={styles.sectionTitle}>
-              Ownership (optional)
-            </h2>
+            <SectionHeader
+              title="Ownership (optional)"
+              icon="assignment_ind"
+              color="cyan"
+              id="contact-section-ownership"
+            />
             {showFormHints ? (
               <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
                 Optional manager, agent, and campaign; leave manager empty if this record has no manager yet.
@@ -567,9 +586,12 @@ export function createContactFormEditSectionRenderers(ctx) {
         ) : null}
         {role === 'manager' && isNew ? (
           <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-new-manager-assign">
-            <h2 id="contact-section-new-manager-assign" className={styles.sectionTitle}>
-              Campaign &amp; assignment (optional)
-            </h2>
+            <SectionHeader
+              title="Campaign & Assignment (optional)"
+              icon="assignment_ind"
+              color="cyan"
+              id="contact-section-new-manager-assign"
+            />
             {showFormHints ? (
               <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
                 Defaults to you as manager; optional team agent and campaign.
@@ -595,9 +617,12 @@ export function createContactFormEditSectionRenderers(ctx) {
         ) : null}
         {role === 'agent' && isNew && type === 'lead' ? (
           <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-new-agent-campaign">
-            <h2 id="contact-section-new-agent-campaign" className={styles.sectionTitle}>
-              Campaign (optional)
-            </h2>
+            <SectionHeader
+              title="Campaign (optional)"
+              icon="campaign"
+              color="emerald"
+              id="contact-section-new-agent-campaign"
+            />
             {showFormHints ? (
               <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>Optional campaign; you stay assigned.</p>
             ) : null}
@@ -614,9 +639,12 @@ export function createContactFormEditSectionRenderers(ctx) {
         ) : null}
         {!isNew && (role === 'admin' || role === 'manager') ? (
           <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-assign">
-            <h2 id="contact-section-assign" className={styles.sectionTitle}>
-              Assignment
-            </h2>
+            <SectionHeader
+              title="Assignment"
+              icon="assignment_ind"
+              color="cyan"
+              id="contact-section-assign"
+            />
             {showFormHints ? (
               <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
                 {role === 'manager' ? 'Team agent and campaign.' : 'Manager, agent, and campaign.'}
@@ -654,10 +682,12 @@ export function createContactFormEditSectionRenderers(ctx) {
 
     [CONTACT_FORM_SECTION_IDS.INDUSTRY]: () => (
       <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-industry">
-        <h2 id="contact-section-industry" className={styles.sectionTitle}>
-          Industry fields
-          {loadingIndustryFields ? <span className={styles.loadingInline}>Loading…</span> : null}
-        </h2>
+        <SectionHeader
+          title={loadingIndustryFields ? 'Industry Fields (Loading…)' : 'Industry Fields'}
+          icon="folder_open"
+          color="blue"
+          id="contact-section-industry"
+        />
         {showFormHints ? (
           <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
             Defined by your platform admin for your industry. Enable optional packs under Company settings. Fields marked *
@@ -792,10 +822,12 @@ export function createContactFormEditSectionRenderers(ctx) {
 
     [CONTACT_FORM_SECTION_IDS.CUSTOM]: () => (
       <section className={`${styles.section} ${styles.sectionCompact}`} aria-labelledby="contact-section-custom">
-        <h2 id="contact-section-custom" className={styles.sectionTitle}>
-          Custom fields
-          {loadingCustomFields ? <span className={styles.loadingInline}>Loading…</span> : null}
-        </h2>
+        <SectionHeader
+          title={loadingCustomFields ? 'Custom Fields (Loading…)' : 'Custom Fields'}
+          icon="grid_view"
+          color="purple"
+          id="contact-section-custom"
+        />
         {showFormHints ? (
           <p className={`${styles.sectionDesc} ${styles.sectionDescShort}`}>
             Tenant-defined. Optional fields can be left blank; fields marked * are required before save.

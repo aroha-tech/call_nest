@@ -9,7 +9,8 @@ import { Select } from '../../components/ui/Select';
 import { Checkbox } from '../../components/ui/Checkbox';
 import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown';
 import { Alert } from '../../components/ui/Alert';
-import { Spinner } from '../../components/ui/Spinner';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { MaterialSymbol } from '../../components/ui/MaterialSymbol';
 import { ConfirmModal } from '../../components/ui/Modal';
 import { ViewIcon, EditIcon, BlacklistIcon } from '../../components/ui/ActionIcons';
 import { contactsAPI } from '../../services/contactsAPI';
@@ -1064,7 +1065,12 @@ export function ContactFormPage({ defaultType }) {
       <div className={styles.stateWrap}>
         <PageHeader title={title} />
         <div className={styles.stateCenter}>
-          <Spinner size="lg" />
+          <div style={{ width: 'min(920px, 100%)', display: 'grid', gap: 12 }}>
+            <Skeleton height={18} width="34%" />
+            <Skeleton height={48} width="100%" />
+            <Skeleton height={48} width="100%" />
+            <Skeleton height={180} width="100%" />
+          </div>
         </div>
       </div>
     );
@@ -1148,7 +1154,9 @@ export function ContactFormPage({ defaultType }) {
                             );
                           }}
                         >
-                          <span className={styles.headerMenuItemIcon} aria-hidden>🕘</span>
+                          <span className={styles.headerMenuItemIcon} aria-hidden>
+                            <MaterialSymbol name="history" size="sm" />
+                          </span>
                           Activity
                         </button>
                       ) : null}
@@ -1177,7 +1185,9 @@ export function ContactFormPage({ defaultType }) {
                               setLayoutEditMode((v) => !v);
                             }}
                           >
-                            <span className={styles.headerMenuItemIcon} aria-hidden>🧩</span>
+                            <span className={styles.headerMenuItemIcon} aria-hidden>
+                              <MaterialSymbol name="dashboard_customize" size="sm" />
+                            </span>
                             {layoutEditMode ? 'Done arranging' : 'Arrange sections'}
                           </button>
                           {layoutEditMode ? (
@@ -1195,7 +1205,9 @@ export function ContactFormPage({ defaultType }) {
                                 );
                               }}
                             >
-                              <span className={styles.headerMenuItemIcon} aria-hidden>↺</span>
+                              <span className={styles.headerMenuItemIcon} aria-hidden>
+                                <MaterialSymbol name="restart_alt" size="sm" />
+                              </span>
                               Reset layout
                             </button>
                           ) : null}
@@ -1210,7 +1222,9 @@ export function ContactFormPage({ defaultType }) {
                             setDeleteConfirmOpen(true);
                           }}
                         >
-                          <span className={styles.headerMenuItemIcon} aria-hidden>🗑</span>
+                          <span className={styles.headerMenuItemIcon} aria-hidden>
+                            <MaterialSymbol name="delete" size="sm" />
+                          </span>
                           Delete
                         </button>
                       ) : null}

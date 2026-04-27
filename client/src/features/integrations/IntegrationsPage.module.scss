@@ -7,6 +7,48 @@
   gap: $space-4;
 }
 
+.appsCard {
+  margin-top: $space-4;
+}
+
+.appsHeader {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  margin-bottom: $space-3;
+}
+
+.appsHeaderIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: $radius-full;
+  color: #ffffff;
+  background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+.appsTitle {
+  margin: 0;
+  font-size: $font-size-base;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+}
+
+.appsFormGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: $space-2;
+  margin-bottom: $space-3;
+}
+
+.appsCreateAction {
+  display: flex;
+  align-items: flex-end;
+}
+
 .textarea {
   width: 100%;
   min-height: 200px;
@@ -28,6 +70,10 @@
 
 @media (max-width: 900px) {
   .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .appsFormGrid {
     grid-template-columns: 1fr;
   }
 }

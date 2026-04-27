@@ -152,7 +152,7 @@
 }
 
 .card_new {
-  @include card-accent(#38bdf8, rgba(56, 189, 248, 0.5), #38bdf8);
+  @include card-accent(#eab308, rgba(234, 179, 8, 0.5), #eab308);
 }
 
 .card_contacted {
@@ -185,8 +185,8 @@
 }
 
 .iconWrap_new {
-  background: color-mix(in srgb, #38bdf8 24%, transparent);
-  color: #7dd3fc;
+  background: color-mix(in srgb, #eab308 22%, transparent);
+  color: #facc15;
 }
 
 .iconWrap_contacted {

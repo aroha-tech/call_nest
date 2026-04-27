@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Spinner } from '../components/ui/Spinner';
 import { Button } from '../components/ui/Button';
-import { SearchInput } from '../components/ui/SearchInput';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
+import { Skeleton } from '../components/ui/Skeleton';
 import { PlatformDataCharts } from '../components/dashboard/DashboardDataCharts';
 import { dashboardAPI } from '../services/adminAPI';
 import { useToast } from '../context/ToastContext';
@@ -28,6 +27,11 @@ const ROLE_ORDER = ['admin', 'manager', 'agent'];
 const PLATFORM_KIND_LABEL = {
   tenant: 'Organization',
   user: 'User',
+};
+
+const PLATFORM_KIND_ICON = {
+  tenant: 'apartment',
+  user: 'group',
 };
 
 const QUICK_LINKS = [
@@ -194,7 +198,13 @@ export function PlatformDashboardPage() {
     return (
       <div className={dashStyles.page}>
         <div className={styles.loading}>
-          <Spinner size="lg" />
+          <div style={{ width: 'min(1040px, 100%)', display: 'grid', gap: 12 }}>
+            <Skeleton width="32%" height={14} />
+            <Skeleton width="46%" height={28} />
+            <Skeleton width="62%" height={14} />
+            <Skeleton width="100%" height={132} />
+            <Skeleton width="100%" height={240} />
+          </div>
         </div>
       </div>
     );
@@ -217,6 +227,7 @@ export function PlatformDashboardPage() {
     <div className={dashStyles.page}>
       <header className={dashStyles.hero}>
         <div className={dashStyles.heroTitles}>
+          <p className={styles.heroKicker}>High-level health of your platform at a glance.</p>
           <h1 className={dashStyles.heroTitle}>Executive dashboard</h1>
           <p className={dashStyles.heroSubtitle}>{subtitle}</p>
         </div>
@@ -350,7 +361,12 @@ export function PlatformDashboardPage() {
 
             <section className={dashStyles.panel}>
               <div className={dashStyles.panelHead}>
-                <h2 className={dashStyles.panelTitle}>Users by role</h2>
+                <h2 className={dashStyles.panelTitleWithIcon}>
+                  <span className={styles.sectionTitleIcon} aria-hidden="true">
+                    <MaterialSymbol name="bar_chart" size="sm" />
+                  </span>
+                  Users by role
+                </h2>
                 <Link to="/admin/users" className={dashStyles.panelLink}>
                   View all
                 </Link>
@@ -401,7 +417,14 @@ export function PlatformDashboardPage() {
                           <span className={styles.platformActivityTime}>{formatDateTime(it.at)}</span>
                           <div className={styles.platformActivityBody}>
                             <div className={styles.platformActivityTitleRow}>
-                              <span className={styles.platformActivityChip}>{kindLabel}</span>
+                              <span className={styles.platformActivityChip}>
+                                <MaterialSymbol
+                                  name={PLATFORM_KIND_ICON[it.kind] || 'history'}
+                                  size="xs"
+                                  className={styles.platformActivityChipIcon}
+                                />
+                                {kindLabel}
+                              </span>
                               <span className={styles.platformActivityTitle}>{it.title}</span>
                             </div>
                             {it.detail ? <p className={styles.platformActivityDetail}>{it.detail}</p> : null}
@@ -456,7 +479,12 @@ export function PlatformDashboardPage() {
 
             <section className={dashStyles.panel}>
               <div className={dashStyles.panelHead}>
-                <h2 className={dashStyles.panelTitle}>Quick actions</h2>
+                <h2 className={dashStyles.panelTitleWithIcon}>
+                  <span className={styles.sectionTitleIcon} aria-hidden="true">
+                    <MaterialSymbol name="bolt" size="sm" />
+                  </span>
+                  Quick actions
+                </h2>
               </div>
               <div className={dashStyles.quickGrid}>
                 <Link

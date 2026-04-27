@@ -69,8 +69,20 @@
 .toolbarSearchField {
   flex: 0 1 auto;
   min-width: 0;
-  max-width: 420px;
+  max-width: 340px;
   width: auto;
+}
+
+.toolbarFilterBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
+  white-space: nowrap;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
 }
 
 .bulkActionsWrap {
@@ -99,17 +111,17 @@
   height: 32px;
   padding: 0 $space-3;
   border-radius: $radius-md;
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-surface);
-  color: var(--color-text-primary);
+  border: 1px solid color-mix(in srgb, var(--color-primary-600) 32%, var(--color-border-subtle));
+  background: var(--color-bg-elevated);
+  color: var(--color-accent-brand);
   font-size: $font-size-xs;
   font-weight: $font-weight-medium;
   cursor: pointer;
   transition: background $transition-fast, border-color $transition-fast;
 
   &:hover {
-    background: var(--color-bg-subtle);
-    border-color: var(--color-border);
+    background: var(--color-accent-brand-subtle);
+    border-color: color-mix(in srgb, var(--color-primary-600) 52%, var(--color-border-subtle));
   }
 
   &:focus-visible {
@@ -186,7 +198,7 @@
     color $transition-fast;
 
   &:hover:not(:disabled) {
-    background: rgba(var(--color-primary-rgb, 99, 102, 241), 0.2);
+    background: rgba(var(--color-primary-rgb, 99, 102, 241), 0.14);
     color: var(--color-text-primary);
   }
 

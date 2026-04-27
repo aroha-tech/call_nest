@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { IconButton } from '../../components/ui/IconButton';
 import { ViewIcon } from '../../components/ui/ActionIcons';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { Spinner } from '../../components/ui/Spinner';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { SearchInput } from '../../components/ui/SearchInput';
@@ -81,7 +81,14 @@ export function WhatsAppLogsPage() {
     return (
       <div className={styles.page}>
         <PageHeader title="WhatsApp API Logs" />
-        <div className={styles.loading}><Spinner size="lg" /></div>
+        <div className={styles.loading}>
+          <div style={{ width: 'min(920px, 100%)', display: 'grid', gap: 10 }}>
+            <Skeleton width="26%" height={14} />
+            <Skeleton width="100%" height={40} />
+            <Skeleton width="100%" height={40} />
+            <Skeleton width="100%" height={40} />
+          </div>
+        </div>
       </div>
     );
   }

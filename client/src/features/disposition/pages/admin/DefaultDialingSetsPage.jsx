@@ -193,10 +193,11 @@ export function DefaultDialingSetsPage() {
     <div className={styles.page}>
       <PageHeader
         title="Default Dialing Sets"
+        titleIcon="tune"
         description="Groups of dispositions for specific calling scenarios"
         actions={
           <Button onClick={openCreateModal} disabled={!selectedIndustry}>
-            + Add Dialing Set
+            Add dialing set
           </Button>
         }
       />
@@ -253,7 +254,7 @@ export function DefaultDialingSetsPage() {
               <>
                 <div className={styles.detailHeader}>
                   <h3>{selectedSet.name}</h3>
-                  <Button size="sm" onClick={() => setShowDispoModal(true)}>+ Add Disposition</Button>
+                  <Button size="sm" onClick={() => setShowDispoModal(true)}>Add disposition</Button>
                 </div>
                 <div className={styles.detailContent}>
                 {setDispositions.length === 0 ? (

@@ -284,6 +284,7 @@ export function TenantUsersPage() {
       <div className={listStyles.page}>
         <PageHeader
           title={pageTitle}
+          titleIcon="group"
           description={pageDescription}
           actions={
             canAddUser ? (
@@ -358,7 +359,7 @@ export function TenantUsersPage() {
             <div className={listStyles.tableCardToolbarLeft}>
               <PaginationPageSize limit={pagination.limit} onLimitChange={handleLimitChange} />
               <Checkbox
-                label="Include disabled"
+                label="Show inactive"
                 checked={showDisabled}
                 onChange={(e) => {
                   setShowDisabled(e.target.checked);

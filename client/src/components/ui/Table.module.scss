@@ -5,7 +5,7 @@
   width: 100%;
   overflow-x: auto;
   border-radius: $radius-md;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-subtle);
   background: var(--color-bg-surface);
   @include custom-scrollbar;
 }
@@ -76,7 +76,7 @@
 }
 
 .thead {
-  background: var(--color-bg-subtle);
+  background: var(--color-surface-secondary);
 }
 
 .tbody {
@@ -99,7 +99,7 @@
 
 .cell,
 .headerCell {
-  padding: $space-3 $space-4;
+  padding: 10px $space-4;
   text-align: left;
   vertical-align: middle;
 
@@ -115,12 +115,12 @@
 .headerCell {
   font-weight: $font-weight-semibold;
   color: var(--color-text-tertiary);
-  font-size: $font-size-xs;
+  font-size: $font-size-2xs;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.07em;
   white-space: nowrap;
-  border-bottom: 1px solid var(--color-border);
-  height: 40px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  height: 38px;
 
   &.sortable {
     cursor: pointer;
@@ -154,7 +154,7 @@
 
 .cell {
   color: var(--color-text-primary);
-  min-height: 48px;
+  min-height: 44px;
   vertical-align: top;
 }
 

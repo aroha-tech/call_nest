@@ -3,6 +3,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { Spinner } from '../components/ui/Spinner';
+import { Skeleton } from '../components/ui/Skeleton';
 import { Pagination } from '../components/ui/Pagination';
 import { backgroundJobsAPI } from '../services/backgroundJobsAPI';
 import { axiosInstance, getStoredAccessToken } from '../services/axiosInstance';
@@ -383,8 +384,11 @@ export function BackgroundJobsPage() {
 
       <div className={listStyles.tableCard}>
         {loading && rows.length === 0 ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 16 }}>
-            <Spinner size="sm" /> Loading…
+          <div style={{ display: 'grid', gap: 10, padding: 16 }}>
+            <Skeleton width="24%" height={14} />
+            <Skeleton width="100%" height={40} />
+            <Skeleton width="100%" height={40} />
+            <Skeleton width="100%" height={40} />
           </div>
         ) : null}
 

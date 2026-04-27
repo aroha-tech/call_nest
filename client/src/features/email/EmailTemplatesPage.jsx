@@ -193,7 +193,7 @@ export function EmailTemplatesPage() {
             ? 'Reusable email templates with subject and body'
             : 'View email templates. Only managers and admins can add or edit templates.'
         }
-        actions={canManageTemplates ? <Button onClick={openCreate}>+ Add Template</Button> : null}
+        actions={canManageTemplates ? <Button onClick={openCreate}>Add template</Button> : null}
       />
 
       {error && <Alert variant="error">{error}</Alert>}
@@ -236,7 +236,7 @@ export function EmailTemplatesPage() {
                 : 'No templates yet. A manager or admin can add templates when ready.'
             }
             action={canManageTemplates ? openCreate : undefined}
-            actionLabel={canManageTemplates ? 'Add Template' : undefined}
+            actionLabel={canManageTemplates ? 'Add template' : undefined}
           />
         ) : (
           <div className={listStyles.tableScrollAreaNatural}>
