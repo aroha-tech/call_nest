@@ -389,9 +389,20 @@
 .roleBar {
   height: 100%;
   min-width: 4px;
-  background: linear-gradient(90deg, var(--color-primary-500), var(--color-primary-400));
   border-radius: $radius-full;
   transition: width 0.4s ease;
+}
+
+.roleBarAdmin {
+  background: linear-gradient(90deg, var(--color-primary-600), var(--color-primary-500));
+}
+
+.roleBarManager {
+  background: linear-gradient(90deg, #0ea5e9, #22d3ee);
+}
+
+.roleBarAgent {
+  background: linear-gradient(90deg, #14b8a6, #10b981);
 }
 
 // —— Quick actions ——

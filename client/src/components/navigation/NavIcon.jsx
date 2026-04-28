@@ -442,6 +442,66 @@ function IconCallbacks() {
   );
 }
 
+/**
+ * Per-item sidebar icon color (stroke + tinted chip). Mid-chroma tones read on dark (#000) and light (#f1f5f9) rails.
+ * Keys align with `useSalesNavigation` / `NAV_ICON_MAP`; unknown keys fall back to `--color-accent-brand` in CSS.
+ */
+export const SHELL_NAV_ICON_ACCENTS = {
+  dashboard: '#38bdf8',
+  activity: '#a78bfa',
+  activities: '#a78bfa',
+  tenants: '#818cf8',
+  users: '#34d399',
+  masters: '#fb923c',
+  industries: '#f97316',
+  'industry-lead-fields': '#fdba74',
+  'dispo-types': '#fbbf24',
+  actions: '#facc15',
+  'contact-statuses': '#2dd4bf',
+  temperatures: '#f472b6',
+  'template-variables': '#93c5fd',
+  'campaign-types': '#ec4899',
+  'campaign-statuses': '#db2777',
+  'workflow-map': '#c084fc',
+  dialer: '#60a5fa',
+  'call-history': '#818cf8',
+  'schedule-hub': '#2dd4bf',
+  'schedule-meetings': '#14b8a6',
+  'schedule-callbacks': '#0f766e',
+  'dialer-workflow': '#a855f7',
+  dispositions: '#c4b5fd',
+  'dialing-sets': '#7c3aed',
+  'default-dispositions': '#c084fc',
+  'default-dialing-sets': '#6d28d9',
+  'dialer-resources': '#0ea5e9',
+  'dialer-scripts': '#0891b2',
+  leads: '#fbbf24',
+  campaigns: '#fb7185',
+  contacts: '#22d3ee',
+  deals: '#fb923c',
+  blacklist: '#f87171',
+  reports: '#64748b',
+  'my-reports': '#64748b',
+  'task-manager': '#84cc16',
+  whatsapp: '#4ade80',
+  'whatsapp-accounts': '#22c55e',
+  'whatsapp-templates': '#16a34a',
+  'whatsapp-messages': '#86efac',
+  'whatsapp-logs': '#15803d',
+  email: '#60a5fa',
+  'email-sent': '#3b82f6',
+  'email-templates': '#2563eb',
+  'email-accounts': '#1d4ed8',
+  meetings: '#14b8a6',
+  settings: '#94a3b8',
+  'settings-main': '#64748b',
+  'contact-fields': '#a855f7',
+  'contact-tags': '#d946ef',
+  integrations: '#6366f1',
+  'background-jobs': '#eab308',
+  'meeting-attendee-emails': '#06b6d4',
+};
+
 const NAV_ICON_MAP = {
   dashboard: IconDashboard,
   tenants: IconBuilding,
@@ -504,8 +564,13 @@ const NAV_ICON_MAP = {
  */
 export function NavIcon({ navKey, className }) {
   const Cmp = NAV_ICON_MAP[navKey] || IconDefault;
+  const accent = SHELL_NAV_ICON_ACCENTS[navKey];
   return (
-    <span className={className} aria-hidden>
+    <span
+      className={className}
+      aria-hidden
+      style={accent ? { ['--nav-icon-accent']: accent } : undefined}
+    >
       <Cmp />
     </span>
   );

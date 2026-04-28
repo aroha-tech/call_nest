@@ -676,6 +676,28 @@
   }
 }
 
+/* Upcoming meetings / pending callbacks — same empty layout as Connected calls */
+.dashPurpleEmpty {
+  min-height: calc(3 * 4.2rem + 2 * 6px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.dashPurpleEmptyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  color: #6d5ce8;
+  background: color-mix(in srgb, #6d5ce8 12%, transparent);
+}
+
 :global(html[data-color-scheme='light']) {
   .panelLink,
   .panelLink:visited,
@@ -683,6 +705,9 @@
   .connectedEmptyLink,
   .connectedEmptyLink:visited,
   .connectedEmptyLink:active,
+  .insightPanelLink,
+  .insightPanelLink:visited,
+  .insightPanelLink:active,
   .activityHistoryLink,
   .activityHistoryLink:visited,
   .activityHistoryLink:active,
@@ -1501,24 +1526,63 @@
   }
 }
 
-.sectionHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: $space-3;
+/* Insights row — same chrome as DashboardDataCharts cards (top accent + in-card title). */
+.insightPanel {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-lg;
+  padding: $space-4;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 2px;
+    background: var(--color-primary-600);
+    opacity: 0.9;
+  }
 }
 
-.sectionTitle {
+.insightPanelRecent {
+  min-height: 148px;
+}
+
+.insightPanelHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $space-3;
+  margin-bottom: $space-4;
+}
+
+.insightPanelTitle {
   font-size: $font-size-base;
   font-weight: $font-weight-semibold;
   color: var(--color-text-primary);
-  margin: 0;
+  margin: 0 0 $space-1;
+  letter-spacing: -0.02em;
 }
 
-.sectionLink {
-  font-size: $font-size-sm;
-  color: var(--color-text-primary);
+.insightPanelHint {
+  font-size: $font-size-xs;
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.45;
+  max-width: 42ch;
+}
+
+.insightPanelLink {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-primary-600);
   text-decoration: none;
+  white-space: nowrap;
+  margin-top: 2px;
 
   &:hover {
     text-decoration: none;
@@ -1526,18 +1590,14 @@
   }
 }
 
-.roleCard {
-  border-radius: $radius-lg;
-  padding: $space-5;
-  @include premium-panel;
+.roleBarBlock {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
 }
 
 .roleRow {
-  margin-bottom: $space-4;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
+  margin-bottom: 0;
 }
 
 .roleMeta {
@@ -1569,23 +1629,27 @@
 .roleBar {
   height: 100%;
   min-width: 4px;
-  background: var(--color-text-primary);
   border-radius: $radius-full;
   transition: width 0.4s ease;
 }
 
-.recentCard {
-  border-radius: $radius-lg;
-  padding: $space-4;
-  min-height: 140px;
-  @include premium-panel;
+.roleBarAdmin {
+  background: linear-gradient(90deg, var(--color-primary-600), var(--color-primary-500));
+}
+
+.roleBarManager {
+  background: linear-gradient(90deg, #0ea5e9, #22d3ee);
+}
+
+.roleBarAgent {
+  background: linear-gradient(90deg, #14b8a6, #10b981);
 }
 
 .recentEmpty {
   margin: 0;
   font-size: $font-size-sm;
   color: var(--color-text-muted);
-  padding: $space-4 0;
+  padding: $space-2 0 $space-1;
 }
 
 .recentList {

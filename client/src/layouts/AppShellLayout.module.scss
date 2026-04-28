@@ -112,7 +112,7 @@ $nav-search-pill-ease: cubic-bezier(0.32, 0.72, 0, 1);
 .navSearchTrackOpen .navSearchPill {
   border-radius: 999px;
   border: 1px solid var(--color-primary-500);
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--color-text-primary) 4%, var(--color-bg-body));
   overflow: hidden;
   cursor: default;
 
@@ -286,29 +286,27 @@ $nav-search-pill-ease: cubic-bezier(0.32, 0.72, 0, 1);
   flex-shrink: 0;
   width: 22px;
   height: 22px;
-  border-radius: $radius-md;
-  padding: 3px;
-  color: var(--color-accent-brand);
-  background: color-mix(in srgb, var(--color-accent-brand) 18%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent-brand) 28%, transparent);
-  transition: background $transition-fast, box-shadow $transition-fast, color $transition-fast;
+  padding: 0;
+  color: var(--nav-icon-accent, var(--color-accent-brand));
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  transition: color $transition-fast, opacity $transition-fast;
 }
 
 .navItem:hover .navItemIcon,
 .navGroupHeader:hover .navItemIcon {
-  color: var(--color-accent-brand);
+  color: var(--nav-icon-accent, var(--color-accent-brand));
 }
 
 .navItem.navItemActive .navItemIcon {
-  color: var(--color-accent-brand);
-  background: color-mix(in srgb, var(--color-accent-brand) 24%, transparent);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--color-accent-brand) 42%, transparent),
-    0 0 0 3px color-mix(in srgb, var(--color-accent-brand) 18%, transparent);
+  color: var(--nav-icon-accent, var(--color-accent-brand));
+  background: transparent;
+  box-shadow: none;
 }
 
 .navGroupHeader.navGroupActive .navItemIcon {
-  color: var(--color-accent-brand);
+  color: var(--nav-icon-accent, var(--color-accent-brand));
 }
 
 .navChildIcon {
@@ -318,24 +316,22 @@ $nav-search-pill-ease: cubic-bezier(0.32, 0.72, 0, 1);
   flex-shrink: 0;
   width: 20px;
   height: 20px;
-  border-radius: $radius-sm;
-  padding: 2px;
-  color: var(--color-accent-brand);
-  background: color-mix(in srgb, var(--color-accent-brand) 16%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent-brand) 24%, transparent);
-  transition: background $transition-fast, box-shadow $transition-fast, color $transition-fast;
+  padding: 0;
+  color: var(--nav-icon-accent, var(--color-accent-brand));
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  transition: color $transition-fast, opacity $transition-fast;
 }
 
 .navChild:hover .navChildIcon {
-  color: var(--color-accent-brand);
+  color: var(--nav-icon-accent, var(--color-accent-brand));
 }
 
 .navChild.navChildActive .navChildIcon {
-  color: var(--color-accent-brand);
-  background: color-mix(in srgb, var(--color-accent-brand) 22%, transparent);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--color-accent-brand) 38%, transparent),
-    0 0 0 2px color-mix(in srgb, var(--color-accent-brand) 14%, transparent);
+  color: var(--nav-icon-accent, var(--color-accent-brand));
+  background: transparent;
+  box-shadow: none;
 }
 
 .navItem {
@@ -745,40 +741,11 @@ $nav-search-pill-ease: cubic-bezier(0.32, 0.72, 0, 1);
   }
 }
 
-// Light appearance: main column + topbar stay light; sidebar stays a dark rail (own tokens).
+// Light appearance: shell sidebar uses global light tokens + --color-shell-sidebar-base (see variables.scss).
 :global(html[data-color-scheme='light']) {
   .sidebar {
-    background: var(--color-shell-sidebar-base, #000000);
-    border-right-color: rgba(255, 255, 255, 0.22);
-    /* Scoped dark semantics for nav / search / footer (do not leak outside aside) */
-    --color-bg-body: #000000;
-    --color-bg-surface: #000000;
-    --color-bg-elevated: #0a0a0a;
-    --color-bg-subtle: #0a0a0a;
-    --color-bg-muted: #141414;
-    --color-bg-hover: rgba(255, 255, 255, 0.06);
-    --color-bg-active: rgba(255, 255, 255, 0.08);
-    --color-border: rgba(255, 255, 255, 0.2);
-    --color-border-subtle: rgba(255, 255, 255, 0.14);
-    --color-border-strong: rgba(255, 255, 255, 0.3);
-    --color-border-focus: rgba(255, 255, 255, 0.72);
-    --color-text-primary: #f4f7fb;
-    --color-text-secondary: #b8c2d4;
-    --color-text-tertiary: #8b96ab;
-    --color-text-muted: #6b7689;
-    --color-text-placeholder: #8b96ab;
-    --color-text-inverse: #09090b;
-    --color-focus-ring: rgba(255, 255, 255, 0.22);
-    --color-input-bg: #0a0a0a;
-    --color-input-border: rgba(255, 255, 255, 0.22);
-    --color-input-border-hover: rgba(255, 255, 255, 0.34);
-    --color-input-border-focus: rgba(255, 255, 255, 0.78);
-    --scrollbar-thumb: rgba(255, 255, 255, 0.12);
-    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
-  }
-
-  .sidebarHeader {
-    background: transparent;
+    background: var(--color-shell-sidebar-base);
+    border-right-color: var(--color-border-subtle);
   }
 
   .mainColumn {
@@ -787,21 +754,5 @@ $nav-search-pill-ease: cubic-bezier(0.32, 0.72, 0, 1);
 
   .topbar {
     background: #ffffff;
-  }
-
-  .navItem.navItemActive .navItemIcon {
-    color: var(--color-text-primary);
-  }
-
-  .navGroupHeader.navGroupActive .navItemIcon {
-    color: var(--color-text-primary);
-  }
-
-  .navChild.navChildActive {
-    color: var(--color-text-primary);
-
-    .navChildIcon {
-      color: var(--color-text-primary);
-    }
   }
 }

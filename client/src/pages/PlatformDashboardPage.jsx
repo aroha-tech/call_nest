@@ -24,6 +24,12 @@ const ROLE_LABELS = {
 
 const ROLE_ORDER = ['admin', 'manager', 'agent'];
 
+const PLATFORM_ROLE_BAR_FILL = {
+  admin: styles.roleBarAdmin,
+  manager: styles.roleBarManager,
+  agent: styles.roleBarAgent,
+};
+
 const PLATFORM_KIND_LABEL = {
   tenant: 'Organization',
   user: 'User',
@@ -383,7 +389,7 @@ export function PlatformDashboardPage() {
                       </div>
                       <div className={styles.roleBarWrap}>
                         <div
-                          className={styles.roleBar}
+                          className={`${styles.roleBar} ${PLATFORM_ROLE_BAR_FILL[role] ?? styles.roleBarAdmin}`}
                           style={{ width: `${pct}%` }}
                           title={`${count} users (${pct.toFixed(0)}%)`}
                         />

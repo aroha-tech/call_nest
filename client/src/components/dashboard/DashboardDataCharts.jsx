@@ -4,10 +4,11 @@ import styles from './DashboardDataCharts.module.scss';
 const ROLE_ORDER = ['admin', 'manager', 'agent'];
 const ROLE_LABELS = { admin: 'Admins', manager: 'Managers', agent: 'Agents' };
 
+/** Align with pipeline horizontal bars: primary / sky / emerald. */
 const DONUT_COLORS = {
-  admin: 'var(--color-text-primary)',
-  manager: 'var(--color-text-secondary)',
-  agent: 'var(--color-text-muted)',
+  admin: 'var(--color-primary-500)',
+  manager: '#0ea5e9',
+  agent: '#10b981',
 };
 
 /** Clockwise donut arc; angles in degrees from top (0° = 12 o'clock). */

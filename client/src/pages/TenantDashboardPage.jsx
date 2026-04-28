@@ -28,6 +28,13 @@ import styles from './TenantDashboardPage.module.scss';
 
 const ROLE_ORDER = ['admin', 'manager', 'agent'];
 
+/** Role bar fills — same gradient language as Pipeline volume (DashboardDataCharts). */
+const ROLE_BAR_FILL_CLASS = {
+  admin: styles.roleBarAdmin,
+  manager: styles.roleBarManager,
+  agent: styles.roleBarAgent,
+};
+
 /** Recent activity card: show only the newest rows; full list is on /activities. */
 const DASHBOARD_ACTIVITY_PREVIEW_LIMIT = 5;
 
@@ -521,64 +528,65 @@ export function TenantDashboardPage() {
                     Calendar
                   </Link>
                 </div>
-                <ul className={`${styles.meetingList} ${styles.dashboardListSlots}`}>
-                  {Array.from({ length: DASHBOARD_LIST_SLOT_COUNT }, (_, slot) => {
-                    const m = meetingsPreview[slot];
-                    if (m) {
-                      const joinUrl =
-                        m.location && /^https?:\/\//i.test(String(m.location).trim())
-                          ? String(m.location).trim()
-                          : null;
-                      return (
-                        <li key={m.id} className={`${styles.meetingRow} ${styles.dashboardSlotRow}`}>
-                          <span className={`${styles.meetingTime} ${styles.upcomingTimeBadge}`}>
-                            {formatMeetingSlot(m.start_at, dtMode)}
-                          </span>
-                          <div className={styles.meetingBody}>
-                            <p className={styles.meetingTitle}>{m.title || 'Meeting'}</p>
-                            <p className={styles.meetingMeta}>
-                              {[m.attendee_email, m.location && !joinUrl ? m.location : null]
-                                .filter(Boolean)
-                                .join(' | ') || '—'}
-                            </p>
-                          </div>
-                          {joinUrl ? (
-                            <a
-                              href={joinUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={styles.joinBtn}
-                            >
-                              <span className={styles.joinBtnInner}>
-                                <MaterialSymbol name="video_call" size="sm" />
-                                Join
-                              </span>
-                            </a>
-                          ) : (
-                            <Link to={DASHBOARD_MEETINGS_PATH} className={styles.joinBtn}>
-                              <span className={styles.joinBtnInner}>
-                                <MaterialSymbol name="event" size="sm" />
-                                Open
-                              </span>
-                            </Link>
-                          )}
-                        </li>
-                      );
-                    }
-                    const emptyFirst = slot === 0 && upcomingMeetings.length === 0;
-                    return (
-                      <li
-                        key={`meeting-slot-${slot}`}
-                        className={styles.dashboardSlotSpacer}
-                        aria-hidden={!emptyFirst}
-                      >
-                        {emptyFirst ? (
-                          <span className={styles.slotEmptyHint}>No upcoming meetings in your scope.</span>
-                        ) : null}
-                      </li>
-                    );
-                  })}
-                </ul>
+                {upcomingMeetings.length === 0 ? (
+                  <div className={styles.dashPurpleEmpty}>
+                    <span className={styles.dashPurpleEmptyIcon}>
+                      <MaterialSymbol name="event_upcoming" size="xl" />
+                    </span>
+                    <p className={styles.connectedEmptyText}>No upcoming meetings in your scope.</p>
+                    <Link to={DASHBOARD_MEETINGS_PATH} className={styles.connectedEmptyLink}>
+                      Open calendar {'\u2192'}
+                    </Link>
+                  </div>
+                ) : (
+                  <ul className={`${styles.meetingList} ${styles.dashboardListSlots}`}>
+                    {Array.from({ length: DASHBOARD_LIST_SLOT_COUNT }, (_, slot) => {
+                      const m = meetingsPreview[slot];
+                      if (m) {
+                        const joinUrl =
+                          m.location && /^https?:\/\//i.test(String(m.location).trim())
+                            ? String(m.location).trim()
+                            : null;
+                        return (
+                          <li key={m.id} className={`${styles.meetingRow} ${styles.dashboardSlotRow}`}>
+                            <span className={`${styles.meetingTime} ${styles.upcomingTimeBadge}`}>
+                              {formatMeetingSlot(m.start_at, dtMode)}
+                            </span>
+                            <div className={styles.meetingBody}>
+                              <p className={styles.meetingTitle}>{m.title || 'Meeting'}</p>
+                              <p className={styles.meetingMeta}>
+                                {[m.attendee_email, m.location && !joinUrl ? m.location : null]
+                                  .filter(Boolean)
+                                  .join(' | ') || '—'}
+                              </p>
+                            </div>
+                            {joinUrl ? (
+                              <a
+                                href={joinUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={styles.joinBtn}
+                              >
+                                <span className={styles.joinBtnInner}>
+                                  <MaterialSymbol name="video_call" size="sm" />
+                                  Join
+                                </span>
+                              </a>
+                            ) : (
+                              <Link to={DASHBOARD_MEETINGS_PATH} className={styles.joinBtn}>
+                                <span className={styles.joinBtnInner}>
+                                  <MaterialSymbol name="event" size="sm" />
+                                  Open
+                                </span>
+                              </Link>
+                            )}
+                          </li>
+                        );
+                      }
+                      return <li key={`meeting-slot-${slot}`} className={styles.dashboardSlotSpacer} aria-hidden />;
+                    })}
+                  </ul>
+                )}
                 {meetingsHasMore ? (
                   <Link
                     to={DASHBOARD_MEETINGS_PATH}
@@ -719,77 +727,72 @@ export function TenantDashboardPage() {
               </div>
               {can(PERMISSIONS.SCHEDULE_VIEW) ? (
                 <>
-                  <ul className={`${styles.meetingList} ${styles.dashboardListSlots}`}>
-                    {Array.from({ length: DASHBOARD_LIST_SLOT_COUNT }, (_, slot) => {
-                      const cb = callbacksPreview[slot];
-                      if (cb) {
-                        const cp = contactPath(cb);
-                        const overdue = isPendingCallbackOverdue(cb.scheduled_at);
-                        const showAssignee = role === 'admin' || role === 'manager';
-                        const metaParts = [
-                          cb.contact_phone?.trim() || null,
-                          showAssignee && cb.assigned_name?.trim() ? cb.assigned_name.trim() : null,
-                        ].filter(Boolean);
-                        const title =
-                          cb.contact_name?.trim() ||
-                          (cb.contact_id ? `Contact #${cb.contact_id}` : 'Callback');
-                        return (
-                          <li key={cb.id} className={`${styles.meetingRow} ${styles.dashboardSlotRow}`}>
-                            <span
-                              className={`${styles.meetingTime} ${overdue ? styles.callbackTimeOverdue : ''}`.trim()}
-                            >
-                              {overdue ? (
-                                <>
-                                  <span className={styles.callbackDueLabel}>Overdue</span>
-                                  <br />
-                                </>
-                              ) : null}
-                              {formatMeetingSlot(cb.scheduled_at, dtMode)}
-                            </span>
-                            <div className={styles.meetingBody}>
-                              <p className={styles.meetingTitle}>
-                                {cp ? (
-                                  <Link to={cp} className={styles.leadLink}>
-                                    {title}
-                                  </Link>
-                                ) : (
-                                  title
-                                )}
-                              </p>
-                              <p className={styles.meetingMeta}>
-                                {metaParts.length ? metaParts.join(' · ') : '—'}
-                                {cb.notes?.trim() ? ` · ${cb.notes.trim()}` : ''}
-                              </p>
-                            </div>
-                            <Link to="/schedule/callbacks" className={styles.joinBtn}>
-                              <span className={styles.joinBtnInner}>
-                                <MaterialSymbol name="event" size="sm" />
-                                Open
+                  {pendingCallbacks.length === 0 ? (
+                    <div className={styles.dashPurpleEmpty}>
+                      <span className={styles.dashPurpleEmptyIcon}>
+                        <MaterialSymbol name="ring_volume" size="xl" />
+                      </span>
+                      <p className={styles.connectedEmptyText}>No pending callbacks in your scope.</p>
+                      <Link to="/schedule/callbacks" className={styles.connectedEmptyLink}>
+                        Open callbacks {'\u2192'}
+                      </Link>
+                    </div>
+                  ) : (
+                    <ul className={`${styles.meetingList} ${styles.dashboardListSlots}`}>
+                      {Array.from({ length: DASHBOARD_LIST_SLOT_COUNT }, (_, slot) => {
+                        const cb = callbacksPreview[slot];
+                        if (cb) {
+                          const cp = contactPath(cb);
+                          const overdue = isPendingCallbackOverdue(cb.scheduled_at);
+                          const showAssignee = role === 'admin' || role === 'manager';
+                          const metaParts = [
+                            cb.contact_phone?.trim() || null,
+                            showAssignee && cb.assigned_name?.trim() ? cb.assigned_name.trim() : null,
+                          ].filter(Boolean);
+                          const title =
+                            cb.contact_name?.trim() ||
+                            (cb.contact_id ? `Contact #${cb.contact_id}` : 'Callback');
+                          return (
+                            <li key={cb.id} className={`${styles.meetingRow} ${styles.dashboardSlotRow}`}>
+                              <span
+                                className={`${styles.meetingTime} ${overdue ? styles.callbackTimeOverdue : ''}`.trim()}
+                              >
+                                {overdue ? (
+                                  <>
+                                    <span className={styles.callbackDueLabel}>Overdue</span>
+                                    <br />
+                                  </>
+                                ) : null}
+                                {formatMeetingSlot(cb.scheduled_at, dtMode)}
                               </span>
-                            </Link>
-                          </li>
-                        );
-                      }
-                      const emptyFirst = slot === 0 && pendingCallbacks.length === 0;
-                      return (
-                        <li
-                          key={`cb-slot-${slot}`}
-                          className={styles.dashboardSlotSpacer}
-                          aria-hidden={!emptyFirst}
-                        >
-                          {emptyFirst ? (
-                            <span className={styles.slotEmptyHint}>
-                              No pending callbacks in your scope. Open{' '}
-                              <Link to="/schedule/callbacks" className={styles.inlineDashLink}>
-                                Callbacks
-                              </Link>{' '}
-                              to add one.
-                            </span>
-                          ) : null}
-                        </li>
-                      );
-                    })}
-                  </ul>
+                              <div className={styles.meetingBody}>
+                                <p className={styles.meetingTitle}>
+                                  {cp ? (
+                                    <Link to={cp} className={styles.leadLink}>
+                                      {title}
+                                    </Link>
+                                  ) : (
+                                    title
+                                  )}
+                                </p>
+                                <p className={styles.meetingMeta}>
+                                  {metaParts.length ? metaParts.join(' · ') : '—'}
+                                  {cb.notes?.trim() ? ` · ${cb.notes.trim()}` : ''}
+                                </p>
+                              </div>
+                              <Link to="/schedule/callbacks" className={styles.joinBtn}>
+                                <span className={styles.joinBtnInner}>
+                                  <MaterialSymbol name="event" size="sm" />
+                                  Open
+                                </span>
+                              </Link>
+                            </li>
+                          );
+                        }
+                        return <li key={`cb-slot-${slot}`} className={styles.dashboardSlotSpacer} aria-hidden />;
+                      })}
+                    </ul>
+                  )}
                   {callbacksHasMore ? (
                     <Link
                       to="/schedule/callbacks"
@@ -982,21 +985,32 @@ export function TenantDashboardPage() {
 
         {(scope === 'tenant' || scope === 'team') && usersTotal > 0 ? (
           <div className={styles.secondaryGrid}>
-            <section>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>
-                  {scope === 'tenant' ? 'Users by role' : 'Your agents'}
-                </h2>
+            <section
+              className={styles.insightPanel}
+              aria-labelledby="dash-users-by-role-heading"
+            >
+              <div className={styles.insightPanelHead}>
+                <div>
+                  <h2 id="dash-users-by-role-heading" className={styles.insightPanelTitle}>
+                    {scope === 'tenant' ? 'Users by role' : 'Your agents'}
+                  </h2>
+                  <p className={styles.insightPanelHint}>
+                    {scope === 'tenant'
+                      ? 'Share of workspace users by admin, manager, and agent roles.'
+                      : 'Agents on your team (managers typically see direct reports here).'}
+                  </p>
+                </div>
                 {canAny([PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM]) ? (
-                  <Link to="/users" className={styles.sectionLink}>
+                  <Link to="/users" className={styles.insightPanelLink}>
                     View all
                   </Link>
                 ) : null}
               </div>
-              <div className={styles.roleCard}>
+              <div className={styles.roleBarBlock}>
                 {(scope === 'team' ? ['agent'] : ROLE_ORDER).map((r) => {
                   const count = usersByRole?.[r] ?? 0;
                   const pct = usersTotal > 0 ? (count / usersTotal) * 100 : 0;
+                  const fillClass = ROLE_BAR_FILL_CLASS[r] ?? styles.roleBarAdmin;
                   return (
                     <div key={r} className={styles.roleRow}>
                       <div className={styles.roleMeta}>
@@ -1005,7 +1019,7 @@ export function TenantDashboardPage() {
                       </div>
                       <div className={styles.roleBarWrap}>
                         <div
-                          className={styles.roleBar}
+                          className={`${styles.roleBar} ${fillClass}`}
                           style={{ width: `${pct}%` }}
                           title={`${count} (${pct.toFixed(0)}%)`}
                         />
@@ -1016,35 +1030,43 @@ export function TenantDashboardPage() {
               </div>
             </section>
 
-            <section>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>
-                  {scope === 'team' ? 'Recent agents' : 'Recent users'}
-                </h2>
+            <section
+              className={`${styles.insightPanel} ${styles.insightPanelRecent}`}
+              aria-labelledby="dash-recent-users-heading"
+            >
+              <div className={styles.insightPanelHead}>
+                <div>
+                  <h2 id="dash-recent-users-heading" className={styles.insightPanelTitle}>
+                    {scope === 'team' ? 'Recent agents' : 'Recent users'}
+                  </h2>
+                  <p className={styles.insightPanelHint}>
+                    {scope === 'team'
+                      ? 'Latest team members surfaced for quick access.'
+                      : 'Latest workspace members in your scope.'}
+                  </p>
+                </div>
                 {canAny([PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM]) ? (
-                  <Link to="/users" className={styles.sectionLink}>
+                  <Link to="/users" className={styles.insightPanelLink}>
                     View all
                   </Link>
                 ) : null}
               </div>
-              <div className={styles.recentCard}>
-                {!data?.recentUsers?.length ? (
-                  <p className={styles.recentEmpty}>
-                    {scope === 'team' ? 'No agents yet' : 'No users yet'}
-                  </p>
-                ) : (
-                  <ul className={styles.recentList}>
-                    {data.recentUsers.map((u) => (
-                      <li key={u.id} className={styles.recentItem}>
-                        <Link to="/users" className={styles.recentLink}>
-                          <span className={styles.recentName}>{u.name?.trim() || u.email}</span>
-                          <span className={styles.recentMeta}>{u.role}</span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              {!data?.recentUsers?.length ? (
+                <p className={styles.recentEmpty}>
+                  {scope === 'team' ? 'No agents yet' : 'No users yet'}
+                </p>
+              ) : (
+                <ul className={styles.recentList}>
+                  {data.recentUsers.map((u) => (
+                    <li key={u.id} className={styles.recentItem}>
+                      <Link to="/users" className={styles.recentLink}>
+                        <span className={styles.recentName}>{u.name?.trim() || u.email}</span>
+                        <span className={styles.recentMeta}>{u.role}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
           </div>
         ) : null}

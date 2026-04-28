@@ -5,17 +5,8 @@
   flex-shrink: 0;
   padding: $space-3;
   border-top: 1px solid var(--color-border-strong);
-  background: var(--color-bg-body);
-}
-
-:global(html[data-color-scheme='light']) .footer {
-  background: var(--color-bg-body);
-}
-
-/* Light app theme: sidebar rail is dark — footer must match aside, not document body */
-:global(html[data-color-scheme='light']) :global([data-app-shell-sidebar]) .footer {
-  background: #000000;
-  border-top-color: rgba(255, 255, 255, 0.22);
+  /* Match parent sidebar surface (tokens differ for light vs dark shell) */
+  background: transparent;
 }
 
 :global(html[data-color-scheme='light']) .avatar {
