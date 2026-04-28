@@ -27,9 +27,10 @@ const STATUS_VARIANT_TO_CLASS = {
  * @param {Array} props.rows
  * @param {object} props.tableStyles — SCSS module from TenantDashboardPage (activity table classes)
  * @param {string} props.dtMode
+ * @param {object} [props.dtPreferences]
  * @param {import('react-router-dom').NavigateFunction} props.navigate
  */
-export function ActivityFeedTable({ rows, tableStyles, dtMode, navigate }) {
+export function ActivityFeedTable({ rows, tableStyles, dtMode, dtPreferences, navigate }) {
   return (
     <div className={tableStyles.activityTableScroll}>
       <table className={tableStyles.activityTable}>
@@ -124,7 +125,7 @@ export function ActivityFeedTable({ rows, tableStyles, dtMode, navigate }) {
                 </td>
                 <td className={`${tableStyles.activityTd} ${tableStyles.activityTdWhen}`.trim()}>
                   <div className={tableStyles.activityWhenCell}>
-                    <span className={tableStyles.activityWhen} title={formatDateTimeDisplay(it.at, dtMode)}>
+                    <span className={tableStyles.activityWhen} title={formatDateTimeDisplay(it.at, dtMode, dtPreferences)}>
                       {formatRelativeTimeShort(it.at)}
                     </span>
                     <button

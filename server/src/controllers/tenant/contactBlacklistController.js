@@ -34,10 +34,26 @@ export async function unblock(req, res, next) {
     const tenantId = req.tenant?.id;
     if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
     const role = String(req.user?.role || '').toLowerCase();
-    if (role !== 'admin' && role !== 'manager') {
-      return res.status(403).json({ error: 'Only admin or manager can unblock entries' });
+    if (role !== 'admin' && role !== 'manager' && role !== 'agent') {
+      return res.status(403).json({ error: 'Only admin, manager, or agent can unblock entries' });
     }
     const ok = await contactBlacklistService.unblockBlacklistEntry(tenantId, req.user, req.params.id);
+    if (!ok) return res.status(404).json({ error: 'Blacklist entry not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function unblockContact(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
+    const role = String(req.user?.role || '').toLowerCase();
+    if (role !== 'admin' && role !== 'manager' && role !== 'agent') {
+      return res.status(403).json({ error: 'Only admin, manager, or agent can unblock entries' });
+    }
+    const ok = await contactBlacklistService.unblockContactEntry(tenantId, req.user, req.params.contactId);
     if (!ok) return res.status(404).json({ error: 'Blacklist entry not found' });
     res.json({ ok: true });
   } catch (err) {

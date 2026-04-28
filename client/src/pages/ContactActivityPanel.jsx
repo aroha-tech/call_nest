@@ -11,11 +11,12 @@ import { MaterialSymbol } from '../components/ui/MaterialSymbol';
 import { PERMISSIONS } from '../utils/permissionUtils';
 import { sanitizeAttemptNotesForDisplay } from '../utils/callAttemptNotesDisplay';
 import { formatDateTimeDisplay, formatRelativeTimeShort } from '../utils/dateTimeDisplay';
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import styles from './ContactActivityPanel.module.scss';
 
-function safeDateTime(v, mode = 'ist_fixed') {
+function safeDateTime(v, mode = 'ist_fixed', preferences = {}) {
   if (!v) return '—';
-  return formatDateTimeDisplay(v, mode);
+  return formatDateTimeDisplay(v, mode, preferences);
 }
 
 function formatMoney(n) {
@@ -102,6 +103,11 @@ function contactTimelineIcon(ev) {
       return { name: 'chat', wrap: 'caIconWa' };
     case 'email_message':
       return { name: 'mail', wrap: 'caIconEmail' };
+    case 'meeting_created':
+      return { name: 'event', wrap: 'caIconDeal' };
+    case 'callback_created':
+    case 'callback_updated':
+      return { name: 'phone_in_talk', wrap: 'caIconCall' };
     case 'assignment_changed':
     case 'tag_applied':
     case 'tag_removed':
@@ -141,7 +147,7 @@ function messageStatusPresentation(raw) {
  * Row model for the activity table: what happened, status, who, info, icon.
  * @returns {{ title: string, subtitle: string, detail: string|null, info: string, statusLabel: string, statusVariant: string, actorName: string|null, iconName: string, iconWrap: string }}
  */
-function contactTimelineRowModel(ev, mode = 'ist_fixed') {
+function contactTimelineRowModel(ev, mode = 'ist_fixed', preferences = {}) {
   const p = ev.payload || {};
   const cat = typeLabel(ev.type);
   const icon = contactTimelineIcon(ev);
@@ -163,7 +169,7 @@ function contactTimelineRowModel(ev, mode = 'ist_fixed') {
       const kind = p.record_type === 'lead' ? 'Lead' : 'Contact';
       const importBatch = p.import_batch || null;
       const importLine = importBatch
-        ? `${importBatch.original_filename || 'Import'} · ${safeDateTime(importBatch.created_at, mode)}`
+        ? `${importBatch.original_filename || 'Import'} · ${safeDateTime(importBatch.created_at, mode, preferences)}`
         : null;
       return {
         ...base,
@@ -283,6 +289,37 @@ function contactTimelineRowModel(ev, mode = 'ist_fixed') {
         actorName: p.sender_name || null,
       };
     }
+    case 'meeting_created': {
+      const details = p.payload_json || {};
+      return {
+        ...base,
+        title: details.title ? `Meeting: ${details.title}` : 'Meeting scheduled',
+        subtitle: details.meeting_platform ? `Platform: ${humanizeKey(details.meeting_platform)}` : cat,
+        detail: details.start_at
+          ? `${safeDateTime(details.start_at, mode, preferences)} → ${safeDateTime(details.end_at, mode, preferences)}`
+          : null,
+        info: details.meeting_status ? humanizeKey(details.meeting_status) : 'Scheduled',
+        statusLabel: 'Meeting',
+        statusVariant: 'purple',
+        actorName: p.actor_name || null,
+      };
+    }
+    case 'callback_created':
+    case 'callback_updated': {
+      const details = p.payload_json || {};
+      const callbackStatus = String(details.status || '').toLowerCase();
+      const statusVariant = callbackStatus === 'completed' ? 'teal' : callbackStatus === 'cancelled' ? 'rose' : 'amber';
+      return {
+        ...base,
+        title: ev.type === 'callback_created' ? 'Callback scheduled' : 'Callback updated',
+        subtitle: details.assigned_user_id ? `Assigned user #${details.assigned_user_id}` : cat,
+        detail: details.notes || details.outcome_notes || null,
+        info: details.scheduled_at ? safeDateTime(details.scheduled_at, mode, preferences) : '—',
+        statusLabel: callbackStatus ? humanizeKey(callbackStatus) : 'Pending',
+        statusVariant,
+        actorName: p.actor_name || null,
+      };
+    }
     case 'opportunity_created':
       return {
         ...base,
@@ -332,6 +369,12 @@ function typeLabel(type) {
       return 'WhatsApp';
     case 'email_message':
       return 'Email';
+    case 'meeting_created':
+      return 'Meeting';
+    case 'callback_created':
+      return 'Callback';
+    case 'callback_updated':
+      return 'Callback updated';
     case 'opportunity_created':
       return 'Deal / opportunity';
     case 'opportunity_updated':
@@ -472,7 +515,8 @@ export function ContactActivityPanel({
   const loadMoreUnlockRef = useRef(false);
   const loadingMoreRef = useRef(false);
   const user = useAppSelector(selectUser);
-  const dtMode = user?.datetimeDisplayMode ?? 'ist_fixed';
+  const { datetimeDisplayMode, datetimePreferences } = useDateTimeDisplay();
+  const dtMode = datetimeDisplayMode;
   const { canAny } = usePermissions();
   const canCallHistory = canAny([PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR]);
   const canBrowseCrm = canAny([PERMISSIONS.LEADS_READ, PERMISSIONS.CONTACTS_READ]);
@@ -626,16 +670,16 @@ export function ContactActivityPanel({
         <div className={styles.grid}>
           <div>
             <span className={styles.dt}>Created</span>
-            <span className={styles.dd}>{safeDateTime(contact.created_at, dtMode)}</span>
+            <span className={styles.dd}>{formatDateTimeDisplay(contact.created_at, dtMode, datetimePreferences)}</span>
           </div>
           <div>
             <span className={styles.dt}>Last updated</span>
-            <span className={styles.dd}>{safeDateTime(contact.updated_at, dtMode)}</span>
+            <span className={styles.dd}>{formatDateTimeDisplay(contact.updated_at, dtMode, datetimePreferences)}</span>
           </div>
           <div>
             <span className={styles.dt}>First / last call</span>
             <span className={styles.dd}>
-              {safeDateTime(contact.first_called_at, dtMode)} → {safeDateTime(contact.last_called_at, dtMode)}
+              {formatDateTimeDisplay(contact.first_called_at, dtMode, datetimePreferences)} → {formatDateTimeDisplay(contact.last_called_at, dtMode, datetimePreferences)}
             </span>
           </div>
           <div>
@@ -722,7 +766,7 @@ export function ContactActivityPanel({
                 {o.stage_name ? ` · ${o.stage_name}` : ''}
                 {o.title ? ` — ${o.title}` : ''}
                 <div style={{ opacity: 0.85, marginTop: 4 }}>
-                  Amount {formatMoney(o.amount ?? o.expected_revenue)} · Updated {safeDateTime(o.updated_at, dtMode)}
+                  Amount {formatMoney(o.amount ?? o.expected_revenue)} · Updated {formatDateTimeDisplay(o.updated_at, dtMode, datetimePreferences)}
                 </div>
               </div>
             ))}
@@ -795,7 +839,7 @@ export function ContactActivityPanel({
                   </thead>
                   <tbody>
                     {filteredTimelineRows.map((ev, idx) => {
-                      const row = contactTimelineRowModel(ev, dtMode);
+                      const row = contactTimelineRowModel(ev, dtMode, datetimePreferences);
                       const statusClass =
                         {
                           teal: styles.caStatusTeal,
@@ -818,7 +862,7 @@ export function ContactActivityPanel({
                               <div className={styles.caDetailText}>
                                 <span className={styles.caRowTitle}>{row.title}</span>
                                 <span className={styles.caRowSubtitle}>{row.subtitle}</span>
-                                <span className={styles.caWhenMobile} title={formatDateTimeDisplay(ev.at, dtMode)}>
+                                <span className={styles.caWhenMobile} title={formatDateTimeDisplay(ev.at, dtMode, datetimePreferences)}>
                                   {formatRelativeTimeShort(ev.at)}
                                 </span>
                                 {row.detail ? (
@@ -858,7 +902,7 @@ export function ContactActivityPanel({
                             <time
                               className={styles.caWhen}
                               dateTime={ev.at || undefined}
-                              title={formatDateTimeDisplay(ev.at, dtMode)}
+                              title={formatDateTimeDisplay(ev.at, dtMode, datetimePreferences)}
                             >
                               {formatRelativeTimeShort(ev.at)}
                             </time>

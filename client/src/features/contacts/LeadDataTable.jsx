@@ -20,9 +20,11 @@ function LeadRowActionsMenu({
   canUpdate,
   canDelete,
   canBlacklist,
+  isBlacklisted,
   onEdit,
   onDelete,
   onBlacklistRecord,
+  onUnblockRecord,
   scrollContainerRef,
 }) {
   const [open, setOpen] = useState(false);
@@ -109,7 +111,11 @@ function LeadRowActionsMenu({
           </IconButton>
         )}
         {canBlacklist && (
-          <IconButton size="sm" title="Add to blacklist" onClick={onBlacklistRecord}>
+          <IconButton
+            size="sm"
+            title={isBlacklisted ? 'Unblock' : 'Add to blacklist'}
+            onClick={isBlacklisted ? onUnblockRecord : onBlacklistRecord}
+          >
             <BlacklistIcon />
           </IconButton>
         )}
@@ -178,12 +184,13 @@ function LeadRowActionsMenu({
                   role="menuitem"
                   className={`${styles.actionMenuItem} ${styles.actionMenuItemWithIcon}`}
                   onClick={() => {
-                    onBlacklistRecord?.();
+                    if (isBlacklisted) onUnblockRecord?.();
+                    else onBlacklistRecord?.();
                     setOpen(false);
                   }}
                 >
                   <BlacklistIcon />
-                  Add to blacklist
+                  {isBlacklisted ? 'Unblock' : 'Add to blacklist'}
                 </button>
               </li>
             ) : null}
@@ -238,6 +245,7 @@ export function LeadDataTable({
   onEdit,
   onDelete,
   onBlacklist,
+  onUnblock,
   tableScrollContainerRef,
   showDialerCall = false,
   onDialerCall,
@@ -284,13 +292,22 @@ export function LeadDataTable({
     switch (col.id) {
       case 'display_name': {
         const text = c.display_name || c.first_name || c.email || '—';
+        const blacklistStatusText = String(c.blacklist_status || '').trim().toLowerCase();
+        const isBlacklistedRecord =
+          !!c.is_blacklisted_contact ||
+          (blacklistStatusText !== '' &&
+            blacklistStatusText !== 'active' &&
+            blacklistStatusText !== '0' &&
+            blacklistStatusText !== 'false');
         if (text === '—' || !displayNameLinkTo) return text;
         const to = displayNameLinkTo(c);
-        if (!to) return text;
+        if (!to) {
+          return <span className={isBlacklistedRecord ? styles.blacklistTextStrong : ''}>{text}</span>;
+        }
         return (
           <Link
             to={to}
-            className={`${styles.displayNameLink} ${c.is_blacklisted_contact ? styles.blacklistTextStrong : ''}`}
+            className={`${styles.displayNameLink} ${isBlacklistedRecord ? styles.blacklistTextStrong : ''}`}
             onClick={(e) => e.stopPropagation()}
           >
             {text}
@@ -475,9 +492,11 @@ export function LeadDataTable({
                 canUpdate={canUpdate}
                 canDelete={canDelete}
                 canBlacklist={!!onBlacklist}
+                isBlacklisted={!!c.is_blacklisted_contact}
                 onEdit={() => onEdit(c)}
                 onDelete={() => onDelete(c)}
                 onBlacklistRecord={() => onBlacklist?.(c, 'record')}
+                onUnblockRecord={() => onUnblock?.(c)}
                 scrollContainerRef={tableScrollContainerRef}
               />
             </TableCell>

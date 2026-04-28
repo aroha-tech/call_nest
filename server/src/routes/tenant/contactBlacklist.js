@@ -9,6 +9,11 @@ router.use(tenantAuthMiddleware);
 router.get('/', requirePermission(['contacts.read', 'leads.read']), contactBlacklistController.list);
 router.post('/', requirePermission(['contacts.read', 'leads.read']), contactBlacklistController.create);
 router.patch('/:id/unblock', requirePermission(['contacts.read', 'leads.read']), contactBlacklistController.unblock);
+router.patch(
+  '/contact/:contactId/unblock',
+  requirePermission(['contacts.read', 'leads.read']),
+  contactBlacklistController.unblockContact
+);
 
 export default router;
 

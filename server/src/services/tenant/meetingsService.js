@@ -6,6 +6,7 @@ import {
   deleteNativeMeetingRoom,
 } from './meetingProviderSyncService.js';
 import { createAndDispatchNotification, listUserIdsByRoles } from './notificationService.js';
+import { insertContactActivityEvent } from './contactActivityEventsService.js';
 
 function trimStr(v) {
   if (v === null || v === undefined) return null;
@@ -36,6 +37,11 @@ function parseMysqlDateTime(raw) {
   const d = new Date(String(raw).replace(' ', 'T'));
   if (Number.isNaN(d.getTime())) return null;
   return d;
+}
+
+function toMillis(value) {
+  const dt = parseMysqlDateTime(value);
+  return dt ? dt.getTime() : null;
 }
 
 function encodeUrlSafe(v) {
@@ -461,6 +467,22 @@ export async function create(tenantId, userId, payload) {
     ]
   );
   const row = await findById(tenantId, result.insertId);
+  if (row?.contact_id) {
+    await insertContactActivityEvent(tenantId, {
+      contactId: row.contact_id,
+      eventType: 'meeting_created',
+      actorUserId: userId ?? null,
+      summary: `Meeting scheduled: ${row?.title || 'Meeting'}`,
+      payloadJson: {
+        meeting_id: row?.id ?? null,
+        title: row?.title ?? null,
+        start_at: row?.start_at ?? null,
+        end_at: row?.end_at ?? null,
+        meeting_status: row?.meeting_status ?? null,
+        meeting_platform: row?.meeting_platform ?? null,
+      },
+    });
+  }
   const notifyKind = row?.meeting_status === 'cancelled' ? 'cancelled' : 'created';
   void trySendMeetingAttendeeEmail(tenantId, userId, row, notifyKind);
   const escalationRecipients = await listUserIdsByRoles(tenantId, ['admin', 'manager']);
@@ -692,8 +714,12 @@ export async function update(tenantId, userId, id, payload) {
       console.error('deleteNativeMeetingRoom(cancelled):', e?.message || e);
     }
   }
-  const notifyKind = row?.meeting_status === 'cancelled' ? 'cancelled' : 'updated';
-  void trySendMeetingAttendeeEmail(tenantId, userId, row, notifyKind);
+  const meetingDateOrTimeChanged =
+    toMillis(existing?.start_at) !== toMillis(row?.start_at) ||
+    toMillis(existing?.end_at) !== toMillis(row?.end_at);
+  if (meetingDateOrTimeChanged) {
+    void trySendMeetingAttendeeEmail(tenantId, userId, row, 'updated');
+  }
   const escalationRecipients = await listUserIdsByRoles(tenantId, ['admin', 'manager']);
   await createAndDispatchNotification(tenantId, userId, {
     moduleKey: 'meetings',

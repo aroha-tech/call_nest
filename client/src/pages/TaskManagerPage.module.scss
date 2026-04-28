@@ -271,16 +271,10 @@
   transition: width 0.35s ease;
 }
 
-.inlineNotes {
-  display: grid;
-  gap: $space-3;
-  padding-top: $space-2;
-  border-top: 1px solid var(--color-border-subtle);
-}
-
-.inlineNoteBlock {
-  display: grid;
+.taskCardActions {
+  display: flex;
   gap: $space-2;
+  flex-wrap: wrap;
 }
 
 .inlineNoteLabel {
@@ -368,6 +362,100 @@
   font-size: $font-size-sm;
   color: var(--color-text-secondary);
   line-height: 1.5;
+}
+
+.noteHistoryPanel {
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: $space-3;
+}
+
+.noteHistoryList {
+  display: grid;
+  gap: $space-2;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.noteHistoryItem {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-md;
+  background: var(--color-bg-subtle);
+  padding: $space-2;
+  display: grid;
+  gap: 6px;
+}
+
+.noteHistoryMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: $space-2;
+  flex-wrap: wrap;
+  font-size: $font-size-2xs;
+  color: var(--color-text-tertiary);
+}
+
+.noteHistoryText {
+  font-size: $font-size-sm;
+  color: var(--color-text-primary);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chatThread {
+  display: grid;
+  gap: $space-3;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 2px 2px 0;
+}
+
+.chatMessage {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+}
+
+.chatMessageOwn {
+  justify-items: end;
+}
+
+.chatSender {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  padding-inline: 2px;
+}
+
+.chatTime {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  padding-inline: 2px;
+}
+
+.chatBubble {
+  max-width: min(82%, 440px);
+  padding: 9px 12px;
+  border-radius: 14px 14px 14px 6px;
+  background: var(--color-bg-muted);
+  border: none;
+  color: var(--color-text-primary);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+
+  .chatMessageOwn & {
+    background: rgba(37, 99, 235, 0.2);
+    border-radius: 14px 14px 6px 14px;
+  }
+}
+
+.chatComposerRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: $space-2;
+  align-items: center;
 }
 
 .formGrid {

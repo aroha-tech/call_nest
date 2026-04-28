@@ -110,14 +110,41 @@ async function getScoringConfig(tenantId) {
 }
 
 function scoreFromWeights(targets, achieved, cfg) {
-  const tw = n(cfg.calls_weight) + n(cfg.meetings_weight) + n(cfg.deals_weight);
-  const cw = tw > 0 ? n(cfg.calls_weight) / tw : 0.3333;
-  const mw = tw > 0 ? n(cfg.meetings_weight) / tw : 0.3333;
-  const dw = tw > 0 ? n(cfg.deals_weight) / tw : 0.3333;
-  const cr = targets.calls > 0 ? Math.min(1, achieved.calls / targets.calls) : 1;
-  const mr = targets.meetings > 0 ? Math.min(1, achieved.meetings / targets.meetings) : 1;
-  const dr = targets.deals > 0 ? Math.min(1, achieved.deals / targets.deals) : 1;
-  return Number(((cr * cw + mr * mw + dr * dw) * 100).toFixed(2));
+  const callsWeight = Math.max(0, n(cfg.calls_weight));
+  const meetingsWeight = Math.max(0, n(cfg.meetings_weight));
+  const dealsWeight = Math.max(0, n(cfg.deals_weight));
+  const weightedParts = [];
+
+  if (n(targets.calls) > 0) {
+    weightedParts.push({
+      weight: callsWeight,
+      ratio: Math.min(1, n(achieved.calls) / Math.max(1, n(targets.calls))),
+    });
+  }
+  if (n(targets.meetings) > 0) {
+    weightedParts.push({
+      weight: meetingsWeight,
+      ratio: Math.min(1, n(achieved.meetings) / Math.max(1, n(targets.meetings))),
+    });
+  }
+  if (n(targets.deals) > 0) {
+    weightedParts.push({
+      weight: dealsWeight,
+      ratio: Math.min(1, n(achieved.deals) / Math.max(1, n(targets.deals))),
+    });
+  }
+
+  if (weightedParts.length === 0) return 0;
+
+  let totalWeight = weightedParts.reduce((sum, part) => sum + part.weight, 0);
+  if (totalWeight <= 0) totalWeight = weightedParts.length;
+
+  const weightedScore = weightedParts.reduce((sum, part) => {
+    const normalizedWeight = part.weight > 0 ? part.weight / totalWeight : 1 / totalWeight;
+    return sum + part.ratio * normalizedWeight;
+  }, 0);
+
+  return Number((weightedScore * 100).toFixed(2));
 }
 
 function completionPercent(targets, achieved) {
@@ -465,6 +492,26 @@ export async function createAssignment(tenantId, actingUser, payload) {
   const targetCalls = taskType === 'call' || taskType === 'todo' ? inputCalls : 0;
   const targetMeetings = taskType === 'meeting' || taskType === 'todo' ? inputMeetings : 0;
   const targetDeals = taskType === 'deal' || taskType === 'todo' ? inputDeals : 0;
+  if (taskType === 'meeting' && targetMeetings <= 0) {
+    const err = new Error('target_meetings must be greater than 0 for meeting tasks');
+    err.status = 400;
+    throw err;
+  }
+  if (taskType === 'call' && targetCalls <= 0) {
+    const err = new Error('target_calls must be greater than 0 for call tasks');
+    err.status = 400;
+    throw err;
+  }
+  if (taskType === 'deal' && targetDeals <= 0) {
+    const err = new Error('target_deals must be greater than 0 for deal tasks');
+    err.status = 400;
+    throw err;
+  }
+  if (taskType === 'todo' && targetCalls <= 0 && targetMeetings <= 0 && targetDeals <= 0) {
+    const err = new Error('At least one target must be greater than 0');
+    err.status = 400;
+    throw err;
+  }
 
   const result = await query(
     `INSERT INTO task_assignments (
@@ -999,7 +1046,7 @@ export async function listNoteHistory(tenantId, actingUser, logId) {
     return [];
   }
   const rows = await query(
-    `SELECT h.id, h.note_type, h.note_text, h.created_at, u.name AS author_name
+    `SELECT h.id, h.note_type, h.note_text, h.created_at, h.created_by, u.name AS author_name, u.role AS author_role
      FROM task_note_history h
      LEFT JOIN users u ON u.id = h.created_by AND u.tenant_id = h.tenant_id
      WHERE h.tenant_id = ? AND h.daily_task_log_id = ? AND h.deleted_at IS NULL
@@ -1075,7 +1122,7 @@ export async function listAssignmentComments(tenantId, actingUser, assignmentId)
     return [];
   }
   return query(
-    `SELECT c.id, c.comment_text, c.created_at, u.name AS author_name
+    `SELECT c.id, c.comment_text, c.created_at, c.created_by, u.name AS author_name, u.role AS author_role
      FROM task_assignment_comments c
      LEFT JOIN users u ON u.id = c.created_by AND u.tenant_id = c.tenant_id
      WHERE c.tenant_id = ? AND c.assignment_id = ? AND c.deleted_at IS NULL

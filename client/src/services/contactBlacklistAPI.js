@@ -16,5 +16,7 @@ export const contactBlacklistAPI = {
   add: (payload) => axiosInstance.post(BASE, payload),
 
   unblock: (id) => axiosInstance.patch(`${BASE}/${id}/unblock`),
+
+  unblockByContact: (contactId) => axiosInstance.patch(`${BASE}/contact/${contactId}/unblock`),
 };
 

@@ -1246,6 +1246,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
   const updateMutation = useMutation((id, payload) => contactsAPI.update(id, payload));
   const deleteMutation = useMutation((id) => contactsAPI.remove(id, { deleted_source: 'manual' }));
   const blacklistMutation = useMutation((payload) => contactBlacklistAPI.add(payload));
+  const unblockMutation = useMutation((contactId) => contactBlacklistAPI.unblockByContact(contactId));
   const bulkDeleteMutation = useMutation((ids) => contactsAPI.removeBulk(ids, { deleted_source: 'manual' }));
   const assignMutation = useMutation((body) => contactsAPI.assign(body));
 
@@ -1390,41 +1391,36 @@ export function ContactsPage({ type, mode = 'crm' }) {
     [type]
   );
 
-  // Dialer: defaults for standalone setup page
+  // Dialer: defaults for standalone setup page (loaded on demand)
   const [dialingSets, setDialingSets] = useState([]);
   const [callScripts, setCallScripts] = useState([]);
   const [dialerDefaults, setDialerDefaults] = useState(null);
+  const [dialerSetupLoaded, setDialerSetupLoaded] = useState(false);
 
-  useEffect(() => {
-    if (!isDialer) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [dsRes, csRes, prefRes] = await Promise.all([
-          dialingSetsAPI.getAll(true),
-          callScriptsAPI.getAll({ includeInactive: false, page: 1, limit: 200 }),
-          dialerPreferencesAPI.get(),
-        ]);
-        if (cancelled) return;
-        setDialingSets(dsRes?.data?.data ?? []);
-        setCallScripts(csRes?.data?.data ?? []);
-        setDialerDefaults(prefRes?.data?.data ?? null);
-      } catch {
-        if (!cancelled) {
-          setDialingSets([]);
-          setCallScripts([]);
-          setDialerDefaults(null);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isDialer]);
+  const ensureDialerSetupLoaded = useCallback(async () => {
+    if (!isDialer || dialerSetupLoaded) return;
+    try {
+      const [dsRes, csRes, prefRes] = await Promise.all([
+        dialingSetsAPI.getAll(true),
+        callScriptsAPI.getAll({ includeInactive: false, page: 1, limit: 200 }),
+        dialerPreferencesAPI.get(),
+      ]);
+      setDialingSets(dsRes?.data?.data ?? []);
+      setCallScripts(csRes?.data?.data ?? []);
+      setDialerDefaults(prefRes?.data?.data ?? null);
+      setDialerSetupLoaded(true);
+    } catch {
+      setDialingSets([]);
+      setCallScripts([]);
+      setDialerDefaults(null);
+      setDialerSetupLoaded(true);
+    }
+  }, [isDialer, dialerSetupLoaded]);
 
   const openStartModal = useCallback(
-    (idsToUse) => {
+    async (idsToUse) => {
       if (!isDialer) return;
+      await ensureDialerSetupLoaded();
       const ids = Array.isArray(idsToUse) && idsToUse.length > 0 ? idsToUse : [...selectedIds];
       if (!ids.length) return;
 
@@ -1448,7 +1444,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
         },
       });
     },
-    [isDialer, dialerDefaults, dialingSets, callScripts, selectedIds, navigate, clearSelection]
+    [isDialer, ensureDialerSetupLoaded, dialerDefaults, dialingSets, callScripts, selectedIds, navigate, clearSelection]
   );
 
   const toggleSelect = (id) => {
@@ -2021,6 +2017,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
                 onEdit={(c) => navigate(`/leads/${c.id}?mode=edit`)}
                 onDelete={setDeleteItem}
                 onBlacklist={(c) => setBlacklistItem({ row: c })}
+                onUnblock={(c) => setBlacklistItem({ row: c, unblock: true })}
                 showDialerCall={isDialer}
                 onDialerCall={(c) => openStartModal([c.id])}
                 displayNameLinkTo={(c) => `/leads/${c.id}?mode=view`}
@@ -2048,6 +2045,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
                 onEdit={(c) => navigate(`/contacts/${c.id}?mode=edit`)}
                 onDelete={setDeleteItem}
                 onBlacklist={(c) => setBlacklistItem({ row: c })}
+                onUnblock={(c) => setBlacklistItem({ row: c, unblock: true })}
                 displayNameLinkTo={(c) => `/contacts/${c.id}?mode=view`}
               />
             )}
@@ -2094,6 +2092,14 @@ export function ContactsPage({ type, mode = 'crm' }) {
         onConfirm={async () => {
           if (!blacklistItem?.row) return;
           const row = blacklistItem.row;
+          if (blacklistItem.unblock) {
+            const result = await unblockMutation.mutate(row.id);
+            if (result?.success) {
+              setBlacklistItem(null);
+              refetch();
+            }
+            return;
+          }
           const scope = row.type === 'lead' ? 'lead' : 'contact';
           const payload = {
             block_scope: scope,
@@ -2106,12 +2112,18 @@ export function ContactsPage({ type, mode = 'crm' }) {
             refetch();
           }
         }}
-        title={`Blacklist ${type === 'lead' ? 'Lead' : 'Contact'}`}
-        message={
-          `Add "${blacklistItem?.row?.display_name || blacklistItem?.row?.email || 'this record'}" to blacklist?`
+        title={
+          blacklistItem?.unblock
+            ? `Unblock ${type === 'lead' ? 'Lead' : 'Contact'}`
+            : `Blacklist ${type === 'lead' ? 'Lead' : 'Contact'}`
         }
-        confirmText="Add to blacklist"
-        loading={blacklistMutation.loading}
+        message={
+          blacklistItem?.unblock
+            ? `Unblock "${blacklistItem?.row?.display_name || blacklistItem?.row?.email || 'this record'}"?`
+            : `Add "${blacklistItem?.row?.display_name || blacklistItem?.row?.email || 'this record'}" to blacklist?`
+        }
+        confirmText={blacklistItem?.unblock ? 'Unblock' : 'Add to blacklist'}
+        loading={blacklistMutation.loading || unblockMutation.loading}
       />
 
       <ConfirmModal

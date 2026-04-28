@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppSelector } from '../../app/hooks';
-import { selectUser } from '../../features/auth/authSelectors';
 import { usePermissions } from '../../hooks/usePermission';
 import { callsAPI } from '../../services/callsAPI';
 import { Alert } from '../../components/ui/Alert';
@@ -9,6 +7,7 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { Button } from '../../components/ui/Button';
 import { MaterialSymbol } from '../../components/ui/MaterialSymbol';
 import { formatDateTimeDisplay, formatRelativeTimeShort } from '../../utils/dateTimeDisplay';
+import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 import styles from './ContactCallHistorySection.module.scss';
 import { buildAttemptHistoryEntries } from '../../utils/callAttemptNotesDisplay';
 
@@ -52,8 +51,7 @@ function attemptStatusPresentation(status, isConnected) {
  */
 export function ContactCallHistorySection({ contactId }) {
   const navigate = useNavigate();
-  const user = useAppSelector(selectUser);
-  const dtMode = user?.datetimeDisplayMode ?? 'ist_fixed';
+  const { datetimeDisplayMode, datetimePreferences } = useDateTimeDisplay();
   const { canAny } = usePermissions();
   const canView = canAny(['dial.execute', 'dial.monitor']);
 
@@ -341,7 +339,7 @@ export function ContactCallHistorySection({ contactId }) {
                             <div className={styles.detailText}>
                               <span className={styles.rowTitle}>{outcomeTitle}</span>
                               <span className={styles.rowSubtitle}>{subtitle}</span>
-                              <span className={styles.whenMobile} title={formatDateTimeDisplay(whenIso, dtMode)}>
+                                <span className={styles.whenMobile} title={formatDateTimeDisplay(whenIso, datetimeDisplayMode, datetimePreferences)}>
                                 {formatRelativeTimeShort(whenIso)}
                               </span>
                             </div>
@@ -371,7 +369,7 @@ export function ContactCallHistorySection({ contactId }) {
                           <time
                             className={styles.when}
                             dateTime={whenIso || undefined}
-                            title={formatDateTimeDisplay(whenIso, dtMode)}
+                            title={formatDateTimeDisplay(whenIso, datetimeDisplayMode, datetimePreferences)}
                           >
                             {formatRelativeTimeShort(whenIso)}
                           </time>
@@ -390,7 +388,7 @@ export function ContactCallHistorySection({ contactId }) {
                                       <time
                                         className={styles.noteWhen}
                                         dateTime={nWhen || undefined}
-                                        title={formatDateTimeDisplay(nWhen, dtMode)}
+                                        title={formatDateTimeDisplay(nWhen, datetimeDisplayMode, datetimePreferences)}
                                       >
                                         {formatRelativeTimeShort(nWhen)}
                                       </time>

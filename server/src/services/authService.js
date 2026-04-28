@@ -12,6 +12,35 @@ import { themeForJwt, defaultTenantThemeJsonString } from '../utils/tenantTheme.
 import { safeLogPlatformActivity } from './superAdmin/platformActivityLogService.js';
 import { safeLogTenantActivity } from './tenant/tenantActivityLogService.js';
 
+const DATETIME_DISPLAY_MODES = new Set(['ist_fixed', 'browser_local']);
+const DATETIME_DATE_FORMATS = new Set([
+  'DD-MM-YYYY',
+  'DD/MM/YYYY',
+  'MM-DD-YYYY',
+  'MM/DD/YYYY',
+  'YYYY-MM-DD',
+]);
+const DATETIME_TIME_FORMATS = new Set([
+  '12h_with_seconds',
+  '12h',
+  '24h_with_seconds',
+  '24h',
+]);
+const DEFAULT_DATETIME_TIMEZONE = 'Asia/Kolkata';
+const DEFAULT_DATETIME_DATE_FORMAT = 'DD-MM-YYYY';
+const DEFAULT_DATETIME_TIME_FORMAT = '12h_with_seconds';
+
+function normalizeIanaTimezone(input) {
+  const tz = input == null ? '' : String(input).trim();
+  if (!tz) return DEFAULT_DATETIME_TIMEZONE;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz }).format(new Date());
+    return tz;
+  } catch {
+    return null;
+  }
+}
+
 function ttlFromString(expiresIn) {
   if (typeof expiresIn !== 'string') {
     return 15 * 60;
@@ -259,7 +288,10 @@ export async function login(email, password, hostContext = {}) {
   const [user] = await query(
     `SELECT id, tenant_id, email, password_hash, name, role, role_id, is_enabled, is_platform_admin, token_version,
             manager_id,
-            COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode
+            COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode,
+            COALESCE(datetime_timezone, 'Asia/Kolkata') AS datetime_timezone,
+            COALESCE(datetime_date_format, 'DD-MM-YYYY') AS datetime_date_format,
+            COALESCE(datetime_time_format, '12h_with_seconds') AS datetime_time_format
      FROM users 
      WHERE email = ? AND is_deleted = 0`,
     [email]
@@ -359,6 +391,9 @@ export async function login(email, password, hostContext = {}) {
       permissions,
       token_version: tokenVersion,
       datetime_display_mode: user.datetime_display_mode ?? 'ist_fixed',
+      datetime_timezone: user.datetime_timezone ?? DEFAULT_DATETIME_TIMEZONE,
+      datetime_date_format: user.datetime_date_format ?? DEFAULT_DATETIME_DATE_FORMAT,
+      datetime_time_format: user.datetime_time_format ?? DEFAULT_DATETIME_TIME_FORMAT,
       ...managerBranding,
       ...tenantBranding,
     },
@@ -521,7 +556,10 @@ export async function refreshAccessToken(refreshToken) {
   const [user] = await query(
     `SELECT id, tenant_id, email, name, role, role_id, is_enabled, is_platform_admin, token_version,
             manager_id,
-            COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode
+            COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode,
+            COALESCE(datetime_timezone, 'Asia/Kolkata') AS datetime_timezone,
+            COALESCE(datetime_date_format, 'DD-MM-YYYY') AS datetime_date_format,
+            COALESCE(datetime_time_format, '12h_with_seconds') AS datetime_time_format
      FROM users
      WHERE id = ? AND is_deleted = 0`,
     [userId]
@@ -556,6 +594,9 @@ export async function refreshAccessToken(refreshToken) {
       permissions,
       token_version: tokenVersion,
       datetime_display_mode: user.datetime_display_mode ?? 'ist_fixed',
+      datetime_timezone: user.datetime_timezone ?? DEFAULT_DATETIME_TIMEZONE,
+      datetime_date_format: user.datetime_date_format ?? DEFAULT_DATETIME_DATE_FORMAT,
+      datetime_time_format: user.datetime_time_format ?? DEFAULT_DATETIME_TIME_FORMAT,
       ...managerBranding,
       ...tenantBranding,
     },
@@ -664,9 +705,27 @@ export async function revokeAllUserTokens(tenantId, userId) {
  * Returns a new access token so the client can refresh JWT claims without re-login.
  */
 export async function updateProfile(userId, payload) {
-  const { name, currentPassword, newPassword, datetimeDisplayMode, datetime_display_mode } = payload;
+  const {
+    name,
+    currentPassword,
+    newPassword,
+    datetimeDisplayMode,
+    datetime_display_mode,
+    datetimeTimezone,
+    datetime_timezone,
+    datetimeDateFormat,
+    datetime_date_format,
+    datetimeTimeFormat,
+    datetime_time_format,
+  } = payload;
   const modeInput =
     datetimeDisplayMode !== undefined ? datetimeDisplayMode : datetime_display_mode;
+  const timezoneInput =
+    datetimeTimezone !== undefined ? datetimeTimezone : datetime_timezone;
+  const dateFormatInput =
+    datetimeDateFormat !== undefined ? datetimeDateFormat : datetime_date_format;
+  const timeFormatInput =
+    datetimeTimeFormat !== undefined ? datetimeTimeFormat : datetime_time_format;
 
   const wantsPasswordChange =
     newPassword !== undefined &&
@@ -675,7 +734,13 @@ export async function updateProfile(userId, payload) {
 
   const hasDatetimeField =
     Object.prototype.hasOwnProperty.call(payload, 'datetimeDisplayMode') ||
-    Object.prototype.hasOwnProperty.call(payload, 'datetime_display_mode');
+    Object.prototype.hasOwnProperty.call(payload, 'datetime_display_mode') ||
+    Object.prototype.hasOwnProperty.call(payload, 'datetimeTimezone') ||
+    Object.prototype.hasOwnProperty.call(payload, 'datetime_timezone') ||
+    Object.prototype.hasOwnProperty.call(payload, 'datetimeDateFormat') ||
+    Object.prototype.hasOwnProperty.call(payload, 'datetime_date_format') ||
+    Object.prototype.hasOwnProperty.call(payload, 'datetimeTimeFormat') ||
+    Object.prototype.hasOwnProperty.call(payload, 'datetime_time_format');
 
   if (name === undefined && !wantsPasswordChange && !hasDatetimeField) {
     const err = new Error('No fields to update');
@@ -686,7 +751,10 @@ export async function updateProfile(userId, payload) {
   const [user] = await query(
     `SELECT id, tenant_id, email, name, password_hash, role, role_id, is_enabled, is_platform_admin, token_version,
             manager_id,
-            COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode
+            COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode,
+            COALESCE(datetime_timezone, 'Asia/Kolkata') AS datetime_timezone,
+            COALESCE(datetime_date_format, 'DD-MM-YYYY') AS datetime_date_format,
+            COALESCE(datetime_time_format, '12h_with_seconds') AS datetime_time_format
      FROM users WHERE id = ? AND is_deleted = 0`,
     [userId]
   );
@@ -748,16 +816,52 @@ export async function updateProfile(userId, payload) {
   }
 
   if (hasDatetimeField) {
-    const raw = modeInput === undefined || modeInput === null ? '' : String(modeInput).trim();
-    if (raw !== 'ist_fixed' && raw !== 'browser_local') {
+    const rawMode = modeInput === undefined || modeInput === null ? '' : String(modeInput).trim();
+    if (rawMode && !DATETIME_DISPLAY_MODES.has(rawMode)) {
       const err = new Error('datetimeDisplayMode must be ist_fixed or browser_local');
       err.status = 400;
       throw err;
     }
+    const rawTimezone = timezoneInput === undefined || timezoneInput === null ? '' : String(timezoneInput).trim();
+    const tz = rawTimezone ? normalizeIanaTimezone(rawTimezone) : user.datetime_timezone;
+    if (tz == null) {
+      const err = new Error('datetimeTimezone must be a valid IANA timezone');
+      err.status = 400;
+      throw err;
+    }
+    const rawDateFormat = dateFormatInput === undefined || dateFormatInput === null ? '' : String(dateFormatInput).trim();
+    if (rawDateFormat && !DATETIME_DATE_FORMATS.has(rawDateFormat)) {
+      const err = new Error('datetimeDateFormat is invalid');
+      err.status = 400;
+      throw err;
+    }
+    const rawTimeFormat = timeFormatInput === undefined || timeFormatInput === null ? '' : String(timeFormatInput).trim();
+    if (rawTimeFormat && !DATETIME_TIME_FORMATS.has(rawTimeFormat)) {
+      const err = new Error('datetimeTimeFormat is invalid');
+      err.status = 400;
+      throw err;
+    }
+
     const prev = user.datetime_display_mode ?? 'ist_fixed';
-    if (raw !== prev) {
+    const nextMode = rawMode || prev;
+    if (nextMode !== prev) {
       updates.push('datetime_display_mode = ?');
-      params.push(raw);
+      params.push(nextMode);
+    }
+    const prevTz = user.datetime_timezone ?? DEFAULT_DATETIME_TIMEZONE;
+    if (tz && tz !== prevTz) {
+      updates.push('datetime_timezone = ?');
+      params.push(tz);
+    }
+    const nextDateFormat = rawDateFormat || user.datetime_date_format || DEFAULT_DATETIME_DATE_FORMAT;
+    if (nextDateFormat !== (user.datetime_date_format || DEFAULT_DATETIME_DATE_FORMAT)) {
+      updates.push('datetime_date_format = ?');
+      params.push(nextDateFormat);
+    }
+    const nextTimeFormat = rawTimeFormat || user.datetime_time_format || DEFAULT_DATETIME_TIME_FORMAT;
+    if (nextTimeFormat !== (user.datetime_time_format || DEFAULT_DATETIME_TIME_FORMAT)) {
+      updates.push('datetime_time_format = ?');
+      params.push(nextTimeFormat);
     }
   }
 
@@ -790,7 +894,10 @@ export async function updateProfile(userId, payload) {
   const [updated] = await query(
     `SELECT id, tenant_id, email, name, role, role_id, is_enabled, is_platform_admin, token_version,
             manager_id,
-            COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode
+            COALESCE(datetime_display_mode, 'ist_fixed') AS datetime_display_mode,
+            COALESCE(datetime_timezone, 'Asia/Kolkata') AS datetime_timezone,
+            COALESCE(datetime_date_format, 'DD-MM-YYYY') AS datetime_date_format,
+            COALESCE(datetime_time_format, '12h_with_seconds') AS datetime_time_format
      FROM users WHERE id = ? AND is_deleted = 0`,
     [userId]
   );
@@ -815,6 +922,9 @@ export async function updateProfile(userId, payload) {
       permissions,
       token_version: tokenVersion,
       datetime_display_mode: updated.datetime_display_mode ?? 'ist_fixed',
+      datetime_timezone: updated.datetime_timezone ?? DEFAULT_DATETIME_TIMEZONE,
+      datetime_date_format: updated.datetime_date_format ?? DEFAULT_DATETIME_DATE_FORMAT,
+      datetime_time_format: updated.datetime_time_format ?? DEFAULT_DATETIME_TIME_FORMAT,
       ...managerBranding,
       ...tenantBranding,
     },

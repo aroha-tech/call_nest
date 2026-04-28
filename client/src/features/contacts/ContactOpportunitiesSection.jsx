@@ -12,6 +12,7 @@ import { opportunitiesAPI } from '../../services/opportunitiesAPI';
 import { dealsAPI } from '../../services/dealsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
 import { campaignsAPI } from '../../services/campaignsAPI';
+import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 import { hasAnyPermission, PERMISSIONS } from '../../utils/permissionUtils';
 import styles from './ContactOpportunitiesSection.module.scss';
 
@@ -34,7 +35,7 @@ const LEAD_SOURCE_OPTIONS = [
   { value: 'Other', label: 'Other' },
 ];
 
-function formatIsoDate(d) {
+function toDateInputValue(d) {
   if (d == null || d === '') return '';
   const s = typeof d === 'string' ? d.slice(0, 10) : '';
   return s || '';
@@ -45,6 +46,7 @@ function formatIsoDate(d) {
  */
 export function ContactOpportunitiesSection({ contactId, contactType, accountName = '' }) {
   const user = useAppSelector(selectUser);
+  const { formatDate } = useDateTimeDisplay();
   const perms = user?.permissions ?? [];
 
   const canRead = hasAnyPermission(user, [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ], perms);
@@ -233,7 +235,7 @@ export function ContactOpportunitiesSection({ contactId, contactType, accountNam
       title: r.title || '',
       amount: r.amount != null ? String(r.amount) : '',
       ownerId: r.owner_id != null ? String(r.owner_id) : user?.id ? String(user.id) : '',
-      closingDate: formatIsoDate(r.closing_date),
+      closingDate: toDateInputValue(r.closing_date),
       probabilityPercent:
         r.probability_percent != null && r.probability_percent !== '' ? String(r.probability_percent) : '',
       expectedRevenue: r.expected_revenue != null ? String(r.expected_revenue) : '',
@@ -367,7 +369,7 @@ export function ContactOpportunitiesSection({ contactId, contactType, accountNam
                   {r.effective_probability != null ? `${Number(r.effective_probability)}%` : ''}
                   {r.amount != null ? ` · ₹ ${Number(r.amount).toLocaleString()}` : ''}
                   {r.expected_revenue != null ? ` · Exp. ₹ ${Number(r.expected_revenue).toLocaleString()}` : ''}
-                  {r.closing_date ? ` · Close ${formatIsoDate(r.closing_date)}` : ''}
+                  {r.closing_date ? ` · Close ${formatDate(r.closing_date)}` : ''}
                   {r.owner_name ? ` · ${r.owner_name}` : ''}
                   {r.campaign_name ? ` · ${r.campaign_name}` : ''}
                 </div>

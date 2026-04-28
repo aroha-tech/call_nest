@@ -17,7 +17,7 @@ import {
   TIME_RANGE_PRESET_OPTIONS,
   computeDashboardInclusiveDates,
 } from '../utils/dateRangePresets';
-import { formatDateTimeDisplay, formatTimeDisplay } from '../utils/dateTimeDisplay';
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import {
   ActivityFeedTable,
   ActivityFullHistoryLink,
@@ -61,8 +61,8 @@ function formatDurationSec(sec) {
   return `${(s / 60).toFixed(1)}m`;
 }
 
-function formatMeetingSlot(startAt, mode) {
-  return formatTimeDisplay(startAt, mode);
+function formatMeetingSlot(startAt, formatTime) {
+  return formatTime(startAt);
 }
 
 function contactPath(row) {
@@ -131,9 +131,9 @@ export function TenantDashboardPage() {
   const [rangeMenuOpen, setRangeMenuOpen] = useState(false);
   const rangeWrapRef = useRef(null);
   const [nowTs, setNowTs] = useState(Date.now());
+  const { formatDateTime, formatTime, datetimeDisplayMode, datetimePreferences } = useDateTimeDisplay();
 
   const role = user?.role ?? 'agent';
-  const dtMode = user?.datetimeDisplayMode ?? 'ist_fixed';
   const canCallHistory = canAny([PERMISSIONS.DIAL_EXECUTE, PERMISSIONS.DIAL_MONITOR]);
 
   useEffect(() => {
@@ -550,7 +550,7 @@ export function TenantDashboardPage() {
                         return (
                           <li key={m.id} className={`${styles.meetingRow} ${styles.dashboardSlotRow}`}>
                             <span className={`${styles.meetingTime} ${styles.upcomingTimeBadge}`}>
-                              {formatMeetingSlot(m.start_at, dtMode)}
+                              {formatMeetingSlot(m.start_at, formatTime)}
                             </span>
                             <div className={styles.meetingBody}>
                               <p className={styles.meetingTitle}>{m.title || 'Meeting'}</p>
@@ -645,7 +645,7 @@ export function TenantDashboardPage() {
                       return (
                         <li key={row.id} className={`${styles.meetingRow} ${styles.dashboardSlotRow}`}>
                           <span className={styles.meetingTime}>
-                            {formatDateTimeDisplay(row.started_at, dtMode)}
+                            {formatDateTime(row.started_at)}
                           </span>
                           <div className={styles.meetingBody}>
                             <p className={styles.meetingTitle}>
@@ -763,7 +763,7 @@ export function TenantDashboardPage() {
                                     <br />
                                   </>
                                 ) : null}
-                                {formatMeetingSlot(cb.scheduled_at, dtMode)}
+                                {formatMeetingSlot(cb.scheduled_at, formatTime)}
                               </span>
                               <div className={styles.meetingBody}>
                                 <p className={styles.meetingTitle}>
@@ -964,7 +964,8 @@ export function TenantDashboardPage() {
             <ActivityFeedTable
               rows={activityFeedFiltered.slice(0, DASHBOARD_ACTIVITY_PREVIEW_LIMIT)}
               tableStyles={styles}
-              dtMode={dtMode}
+              dtMode={datetimeDisplayMode}
+              dtPreferences={datetimePreferences}
               navigate={navigate}
             />
           )}

@@ -1,5 +1,6 @@
 import { query } from '../../config/db.js';
 import { getCreatedByUserIdsForScope } from './userMessageScopeService.js';
+import { insertContactActivityEvent } from './contactActivityEventsService.js';
 
 function clampInt(v, { min = 1, max = 100, fallback = 20 } = {}) {
   const n = Number(v);
@@ -245,7 +246,23 @@ export async function createCallback(tenantId, user, payload) {
       user?.id ?? null,
     ]
   );
-  return findCallbackById(tenantId, result.insertId);
+  const row = await findCallbackById(tenantId, result.insertId);
+  if (row?.contact_id) {
+    await insertContactActivityEvent(tenantId, {
+      contactId: row.contact_id,
+      eventType: 'callback_created',
+      actorUserId: user?.id ?? null,
+      summary: `Callback scheduled for ${row?.scheduled_at || 'selected time'}`,
+      payloadJson: {
+        callback_id: row?.id ?? null,
+        scheduled_at: row?.scheduled_at ?? null,
+        status: row?.status ?? null,
+        assigned_user_id: row?.assigned_user_id ?? null,
+        notes: row?.notes ?? null,
+      },
+    });
+  }
+  return row;
 }
 
 export async function updateCallback(tenantId, user, id, payload) {
@@ -320,7 +337,25 @@ export async function updateCallback(tenantId, user, id, payload) {
     params
   );
 
-  return findCallbackById(tenantId, id);
+  const row = await findCallbackById(tenantId, id);
+  if (row?.contact_id) {
+    await insertContactActivityEvent(tenantId, {
+      contactId: row.contact_id,
+      eventType: 'callback_updated',
+      actorUserId: user?.id ?? null,
+      summary: `Callback ${row?.status || 'updated'}`,
+      payloadJson: {
+        callback_id: row?.id ?? null,
+        scheduled_at: row?.scheduled_at ?? null,
+        status: row?.status ?? null,
+        assigned_user_id: row?.assigned_user_id ?? null,
+        notes: row?.notes ?? null,
+        outcome_notes: row?.outcome_notes ?? null,
+        completed_at: row?.completed_at ?? null,
+      },
+    });
+  }
+  return row;
 }
 
 export async function removeCallback(tenantId, user, id) {

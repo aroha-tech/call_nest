@@ -1,11 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../app/hooks';
 import { selectUser, selectTenant, selectRefreshToken } from '../features/auth/authSelectors';
 import { setTokens } from '../features/auth/authSlice';
 import { userAndTenantFromToken } from '../features/auth/utils/jwtUtils';
 import { getUserDisplayName, getUserInitials, getManagerDisplayLabel } from '../features/auth/utils/userDisplay';
 import { updateProfile as updateProfileAPI } from '../features/auth/authAPI';
-import { DATETIME_DISPLAY_BROWSER, DATETIME_DISPLAY_IST } from '../utils/dateTimeDisplay';
+import {
+  DATETIME_DISPLAY_BROWSER,
+  DATETIME_DISPLAY_IST,
+  COMMON_TIMEZONE_OPTIONS,
+  DATE_FORMAT_OPTIONS,
+  TIME_FORMAT_OPTIONS,
+  DEFAULT_DATETIME_TIMEZONE,
+  DEFAULT_DATE_FORMAT,
+  DEFAULT_TIME_FORMAT,
+} from '../utils/dateTimeDisplay';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -52,6 +61,9 @@ export function ProfilePage() {
   const [apiError, setApiError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [datetimeDisplayMode, setDatetimeDisplayMode] = useState(DATETIME_DISPLAY_IST);
+  const [datetimeTimezone, setDatetimeTimezone] = useState(DEFAULT_DATETIME_TIMEZONE);
+  const [datetimeDateFormat, setDatetimeDateFormat] = useState(DEFAULT_DATE_FORMAT);
+  const [datetimeTimeFormat, setDatetimeTimeFormat] = useState(DEFAULT_TIME_FORMAT);
 
   useEffect(() => {
     if (!user) return;
@@ -59,9 +71,12 @@ export function ProfilePage() {
     setDatetimeDisplayMode(
       user.datetimeDisplayMode === DATETIME_DISPLAY_BROWSER ? DATETIME_DISPLAY_BROWSER : DATETIME_DISPLAY_IST
     );
+    setDatetimeTimezone(user.datetimeTimezone || DEFAULT_DATETIME_TIMEZONE);
+    setDatetimeDateFormat(user.datetimeDateFormat || DEFAULT_DATE_FORMAT);
+    setDatetimeTimeFormat(user.datetimeTimeFormat || DEFAULT_TIME_FORMAT);
     setFieldErrors({});
     setApiError(null);
-  }, [user?.id, user?.name, user?.datetimeDisplayMode]);
+  }, [user?.id, user?.name, user?.datetimeDisplayMode, user?.datetimeTimezone, user?.datetimeDateFormat, user?.datetimeTimeFormat]);
 
   useEffect(() => {
     if (!user) return;
@@ -70,6 +85,13 @@ export function ProfilePage() {
   }, [user?.id]);
 
   if (!user) return null;
+
+  const timezoneOptions = useMemo(() => {
+    if (COMMON_TIMEZONE_OPTIONS.some((o) => o.value === datetimeTimezone)) {
+      return COMMON_TIMEZONE_OPTIONS;
+    }
+    return [{ value: datetimeTimezone, label: datetimeTimezone }, ...COMMON_TIMEZONE_OPTIONS];
+  }, [datetimeTimezone]);
 
   const previewUser = { ...user, name: name.trim() || null };
   const displayName = getUserDisplayName(previewUser);
@@ -126,6 +148,9 @@ export function ProfilePage() {
       const payload = {
         name: name.trim() || null,
         datetimeDisplayMode,
+        datetimeTimezone,
+        datetimeDateFormat,
+        datetimeTimeFormat,
       };
       if (attemptingPasswordChange && newPassword.trim()) {
         payload.currentPassword = currentPassword;
@@ -279,16 +304,37 @@ export function ProfilePage() {
                 options={[
                   {
                     value: DATETIME_DISPLAY_IST,
-                    label: 'India (IST) — DD/MM/YYYY, 12-hour with seconds',
+                    label: 'Use my selected timezone + format',
                   },
                   {
                     value: DATETIME_DISPLAY_BROWSER,
-                    label: 'This device — use my system timezone and formats',
+                    label: 'This device timezone (browser local) + my selected format',
                   },
                 ]}
               />
+              <Select
+                id="profile-datetime-timezone"
+                label="Timezone"
+                value={datetimeTimezone}
+                onChange={(e) => setDatetimeTimezone(e.target.value)}
+                options={timezoneOptions}
+              />
+              <Select
+                id="profile-date-format"
+                label="Date format"
+                value={datetimeDateFormat}
+                onChange={(e) => setDatetimeDateFormat(e.target.value)}
+                options={DATE_FORMAT_OPTIONS}
+              />
+              <Select
+                id="profile-time-format"
+                label="Time format"
+                value={datetimeTimeFormat}
+                onChange={(e) => setDatetimeTimeFormat(e.target.value)}
+                options={TIME_FORMAT_OPTIONS}
+              />
               <p className={styles.fieldHint}>
-                Applies to lists and details across the app. Default is India (IST).
+                Applies to lists and details across the app. In browser-local mode, timezone comes from your device while date/time format still follows these selections.
               </p>
 
               {!passwordFlowOpen && (

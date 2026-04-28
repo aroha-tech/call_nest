@@ -16,6 +16,7 @@ import { dealsAPI } from '../services/dealsAPI';
 import { opportunitiesAPI } from '../services/opportunitiesAPI';
 import { contactsAPI } from '../services/contactsAPI';
 import { tenantUsersAPI } from '../services/tenantUsersAPI';
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import { useToast } from '../context/ToastContext';
 import styles from './DealsPage.module.scss';
 
@@ -98,6 +99,7 @@ function moveOppBetweenColumns(prev, oppId, fromStageId, toStageId) {
 
 export function DealsPage() {
   const user = useAppSelector(selectUser);
+  const { formatDate } = useDateTimeDisplay();
   const { showToast } = useToast();
   const [tab, setTab] = useState('setup');
   const [deals, setDeals] = useState([]);
@@ -735,7 +737,7 @@ export function DealsPage() {
                           <div className={styles.oppMeta}>Exp. ₹ {Number(o.expected_revenue).toLocaleString()}</div>
                         ) : null}
                         {o.closing_date ? (
-                          <div className={styles.oppMeta}>Close {String(o.closing_date).slice(0, 10)}</div>
+                          <div className={styles.oppMeta}>Close {formatDate(o.closing_date)}</div>
                         ) : null}
                         {o.owner_name ? <div className={styles.oppMeta}>{o.owner_name}</div> : null}
                       </Link>

@@ -183,7 +183,7 @@ function meetingChipStatusClass(meeting) {
 }
 
 export function MeetingsPage() {
-  const { formatDateTime, formatDate, formatMonthYear } = useDateTimeDisplay();
+  const { formatDateTime, formatDate, formatTime, formatMonthYear } = useDateTimeDisplay();
   const navigate = useNavigate();
   const { canAny } = usePermissions();
   const canManage = canAny([PERMISSIONS.MEETINGS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]);
@@ -643,29 +643,6 @@ export function MeetingsPage() {
     setModalOpen(true);
   }
 
-  const canSaveMeeting = useMemo(() => {
-    const hasEntity = Boolean(selectedEntityId);
-    const hasAssigned = Boolean(form.assigned_user_id);
-    const hasOwner = Boolean(form.meeting_owner_user_id);
-    const hasPlatform = Boolean(form.meeting_platform);
-    const hasDuration = Boolean(form.meeting_duration_min);
-    const hasTitle = Boolean(form.title?.trim());
-    const hasAcc = Boolean(form.email_account_id);
-    const hasTimes = Boolean(form.start_at && form.end_at);
-    return hasEntity && hasAssigned && hasOwner && hasPlatform && hasDuration && hasTitle && hasAcc && hasTimes && !saving;
-  }, [
-    selectedEntityId,
-    form.assigned_user_id,
-    form.meeting_owner_user_id,
-    form.meeting_platform,
-    form.meeting_duration_min,
-    form.title,
-    form.email_account_id,
-    form.start_at,
-    form.end_at,
-    saving,
-  ]);
-
   async function handleSave(e) {
     e.preventDefault();
     const nextErrors = {};
@@ -676,11 +653,19 @@ export function MeetingsPage() {
     if (!form.meeting_duration_min) nextErrors.meeting_duration_min = 'Duration is required';
     if (!form.title?.trim()) nextErrors.title = 'Title is required';
     if (!form.email_account_id) nextErrors.email_account_id = 'Email account is required';
+    if (!form.start_at) nextErrors.start_at = 'Start time is required';
+    if (!form.end_at) nextErrors.end_at = 'End time is required';
     setMeetingFormErrors(nextErrors);
-    if (Object.keys(nextErrors).length) return;
+    if (Object.keys(nextErrors).length) {
+      setError('Please fill all required fields marked with *.');
+      return;
+    }
     const start_at = localDatetimeToMysql(form.start_at);
     const end_at = localDatetimeToMysql(form.end_at);
-    if (!start_at || !end_at) return;
+    if (!start_at || !end_at) {
+      setError('Please provide valid start and end date/time.');
+      return;
+    }
     const startTs = new Date(form.start_at).getTime();
     const endTs = new Date(form.end_at).getTime();
     if (!Number.isFinite(startTs) || !Number.isFinite(endTs)) {
@@ -1045,7 +1030,7 @@ export function MeetingsPage() {
                         openEdit(m);
                       }}
                     >
-                      {String(m.start_at || '').slice(11, 16)} {m.title}
+                      {formatTime(String(m.start_at || '').replace(' ', 'T'))} {m.title}
                     </button>
                   ))}
                   {dayMeetings.length > 4 ? (
@@ -1176,7 +1161,7 @@ export function MeetingsPage() {
                   </Button>
                 ) : null}
                 {canManage ? (
-                  <Button type="submit" form="meeting-form" loading={saving} disabled={!canSaveMeeting}>
+                  <Button type="submit" form="meeting-form" loading={saving} disabled={saving}>
                     Save
                   </Button>
                 ) : null}
@@ -1266,12 +1251,16 @@ export function MeetingsPage() {
               ) : null}
             </div>
             <Select
-              label="Email account"
+              label="Email account *"
               value={form.email_account_id}
-              onChange={(e) => setForm((f) => ({ ...f, email_account_id: e.target.value }))}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, email_account_id: e.target.value }));
+                setMeetingFormErrors((e2) => ({ ...e2, email_account_id: undefined }));
+              }}
               options={formAccountOptions}
               required
               disabled={!canManage}
+              error={meetingFormErrors.email_account_id}
             />
             <div style={{ gridColumn: '1 / -1' }}>
               <p className={styles.listHint} style={{ margin: 0 }}>
@@ -1280,7 +1269,7 @@ export function MeetingsPage() {
               </p>
             </div>
             <Select
-              label="Assigned to"
+              label="Assigned to *"
               value={form.assigned_user_id}
               onChange={(e) => {
                 setForm((f) => ({
@@ -1292,9 +1281,10 @@ export function MeetingsPage() {
               }}
               options={agentOptions}
               disabled={!canManage}
+              error={meetingFormErrors.assigned_user_id}
             />
             <Select
-              label="Meeting owner"
+              label="Meeting owner *"
               value={form.meeting_owner_user_id}
               onChange={(e) => {
                 setForm((f) => ({ ...f, meeting_owner_user_id: e.target.value }));
@@ -1302,9 +1292,10 @@ export function MeetingsPage() {
               }}
               options={ownerOptions}
               disabled={!canManage}
+              error={meetingFormErrors.meeting_owner_user_id}
             />
             <Select
-              label="Platform"
+              label="Platform *"
               value={form.meeting_platform}
               onChange={(e) => {
                 setForm((f) => ({ ...f, meeting_platform: e.target.value }));
@@ -1315,9 +1306,10 @@ export function MeetingsPage() {
                 { value: 'microsoft_teams', label: 'Microsoft Teams' },
               ]}
               disabled={!canManage}
+              error={meetingFormErrors.meeting_platform}
             />
             <Select
-              label="Duration"
+              label="Duration *"
               value={form.meeting_duration_min}
               onChange={(e) => {
                 const mins = Number(e.target.value || 0);
@@ -1339,11 +1331,15 @@ export function MeetingsPage() {
                 { value: '90', label: '90 minutes' },
               ]}
               disabled={!canManage}
+              error={meetingFormErrors.meeting_duration_min}
             />
             <Input
-              label="Title"
+              label="Title *"
               value={form.title}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, title: e.target.value }));
+                setMeetingFormErrors((e2) => ({ ...e2, title: undefined }));
+              }}
               required
               disabled={!canManage}
               error={meetingFormErrors.title}
@@ -1363,32 +1359,40 @@ export function MeetingsPage() {
               disabled={!canManage}
             />
             <Input
-              label="Start"
+              label="Start *"
               type="datetime-local"
               value={form.start_at}
               min={formatDateTimeLocalInputValue(new Date())}
               onChange={(e) =>
-                setForm((f) => {
-                  const mins = Number(f.meeting_duration_min || 0);
-                  const startMs = new Date(e.target.value).getTime();
-                  const endAt =
-                    Number.isFinite(startMs) && mins > 0
-                      ? formatDateTimeLocalInputValue(new Date(startMs + mins * 60000))
-                      : f.end_at;
-                  return { ...f, start_at: e.target.value, end_at: endAt };
-                })
+                {
+                  setForm((f) => {
+                    const mins = Number(f.meeting_duration_min || 0);
+                    const startMs = new Date(e.target.value).getTime();
+                    const endAt =
+                      Number.isFinite(startMs) && mins > 0
+                        ? formatDateTimeLocalInputValue(new Date(startMs + mins * 60000))
+                        : f.end_at;
+                    return { ...f, start_at: e.target.value, end_at: endAt };
+                  });
+                  setMeetingFormErrors((e2) => ({ ...e2, start_at: undefined, end_at: undefined }));
+                }
               }
               required
               disabled={!canManage}
+              error={meetingFormErrors.start_at}
             />
             <Input
-              label="End"
+              label="End *"
               type="datetime-local"
               value={form.end_at}
               min={form.start_at || formatDateTimeLocalInputValue(new Date())}
-              onChange={(e) => setForm((f) => ({ ...f, end_at: e.target.value }))}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, end_at: e.target.value }));
+                setMeetingFormErrors((e2) => ({ ...e2, end_at: undefined }));
+              }}
               required
               disabled={!canManage}
+              error={meetingFormErrors.end_at}
             />
             <Select
               label="Status"

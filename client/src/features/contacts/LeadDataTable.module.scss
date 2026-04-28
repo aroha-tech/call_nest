@@ -483,6 +483,19 @@
 }
 
 .blacklistTextStrong {
-  color: #8b1d1d;
-  font-weight: 600;
+  color: var(--color-danger, #dc2626) !important;
+  font-weight: 700;
+}
+
+.displayNameLink.blacklistTextStrong,
+.displayNameLink.blacklistTextStrong:hover,
+.displayNameLink.blacklistTextStrong:focus-visible {
+  color: var(--color-danger, #dc2626) !important;
+}
+
+:global(:root[data-color-scheme='light']) .displayNameLink.blacklistTextStrong,
+:global(:root[data-color-scheme='light']) .displayNameLink.blacklistTextStrong:hover,
+:global(:root[data-color-scheme='light']) .displayNameLink.blacklistTextStrong:focus-visible,
+:global(:root[data-color-scheme='light']) .blacklistTextStrong {
+  color: #dc2626 !important;
 }

@@ -1084,9 +1084,16 @@ async function prepareContactListFinalWhere(
     filterUnassignedManagers,
   });
 
-  const effIndFields = await tenantIndustryFieldsService.getEffectiveFieldDefinitions(tenantId);
-  const allowedIndustryFieldKeys = new Set(effIndFields.map((d) => String(d.field_key)));
-  const normalizedColumnFilters = normalizeContactListColumnFilters(columnFilters, allowedIndustryFieldKeys);
+  const parsedColumnFilters = normalizeContactListColumnFilters(columnFilters);
+  const hasIndustryColumnFilters = parsedColumnFilters.some((rule) =>
+    !!parseIndustryProfileListFilterField(rule?.field)
+  );
+  let normalizedColumnFilters = parsedColumnFilters;
+  if (hasIndustryColumnFilters) {
+    const effIndFields = await tenantIndustryFieldsService.getEffectiveFieldDefinitions(tenantId);
+    const allowedIndustryFieldKeys = new Set(effIndFields.map((d) => String(d.field_key)));
+    normalizedColumnFilters = normalizeContactListColumnFilters(parsedColumnFilters, allowedIndustryFieldKeys);
+  }
   applyContactListColumnFilters(whereClauses, params, normalizedColumnFilters);
 
   if (excludeBlacklisted) {
@@ -1096,19 +1103,19 @@ async function prepareContactListFinalWhere(
         FROM contact_blacklist_entries b
         WHERE b.tenant_id = c.tenant_id
           AND b.deleted_at IS NULL
-          AND (
-            b.contact_id = c.id
-            OR (
-              b.phone_e164 IS NOT NULL
-              AND EXISTS (
-                SELECT 1
-                FROM contact_phones cp_blk
-                WHERE cp_blk.tenant_id = c.tenant_id
-                  AND cp_blk.contact_id = c.id
-                  AND cp_blk.phone = b.phone_e164
-              )
-            )
-          )
+          AND b.contact_id = c.id
+      )`
+    );
+    whereClauses.push(
+      `NOT EXISTS (
+        SELECT 1
+        FROM contact_phones cp_blk
+        INNER JOIN contact_blacklist_entries b
+          ON b.tenant_id = cp_blk.tenant_id
+         AND b.deleted_at IS NULL
+         AND b.phone_e164 = cp_blk.phone
+        WHERE cp_blk.tenant_id = c.tenant_id
+          AND cp_blk.contact_id = c.id
       )`
     );
   }
@@ -1151,6 +1158,33 @@ export async function listContacts(
   const limitInt = Math.floor(Number(limitNum)) || 20;
   const offsetInt = Math.floor(Number(offset)) || 0;
   const orderBySQL = resolveContactListOrderBy(sortBy, sortDir);
+  const blacklistContactSelectSQL = excludeBlacklisted
+    ? '0 AS is_blacklisted_contact'
+    : `EXISTS (
+          SELECT 1
+          FROM contact_blacklist_entries b
+          WHERE b.tenant_id = c.tenant_id
+            AND b.deleted_at IS NULL
+            AND b.contact_id = c.id
+        ) AS is_blacklisted_contact`;
+  const blacklistNumberSelectSQL = excludeBlacklisted
+    ? '0 AS has_blacklisted_number'
+    : `EXISTS (
+          SELECT 1
+          FROM contact_blacklist_entries bpn
+          WHERE bpn.tenant_id = c.tenant_id
+            AND bpn.deleted_at IS NULL
+            AND bpn.phone_e164 IS NOT NULL
+            AND (
+              bpn.phone_e164 = p.phone
+              OR EXISTS (
+                SELECT 1 FROM contact_phones cpn
+                WHERE cpn.tenant_id = c.tenant_id
+                  AND cpn.contact_id = c.id
+                  AND cpn.phone = bpn.phone_e164
+              )
+            )
+        ) AS has_blacklisted_number`;
 
   const { finalWhere, params } = await prepareContactListFinalWhere(tenantId, user, {
     search,
@@ -1174,7 +1208,7 @@ export async function listContacts(
   });
 
   const [countRow] = await query(
-    `SELECT COUNT(DISTINCT c.id) AS total
+    `SELECT COUNT(*) AS total
      ${CONTACT_LIST_JOIN_FROM}
      ${finalWhere}`,
     params
@@ -1227,29 +1261,8 @@ export async function listContacts(
         c.call_count_total,
         c.created_at
         ,
-        EXISTS (
-          SELECT 1
-          FROM contact_blacklist_entries b
-          WHERE b.tenant_id = c.tenant_id
-            AND b.deleted_at IS NULL
-            AND b.contact_id = c.id
-        ) AS is_blacklisted_contact,
-        EXISTS (
-          SELECT 1
-          FROM contact_blacklist_entries bpn
-          WHERE bpn.tenant_id = c.tenant_id
-            AND bpn.deleted_at IS NULL
-            AND bpn.phone_e164 IS NOT NULL
-            AND (
-              bpn.phone_e164 = p.phone
-              OR EXISTS (
-                SELECT 1 FROM contact_phones cpn
-                WHERE cpn.tenant_id = c.tenant_id
-                  AND cpn.contact_id = c.id
-                  AND cpn.phone = bpn.phone_e164
-              )
-            )
-        ) AS has_blacklisted_number
+        ${blacklistContactSelectSQL},
+        ${blacklistNumberSelectSQL}
      ${CONTACT_LIST_JOIN_FROM}
      ${finalWhere}
      ORDER BY ${orderBySQL}
@@ -1302,7 +1315,7 @@ export async function listContacts(
 export async function listContactIds(tenantId, user, options) {
   const { finalWhere, params } = await prepareContactListFinalWhere(tenantId, user, options);
   const [countRow] = await query(
-    `SELECT COUNT(DISTINCT c.id) AS total
+    `SELECT COUNT(*) AS total
      ${CONTACT_LIST_JOIN_FROM}
      ${finalWhere}`,
     params
@@ -1310,7 +1323,7 @@ export async function listContactIds(tenantId, user, options) {
   const total = countRow?.total ?? 0;
   const cap = CONTACT_LIST_IDS_CAP;
   const rows = await query(
-    `SELECT DISTINCT c.id
+    `SELECT c.id
      ${CONTACT_LIST_JOIN_FROM}
      ${finalWhere}
      ORDER BY c.id ASC
@@ -1329,7 +1342,7 @@ export async function listContactIds(tenantId, user, options) {
 export async function listAllContactIdsForBulkJob(tenantId, user, options) {
   const { finalWhere, params } = await prepareContactListFinalWhere(tenantId, user, options);
   const [countRow] = await query(
-    `SELECT COUNT(DISTINCT c.id) AS total
+    `SELECT COUNT(*) AS total
      ${CONTACT_LIST_JOIN_FROM}
      ${finalWhere}`,
     params
@@ -1344,7 +1357,7 @@ export async function listAllContactIdsForBulkJob(tenantId, user, options) {
     throw err;
   }
   const rows = await query(
-    `SELECT DISTINCT c.id
+    `SELECT c.id
      ${CONTACT_LIST_JOIN_FROM}
      ${finalWhere}
      ORDER BY c.id ASC`,

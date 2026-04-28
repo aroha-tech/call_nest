@@ -50,6 +50,18 @@ export function userAndTenantFromToken(accessToken) {
     isPlatformAdmin: Boolean(payload.is_platform_admin),
     datetimeDisplayMode:
       payload.datetime_display_mode === 'browser_local' ? 'browser_local' : 'ist_fixed',
+    datetimeTimezone:
+      typeof payload.datetime_timezone === 'string' && payload.datetime_timezone.trim()
+        ? payload.datetime_timezone.trim()
+        : 'Asia/Kolkata',
+    datetimeDateFormat:
+      typeof payload.datetime_date_format === 'string' && payload.datetime_date_format.trim()
+        ? payload.datetime_date_format.trim()
+        : 'DD-MM-YYYY',
+    datetimeTimeFormat:
+      typeof payload.datetime_time_format === 'string' && payload.datetime_time_format.trim()
+        ? payload.datetime_time_format.trim()
+        : '12h_with_seconds',
     manager,
   };
 

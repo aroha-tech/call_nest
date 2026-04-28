@@ -261,6 +261,7 @@ export function ContactFormPage({ defaultType }) {
   const convertTypeMutation = useMutation((nextType) => contactsAPI.update(id, { type: nextType }));
   const deleteMutation = useMutation((delId) => contactsAPI.remove(delId, { deleted_source: 'manual' }));
   const blacklistMutation = useMutation((payload) => contactBlacklistAPI.add(payload));
+  const unblockMutation = useMutation((contactId) => contactBlacklistAPI.unblockByContact(contactId));
 
   const fetchCustomFields = useCallback(async () => {
     setLoadingCustomFields(true);
@@ -1163,7 +1164,6 @@ export function ContactFormPage({ defaultType }) {
                       <button
                         type="button"
                         className={styles.headerMenuItem}
-                        disabled={isBlacklistedContact}
                         onClick={() => {
                           setActionsOpen(false);
                           setBlacklistScope('record');
@@ -1173,7 +1173,7 @@ export function ContactFormPage({ defaultType }) {
                         <span className={styles.headerMenuItemIcon} aria-hidden>
                           <BlacklistIcon className={styles.headerMenuGlyph} />
                         </span>
-                        {isBlacklistedContact ? 'Already blacklisted' : 'Add to blacklist'}
+                        {isBlacklistedContact ? 'Unblock' : 'Add to blacklist'}
                       </button>
                       {isEditing ? (
                         <>
@@ -1354,10 +1354,20 @@ export function ContactFormPage({ defaultType }) {
       <ConfirmModal
         isOpen={blacklistConfirmOpen}
         onClose={() => {
-          if (!blacklistMutation.loading) setBlacklistConfirmOpen(false);
+          if (!blacklistMutation.loading && !unblockMutation.loading) setBlacklistConfirmOpen(false);
         }}
         onConfirm={async () => {
           if (!id || id === 'new') return;
+          if (blacklistScope === 'record' && isBlacklistedContact) {
+            const unblockResult = await unblockMutation.mutate(Number(id));
+            if (unblockResult?.success) {
+              setBlacklistConfirmOpen(false);
+              await refetchContact();
+            } else if (unblockResult?.error) {
+              setSubmitError(unblockResult.error);
+            }
+            return;
+          }
           const payload =
             blacklistScope === 'number'
               ? {
@@ -1380,14 +1390,22 @@ export function ContactFormPage({ defaultType }) {
             setSubmitError(result.error);
           }
         }}
-        title={blacklistScope === 'number' ? 'Blacklist number' : `Blacklist ${type === 'lead' ? 'Lead' : 'Contact'}`}
+        title={
+          blacklistScope === 'number'
+            ? 'Blacklist number'
+            : isBlacklistedContact
+              ? `Unblock ${type === 'lead' ? 'Lead' : 'Contact'}`
+              : `Blacklist ${type === 'lead' ? 'Lead' : 'Contact'}`
+        }
         message={
           blacklistScope === 'number'
             ? `Blacklist "${blacklistPhoneE164 || 'this number'}" for this tenant?`
-            : `Blacklist "${contact?.display_name || formData?.display_name || 'this record'}" for this tenant?`
+            : isBlacklistedContact
+              ? `Unblock "${contact?.display_name || formData?.display_name || 'this record'}"?`
+              : `Blacklist "${contact?.display_name || formData?.display_name || 'this record'}" for this tenant?`
         }
-        confirmText="Add to blacklist"
-        loading={blacklistMutation.loading}
+        confirmText={isBlacklistedContact && blacklistScope === 'record' ? 'Unblock' : 'Add to blacklist'}
+        loading={blacklistMutation.loading || unblockMutation.loading}
       />
 
       {!isNew && contact ? (

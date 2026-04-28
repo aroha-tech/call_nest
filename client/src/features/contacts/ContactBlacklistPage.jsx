@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { selectUser } from '../auth/authSelectors';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -10,18 +11,20 @@ import { ConfirmModal } from '../../components/ui/Modal';
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from '../../components/ui/Table';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
+import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 import { contactBlacklistAPI } from '../../services/contactBlacklistAPI';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 
 export function ContactBlacklistPage() {
   const user = useAppSelector(selectUser);
   const role = String(user?.role || '').toLowerCase();
-  const canUnblock = role === 'admin' || role === 'manager';
+  const canUnblock = role === 'admin' || role === 'manager' || role === 'agent';
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [unblockItem, setUnblockItem] = useState(null);
   const [scopeFilter, setScopeFilter] = useState('all');
+  const { formatDateTime } = useDateTimeDisplay();
 
   const fetchRows = useCallback(
     () =>
@@ -45,6 +48,14 @@ export function ContactBlacklistPage() {
     () => ({ lead: 'Lead', contact: 'Contact', number: 'Number' }),
     []
   );
+
+  const rowDetailPath = useCallback((row) => {
+    const cid = Number(row?.contact_id);
+    if (!Number.isFinite(cid) || cid < 1) return '';
+    if (row?.block_scope === 'lead') return `/leads/${cid}?mode=view`;
+    if (row?.block_scope === 'contact') return `/contacts/${cid}?mode=view`;
+    return '';
+  }, []);
 
   return (
     <div className={listStyles.page}>
@@ -98,11 +109,17 @@ export function ContactBlacklistPage() {
                 {rows.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>{scopeLabel[r.block_scope] || r.block_scope}</TableCell>
-                    <TableCell>{r.display_name || '—'}</TableCell>
+                    <TableCell>
+                      {r.display_name && rowDetailPath(r) ? (
+                        <Link to={rowDetailPath(r)}>{r.display_name}</Link>
+                      ) : (
+                        r.display_name || '—'
+                      )}
+                    </TableCell>
                     <TableCell>{r.email || '—'}</TableCell>
                     <TableCell>{r.phone_e164 || '—'}</TableCell>
                     <TableCell>{r.reason || '—'}</TableCell>
-                    <TableCell>{r.created_at || '—'}</TableCell>
+                    <TableCell>{formatDateTime(r.created_at)}</TableCell>
                     <TableCell align="center">
                       {canUnblock ? (
                         <Button size="sm" variant="secondary" onClick={() => setUnblockItem(r)}>

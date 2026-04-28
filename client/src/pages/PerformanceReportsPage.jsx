@@ -11,6 +11,7 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } fro
 import { taskManagerAPI } from '../services/taskManagerAPI';
 import { tenantUsersAPI } from '../services/tenantUsersAPI';
 import { usePermissions } from '../hooks/usePermission';
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import { PERMISSIONS } from '../utils/permissionUtils';
 import listStyles from '../components/admin/adminDataList.module.scss';
 import styles from './PerformanceReportsPage.module.scss';
@@ -50,6 +51,7 @@ export function PerformanceReportsPage() {
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
   const { canAny } = usePermissions();
+  const { formatDate } = useDateTimeDisplay();
   const canExport = canAny([PERMISSIONS.REPORTS_PERFORMANCE_EXPORT, PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.REPORTS_VIEW]);
   const canManageScore = canAny([PERMISSIONS.TASKS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]);
 
@@ -412,7 +414,7 @@ export function PerformanceReportsPage() {
                     <TableBody>
                       {calendar.length ? calendar.map((c, i) => (
                         <TableRow key={`${c.task_date}-${c.status}-${i}`}>
-                          <TableCell>{String(c.task_date).slice(0, 10)}</TableCell>
+                          <TableCell>{formatDate(c.task_date)}</TableCell>
                           <TableCell>{c.status}</TableCell>
                           <TableCell>{c.logs_count}</TableCell>
                           <TableCell>{Number(c.completion_percent || 0).toFixed(2)}%</TableCell>

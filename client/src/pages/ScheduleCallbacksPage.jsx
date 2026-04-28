@@ -96,7 +96,7 @@ function defaultDateTimeLocalForDay(ymd) {
 }
 
 export function ScheduleCallbacksPage() {
-  const { formatDateTime, formatMonthYear } = useDateTimeDisplay();
+  const { formatDateTime, formatTime, formatMonthYear } = useDateTimeDisplay();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month0, setMonth0] = useState(now.getMonth());
@@ -594,7 +594,7 @@ export function ScheduleCallbacksPage() {
                         openEditCallbackModal(r);
                       }}
                     >
-                      {String(r.scheduled_at || '').slice(11, 16)} {r.contact_name || '—'}
+                      {formatTime(String(r.scheduled_at || '').replace(' ', 'T'))} {r.contact_name || '—'}
                     </button>
                   ))}
                   {dayRows.length > 4 ? <div className={styles.listHint}>+{dayRows.length - 4} more</div> : null}

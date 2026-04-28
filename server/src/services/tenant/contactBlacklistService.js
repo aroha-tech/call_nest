@@ -20,10 +20,11 @@ function toE164Phone(raw) {
 async function getVisibleContactById(tenantId, user, contactId) {
   const cid = Number(contactId);
   if (!Number.isFinite(cid) || cid < 1) return null;
+  const role = String(user?.role || '').toLowerCase();
   const { whereSQL, params } = buildOwnershipWhere({
     tenantId,
     id: user?.id,
-    role: user?.role,
+    role,
   });
   const finalWhere = `${whereSQL} AND c.id = ?`;
   const rows = await query(
@@ -68,6 +69,7 @@ export async function listBlacklistEntries(
   user,
   { search = '', page = 1, limit = 20, block_scope = '' } = {}
 ) {
+  const role = String(user?.role || '').toLowerCase();
   const pageNum = Math.max(1, Number(page) || 1);
   const limitNum = Math.min(100, Math.max(1, Number(limit) || 20));
   const offset = (pageNum - 1) * limitNum;
@@ -80,7 +82,7 @@ export async function listBlacklistEntries(
     params.push(scope);
   }
 
-  if (user?.role === 'agent') {
+  if (role === 'agent') {
     where.push(
       `(b.contact_id IS NULL OR EXISTS (
         SELECT 1 FROM contacts c
@@ -91,7 +93,7 @@ export async function listBlacklistEntries(
       ))`
     );
     params.push(Number(user.id) || 0);
-  } else if (user?.role === 'manager') {
+  } else if (role === 'manager') {
     where.push(
       `(b.contact_id IS NULL OR EXISTS (
         SELECT 1 FROM contacts c
@@ -279,6 +281,7 @@ export async function createBlacklistEntry(
 }
 
 export async function unblockBlacklistEntry(tenantId, user, id) {
+  const role = String(user?.role || '').toLowerCase();
   const bid = Number(id);
   if (!Number.isFinite(bid) || bid < 1) {
     const err = new Error('Invalid blacklist id');
@@ -294,6 +297,21 @@ export async function unblockBlacklistEntry(tenantId, user, id) {
   );
   const existing = beforeRows[0];
   if (!existing) return false;
+  const hasContactRef = Number.isFinite(Number(existing.contact_id)) && Number(existing.contact_id) > 0;
+  if (role === 'agent' || role === 'manager') {
+    // Restrict non-admin users to records linked to contacts they can access.
+    if (!hasContactRef) {
+      const err = new Error('Not allowed to unblock this entry');
+      err.status = 403;
+      throw err;
+    }
+    const visible = await getVisibleContactById(tenantId, user, existing.contact_id);
+    if (!visible) {
+      const err = new Error('Not allowed to unblock this entry');
+      err.status = 403;
+      throw err;
+    }
+  }
 
   const r = await query(
     `UPDATE contact_blacklist_entries
@@ -344,5 +362,28 @@ export async function unblockBlacklistEntry(tenantId, user, id) {
   });
 
   return true;
+}
+
+export async function unblockContactEntry(tenantId, user, contactId) {
+  const cid = Number(contactId);
+  if (!Number.isFinite(cid) || cid < 1) {
+    const err = new Error('Invalid contact id');
+    err.status = 400;
+    throw err;
+  }
+  const existingRows = await query(
+    `SELECT id
+     FROM contact_blacklist_entries
+     WHERE tenant_id = ?
+       AND contact_id = ?
+       AND deleted_at IS NULL
+       AND block_scope IN ('lead', 'contact')
+     ORDER BY created_at DESC, id DESC
+     LIMIT 1`,
+    [tenantId, cid]
+  );
+  const existingId = Number(existingRows[0]?.id || 0);
+  if (!existingId) return false;
+  return unblockBlacklistEntry(tenantId, user, existingId);
 }
 

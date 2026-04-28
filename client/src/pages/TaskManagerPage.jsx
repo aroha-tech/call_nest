@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -20,6 +20,7 @@ import { campaignsAPI } from '../services/campaignsAPI';
 import { contactTagsAPI } from '../services/contactTagsAPI';
 import { emailAccountsAPI } from '../services/emailAPI';
 import { usePermissions } from '../hooks/usePermission';
+import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import { PERMISSIONS } from '../utils/permissionUtils';
 import { useAppSelector } from '../app/hooks';
 import { selectUser } from '../features/auth/authSelectors';
@@ -104,6 +105,15 @@ function toMillis(v) {
   return Number.isFinite(ms) ? ms : NaN;
 }
 
+function normalizeNonNegativeIntegerInput(raw, fallback = 0) {
+  if (raw == null) return fallback;
+  const text = String(raw).trim();
+  if (!text) return '';
+  const digits = text.replace(/[^\d]/g, '');
+  if (!digits) return '';
+  return String(Math.max(0, Number(digits)));
+}
+
 function statusBadgeVariant(status) {
   switch (String(status || '').toLowerCase()) {
     case 'achieved':
@@ -124,6 +134,13 @@ function statusBadgeVariant(status) {
 function formatStatusLabel(status) {
   const s = String(status || '').replace(/_/g, ' ');
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : '—';
+}
+
+function formatRoleLabel(role) {
+  const text = String(role || '').trim();
+  if (!text) return 'User';
+  const spaced = text.replace(/_/g, ' ');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
 }
 
 function assignmentDisplayStatus(assignment, todayYmd) {
@@ -167,6 +184,7 @@ function assignmentCoversYmd(a, ymd) {
 
 export function TaskManagerPage() {
   const { canAny } = usePermissions();
+  const { formatDate, formatDateTime } = useDateTimeDisplay();
   const user = useAppSelector(selectUser);
   const canManage = canAny([PERMISSIONS.TASKS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]);
   const role = String(user?.role || '').toLowerCase();
@@ -199,11 +217,13 @@ export function TaskManagerPage() {
   const [campaigns, setCampaigns] = useState([]);
   const [contactTags, setContactTags] = useState([]);
   const [emailAccounts, setEmailAccounts] = useState([]);
-  const [saveAndAddAnother, setSaveAndAddAnother] = useState(false);
   const [commentsModalAssignment, setCommentsModalAssignment] = useState(null);
   const [assignmentComments, setAssignmentComments] = useState([]);
   const [commentDraft, setCommentDraft] = useState('');
   const [commentsLoading, setCommentsLoading] = useState(false);
+  const [noteHistory, setNoteHistory] = useState([]);
+  const [noteHistoryLoading, setNoteHistoryLoading] = useState(false);
+  const chatScrollTimersRef = useRef({});
 
   const [templateForm, setTemplateForm] = useState({
     name: '',
@@ -235,11 +255,21 @@ export function TaskManagerPage() {
     target_meetings: 2,
     target_deals: 2,
   });
-  const [noteDraft, setNoteDraft] = useState({});
   const [notesModalDraft, setNotesModalDraft] = useState({ agent: '', manager: '' });
 
   /** Calendar “today” in the browser (must match `task_date` rows in DB). Recomputed each render so it rolls over at midnight. */
   const todayStr = toYmd(new Date());
+  const todayDisplay = formatDate(todayStr);
+
+  const currentUserNameLower = String(user?.name || user?.email || '').trim().toLowerCase();
+
+  useEffect(
+    () => () => {
+      Object.values(chatScrollTimersRef.current).forEach((timerId) => clearTimeout(timerId));
+      chatScrollTimersRef.current = {};
+    },
+    []
+  );
 
   const showAgentFilter = canManage && !isAgentRole;
   const showExecutionBoard = !canManage || managerView === 'execution';
@@ -261,7 +291,7 @@ export function TaskManagerPage() {
     const coversToday = assignmentsForHints.filter((a) => assignmentCoversYmd(a, todayStr));
     if (assignmentsForHints.length > 0 && coversToday.length === 0) {
       hints.push(
-        `The app is showing today as ${todayStr}. None of the listed assignments include that calendar date (check start/end dates — wrong year is a common reason).`
+        `The app is showing today as ${todayDisplay}. None of the listed assignments include that calendar date (check start/end dates — wrong year is a common reason).`
       );
     }
     if (coversToday.length > 0 && todayLogs.length === 0) {
@@ -273,14 +303,7 @@ export function TaskManagerPage() {
       hints.push('Agent filter is set — you only see tasks for that rep.');
     }
     return hints;
-  }, [
-    assignmentsForHints,
-    todayStr,
-    todayLogs.length,
-    effectiveTodayLogs.length,
-    showAgentFilter,
-    agentFilter,
-  ]);
+  }, [assignmentsForHints, todayStr, todayDisplay, todayLogs.length, effectiveTodayLogs.length, showAgentFilter, agentFilter]);
 
   const duePresetOptionsWithDate = useMemo(() => {
     const map = {
@@ -338,7 +361,7 @@ export function TaskManagerPage() {
   );
 
   const agentFilterOptions = useMemo(() => {
-    const allLabel = role === 'manager' ? 'All assignees (my team + me)' : 'All assignees';
+    const allLabel = role === 'manager' ? 'All assignments' : 'All assignees';
     const options = [{ value: '', label: allLabel }];
     if (user?.id) {
       options.push({ value: String(user.id), label: `Self (${user.name || user.email || 'Me'})` });
@@ -601,6 +624,8 @@ export function TaskManagerPage() {
 
   async function onCreateAssignment(e) {
     e.preventDefault();
+    const submitAction = e?.nativeEvent?.submitter?.value === 'add-another' ? 'add-another' : 'publish';
+    const keepModalOpen = submitAction === 'add-another';
     setError('');
     setOk('');
     const assignedToUserId = Number(assignForm.assigned_to_user_id);
@@ -672,6 +697,22 @@ export function TaskManagerPage() {
       targetCalls = 0;
       targetMeetings = 0;
     }
+    if (assignForm.task_type === 'meeting' && targetMeetings <= 0) {
+      setError('Target meetings must be greater than 0 for Meeting tasks.');
+      return;
+    }
+    if (assignForm.task_type === 'call' && targetCalls <= 0) {
+      setError('Target calls must be greater than 0 for Call tasks.');
+      return;
+    }
+    if (assignForm.task_type === 'deal' && targetDeals <= 0) {
+      setError('Target deals must be greater than 0 for Deal tasks.');
+      return;
+    }
+    if (assignForm.task_type === 'todo' && targetCalls <= 0 && targetMeetings <= 0 && targetDeals <= 0) {
+      setError('Add at least one target greater than 0 before publishing this task.');
+      return;
+    }
     let reminderAt = null;
     if (assignForm.reminder_preset !== 'none') {
       const dueBase = new Date(`${endDate}T23:59:00`);
@@ -710,7 +751,7 @@ export function TaskManagerPage() {
       };
       await taskManagerAPI.createAssignment(payload);
       setOk('Assignment published. Daily rows were generated for the selected day(s).');
-      if (!saveAndAddAnother) setAssignModalOpen(false);
+      if (!keepModalOpen) setAssignModalOpen(false);
       setAssignForm((s) => ({
         ...s,
         template_id: '',
@@ -737,8 +778,6 @@ export function TaskManagerPage() {
     } catch (err) {
       const msg = err?.response?.data?.error || err?.message || 'Failed to create assignment';
       setError(msg);
-    } finally {
-      setSaveAndAddAnother(false);
     }
   }
 
@@ -760,18 +799,6 @@ export function TaskManagerPage() {
     }
   }
 
-  async function saveNote(log, type) {
-    try {
-      const text = noteDraft[`${type}-${log.id}`] ?? '';
-      if (type === 'agent') await taskManagerAPI.updateAgentNote(log.id, text);
-      else await taskManagerAPI.updateManagerNote(log.id, text);
-      setOk(type === 'agent' ? 'Agent note saved' : 'Manager note saved');
-      await refetchTaskViews();
-    } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Failed to save note');
-    }
-  }
-
   async function saveNotesModal() {
     if (!notesModalLog) return;
     try {
@@ -783,10 +810,14 @@ export function TaskManagerPage() {
         await taskManagerAPI.updateManagerNote(notesModalLog.id, notesModalDraft.manager || '');
       }
       setOk('Notes updated');
-      setNotesModalLog(null);
+      setNoteHistoryLoading(true);
+      const historyRes = await taskManagerAPI.listNoteHistory(notesModalLog.id);
+      setNoteHistory(historyRes?.data?.data || []);
       await refetchTaskViews();
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Failed to save notes');
+    } finally {
+      setNoteHistoryLoading(false);
     }
   }
 
@@ -797,6 +828,7 @@ export function TaskManagerPage() {
     try {
       const res = await taskManagerAPI.listAssignmentComments(assignment.id);
       setAssignmentComments(res?.data?.data || []);
+      scheduleChatScroll(`modal-${assignment.id}`);
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Failed to load comments');
       setAssignmentComments([]);
@@ -814,22 +846,89 @@ export function TaskManagerPage() {
       setCommentDraft('');
       const res = await taskManagerAPI.listAssignmentComments(commentsModalAssignment.id);
       setAssignmentComments(res?.data?.data || []);
+      scheduleChatScroll(`modal-${commentsModalAssignment.id}`);
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Failed to post comment');
     }
   }
 
-  function openNotesModal(log) {
+  function scheduleChatScroll(threadId) {
+    if (!threadId) return;
+    const key = String(threadId);
+    const pending = chatScrollTimersRef.current[key];
+    if (pending) clearTimeout(pending);
+    chatScrollTimersRef.current[key] = setTimeout(() => {
+      const thread = document.querySelector(`[data-chat-thread="${key}"]`);
+      if (thread) thread.scrollTop = thread.scrollHeight;
+      delete chatScrollTimersRef.current[key];
+    }, 30);
+  }
+
+  function onCommentKeyDown(e, sendHandler) {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    e.preventDefault();
+    sendHandler();
+  }
+
+  function isOwnComment(comment) {
+    const currentUserId = Number(user?.id);
+    const authorId = Number(comment?.created_by);
+    if (Number.isFinite(currentUserId) && currentUserId > 0 && Number.isFinite(authorId) && authorId > 0) {
+      return authorId === currentUserId;
+    }
+    const authorNameLower = String(comment?.author_name || '').trim().toLowerCase();
+    if (authorNameLower && currentUserNameLower) {
+      return authorNameLower === currentUserNameLower;
+    }
+    return false;
+  }
+
+  function resolveCommentRole(comment) {
+    const directRole = String(comment?.author_role || '').trim();
+    if (directRole) return directRole;
+
+    const authorId = Number(comment?.created_by);
+    if (Number.isFinite(authorId) && authorId > 0) {
+      const byId = users.find((u) => Number(u?.id) === authorId);
+      if (byId?.role) return String(byId.role);
+    }
+
+    const authorNameLower = String(comment?.author_name || '').trim().toLowerCase();
+    if (authorNameLower) {
+      const byName = users.find((u) => String(u?.name || '').trim().toLowerCase() === authorNameLower);
+      if (byName?.role) return String(byName.role);
+    }
+
+    if (isOwnComment(comment) && user?.role) return String(user.role);
+    return 'user';
+  }
+
+  function commentAuthorLabel(comment) {
+    const own = isOwnComment(comment);
+    const displayName = own ? (user?.name || user?.email || comment?.author_name || 'You') : (comment?.author_name || 'User');
+    const roleText = formatRoleLabel(resolveCommentRole(comment));
+    return own ? `${displayName} (${roleText}) • You` : `${displayName} (${roleText})`;
+  }
+
+  async function openNotesModal(log) {
     setNotesModalLog(log);
     setNotesModalDraft({
       agent: log.agent_note || '',
       manager: log.manager_note || '',
     });
+    setNoteHistoryLoading(true);
+    try {
+      const res = await taskManagerAPI.listNoteHistory(log.id);
+      setNoteHistory(res?.data?.data || []);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to load note history');
+      setNoteHistory([]);
+    } finally {
+      setNoteHistoryLoading(false);
+    }
   }
 
   function renderTaskCard(log, { showAgent }) {
-    const canEditAgent = isAgentRole && Number(log.user_id) === Number(user?.id);
-    const canEditManager = canManage;
     const pct = Math.min(100, Math.max(0, Number(log.completion_percent || 0)));
     const agentLabel = log.user_name || 'Agent';
     return (
@@ -840,7 +939,7 @@ export function TaskManagerPage() {
             <div className={styles.taskCardMeta}>
               <span className={styles.taskCardDate}>
                 <MaterialSymbol name="calendar_today" size="sm" />
-                {String(log.task_date || '').slice(0, 10)}
+                {formatDate(log.task_date)}
               </span>
               {showAgent ? (
                 <span className={styles.taskCardAgent}>
@@ -884,38 +983,18 @@ export function TaskManagerPage() {
           <div className={styles.progressFill} style={{ width: `${pct}%` }} />
         </div>
 
-        {(canEditAgent || canEditManager) && mainTab !== 'upcoming' ? (
-          <div className={styles.inlineNotes}>
-            {canEditAgent ? (
-              <div className={styles.inlineNoteBlock}>
-                <span className={styles.inlineNoteLabel}>Your note</span>
-                <Textarea
-                  rows={2}
-                  value={noteDraft[`agent-${log.id}`] ?? log.agent_note ?? ''}
-                  onChange={(e) => setNoteDraft((s) => ({ ...s, [`agent-${log.id}`]: e.target.value }))}
-                  placeholder="What moved the needle today?"
-                />
-                <Button size="sm" variant="secondary" onClick={() => saveNote(log, 'agent')}>
-                  Save
-                </Button>
-              </div>
-            ) : null}
-            {canEditManager ? (
-              <div className={styles.inlineNoteBlock}>
-                <span className={styles.inlineNoteLabel}>Manager note</span>
-                <Textarea
-                  rows={2}
-                  value={noteDraft[`manager-${log.id}`] ?? log.manager_note ?? ''}
-                  onChange={(e) => setNoteDraft((s) => ({ ...s, [`manager-${log.id}`]: e.target.value }))}
-                  placeholder="Coaching context for this day"
-                />
-                <Button size="sm" variant="secondary" onClick={() => saveNote(log, 'manager')}>
-                  Save
-                </Button>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+        <div className={styles.taskCardActions}>
+          <Button size="sm" variant="ghost" onClick={() => openNotesModal(log)}>
+            <MaterialSymbol name="description" size="sm" />
+            Notes
+          </Button>
+          {log.assignment_id ? (
+            <Button size="sm" variant="ghost" onClick={() => openCommentsModal({ id: log.assignment_id, title: log.assignment_title })}>
+              <MaterialSymbol name="comment" size="sm" />
+              Comments
+            </Button>
+          ) : null}
+        </div>
       </article>
     );
   }
@@ -956,7 +1035,7 @@ export function TaskManagerPage() {
           <MaterialSymbol name="wb_sunny" size="md" className={styles.heroIcon} />
           <div>
             <div className={styles.heroLabel}>Working day</div>
-            <div className={styles.heroValue}>{todayStr}</div>
+            <div className={styles.heroValue}>{todayDisplay}</div>
             <div className={styles.heroHint}>All “today” targets use this calendar date.</div>
           </div>
         </div>
@@ -1017,7 +1096,7 @@ export function TaskManagerPage() {
                   <MaterialSymbol name="sync" size="sm" />
                   Sync live metrics
                 </Button>
-                {canManage && showAssignmentsBoard ? (
+                {canManage && (showAssignmentsBoard || showExecutionBoard) ? (
                   <Button variant="primary" className={styles.toolbarBtn} onClick={() => setAssignModalOpen(true)} disabled={loadingShell}>
                     <MaterialSymbol name="assignment_add" size="sm" />
                     New assignment
@@ -1077,7 +1156,7 @@ export function TaskManagerPage() {
                           <TableCell>{a.assigned_to_name || '—'}</TableCell>
                           <TableCell>
                             <span className={styles.tableMono}>
-                              {String(a.start_date || a.start_at || '').slice(0, 10)} → {String(a.end_date || a.end_at || '').slice(0, 10)}
+                              {formatDate(a.start_date || a.start_at)} → {formatDate(a.end_date || a.end_at)}
                             </span>
                           </TableCell>
                           <TableCell>
@@ -1092,11 +1171,23 @@ export function TaskManagerPage() {
                             </span>
                           </TableCell>
                           <TableCell align="right">
-                            <Button size="sm" variant="ghost" onClick={() => openCommentsModal(a)}>
-                              Comments
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => openCommentsModal(a)}
+                              title="Comments"
+                              aria-label="Open comments"
+                            >
+                              <MaterialSymbol name="comment" size="sm" />
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={() => setDeleteAssignmentTarget(a)}>
-                              Remove
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setDeleteAssignmentTarget(a)}
+                              title="Remove"
+                              aria-label="Remove assignment"
+                            >
+                              <MaterialSymbol name="delete" size="sm" />
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -1130,7 +1221,7 @@ export function TaskManagerPage() {
           </TabList>
 
           <TabPanel isActive={mainTab === 'current'}>
-            <p className={styles.tabHint}>Tasks in the active window for today ({todayStr}).</p>
+            <p className={styles.tabHint}>Tasks in the active window for today ({todayDisplay}).</p>
             {!effectiveTodayLogs.length ? renderEmpty('current', todayEmptyHints) : null}
             {effectiveTodayLogs.length ? (
               <div className={styles.cardGrid}>
@@ -1200,7 +1291,7 @@ export function TaskManagerPage() {
                   {!loadingTab
                     ? filteredHistoryLogs.map((log) => (
                         <TableRow key={log.id}>
-                          <TableCell>{String(log.task_date || '').slice(0, 10)}</TableCell>
+                          <TableCell>{formatDate(log.task_date)}</TableCell>
                           {showAgentFilter ? <TableCell>{log.user_name || '—'}</TableCell> : null}
                           <TableCell>{log.assignment_title || '—'}</TableCell>
                           <TableCell>
@@ -1259,7 +1350,7 @@ export function TaskManagerPage() {
               variant="secondary"
               type="submit"
               form="assign-task-form"
-              onClick={() => setSaveAndAddAnother(true)}
+              value="add-another"
             >
               Create & add another
             </Button>
@@ -1431,7 +1522,12 @@ export function TaskManagerPage() {
                 label="Target calls"
                 type="number"
                 value={assignForm.target_calls}
-                onChange={(e) => setAssignForm((s) => ({ ...s, target_calls: Number(e.target.value || 0) }))}
+                onChange={(e) =>
+                  setAssignForm((s) => ({
+                    ...s,
+                    target_calls: normalizeNonNegativeIntegerInput(e.target.value, s.target_calls),
+                  }))
+                }
               />
             ) : null}
             {assignForm.task_type === 'todo' || assignForm.task_type === 'meeting' ? (
@@ -1439,7 +1535,12 @@ export function TaskManagerPage() {
                 label="Target meetings"
                 type="number"
                 value={assignForm.target_meetings}
-                onChange={(e) => setAssignForm((s) => ({ ...s, target_meetings: Number(e.target.value || 0) }))}
+                onChange={(e) =>
+                  setAssignForm((s) => ({
+                    ...s,
+                    target_meetings: normalizeNonNegativeIntegerInput(e.target.value, s.target_meetings),
+                  }))
+                }
               />
             ) : null}
             {assignForm.task_type === 'todo' || assignForm.task_type === 'deal' ? (
@@ -1447,7 +1548,12 @@ export function TaskManagerPage() {
                 label="Target deals"
                 type="number"
                 value={assignForm.target_deals}
-                onChange={(e) => setAssignForm((s) => ({ ...s, target_deals: Number(e.target.value || 0) }))}
+                onChange={(e) =>
+                  setAssignForm((s) => ({
+                    ...s,
+                    target_deals: normalizeNonNegativeIntegerInput(e.target.value, s.target_deals),
+                  }))
+                }
               />
             ) : null}
             <div className={styles.full}>
@@ -1525,7 +1631,11 @@ export function TaskManagerPage() {
 
       <Modal
         isOpen={!!notesModalLog}
-        onClose={() => setNotesModalLog(null)}
+        onClose={() => {
+          setNotesModalLog(null);
+          setNoteHistory([]);
+          setNoteHistoryLoading(false);
+        }}
         title="Day notes"
         size="md"
         closeOnOverlay
@@ -1544,7 +1654,7 @@ export function TaskManagerPage() {
         {notesModalLog ? (
           <div className={styles.modalForm}>
             <p className={styles.modalLead}>
-              {notesModalLog.assignment_title} · {String(notesModalLog.task_date || '').slice(0, 10)}
+              {notesModalLog.assignment_title} · {formatDate(notesModalLog.task_date)}
             </p>
             {isAgentRole && Number(notesModalLog.user_id) === Number(user?.id) ? (
               <Textarea
@@ -1563,6 +1673,27 @@ export function TaskManagerPage() {
               />
             ) : null}
             {!isAgentRole && !canManage ? <p className={styles.muted}>You do not have access to edit these notes.</p> : null}
+            <div className={styles.noteHistoryPanel}>
+              <p className={styles.inlineNoteLabel}>Notes timeline</p>
+              {noteHistoryLoading ? <p className={styles.muted}>Loading notes...</p> : null}
+              {!noteHistoryLoading && noteHistory.length === 0 ? <p className={styles.muted}>No notes saved yet.</p> : null}
+              {!noteHistoryLoading && noteHistory.length > 0 ? (
+                <div className={styles.noteHistoryList}>
+                  {noteHistory.map((entry) => (
+                    <div key={entry.id} className={styles.noteHistoryItem}>
+                      <div className={styles.noteHistoryMeta}>
+                        <span>{entry.note_type === 'manager' ? 'Manager note' : 'Agent note'}</span>
+                        <span>
+                          {(entry.author_name || 'User') + (entry.author_role ? ` (${entry.author_role})` : '')} ·{' '}
+                          {formatDateTime(entry.created_at)}
+                        </span>
+                      </div>
+                      <div className={styles.noteHistoryText}>{entry.note_text || '—'}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </Modal>
@@ -1579,36 +1710,39 @@ export function TaskManagerPage() {
             <Button variant="ghost" onClick={() => setCommentsModalAssignment(null)}>
               Close
             </Button>
-            <Button variant="primary" onClick={submitAssignmentComment}>
-              Add comment
-            </Button>
           </ModalFooter>
         }
       >
         {commentsModalAssignment ? (
           <div className={styles.modalForm}>
             <p className={styles.modalLead}>{commentsModalAssignment.title || 'Task'}</p>
-            <Textarea
-              label="New comment"
-              rows={3}
-              value={commentDraft}
-              onChange={(e) => setCommentDraft(e.target.value)}
-              placeholder="Write your update..."
-            />
             {commentsLoading ? <p className={styles.muted}>Loading comments...</p> : null}
             {!commentsLoading && assignmentComments.length === 0 ? <p className={styles.muted}>No comments yet.</p> : null}
             {!commentsLoading && assignmentComments.length > 0 ? (
-              <div>
-                {assignmentComments.map((c) => (
-                  <div key={c.id} className={styles.inlineNoteBlock}>
-                    <div className={styles.inlineNoteLabel}>
-                      {c.author_name || 'User'} · {String(c.created_at || '').replace('T', ' ').slice(0, 16)}
-                    </div>
-                    <div>{c.comment_text}</div>
+              <div className={styles.chatThread} data-chat-thread={`modal-${commentsModalAssignment.id}`}>
+                {[...assignmentComments].reverse().map((c) => (
+                  <div
+                    key={c.id}
+                    className={`${styles.chatMessage} ${isOwnComment(c) ? styles.chatMessageOwn : ''}`}
+                  >
+                    <div className={styles.chatSender}>{commentAuthorLabel(c)}</div>
+                    <div className={styles.chatBubble}>{c.comment_text}</div>
+                    <div className={styles.chatTime}>{formatDateTime(c.created_at)}</div>
                   </div>
                 ))}
               </div>
             ) : null}
+            <div className={styles.chatComposerRow}>
+              <Input
+                value={commentDraft}
+                onChange={(e) => setCommentDraft(e.target.value)}
+                onKeyDown={(e) => onCommentKeyDown(e, submitAssignmentComment)}
+                placeholder="Type a message..."
+              />
+              <Button variant="primary" onClick={submitAssignmentComment} aria-label="Send comment">
+                <MaterialSymbol name="send" size="sm" />
+              </Button>
+            </div>
           </div>
         ) : null}
       </Modal>
@@ -1622,13 +1756,9 @@ export function TaskManagerPage() {
         title="Remove assignment"
         message={
           deleteAssignmentTarget
-            ? `Remove "${deleteAssignmentTarget.title || 'Task'}" for ${deleteAssignmentTarget.assigned_to_name || 'agent'} (${String(
-                deleteAssignmentTarget.start_at || deleteAssignmentTarget.start_date || ''
-              )
-                .replace('T', ' ')
-                .slice(0, 16)} → ${String(deleteAssignmentTarget.end_at || deleteAssignmentTarget.end_date || '')
-                .replace('T', ' ')
-                .slice(0, 16)})? This deletes the assignment and its daily rows.`
+            ? `Remove "${deleteAssignmentTarget.title || 'Task'}" for ${deleteAssignmentTarget.assigned_to_name || 'agent'} (${formatDateTime(
+                deleteAssignmentTarget.start_at || deleteAssignmentTarget.start_date
+              )} → ${formatDateTime(deleteAssignmentTarget.end_at || deleteAssignmentTarget.end_date)})? This deletes the assignment and its daily rows.`
             : ''
         }
         confirmText="Remove"

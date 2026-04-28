@@ -25,6 +25,7 @@ import {
   statusBadgeForActivity,
   valueColumnForActivity,
 } from './activityFeedDisplay';
+import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 import dashStyles from '../../pages/TenantDashboardPage.module.scss';
 import styles from './ActivityHistoryPage.module.scss';
 
@@ -53,7 +54,8 @@ export function ActivityHistoryPage() {
   const navigate = useNavigate();
   const user = useAppSelector(selectUser);
   const role = user?.role ?? 'agent';
-  const dtMode = user?.datetimeDisplayMode ?? 'ist_fixed';
+  const { datetimeDisplayMode, datetimePreferences } = useDateTimeDisplay();
+  const dtMode = datetimeDisplayMode;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const activityTab = useMemo(() => normalizeTabFromParams(searchParams, role), [searchParams, role]);
@@ -262,7 +264,7 @@ export function ActivityHistoryPage() {
                         </TableCell>
                         <TableCell>{valueColumnForActivity(it)}</TableCell>
                         <TableCell>
-                          <span className={styles.whenCell} title={formatDateTimeDisplay(it.at, dtMode)}>
+                          <span className={styles.whenCell} title={formatDateTimeDisplay(it.at, dtMode, datetimePreferences)}>
                             {formatRelativeTimeShort(it.at)}
                           </span>
                           <button type="button" className={styles.rowMenuBtn} aria-label="Row actions">

@@ -158,6 +158,12 @@ export function CallScriptsPage() {
 
   const handleToggleStatusConfirm = useCallback(async () => {
     if (!toggleTarget) return;
+    const isToggleTargetMyDefault =
+      canSetPersonalDefault && Number(myDefaultScriptId) === Number(toggleTarget.id);
+    if (toggleTarget.status === 1 && isToggleTargetMyDefault) {
+      setToggleTarget(null);
+      return;
+    }
     setToggleLoading(true);
     const newStatus = toggleTarget.status === 1 ? 0 : 1;
     const result = await updateMutation.mutate(toggleTarget.id, { status: newStatus });
@@ -166,7 +172,7 @@ export function CallScriptsPage() {
       setToggleTarget(null);
       fetchScripts();
     }
-  }, [toggleTarget, updateMutation, fetchScripts]);
+  }, [toggleTarget, updateMutation, fetchScripts, canSetPersonalDefault, myDefaultScriptId]);
 
   const { active: autocompleteActive, suggestions, context: autocompleteContext } = useTemplateVariableAutocomplete(
     editorPlainText,
@@ -310,6 +316,7 @@ export function CallScriptsPage() {
                   const editable = canEditScript(script);
                   const isMyDefault =
                     canSetPersonalDefault && Number(myDefaultScriptId) === Number(script.id);
+                  const disableDeactivate = script.status === 1 && isMyDefault;
                   return (
                   <TableRow key={script.id}>
                     <TableCell>{script.script_name}</TableCell>
@@ -351,13 +358,15 @@ export function CallScriptsPage() {
                           title={
                             !editable
                               ? 'You can only change status on scripts you created'
+                              : disableDeactivate
+                                ? 'Default script cannot be deactivated'
                               : script.status === 1
                                 ? 'Deactivate'
                                 : 'Activate'
                           }
                           variant={script.status === 1 ? 'warning' : 'success'}
                           onClick={() => setToggleTarget(script)}
-                          disabled={!editable || toggleLoading}
+                          disabled={!editable || toggleLoading || disableDeactivate}
                         >
                           {script.status === 1 ? <PauseIcon /> : <PlayIcon />}
                         </IconButton>
