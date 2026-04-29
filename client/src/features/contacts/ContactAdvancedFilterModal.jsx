@@ -38,6 +38,68 @@ function IconPropertyRules() {
   );
 }
 
+function IconTrash() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 7h16M9.5 7V5.6c0-.9.7-1.6 1.6-1.6h1.8c.9 0 1.6.7 1.6 1.6V7M8.2 10.5v6.8M12 10.5v6.8M15.8 10.5v6.8M6.6 7l.8 11.2c.1 1 .9 1.8 1.9 1.8h5.4c1 0 1.8-.8 1.9-1.8L17.4 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconFieldTag({ kind }) {
+  if (kind === 'campaign') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M3 10.5V6.8A1.8 1.8 0 0 1 4.8 5h10.4A1.8 1.8 0 0 1 17 6.8V9l4 2.5v1L17 15v2.2a1.8 1.8 0 0 1-1.8 1.8H4.8A1.8 1.8 0 0 1 3 17.2v-3.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (kind === 'status') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M8.5 12.2 10.8 14.5 15.8 9.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (kind === 'manager') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="8.5" cy="9" r="3" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M3.5 18.5c.7-2.2 2.7-3.5 5-3.5s4.3 1.3 5 3.5M16 8h4M18 6v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (kind === 'agent') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="8.5" r="3.2" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M5 19c1-2.8 3.5-4.5 7-4.5s6 1.7 7 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (kind === 'tag') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M12 4H6.8A1.8 1.8 0 0 0 5 5.8V11l7 7 7-7-7-7Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+        <circle cx="9" cy="8.5" r="1.2" fill="currentColor" />
+      </svg>
+    );
+  }
+  return null;
+}
+
+function FieldLabel({ kind, text }) {
+  return (
+    <span className={styles.fieldLabel}>
+      <span className={`${styles.fieldLabelIcon} ${styles[`fieldLabelIcon${kind.charAt(0).toUpperCase()}${kind.slice(1)}`] || ''}`}>
+        <IconFieldTag kind={kind} />
+      </span>
+      <span>{text}</span>
+    </span>
+  );
+}
+
 /** Core fields — must match server COLUMN_FILTER_FIELDS + COLUMN_FILTER_OPS. Industry fields use `ind:field_key` (server validates against tenant definitions). */
 const FIELD_OPTIONS = [
   { value: 'display_name', label: 'Name / display' },
@@ -69,6 +131,20 @@ const OP_OPTIONS = [
   { value: 'empty', label: 'Is empty' },
   { value: 'not_empty', label: 'Is not empty' },
 ];
+
+function propertyInputConfig(fieldKey) {
+  const key = String(fieldKey || '').toLowerCase();
+  if (key === 'date_of_birth') {
+    return { type: 'date', placeholder: 'Select date', inputMode: undefined };
+  }
+  if (key.endsWith('_at') || key.endsWith('_datetime')) {
+    return { type: 'date', placeholder: 'Select date', inputMode: undefined };
+  }
+  if (key.endsWith('_count') || key.startsWith('num_') || key.includes('_number')) {
+    return { type: 'number', placeholder: 'Enter number', inputMode: 'numeric' };
+  }
+  return { type: 'text', placeholder: 'Text to match', inputMode: undefined };
+}
 
 function needsValue(op) {
   return ['contains', 'not_contains', 'starts_with', 'ends_with'].includes(op);
@@ -353,15 +429,15 @@ export function ContactAdvancedFilterModal({
           <>
             <div className={styles.refinePanel}>
               <div className={styles.sectionTitleRow}>
-                <span className={styles.sectionTitleIcon}>
+                <span className={`${styles.sectionTitleIcon} ${styles.sectionTitleIconQuick}`}>
                   <IconSliders />
                 </span>
-                <span className={styles.sectionTitleText}>Refine by field</span>
+            <span className={styles.sectionTitleText}>Quick filters</span>
               </div>
               <div className={styles.structuredGrid}>
                 {showCampaign ? (
                   <MultiSelectDropdown
-                    label="Campaigns"
+                    label={<FieldLabel kind="campaign" text="Campaigns" />}
                     value={draftCampaignIdsMulti}
                     onChange={setDraftCampaignIdsMulti}
                     options={campaignOptions}
@@ -370,7 +446,7 @@ export function ContactAdvancedFilterModal({
                 ) : null}
                 {showStatuses ? (
                   <MultiSelectDropdown
-                    label="Status"
+                    label={<FieldLabel kind="status" text="Status" />}
                     value={draftStatusIdsMulti}
                     onChange={setDraftStatusIdsMulti}
                     options={statusOptions}
@@ -379,7 +455,7 @@ export function ContactAdvancedFilterModal({
                 ) : null}
                 {showManagersMulti ? (
                   <MultiSelectDropdown
-                    label="Owning managers"
+                    label={<FieldLabel kind="manager" text="Owning managers" />}
                     value={draftAdminManagersMulti}
                     onChange={setDraftAdminManagersMulti}
                     options={adminManagerOptions}
@@ -389,7 +465,7 @@ export function ContactAdvancedFilterModal({
                 {showAgent ? (
                   <Select
                     allowEmpty
-                    label="Assigned agent"
+                    label={<FieldLabel kind="agent" text="Assigned agent" />}
                     placeholder="All agents"
                     value={draftAgentFilter || ''}
                     onChange={(e) => setDraftAgentFilter(e.target.value)}
@@ -399,7 +475,7 @@ export function ContactAdvancedFilterModal({
                 ) : null}
                 {showTags ? (
                   <MultiSelectDropdown
-                    label="Tags (match all selected)"
+                    label={<FieldLabel kind="tag" text="Tags (match all selected)" />}
                     value={draftTagIdsMulti}
                     onChange={setDraftTagIdsMulti}
                     options={tagOptions}
@@ -436,15 +512,19 @@ export function ContactAdvancedFilterModal({
                     />
                     <Input
                       label="Min calls"
+                      type="number"
                       value={draftMinCallCount}
                       onChange={(e) => setDraftMinCallCount(e.target.value)}
                       placeholder="e.g. 0"
+                      inputMode="numeric"
                     />
                     <Input
                       label="Max calls"
+                      type="number"
                       value={draftMaxCallCount}
                       onChange={(e) => setDraftMaxCallCount(e.target.value)}
                       placeholder="e.g. 5"
+                      inputMode="numeric"
                     />
                   </>
                 ) : null}
@@ -462,10 +542,10 @@ export function ContactAdvancedFilterModal({
 
         <div className={styles.propertyPanel}>
           <div className={styles.sectionTitleRow}>
-            <span className={styles.sectionTitleIcon}>
+            <span className={`${styles.sectionTitleIcon} ${styles.sectionTitleIconProperty}`}>
               <IconPropertyRules />
             </span>
-            <span className={styles.sectionTitleText}>Property</span>
+            <span className={styles.sectionTitleText}>Common property filters</span>
           </div>
           <p className={styles.hint}>
             Rules here are combined with the selections above. Each field can only be used once. Values are optional
@@ -478,7 +558,9 @@ export function ContactAdvancedFilterModal({
               <span>Value</span>
               <span className={styles.propertyGridHeaderAction} />
             </div>
-            {rows.map((row, idx) => (
+            {rows.map((row, idx) => {
+              const inputCfg = propertyInputConfig(row.field);
+              return (
               <div key={idx} className={styles.row}>
                 <Select
                   label=""
@@ -499,21 +581,28 @@ export function ContactAdvancedFilterModal({
                 <Input
                   label=""
                   aria-label={`Property value, row ${idx + 1}`}
+                  type={inputCfg.type}
                   value={row.value}
                   onChange={(e) => patchRow(idx, { value: e.target.value })}
-                  placeholder={needsValue(row.op) ? 'Text to match' : '—'}
+                  placeholder={needsValue(row.op) ? inputCfg.placeholder : '—'}
                   disabled={!needsValue(row.op)}
+                  inputMode={inputCfg.inputMode}
                   className={styles.valInp}
+                  inputClassName={styles.valueInputControl}
                 />
                 <button
                   type="button"
                   className={styles.removeRowBtn}
                   onClick={() => removeRow(idx)}
+                  aria-label={`Remove property row ${idx + 1}`}
+                  title="Remove row"
+                  data-tooltip="Remove"
                 >
-                  Remove
+                  <IconTrash />
                 </button>
               </div>
-            ))}
+            );
+            })}
           </div>
           <Button
             type="button"

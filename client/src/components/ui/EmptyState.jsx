@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from './Button';
+import { InfoHelpIcon } from './InfoHelpIcon';
 import styles from './EmptyState.module.scss';
 
 export function EmptyState({
@@ -13,8 +14,10 @@ export function EmptyState({
   return (
     <div className={`${styles.empty} ${className}`}>
       <span className={styles.icon}>{icon}</span>
-      <h3 className={styles.title}>{title}</h3>
-      {description && <p className={styles.description}>{description}</p>}
+      <h3 className={styles.title}>
+        <span>{title}</span>
+        <InfoHelpIcon title="More details" modalTitle={title} message={description} className={styles.titleInfoBtn} />
+      </h3>
       {action && actionLabel && (
         <Button onClick={action} variant="primary" size="sm">
           {actionLabel}

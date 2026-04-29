@@ -39,6 +39,10 @@
   );
 }
 
+.heroBody {
+  min-width: 0;
+}
+
 .heroIcon {
   flex-shrink: 0;
   color: var(--color-primary-400);
@@ -46,6 +50,9 @@
 }
 
 .heroLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: $font-size-2xs;
   font-weight: $font-weight-semibold;
   text-transform: uppercase;
@@ -59,6 +66,33 @@
   font-weight: $font-weight-bold;
   color: var(--color-text-primary);
   line-height: 1.2;
+}
+
+.heroSubtext {
+  margin: $space-1 0 0;
+  font-size: $font-size-xs;
+  color: var(--color-text-secondary);
+}
+
+.glanceStats {
+  margin-top: $space-1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+}
+
+.glanceStatDone {
+  color: #14b86a;
+}
+
+.glanceStatMissed {
+  color: #e15858;
+}
+
+.glanceStatPending {
+  color: #d39322;
 }
 
 .heroHint {
@@ -81,18 +115,13 @@
 }
 
 .assignmentsTitle {
-  margin: 0 0 $space-2;
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1;
+  margin: 0;
   font-size: $font-size-base;
   font-weight: $font-weight-semibold;
   color: var(--color-text-primary);
-}
-
-.assignmentsSub {
-  margin: 0;
-  font-size: $font-size-sm;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-  max-width: 820px;
 }
 
 .toolbar {
@@ -150,15 +179,15 @@
 
 .cardGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: $space-4;
 }
 
 .taskCard {
   @include premium-panel;
   border-radius: $radius-lg;
-  padding: $space-4;
-  border: 1px solid var(--color-border-subtle);
+  padding: $space-3;
+  border: 1px solid #e8ecf4;
   background: var(--color-bg-elevated, var(--color-bg-subtle));
   display: flex;
   flex-direction: column;
@@ -228,7 +257,7 @@
 .taskMetrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: $space-2;
+  gap: $space-1;
 
   @media (max-width: 520px) {
     grid-template-columns: repeat(2, 1fr);
@@ -238,13 +267,13 @@
 .taskMetric {
   padding: $space-2 $space-2;
   border-radius: $radius-md;
-  background: var(--color-bg-subtle);
-  border: 1px solid var(--color-border-subtle);
+  background: #f8f9fe;
+  border: 1px solid #e7edf8;
 }
 
 .taskMetricLabel {
   display: block;
-  font-size: 10px;
+  font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-text-tertiary);
@@ -258,7 +287,7 @@
 }
 
 .progressTrack {
-  height: 8px;
+  height: 6px;
   border-radius: $radius-full;
   background: var(--color-bg-muted);
   overflow: hidden;
@@ -275,6 +304,9 @@
   display: flex;
   gap: $space-2;
   flex-wrap: wrap;
+  border-top: 1px solid #eef2f9;
+  padding-top: $space-2;
+  justify-content: space-between;
 }
 
 .inlineNoteLabel {
@@ -404,25 +436,32 @@
 }
 
 .chatThread {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: $space-3;
-  max-height: 360px;
+  max-height: 430px;
   overflow-y: auto;
-  padding: 2px 2px 0;
+  padding: $space-2;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-md;
+  background: var(--color-bg-subtle);
 }
 
 .chatMessage {
-  display: grid;
-  gap: 4px;
-  justify-items: start;
+  display: flex;
+  gap: $space-2;
+  align-items: flex-start;
+  width: 100%;
 }
 
 .chatMessageOwn {
-  justify-items: end;
+  flex-direction: row-reverse;
+  justify-content: flex-start;
 }
 
 .chatSender {
-  font-size: 11px;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
   color: var(--color-text-secondary);
   padding-inline: 2px;
 }
@@ -434,21 +473,48 @@
 }
 
 .chatBubble {
-  max-width: min(82%, 440px);
-  padding: 9px 12px;
+  max-width: min(92%, 560px);
+  width: fit-content;
+  padding: 10px 12px;
   border-radius: 14px 14px 14px 6px;
-  background: var(--color-bg-muted);
-  border: none;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
   color: var(--color-text-primary);
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 
   .chatMessageOwn & {
-    background: rgba(37, 99, 235, 0.2);
+    background: rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.35);
     border-radius: 14px 14px 6px 14px;
   }
+}
+
+.chatAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  flex: 0 0 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: $font-weight-semibold;
+  background: #ece8ff;
+  color: #5a43d5;
+}
+
+.chatContent {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.chatMessageOwn .chatContent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 .chatComposerRow {
@@ -456,6 +522,170 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: $space-2;
   align-items: center;
+  margin-top: $space-2;
+}
+
+.commentsModalLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(240px, 0.9fr);
+  gap: $space-4;
+
+  @media (max-width: 980px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.commentsMain {
+  min-width: 0;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-lg;
+  padding: $space-4;
+  background: var(--color-bg-elevated);
+}
+
+.commentsMainHead {
+  display: flex;
+  justify-content: space-between;
+  gap: $space-2;
+  align-items: flex-start;
+  margin-bottom: $space-2;
+
+  @media (max-width: 720px) {
+    flex-direction: column;
+  }
+}
+
+.commentsSortMeta {
+  font-size: $font-size-xs;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.commentsSide {
+  display: grid;
+  align-content: start;
+  gap: $space-3;
+  min-width: 0;
+}
+
+.commentTaskCard,
+.commentParticipantsCard {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-lg;
+  padding: $space-3;
+  background: var(--color-bg-subtle);
+}
+
+.commentSideHeading {
+  margin: 0 0 $space-2;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+}
+
+.commentTaskTitle {
+  margin: 0;
+  font-size: $font-size-sm;
+  color: var(--color-text-primary);
+}
+
+.commentTaskDate {
+  margin: $space-2 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: $font-size-xs;
+  color: var(--color-text-secondary);
+}
+
+.commentMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-2;
+  margin-top: $space-2;
+}
+
+.commentMetricTile {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-md;
+  background: var(--color-bg-elevated);
+  padding: $space-2;
+  display: grid;
+  gap: 2px;
+}
+
+.commentMetricLabel {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary);
+}
+
+.commentMetricValue {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+}
+
+.commentNotesBlock {
+  margin-top: $space-3;
+  padding-top: $space-2;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.commentNotesText {
+  margin: 0;
+  font-size: $font-size-sm;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.commentParticipantList {
+  display: grid;
+  gap: $space-2;
+}
+
+.commentParticipantRow {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  padding: 2px 0;
+}
+
+.commentParticipantName {
+  font-size: $font-size-sm;
+  color: var(--color-text-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commentParticipantRole {
+  font-size: $font-size-2xs;
+  color: var(--color-text-primary);
+  border-radius: $radius-full;
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  font-weight: $font-weight-semibold;
+}
+
+.commentParticipantRoleAdmin {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.32);
+}
+
+.commentParticipantRoleManager {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: rgba(168, 85, 247, 0.34);
+}
+
+.commentParticipantRoleDefault {
+  background: var(--color-bg-muted);
+  border-color: var(--color-border-subtle);
 }
 
 .formGrid {
@@ -469,6 +699,9 @@
 }
 
 .formSectionTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin: 0 0 4px;
   font-size: $font-size-sm;
   font-weight: $font-weight-semibold;

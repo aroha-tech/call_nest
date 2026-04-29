@@ -14,18 +14,13 @@
 }
 
 .title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 1.125rem;
   font-weight: 650;
   margin: 0;
   color: var(--color-text-primary, #f8fafc);
-}
-
-.desc {
-  font-size: 0.8125rem;
-  color: var(--color-text-muted, #94a3b8);
-  margin: 0 0 14px;
-  line-height: 1.5;
-  max-width: 52rem;
 }
 
 .panel {

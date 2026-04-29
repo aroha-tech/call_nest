@@ -7,6 +7,7 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Alert } from '../components/ui/Alert';
 import { Tabs, TabList, Tab, TabPanel } from '../components/ui/Tabs';
+import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '../components/ui/Table';
 import { taskManagerAPI } from '../services/taskManagerAPI';
 import { tenantUsersAPI } from '../services/tenantUsersAPI';
@@ -220,8 +221,14 @@ export function PerformanceReportsPage() {
       <div className={styles.scopeCard}>
         <div>
           <p className={styles.scopeLabel}>Report Perspective</p>
-          <h3 className={styles.scopeTitle}>{reportPerspective}</h3>
-          <p className={styles.scopeHint}>{reportSubtitle}</p>
+          <h3 className={styles.scopeTitle}>
+            <span>{reportPerspective}</span>
+            <InfoHelpIcon
+              title="Report perspective info"
+              modalTitle={reportPerspective}
+              message={reportSubtitle}
+            />
+          </h3>
         </div>
         {!isAgent ? (
           <div className={styles.viewToggleGroup}>
@@ -267,9 +274,15 @@ export function PerformanceReportsPage() {
       <div className={styles.cardsRow}>
         {reportCards.map((card) => (
           <div key={card.label} className={styles.miniCard}>
-            <div className={styles.miniLabel}>{card.label}</div>
+            <div className={styles.miniLabel}>
+              <span>{card.label}</span>
+              <InfoHelpIcon
+                title={`${card.label} info`}
+                modalTitle={card.label}
+                message={card.hint}
+              />
+            </div>
             <div className={styles.miniValue}>{card.value}</div>
-            <div className={styles.miniHint}>{card.hint}</div>
           </div>
         ))}
       </div>

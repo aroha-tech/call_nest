@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { InfoHelpIcon } from '../ui/InfoHelpIcon';
 import styles from './DashboardDataCharts.module.scss';
 
 const ROLE_ORDER = ['admin', 'manager', 'agent'];
@@ -47,8 +48,10 @@ function RoleDonutCard({ usersByRole, usersTotal, title, hint }) {
 
   return (
     <div className={styles.card}>
-      <h3 className={styles.cardTitle}>{title}</h3>
-      <p className={styles.cardHint}>{hint}</p>
+      <h3 className={styles.cardTitle}>
+        <span>{title}</span>
+        <InfoHelpIcon title={`${title} info`} modalTitle={title} message={hint} />
+      </h3>
       <div className={styles.donutWrap}>
         <div className={styles.donutSvgWrap}>
           {usersTotal === 0 ? (
@@ -132,8 +135,10 @@ function HorizontalMetricsCard({ title, hint, rows }) {
   const max = Math.max(...rows.map((r) => r.value), 1);
   return (
     <div className={styles.card}>
-      <h3 className={styles.cardTitle}>{title}</h3>
-      <p className={styles.cardHint}>{hint}</p>
+      <h3 className={styles.cardTitle}>
+        <span>{title}</span>
+        <InfoHelpIcon title={`${title} info`} modalTitle={title} message={hint} />
+      </h3>
       <div className={styles.hBarBlock}>
         {rows.map((row, i) => {
           const dimmed = hovered && hovered !== row.key;
@@ -171,8 +176,10 @@ function SparkCompareCard({ title, hint, left, right }) {
 
   return (
     <div className={styles.card}>
-      <h3 className={styles.cardTitle}>{title}</h3>
-      <p className={styles.cardHint}>{hint}</p>
+      <h3 className={styles.cardTitle}>
+        <span>{title}</span>
+        <InfoHelpIcon title={`${title} info`} modalTitle={title} message={hint} />
+      </h3>
       <div className={styles.sparkArea}>
         <div
           className={`${styles.sparkBarWrap} ${hovered && hovered !== 'left' ? styles.sparkBarWrapDimmed : ''} ${

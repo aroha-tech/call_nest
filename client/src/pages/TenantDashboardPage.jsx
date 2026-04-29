@@ -12,6 +12,7 @@ import { PERMISSIONS } from '../utils/permissionUtils';
 import { useToast } from '../context/ToastContext';
 import { DateRangePresetControl } from '../components/ui/DateRangePresetControl';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
+import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
 import {
   TIME_RANGE_PRESET,
   TIME_RANGE_PRESET_OPTIONS,
@@ -995,11 +996,15 @@ export function TenantDashboardPage() {
                   <h2 id="dash-users-by-role-heading" className={styles.insightPanelTitle}>
                     {scope === 'tenant' ? 'Users by role' : 'Your agents'}
                   </h2>
-                  <p className={styles.insightPanelHint}>
-                    {scope === 'tenant'
-                      ? 'Share of workspace users by admin, manager, and agent roles.'
-                      : 'Agents on your team (managers typically see direct reports here).'}
-                  </p>
+                  <InfoHelpIcon
+                    title="Users by role info"
+                    modalTitle={scope === 'tenant' ? 'Users by role' : 'Your agents'}
+                    message={
+                      scope === 'tenant'
+                        ? 'Share of workspace users by admin, manager, and agent roles.'
+                        : 'Agents on your team (managers typically see direct reports here).'
+                    }
+                  />
                 </div>
                 {canAny([PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM]) ? (
                   <Link to="/users" className={styles.insightPanelLink}>
@@ -1040,11 +1045,15 @@ export function TenantDashboardPage() {
                   <h2 id="dash-recent-users-heading" className={styles.insightPanelTitle}>
                     {scope === 'team' ? 'Recent agents' : 'Recent users'}
                   </h2>
-                  <p className={styles.insightPanelHint}>
-                    {scope === 'team'
-                      ? 'Latest team members surfaced for quick access.'
-                      : 'Latest workspace members in your scope.'}
-                  </p>
+                  <InfoHelpIcon
+                    title="Recent users info"
+                    modalTitle={scope === 'team' ? 'Recent agents' : 'Recent users'}
+                    message={
+                      scope === 'team'
+                        ? 'Latest team members surfaced for quick access.'
+                        : 'Latest workspace members in your scope.'
+                    }
+                  />
                 </div>
                 {canAny([PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM]) ? (
                   <Link to="/users" className={styles.insightPanelLink}>

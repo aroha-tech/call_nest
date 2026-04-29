@@ -1,5 +1,6 @@
 import React from 'react';
 import { MaterialSymbol } from './MaterialSymbol';
+import { InfoHelpIcon } from './InfoHelpIcon';
 import styles from './PageHeader.module.scss';
 
 function inferTitleIcon(title = '') {
@@ -47,8 +48,13 @@ export function PageHeader({
               </span>
             ) : null}
             <span>{title}</span>
+            <InfoHelpIcon
+              title={`About ${title}`}
+              modalTitle={title}
+              message={description}
+              className={styles.titleInfoBtn}
+            />
           </h1>
-          {description && <p className={styles.description}>{description}</p>}
         </div>
         {actions && <div className={styles.actions}>{actions}</div>}
       </div>

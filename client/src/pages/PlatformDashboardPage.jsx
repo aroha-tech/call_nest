@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
+import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
 import { Skeleton } from '../components/ui/Skeleton';
 import { PlatformDataCharts } from '../components/dashboard/DashboardDataCharts';
 import { dashboardAPI } from '../services/adminAPI';
@@ -407,9 +408,11 @@ export function PlatformDashboardPage() {
                   Platform activity
                 </h2>
               </div>
-              <p className={styles.platformActivityHint}>
-                New organizations and workspace users (not scoped by the KPI date filter above).
-              </p>
+              <InfoHelpIcon
+                title="Platform activity info"
+                modalTitle="Platform activity"
+                message="New organizations and workspace users (not scoped by the KPI date filter above)."
+              />
               <div className={styles.platformActivityCard}>
                 {(stats?.activityFeed ?? []).length === 0 ? (
                   <p className={styles.recentEmpty}>No recent platform events yet.</p>

@@ -21,6 +21,7 @@ import { Select } from '../components/ui/Select';
 import { PasswordField } from '../features/auth/components/PasswordField';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
+import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
 import { SectionIcon } from '../components/ui/SectionIcon';
 import styles from './ProfilePage.module.scss';
 
@@ -217,25 +218,16 @@ export function ProfilePage() {
                   <p className={styles.emailValue} title={user.email}>
                     {user.email}
                   </p>
-                  <p className={styles.emailHint}>Email cannot be changed here yet.</p>
+                  <InfoHelpIcon
+                    title="Email change info"
+                    modalTitle="Email"
+                    message="Email cannot be changed here yet."
+                  />
                 </div>
               </div>
             </div>
           </section>
 
-          <section className={styles.card}>
-            <div className={styles.infoCardHeader}>
-              <SectionIcon icon="menu_book" color="purple" size="sm" />
-              <h3 className={styles.managerCardTitle}>Instructions</h3>
-            </div>
-            <p className={styles.managerCardBody}>Guidelines and important information for this workspace.</p>
-            <ul className={styles.instructionList}>
-              <li>Getting started</li>
-              <li>Dialer guide</li>
-              <li>Lead management</li>
-              <li>Best practices</li>
-            </ul>
-          </section>
         </aside>
 
         <main className={styles.mainColumn}>
@@ -333,9 +325,11 @@ export function ProfilePage() {
                 onChange={(e) => setDatetimeTimeFormat(e.target.value)}
                 options={TIME_FORMAT_OPTIONS}
               />
-              <p className={styles.fieldHint}>
-                Applies to lists and details across the app. In browser-local mode, timezone comes from your device while date/time format still follows these selections.
-              </p>
+              <InfoHelpIcon
+                title="Date/time settings info"
+                modalTitle="Dates and times"
+                message="Applies to lists and details across the app. In browser-local mode, timezone comes from your device while date/time format still follows these selections."
+              />
 
               {!passwordFlowOpen && (
                 <div className={styles.changePwdTrigger}>
@@ -364,9 +358,11 @@ export function ProfilePage() {
                       Cancel
                     </Button>
                   </div>
-                  <p className={styles.sectionHint}>
-                    Enter your current password and choose a new one (at least 8 characters).
-                  </p>
+                  <InfoHelpIcon
+                    title="Password change info"
+                    modalTitle="Change password"
+                    message="Enter your current password and choose a new one (at least 8 characters)."
+                  />
                   <PasswordField
                     id="profile-current-password"
                     label="Current password"
@@ -433,7 +429,11 @@ export function ProfilePage() {
             </div>
             <p className={styles.planTitle}>Current plan</p>
             <p className={styles.planValue}>Workspace Plan</p>
-            <p className={styles.planHint}>Billing information and usage metrics will appear here.</p>
+            <InfoHelpIcon
+              title="Billing info"
+              modalTitle="Billing and plan"
+              message="Billing information and usage metrics will appear here."
+            />
             <Button type="button" variant="secondary" size="sm">
               Manage plan
             </Button>
@@ -444,12 +444,11 @@ export function ProfilePage() {
               <SectionIcon icon="extension" color="emerald" size="sm" />
               <h3 className={styles.managerCardTitle}>Add-ons</h3>
             </div>
-            <ul className={styles.instructionList}>
-              <li>Power Dialer</li>
-              <li>WhatsApp Integration</li>
-              <li>Advanced Reports</li>
-              <li>API Access</li>
-            </ul>
+            <InfoHelpIcon
+              title="Add-ons info"
+              modalTitle="Add-ons"
+              message={'Power Dialer\nWhatsApp Integration\nAdvanced Reports\nAPI Access'}
+            />
             <Button type="button" variant="secondary" size="sm">
               Browse add-ons
             </Button>

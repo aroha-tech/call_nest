@@ -37,6 +37,7 @@ import { useMutation } from '../hooks/useAsyncData';
 import { useTableLoadingState } from '../hooks/useTableLoadingState';
 import { TableDataRegion } from '../components/admin/TableDataRegion';
 import { TenantWorkspaceUrlCopy } from '../components/admin/TenantWorkspaceUrlCopy';
+import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
 import styles from './TenantsPage.module.scss';
 import { isNoListFilter } from '../utils/listFilterNarrowing';
 
@@ -804,10 +805,11 @@ export function TenantsPage() {
           {editing && (
             <div className={styles.formSection}>
               <h3 className={styles.formSectionTitle}>Workspace appearance</h3>
-              <p className={styles.formSectionHint}>
-                Logo and typography apply to this tenant&apos;s app after sign-in. Users see updates on
-                their next session refresh. Logo URL must use HTTPS.
-              </p>
+              <InfoHelpIcon
+                title="Workspace appearance info"
+                modalTitle="Workspace appearance"
+                message="Logo and typography apply to this tenant app after sign-in. Users see updates on their next session refresh. Logo URL must use HTTPS."
+              />
               <Input
                 label="Logo URL (HTTPS)"
                 value={form.theme_logo_url}
@@ -856,7 +858,11 @@ export function TenantsPage() {
           {!editing && (
             <div className={styles.formSection}>
               <h3 className={styles.formSectionTitle}>First admin user</h3>
-              <p className={styles.formSectionHint}>Every tenant must have at least one admin. This user will have full access to the tenant.</p>
+              <InfoHelpIcon
+                title="First admin user info"
+                modalTitle="First admin user"
+                message="Every tenant must have at least one admin. This user will have full access to the tenant."
+              />
               <Input
                 label="Admin email"
                 type="email"

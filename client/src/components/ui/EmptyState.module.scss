@@ -16,10 +16,17 @@
 }
 
 .title {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1;
   font-size: $font-size-md;
   font-weight: $font-weight-medium;
   color: var(--color-text-primary);
   margin: 0 0 $space-1;
+}
+
+.titleInfoBtn {
+  margin-left: 2px;
 }
 
 .description {

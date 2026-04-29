@@ -22,6 +22,7 @@ import { Badge } from '../components/ui/Badge';
 import { TableDataRegion } from '../components/admin/TableDataRegion';
 import listStyles from '../components/admin/adminDataList.module.scss';
 import { ScriptBodyEditor } from '../features/callScripts/ScriptBodyEditor';
+import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import styles from './MeetingsPage.module.scss';
 
@@ -1559,10 +1560,11 @@ export function MeetingsPage() {
               />
               <div>
                 <div className={styles.fieldLabel}>Message (formatted)</div>
-                <p className={styles.fieldHint}>
-                  Use the toolbar for formatting. Insert meeting fields with <strong>Variable</strong> in the toolbar (same as
-                  call scripts).
-                </p>
+                <InfoHelpIcon
+                  title="Formatted message info"
+                  modalTitle="Message (formatted)"
+                  message="Use the toolbar for formatting. Insert meeting fields with Variable in the toolbar (same as call scripts)."
+                />
                 <ScriptBodyEditor
                   key={meetingPreviewKind}
                   scrollableLayout
@@ -1603,7 +1605,11 @@ export function MeetingsPage() {
           </ModalFooter>
         }
       >
-        <p className={styles.previewModalHint}>Filled with the meeting currently on the form (read-only).</p>
+        <InfoHelpIcon
+          title="Preview info"
+          modalTitle="Preview"
+          message="Filled with the meeting currently on the form (read-only)."
+        />
         {meetingPreviewResolving ? (
           <p className={styles.listHint}>Updating…</p>
         ) : (
@@ -1665,22 +1671,22 @@ export function MeetingsPage() {
         ) : (
           <div className={styles.meetingEmailModal}>
             <div className={styles.meetingEmailIntro}>
-              <p className={styles.meetingEmailIntroLead}>
-                These emails go to the attendee when a meeting is saved. Pick a tab (new / updated / cancelled), edit, then
-                save.
-              </p>
-              <ul className={styles.meetingEmailBullets}>
-                <li>Put the cursor where you want a value, then click a merge field.</li>
-                <li>The formatted message uses the toolbar; plain text is optional and folded away.</li>
-              </ul>
+              <InfoHelpIcon
+                title="Meeting email templates info"
+                modalTitle="Meeting notification emails"
+                message={
+                  'These emails go to the attendee when a meeting is saved. Pick a tab (new / updated / cancelled), edit, then save.\n\n- Put the cursor where you want a value, then click a merge field.\n- The formatted message uses the toolbar; plain text is optional and folded away.'
+                }
+              />
             </div>
             {placeholderHelp.length > 0 && (
               <div className={styles.mergeFieldsCard}>
                 <p className={styles.mergeFieldsTitle}>Insert meeting details</p>
-                <p className={styles.mergeFieldsHint}>
-                  Focus Subject, the formatted message, or plain text, then click. Tooltip shows the code (e.g.{' '}
-                  <code className={styles.mergeFieldsCode}>{'{{title}}'}</code>).
-                </p>
+                <InfoHelpIcon
+                  title="Merge fields info"
+                  modalTitle="Insert meeting details"
+                  message='Focus Subject, the formatted message, or plain text, then click. Tooltip shows the code (e.g. {{title}}).'
+                />
                 <div className={styles.mergeFieldsChips} role="group" aria-label="Insert merge field">
                   {placeholderHelp.map((name) => (
                     <button
@@ -1720,7 +1726,11 @@ export function MeetingsPage() {
                 />
                 <div>
                   <div className={styles.fieldLabel}>Message (formatted)</div>
-                  <p className={styles.fieldHint}>Use the toolbar for bold, lists, and links.</p>
+                  <InfoHelpIcon
+                    title="Editor toolbar info"
+                    modalTitle="Message (formatted)"
+                    message="Use the toolbar for bold, lists, and links."
+                  />
                   <ScriptBodyEditor
                     ref={meetingTemplateHtmlRef}
                     key={templateTab}
@@ -1735,7 +1745,11 @@ export function MeetingsPage() {
                 </div>
                 <details className={styles.optionalPlainDetails}>
                   <summary className={styles.optionalPlainSummary}>Plain text version (optional)</summary>
-                  <p className={styles.optionalPlainHint}>Optional fallback for simple mail clients. Merge buttons work when this box is focused.</p>
+                  <InfoHelpIcon
+                    title="Plain text info"
+                    modalTitle="Plain text version"
+                    message="Optional fallback for simple mail clients. Merge buttons work when this box is focused."
+                  />
                   <textarea
                     id="meeting-template-plain"
                     className={styles.templateTextarea}

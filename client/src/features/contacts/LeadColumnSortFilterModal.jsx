@@ -3,6 +3,7 @@ import { Modal, ModalFooter } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { InfoHelpIcon } from '../../components/ui/InfoHelpIcon';
 import styles from './LeadColumnSortFilterModal.module.scss';
 
 const FILTER_OPS = [
@@ -16,6 +17,80 @@ const FILTER_OPS = [
 ];
 
 const FILTER_SELECT_OPTIONS = FILTER_OPS.map(({ value, label }) => ({ value, label }));
+
+function IconSortArrows() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M8 5v14M8 5l-3 3M8 5l3 3M16 19V5m0 14-3-3m3 3 3-3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconFilterFunnel() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 6h16l-6.5 7.1v4.7l-3 1.7v-6.4L4 6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconTitleTag({ kind }) {
+  if (kind === 'campaign') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M3 10.5V6.8A1.8 1.8 0 0 1 4.8 5h10.4A1.8 1.8 0 0 1 17 6.8V9l4 2.5v1L17 15v2.2a1.8 1.8 0 0 1-1.8 1.8H4.8A1.8 1.8 0 0 1 3 17.2v-3.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (kind === 'status') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M8.5 12.2 10.8 14.5 15.8 9.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (kind === 'manager') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="8.5" cy="9" r="3" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M3.5 18.5c.7-2.2 2.7-3.5 5-3.5s4.3 1.3 5 3.5M16 8h4M18 6v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (kind === 'agent') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="8.5" r="3.2" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M5 19c1-2.8 3.5-4.5 7-4.5s6 1.7 7 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (kind === 'tag') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M12 4H6.8A1.8 1.8 0 0 0 5 5.8V11l7 7 7-7-7-7Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+        <circle cx="9" cy="8.5" r="1.2" fill="currentColor" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="4.5" y="4.5" width="15" height="15" rx="2" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M8 9h8M8 12h8M8 15h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function getTitleKind(column) {
+  const raw = `${column?.id || ''} ${column?.label || ''} ${column?.sortKey || ''}`.toLowerCase();
+  if (raw.includes('campaign')) return 'campaign';
+  if (raw.includes('status')) return 'status';
+  if (raw.includes('manager')) return 'manager';
+  if (raw.includes('agent') || raw.includes('assigned_user')) return 'agent';
+  if (raw.includes('tag')) return 'tag';
+  return 'column';
+}
 
 /** Human-readable sort copy for the active column (server uses same keys). */
 function getSortCopy(sortKey) {
@@ -211,12 +286,21 @@ export function LeadColumnSortFilterModal({
 
   const hasColumnSort = !filterOnly && sortBy === sortKey;
   const showStatusBanner = hasColumnSort || !!activeFilterSummary;
+  const titleKind = getTitleKind(column);
+  const modalTitle = (
+    <span className={styles.modalTitleWrap}>
+      <span className={`${styles.modalTitleIcon} ${styles[`modalTitleIcon${titleKind.charAt(0).toUpperCase()}${titleKind.slice(1)}`] || ''}`} aria-hidden>
+        <IconTitleTag kind={titleKind} />
+      </span>
+      <span>{column.label}</span>
+    </span>
+  );
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={column.label}
+      title={modalTitle}
       size="lg"
       closeOnEscape
       footer={
@@ -256,14 +340,20 @@ export function LeadColumnSortFilterModal({
         {!filterOnly ? (
         <section className={styles.panel} aria-labelledby="lead-col-sort-heading">
           <div className={styles.panelHead}>
-            <span className={styles.panelIcon} aria-hidden>
-              ↕
+            <span className={`${styles.panelIcon} ${styles.panelIconSort}`} aria-hidden>
+              <IconSortArrows />
             </span>
             <div>
-              <h3 id="lead-col-sort-heading" className={styles.panelTitle}>
-                Sort
-              </h3>
-              <p className={styles.panelHint}>Applies to the whole list (server-side). One column controls order at a time.</p>
+              <div className={styles.panelTitleRow}>
+                <h3 id="lead-col-sort-heading" className={styles.panelTitle}>
+                  Sort
+                </h3>
+                <InfoHelpIcon
+                  title="Sort info"
+                  modalTitle="Sort"
+                  message="Applies to the whole list (server-side). One column controls order at a time."
+                />
+              </div>
             </div>
           </div>
           <div className={styles.radioCards}>
@@ -309,16 +399,20 @@ export function LeadColumnSortFilterModal({
 
         <section className={styles.panel} aria-labelledby="lead-col-filter-heading">
           <div className={styles.panelHead}>
-            <span className={styles.panelIcon} aria-hidden>
-              ◇
+            <span className={`${styles.panelIcon} ${styles.panelIconFilter}`} aria-hidden>
+              <IconFilterFunnel />
             </span>
             <div>
-              <h3 id="lead-col-filter-heading" className={styles.panelTitle}>
-                Filter
-              </h3>
-              <p className={styles.panelHint}>
-                Keeps rows where this column matches the rule. Combines with search and other column filters.
-              </p>
+              <div className={styles.panelTitleRow}>
+                <h3 id="lead-col-filter-heading" className={styles.panelTitle}>
+                  Filter
+                </h3>
+                <InfoHelpIcon
+                  title="Filter info"
+                  modalTitle="Filter"
+                  message="Keeps rows where this column matches the rule. Combines with search and other column filters."
+                />
+              </div>
             </div>
           </div>
 

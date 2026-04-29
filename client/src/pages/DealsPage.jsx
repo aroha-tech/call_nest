@@ -12,6 +12,7 @@ import { Alert } from '../components/ui/Alert';
 import { Skeleton } from '../components/ui/Skeleton';
 import { Modal, ModalFooter, ConfirmModal } from '../components/ui/Modal';
 import { SlidePanel } from '../components/ui/SlidePanel';
+import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
 import { dealsAPI } from '../services/dealsAPI';
 import { opportunitiesAPI } from '../services/opportunitiesAPI';
 import { contactsAPI } from '../services/contactsAPI';
@@ -536,7 +537,11 @@ export function DealsPage() {
       {tab === 'setup' && (
         <>
           {!deals.length ? (
-            <p className={styles.emptyHint}>No pipelines yet. Create one and add stages.</p>
+            <InfoHelpIcon
+              title="Pipelines info"
+              modalTitle="Pipelines and stages"
+              message="No pipelines yet. Create one and add stages."
+            />
           ) : null}
           {deals.map((d) => (
             <div key={d.id} className={styles.dealCard}>
@@ -658,7 +663,11 @@ export function DealsPage() {
                   </table>
                 </div>
               ) : (
-                <p className={styles.emptyHint}>No stages — add at least one.</p>
+                <InfoHelpIcon
+                  title="Stages info"
+                  modalTitle="Pipeline stages"
+                  message="No stages. Add at least one."
+                />
               )}
             </div>
           ))}
@@ -761,9 +770,11 @@ export function DealsPage() {
           closeOnEscape={!saving}
         >
           <form onSubmit={saveDeal} className={styles.modalForm}>
-            <p className={styles.modalHint}>
-              A pipeline is a template (e.g. “Direct sales”). Stages belong to the pipeline; individual deals are added on contacts and leads.
-            </p>
+            <InfoHelpIcon
+              title="Pipeline info"
+              modalTitle="New pipeline"
+              message="A pipeline is a template (e.g. Direct sales). Stages belong to the pipeline; individual deals are added on contacts and leads."
+            />
             <div className={styles.modalFields}>
               <Input
                 label="Pipeline name"
@@ -817,9 +828,11 @@ export function DealsPage() {
           onClose={() => !saving && setStageModal(null)}
         >
           <form onSubmit={saveStage} className={styles.modalForm}>
-            <p className={styles.modalHint}>
-              Choose 10–90% for open pipeline stages. At 100% you can keep the stage open or mark it closed as Won or Lost.
-            </p>
+            <InfoHelpIcon
+              title="Stage progress info"
+              modalTitle="Stage setup"
+              message="Choose 10–90% for open pipeline stages. At 100% you can keep the stage open or mark it closed as Won or Lost."
+            />
             <div className={styles.modalFields}>
               <Input
                 label="Stage name"

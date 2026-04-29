@@ -55,8 +55,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.1rem;
-  height: 2.1rem;
+  width: 1.6rem;
+  height: 1.6rem;
   border-radius: $radius-full;
   background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
   color: #ffffff;
@@ -66,6 +66,10 @@
 
 .titleIcon {
   line-height: 1;
+}
+
+.titleInfoBtn {
+  margin-left: 0;
 }
 
 .description {

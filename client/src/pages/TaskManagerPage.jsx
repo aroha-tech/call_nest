@@ -14,6 +14,7 @@ import { SlidePanel } from '../components/ui/SlidePanel';
 import { Tabs, TabList, Tab, TabPanel } from '../components/ui/Tabs';
 import { Badge } from '../components/ui/Badge';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
+import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
 import { taskManagerAPI } from '../services/taskManagerAPI';
 import { tenantUsersAPI } from '../services/tenantUsersAPI';
 import { campaignsAPI } from '../services/campaignsAPI';
@@ -910,6 +911,14 @@ export function TaskManagerPage() {
     return own ? `${displayName} (${roleText}) • You` : `${displayName} (${roleText})`;
   }
 
+  function initialsFromName(name) {
+    const cleaned = String(name || '').trim();
+    if (!cleaned) return 'U';
+    const parts = cleaned.split(/\s+/).filter(Boolean);
+    if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+    return `${parts[0].slice(0, 1)}${parts[1].slice(0, 1)}`.toUpperCase();
+  }
+
   async function openNotesModal(log) {
     setNotesModalLog(log);
     setNotesModalDraft({
@@ -989,7 +998,26 @@ export function TaskManagerPage() {
             Notes
           </Button>
           {log.assignment_id ? (
-            <Button size="sm" variant="ghost" onClick={() => openCommentsModal({ id: log.assignment_id, title: log.assignment_title })}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                openCommentsModal({
+                  id: log.assignment_id,
+                  title: log.assignment_title,
+                  task_date: log.task_date,
+                  status: log.status,
+                  score: log.score,
+                  achieved_calls: log.achieved_calls,
+                  target_calls: log.target_calls,
+                  achieved_meetings: log.achieved_meetings,
+                  target_meetings: log.target_meetings,
+                  achieved_deals: log.achieved_deals,
+                  target_deals: log.target_deals,
+                  notes: log.agent_note || log.manager_note || '',
+                })
+              }
+            >
               <MaterialSymbol name="comment" size="sm" />
               Comments
             </Button>
@@ -1033,20 +1061,40 @@ export function TaskManagerPage() {
       <section className={styles.hero}>
         <div className={styles.heroCard}>
           <MaterialSymbol name="wb_sunny" size="md" className={styles.heroIcon} />
-          <div>
-            <div className={styles.heroLabel}>Working day</div>
+          <div className={styles.heroBody}>
+            <div className={styles.heroLabel}>
+              <span>Working day</span>
+              <InfoHelpIcon
+                title="Working day info"
+                modalTitle="Working day"
+                message="All today targets use this calendar date."
+              />
+            </div>
             <div className={styles.heroValue}>{todayDisplay}</div>
-            <div className={styles.heroHint}>All “today” targets use this calendar date.</div>
+            <p className={styles.heroSubtext}>All today targets use this calendar date.</p>
           </div>
         </div>
         <div className={styles.heroCard}>
           <MaterialSymbol name="target" size="md" className={styles.heroIcon} />
-          <div>
-            <div className={styles.heroLabel}>Today at a glance</div>
+          <div className={styles.heroBody}>
+            <div className={styles.heroLabel}>
+              <span>Today at a glance</span>
+              <InfoHelpIcon
+                title="Today stats info"
+                modalTitle="Today at a glance"
+                message={`${todayStats.done} achieved · ${todayStats.risk} missed · ${Math.max(
+                  0,
+                  todayStats.n - todayStats.done - todayStats.risk
+                )} in progress or pending`}
+              />
+            </div>
             <div className={styles.heroValue}>{todayStats.n}</div>
-            <div className={styles.heroHint}>
-              {todayStats.done} achieved · {todayStats.risk} missed ·{' '}
-              {Math.max(0, todayStats.n - todayStats.done - todayStats.risk)} in progress or pending
+            <div className={styles.glanceStats}>
+              <span className={styles.glanceStatDone}>{todayStats.done} Achieved</span>
+              <span className={styles.glanceStatMissed}>{todayStats.risk} Missed</span>
+              <span className={styles.glanceStatPending}>
+                {Math.max(0, todayStats.n - todayStats.done - todayStats.risk)} In Progress or Pending
+              </span>
             </div>
           </div>
         </div>
@@ -1111,11 +1159,14 @@ export function TaskManagerPage() {
       {showAssignmentsBoard ? (
         <section className={styles.assignmentsSection}>
           <div className={styles.assignmentsSectionHead}>
-            <h2 className={styles.assignmentsTitle}>Active assignments</h2>
-            <p className={styles.assignmentsSub}>
-              Remove a mistaken schedule here. Each agent can have only one active task window at a time (overlapping dates
-              are blocked). Call activity still counts the same for any open tasks on the same day.
-            </p>
+            <h2 className={styles.assignmentsTitle}>
+              <span>Active assignments</span>
+              <InfoHelpIcon
+                title="Active assignments info"
+                modalTitle="Active assignments"
+                message="Remove a mistaken schedule here. Each agent can have only one active task window at a time (overlapping dates are blocked). Call activity still counts the same for any open tasks on the same day."
+              />
+            </h2>
           </div>
           <div className={listStyles.tableCard}>
             <div className={listStyles.tableCardBody}>
@@ -1221,7 +1272,6 @@ export function TaskManagerPage() {
           </TabList>
 
           <TabPanel isActive={mainTab === 'current'}>
-            <p className={styles.tabHint}>Tasks in the active window for today ({todayDisplay}).</p>
             {!effectiveTodayLogs.length ? renderEmpty('current', todayEmptyHints) : null}
             {effectiveTodayLogs.length ? (
               <div className={styles.cardGrid}>
@@ -1231,7 +1281,6 @@ export function TaskManagerPage() {
           </TabPanel>
 
           <TabPanel isActive={mainTab === 'upcoming'}>
-            <p className={styles.tabHint}>Tasks with a start date after today are shown here.</p>
             {loadingTab ? <p className={styles.muted}>Loading upcoming…</p> : null}
             {!loadingTab && !upcomingLogs.length ? renderEmpty('upcoming') : null}
             {!loadingTab && upcomingLogs.length ? (
@@ -1240,7 +1289,6 @@ export function TaskManagerPage() {
           </TabPanel>
 
           <TabPanel isActive={mainTab === 'history'}>
-            <p className={styles.tabHint}>Finished task days (end date before today) appear here.</p>
             <div className={listStyles.tableCard}>
             <div className={listStyles.tableCardToolbarTop}>
               <div className={styles.search}>
@@ -1358,11 +1406,15 @@ export function TaskManagerPage() {
         }
       >
         <form id="assign-task-form" onSubmit={onCreateAssignment} className={styles.modalForm}>
-          <p className={styles.modalLead}>Create tasks in sequence: who to assign, when it should run, task type, targets, reminders, notes.</p>
+          <p className={styles.modalLead}>
+            Create tasks in sequence: who to assign, when it should run, task type, targets, reminders, notes.
+          </p>
           <div className={styles.formGrid}>
             <div className={styles.full}>
-              <h4 className={styles.formSectionTitle}>1) Assign</h4>
-              <p className={styles.formSectionHint}>Assign user and add a clear title.</p>
+              <h4 className={styles.formSectionTitle}>
+                <span>1) Assign</span>
+                <InfoHelpIcon title="Assign step info" modalTitle="Assign" message="Assign user and add a clear title." />
+              </h4>
             </div>
             <Select
               label="Assign to"
@@ -1379,8 +1431,14 @@ export function TaskManagerPage() {
               />
             </div>
             <div className={styles.full}>
-              <h4 className={styles.formSectionTitle}>2) Type and priority</h4>
-              <p className={styles.formSectionHint}>Pick task type first, then set priority.</p>
+              <h4 className={styles.formSectionTitle}>
+                <span>2) Type and priority</span>
+                <InfoHelpIcon
+                  title="Type and priority info"
+                  modalTitle="Type and priority"
+                  message="Pick task type first, then set priority."
+                />
+              </h4>
             </div>
             <Select
               label="Type"
@@ -1395,8 +1453,14 @@ export function TaskManagerPage() {
               options={priorityOptions}
             />
             <div className={styles.full}>
-              <h4 className={styles.formSectionTitle}>3) Schedule and reminder</h4>
-              <p className={styles.formSectionHint}>Current uses due-in options, upcoming uses start + due date.</p>
+              <h4 className={styles.formSectionTitle}>
+                <span>3) Schedule and reminder</span>
+                <InfoHelpIcon
+                  title="Schedule step info"
+                  modalTitle="Schedule and reminder"
+                  message="Current uses due-in options, upcoming uses start + due date."
+                />
+              </h4>
             </div>
             <Select
               label="Task window"
@@ -1471,16 +1535,22 @@ export function TaskManagerPage() {
               </>
             ) : null}
             <div className={styles.full}>
-              <h4 className={styles.formSectionTitle}>4) Meeting and targets</h4>
-              <p className={styles.formSectionHint}>
-                {assignForm.task_type === 'todo'
-                  ? 'To-do tracks calls, meetings, and deals.'
-                  : assignForm.task_type === 'meeting'
-                    ? 'Meeting tasks only track meetings.'
-                    : assignForm.task_type === 'call'
-                      ? 'Call tasks only track calls.'
-                      : 'Deal tasks only track deals.'}
-              </p>
+              <h4 className={styles.formSectionTitle}>
+                <span>4) Meeting and targets</span>
+                <InfoHelpIcon
+                  title="Targets step info"
+                  modalTitle="Meeting and targets"
+                  message={
+                    assignForm.task_type === 'todo'
+                      ? 'To-do tracks calls, meetings, and deals.'
+                      : assignForm.task_type === 'meeting'
+                        ? 'Meeting tasks only track meetings.'
+                        : assignForm.task_type === 'call'
+                          ? 'Call tasks only track calls.'
+                          : 'Deal tasks only track deals.'
+                  }
+                />
+              </h4>
             </div>
             {assignForm.task_type === 'todo' || assignForm.task_type === 'meeting' ? (
               <>
@@ -1557,8 +1627,10 @@ export function TaskManagerPage() {
               />
             ) : null}
             <div className={styles.full}>
-              <h4 className={styles.formSectionTitle}>5) Notes</h4>
-              <p className={styles.formSectionHint}>Add context for the assignee.</p>
+              <h4 className={styles.formSectionTitle}>
+                <span>5) Notes</span>
+                <InfoHelpIcon title="Notes step info" modalTitle="Notes" message="Add context for the assignee." />
+              </h4>
             </div>
             <div className={styles.full}>
               <Textarea
@@ -1575,7 +1647,7 @@ export function TaskManagerPage() {
         isOpen={templateModalOpen}
         onClose={() => setTemplateModalOpen(false)}
         title="Template library"
-        size="md"
+        size="xl"
         closeOnOverlay
         closeOnEscape
         footer={
@@ -1702,7 +1774,7 @@ export function TaskManagerPage() {
         isOpen={!!commentsModalAssignment}
         onClose={() => setCommentsModalAssignment(null)}
         title="Task comments"
-        size="md"
+        size="xxl"
         closeOnOverlay
         closeOnEscape
         footer={
@@ -1714,35 +1786,130 @@ export function TaskManagerPage() {
         }
       >
         {commentsModalAssignment ? (
-          <div className={styles.modalForm}>
-            <p className={styles.modalLead}>{commentsModalAssignment.title || 'Task'}</p>
-            {commentsLoading ? <p className={styles.muted}>Loading comments...</p> : null}
-            {!commentsLoading && assignmentComments.length === 0 ? <p className={styles.muted}>No comments yet.</p> : null}
-            {!commentsLoading && assignmentComments.length > 0 ? (
-              <div className={styles.chatThread} data-chat-thread={`modal-${commentsModalAssignment.id}`}>
-                {[...assignmentComments].reverse().map((c) => (
-                  <div
-                    key={c.id}
-                    className={`${styles.chatMessage} ${isOwnComment(c) ? styles.chatMessageOwn : ''}`}
-                  >
-                    <div className={styles.chatSender}>{commentAuthorLabel(c)}</div>
-                    <div className={styles.chatBubble}>{c.comment_text}</div>
-                    <div className={styles.chatTime}>{formatDateTime(c.created_at)}</div>
-                  </div>
-                ))}
+          <div className={styles.commentsModalLayout}>
+            <section className={styles.commentsMain}>
+              <div className={styles.commentsMainHead}>
+                <div>
+                  <p className={styles.modalLead}>Collaborate and keep track of updates</p>
+                </div>
+                <div className={styles.commentsSortMeta}>Sort by: Oldest</div>
               </div>
-            ) : null}
-            <div className={styles.chatComposerRow}>
-              <Input
-                value={commentDraft}
-                onChange={(e) => setCommentDraft(e.target.value)}
-                onKeyDown={(e) => onCommentKeyDown(e, submitAssignmentComment)}
-                placeholder="Type a message..."
-              />
-              <Button variant="primary" onClick={submitAssignmentComment} aria-label="Send comment">
-                <MaterialSymbol name="send" size="sm" />
-              </Button>
-            </div>
+              {commentsLoading ? <p className={styles.muted}>Loading comments...</p> : null}
+              {!commentsLoading && assignmentComments.length === 0 ? <p className={styles.muted}>No comments yet.</p> : null}
+              {!commentsLoading && assignmentComments.length > 0 ? (
+                <div className={styles.chatThread} data-chat-thread={`modal-${commentsModalAssignment.id}`}>
+                  {[...assignmentComments].reverse().map((c) => {
+                    const authorName = isOwnComment(c) ? (user?.name || user?.email || c?.author_name || 'You') : (c?.author_name || 'User');
+                    return (
+                      <div key={c.id} className={`${styles.chatMessage} ${isOwnComment(c) ? styles.chatMessageOwn : ''}`}>
+                        <div className={styles.chatAvatar}>{initialsFromName(authorName)}</div>
+                        <div className={styles.chatContent}>
+                          <div className={styles.chatSender}>{commentAuthorLabel(c)}</div>
+                          <div className={styles.chatBubble}>{c.comment_text}</div>
+                          <div className={styles.chatTime}>{formatDateTime(c.created_at)}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+              <div className={styles.chatComposerRow}>
+                <Input
+                  value={commentDraft}
+                  onChange={(e) => setCommentDraft(e.target.value)}
+                  onKeyDown={(e) => onCommentKeyDown(e, submitAssignmentComment)}
+                  placeholder="Write a comment..."
+                />
+                <Button variant="primary" onClick={submitAssignmentComment} aria-label="Send comment">
+                  <MaterialSymbol name="send" size="sm" />
+                </Button>
+              </div>
+            </section>
+            <aside className={styles.commentsSide}>
+              <div className={styles.commentTaskCard}>
+                <p className={styles.commentSideHeading}>Task details</p>
+                <h4 className={styles.commentTaskTitle}>{commentsModalAssignment.title || 'Task'}</h4>
+                {commentsModalAssignment.task_date ? (
+                  <p className={styles.commentTaskDate}>
+                    <MaterialSymbol name="calendar_today" size="sm" />
+                    {formatDate(commentsModalAssignment.task_date)}
+                  </p>
+                ) : (
+                  <p className={styles.commentTaskDate}>
+                    <MaterialSymbol name="date_range" size="sm" />
+                    {commentsModalAssignment.start_date || commentsModalAssignment.start_at
+                      ? `${formatDate(commentsModalAssignment.start_date || commentsModalAssignment.start_at)} - ${formatDate(
+                          commentsModalAssignment.end_date || commentsModalAssignment.end_at
+                        )}`
+                      : 'Date not available'}
+                  </p>
+                )}
+                <div className={styles.commentMetricGrid}>
+                  <div className={styles.commentMetricTile}>
+                    <span className={styles.commentMetricLabel}>Calls</span>
+                    <span className={styles.commentMetricValue}>
+                      {commentsModalAssignment.achieved_calls ?? 0}/{commentsModalAssignment.target_calls ?? 0}
+                    </span>
+                  </div>
+                  <div className={styles.commentMetricTile}>
+                    <span className={styles.commentMetricLabel}>Meetings</span>
+                    <span className={styles.commentMetricValue}>
+                      {commentsModalAssignment.achieved_meetings ?? 0}/{commentsModalAssignment.target_meetings ?? 0}
+                    </span>
+                  </div>
+                  <div className={styles.commentMetricTile}>
+                    <span className={styles.commentMetricLabel}>Deals</span>
+                    <span className={styles.commentMetricValue}>
+                      {commentsModalAssignment.achieved_deals ?? 0}/{commentsModalAssignment.target_deals ?? 0}
+                    </span>
+                  </div>
+                  <div className={styles.commentMetricTile}>
+                    <span className={styles.commentMetricLabel}>Score</span>
+                    <span className={styles.commentMetricValue}>{Number(commentsModalAssignment.score || 0).toFixed(0)}</span>
+                  </div>
+                </div>
+                {String(commentsModalAssignment.notes || commentsModalAssignment.description || '').trim() ? (
+                  <div className={styles.commentNotesBlock}>
+                    <p className={styles.commentSideHeading}>Notes</p>
+                    <p className={styles.commentNotesText}>
+                      {String(commentsModalAssignment.notes || commentsModalAssignment.description || '').trim()}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+              <div className={styles.commentParticipantsCard}>
+                <p className={styles.commentSideHeading}>Participants</p>
+                <div className={styles.commentParticipantList}>
+                  {assignmentComments
+                    .reduce((acc, c) => {
+                      const name = String(c?.author_name || '').trim();
+                      if (!name) return acc;
+                      if (!acc.some((x) => x.name.toLowerCase() === name.toLowerCase())) {
+                        acc.push({ name, role: formatRoleLabel(resolveCommentRole(c)) });
+                      }
+                      return acc;
+                    }, [])
+                    .slice(0, 6)
+                    .map((p) => (
+                      <div key={`${p.name}-${p.role}`} className={styles.commentParticipantRow}>
+                        <span className={styles.chatAvatar}>{initialsFromName(p.name)}</span>
+                        <span className={styles.commentParticipantName}>{p.name}</span>
+                        <span
+                          className={`${styles.commentParticipantRole} ${
+                            String(p.role).toLowerCase().includes('admin')
+                              ? styles.commentParticipantRoleAdmin
+                              : String(p.role).toLowerCase().includes('manager')
+                                ? styles.commentParticipantRoleManager
+                                : styles.commentParticipantRoleDefault
+                          }`}
+                        >
+                          {p.role}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </aside>
           </div>
         ) : null}
       </Modal>

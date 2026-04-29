@@ -40,6 +40,76 @@ function IconPropertyRules() {
   );
 }
 
+function IconTrash() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 7h16M9.5 7V5.6c0-.9.7-1.6 1.6-1.6h1.8c.9 0 1.6.7 1.6 1.6V7M8.2 10.5v6.8M12 10.5v6.8M15.8 10.5v6.8M6.6 7l.8 11.2c.1 1 .9 1.8 1.9 1.8h5.4c1 0 1.8-.8 1.9-1.8L17.4 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconFieldTag({ kind }) {
+  if (kind === 'contact') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="8.5" r="3.2" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M5 19c1-2.8 3.5-4.5 7-4.5s6 1.7 7 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (kind === 'disposition') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M4 12h16M12 4v16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+  if (kind === 'direction') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M6 8h10m0 0-3-3m3 3-3 3M18 16H8m0 0 3-3m-3 3 3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (kind === 'status') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M8.5 12.2 10.8 14.5 15.8 9.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (kind === 'connectivity') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M4.5 9.5A11 11 0 0 1 19.5 9.5M7.5 12.5a7 7 0 0 1 9 0M10.5 15.5a3 3 0 0 1 3 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="12" cy="18.2" r="1.2" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (kind === 'agent') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="8.5" r="3.2" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M5 19c1-2.8 3.5-4.5 7-4.5s6 1.7 7 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  return null;
+}
+
+function FieldLabel({ kind, text }) {
+  return (
+    <span className={styles.fieldLabel}>
+      <span className={`${styles.fieldLabelIcon} ${styles[`fieldLabelIcon${kind.charAt(0).toUpperCase()}${kind.slice(1)}`] || ''}`}>
+        <IconFieldTag kind={kind} />
+      </span>
+      <span>{text}</span>
+    </span>
+  );
+}
+
 const CH_PROPERTY_FIELD_OPTIONS = ALL_CALL_HISTORY_COLUMNS.map((c) => ({ value: c.id, label: c.label }));
 
 const OP_OPTIONS = [
@@ -50,6 +120,17 @@ const OP_OPTIONS = [
   { value: 'empty', label: 'Is empty' },
   { value: 'not_empty', label: 'Is not empty' },
 ];
+
+function propertyInputConfig(fieldKey) {
+  const key = String(fieldKey || '').toLowerCase();
+  if (key === 'duration_sec') {
+    return { type: 'number', placeholder: 'Enter duration in seconds', inputMode: 'numeric' };
+  }
+  if (key.endsWith('_at') || key.includes('date')) {
+    return { type: 'date', placeholder: 'Select date', inputMode: undefined };
+  }
+  return { type: 'text', placeholder: 'Text to match', inputMode: undefined };
+}
 
 function needsValue(op) {
   return ['contains', 'not_contains', 'starts_with', 'ends_with'].includes(op);
@@ -240,10 +321,10 @@ export function CallHistoryFilterModal({
 
         <div className={styles.refinePanel}>
           <div className={styles.sectionTitleRow}>
-            <span className={styles.sectionTitleIcon}>
+            <span className={`${styles.sectionTitleIcon} ${styles.sectionTitleIconQuick}`}>
               <IconSliders />
             </span>
-            <span className={styles.sectionTitleText}>Refine by field</span>
+            <span className={styles.sectionTitleText}>Quick filters</span>
           </div>
           <div className={styles.structuredGrid}>
             <Input
@@ -254,28 +335,28 @@ export function CallHistoryFilterModal({
               inputMode="numeric"
             />
             <MultiSelectDropdown
-              label="Disposition"
+              label={<FieldLabel kind="disposition" text="Disposition" />}
               value={fields.dispositionFilterMulti || ''}
               onChange={(v) => setDraft((p) => ({ ...p, dispositionFilterMulti: v }))}
               options={dispositionOptions}
               placeholder="All dispositions"
             />
             <MultiSelectDropdown
-              label="Direction"
+              label={<FieldLabel kind="direction" text="Direction" />}
               value={fields.directionFilterMulti || ''}
               onChange={(v) => setDraft((p) => ({ ...p, directionFilterMulti: v }))}
               options={directionOptions}
               placeholder="Any direction"
             />
             <MultiSelectDropdown
-              label="Status"
+              label={<FieldLabel kind="status" text="Status" />}
               value={fields.statusFilterMulti || ''}
               onChange={(v) => setDraft((p) => ({ ...p, statusFilterMulti: v }))}
               options={statusOptions}
               placeholder="All statuses"
             />
             <MultiSelectDropdown
-              label="Connectivity"
+              label={<FieldLabel kind="connectivity" text="Connectivity" />}
               value={fields.connectedFilterMulti || ''}
               onChange={(v) => setDraft((p) => ({ ...p, connectedFilterMulti: v }))}
               options={connectedOptions}
@@ -283,7 +364,7 @@ export function CallHistoryFilterModal({
             />
             {canPickAgents ? (
               <MultiSelectDropdown
-                label="Agent"
+                label={<FieldLabel kind="agent" text="Agent" />}
                 value={fields.agentFilterMulti || ''}
                 onChange={(v) => setDraft((p) => ({ ...p, agentFilterMulti: v }))}
                 options={agentOptions}
@@ -314,10 +395,10 @@ export function CallHistoryFilterModal({
 
         <div className={styles.propertyPanel}>
           <div className={styles.sectionTitleRow}>
-            <span className={styles.sectionTitleIcon}>
+            <span className={`${styles.sectionTitleIcon} ${styles.sectionTitleIconProperty}`}>
               <IconPropertyRules />
             </span>
-            <span className={styles.sectionTitleText}>Property</span>
+            <span className={styles.sectionTitleText}>Common property filters</span>
           </div>
           <p className={styles.hint}>
             Rules here are combined with the selections above. Each field can only be used once. Values are optional for
@@ -330,7 +411,9 @@ export function CallHistoryFilterModal({
               <span>Value</span>
               <span className={styles.propertyGridHeaderAction} />
             </div>
-            {rows.map((row, idx) => (
+            {rows.map((row, idx) => {
+              const inputCfg = propertyInputConfig(row.field);
+              return (
               <div key={idx} className={styles.row}>
                 <Select
                   label=""
@@ -351,17 +434,28 @@ export function CallHistoryFilterModal({
                 <Input
                   label=""
                   aria-label={`Property value, row ${idx + 1}`}
+                  type={inputCfg.type}
                   value={row.value}
                   onChange={(e) => patchRow(idx, { value: e.target.value })}
-                  placeholder={needsValue(row.op) ? 'Text to match' : '—'}
+                  placeholder={needsValue(row.op) ? inputCfg.placeholder : '—'}
                   disabled={!needsValue(row.op)}
+                  inputMode={inputCfg.inputMode}
                   className={styles.valInp}
+                  inputClassName={styles.valueInputControl}
                 />
-                <button type="button" className={styles.removeRowBtn} onClick={() => removeRow(idx)}>
-                  Remove
+                <button
+                  type="button"
+                  className={styles.removeRowBtn}
+                  onClick={() => removeRow(idx)}
+                  aria-label={`Remove property row ${idx + 1}`}
+                  title="Remove row"
+                  data-tooltip="Remove"
+                >
+                  <IconTrash />
                 </button>
               </div>
-            ))}
+            );
+            })}
           </div>
           <Button
             type="button"

@@ -19,6 +19,7 @@ import { useTemplateVariableAutocomplete } from '../../hooks/useTemplateVariable
 import { renderPreview, linkify, linkifyHtml, stripHtml, DEFAULT_PREVIEW_DATA } from '../../utils/templateVariables';
 import { templateVariablesAPI } from '../../services/templateVariablesAPI';
 import { ScriptBodyEditor } from './ScriptBodyEditor';
+import { InfoHelpIcon } from '../../components/ui/InfoHelpIcon';
 import styles from './CallScriptsPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
@@ -484,7 +485,11 @@ export function CallScriptsPage() {
           </ModalFooter>
         }
       >
-        <p className={styles.previewModalHint}>Sample data: contact_first_name, agent_name, company_name, links, etc.</p>
+        <InfoHelpIcon
+          title="Preview sample info"
+          modalTitle="Script preview"
+          message="Sample data: contact_first_name, agent_name, company_name, links, etc."
+        />
         <div
           className={styles.previewModalContent}
           dangerouslySetInnerHTML={{

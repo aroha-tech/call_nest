@@ -6,6 +6,7 @@
   gap: 0;
   max-height: min(72vh, 680px);
   overflow-y: auto;
+  padding-bottom: $space-3;
 }
 
 .sectionDivider {
@@ -37,17 +38,30 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
   border-radius: $radius-md;
-  background: rgba(var(--color-primary-rgb, 99, 102, 241), 0.12);
-  color: var(--color-primary-400, #818cf8);
+  background: rgba(59, 130, 246, 0.12);
+  color: rgba(148, 197, 255, 1);
+  border: 1px solid rgba(59, 130, 246, 0.18);
   flex-shrink: 0;
 }
 
+.sectionTitleIconQuick {
+  background: rgba(59, 130, 246, 0.14);
+  color: var(--color-chip-blue-text, #1d4ed8);
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+.sectionTitleIconProperty {
+  background: rgba(139, 92, 246, 0.14);
+  color: var(--color-chip-purple-text, #6d28d9);
+  border-color: rgba(139, 92, 246, 0.25);
+}
+
 .sectionSvg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   display: block;
 }
 
@@ -97,6 +111,33 @@
   min-width: 0;
 }
 
+.fieldLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fieldLabelIcon {
+  width: 17px;
+  height: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary-600, #4f46e5);
+
+  svg {
+    width: 17px;
+    height: 17px;
+    display: block;
+  }
+}
+
+.fieldLabelIconCampaign { color: var(--color-chip-blue-text); }
+.fieldLabelIconStatus { color: var(--color-chip-green-text); }
+.fieldLabelIconManager { color: var(--color-chip-purple-text); }
+.fieldLabelIconAgent { color: var(--color-chip-slate-text); }
+.fieldLabelIconTag { color: var(--color-chip-amber-text); }
+
 .hint {
   margin: 0 0 $space-4;
   font-size: $font-size-xs;
@@ -113,7 +154,7 @@
 
 .propertyGridHeader {
   display: grid;
-  grid-template-columns: 1.15fr 1fr 1.15fr auto;
+  grid-template-columns: 1fr 1fr 1fr auto;
   gap: 12px;
   align-items: end;
   padding: 0 2px $space-1;
@@ -136,7 +177,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 1.15fr 1fr 1.15fr auto;
+  grid-template-columns: 1fr 1fr 1fr auto;
   gap: 12px;
   align-items: end;
   padding: $space-3;
@@ -159,26 +200,65 @@
   min-width: 0;
 }
 
+.valueInputControl {
+  height: 40px !important;
+}
+
 .removeRowBtn {
   justify-self: end;
   align-self: end;
   margin-bottom: 2px;
-  padding: 6px 10px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
   border: none;
   border-radius: $radius-sm;
   background: transparent;
-  font-size: $font-size-xs;
-  font-weight: $font-weight-medium;
-  font-family: inherit;
-  color: var(--color-text-muted, rgba(255, 255, 255, 0.5));
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.56));
   cursor: pointer;
   transition:
     color $transition-fast,
     background $transition-fast;
 
+  svg {
+    width: 16px;
+    height: 16px;
+    display: block;
+  }
+
+  &::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 6px);
+    padding: 4px 7px;
+    border-radius: $radius-xs;
+    background: var(--color-bg-elevated, #111827);
+    border: 1px solid var(--color-border-subtle);
+    color: var(--color-text-primary);
+    font-size: $font-size-2xs;
+    font-weight: $font-weight-medium;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(2px);
+    transition:
+      opacity $transition-fast,
+      transform $transition-fast;
+  }
+
   &:hover {
     color: var(--color-danger, #f87171);
     background: rgba(239, 68, 68, 0.08);
+
+    &::after {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   &:focus-visible {

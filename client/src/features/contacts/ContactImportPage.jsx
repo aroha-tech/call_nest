@@ -11,6 +11,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown';
+import { InfoHelpIcon } from '../../components/ui/InfoHelpIcon';
 import { contactsAPI } from '../../services/contactsAPI';
 import { backgroundJobsAPI } from '../../services/backgroundJobsAPI';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
@@ -700,7 +701,13 @@ export function ContactImportPage({ type }) {
                 <div className={styles.stepCard}>
                   <div className={styles.stepTitle}>
                     <div className={styles.stepTitleText}>Upload file</div>
-                    {file ? <div className={styles.stepHint}>{file.name}</div> : null}
+                    {file ? (
+                      <InfoHelpIcon
+                        title="Selected file"
+                        modalTitle="Upload file"
+                        message={file.name}
+                      />
+                    ) : null}
                   </div>
                   <input
                     type="file"
@@ -741,7 +748,11 @@ export function ContactImportPage({ type }) {
                 <div className={styles.stepCard}>
                   <div className={styles.stepTitle}>
                     <div className={styles.stepTitleText}>Import settings</div>
-                    <div className={styles.stepHint}>Duplicates are matched by email.</div>
+                    <InfoHelpIcon
+                      title="Import settings info"
+                      modalTitle="Import settings"
+                      message="Duplicates are matched by email."
+                    />
                   </div>
 
                   <div className={styles.grid2}>
@@ -798,7 +809,11 @@ export function ContactImportPage({ type }) {
                         />
                       </div>
                     ) : null}
-                    <div className={styles.importBulkHint}>File-level manager/agent values override defaults.</div>
+                    <InfoHelpIcon
+                      title="Ownership override info"
+                      modalTitle="Import ownership"
+                      message="File-level manager/agent values override defaults."
+                    />
                   </div>
 
                   <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
@@ -845,9 +860,11 @@ export function ContactImportPage({ type }) {
               <div className={styles.stepCard}>
                 <div className={styles.stepTitle}>
                   <div className={styles.stepTitleText}>Match columns &amp; preview contacts</div>
-                  <div className={styles.stepHint}>
-                    Select how each file column should be saved.
-                  </div>
+                  <InfoHelpIcon
+                    title="Column mapping info"
+                    modalTitle="Match columns and preview contacts"
+                    message="Select how each file column should be saved."
+                  />
                 </div>
                 <div className={styles.footerNote} style={{ marginBottom: 10 }}>
                   Use <b>Unmapped</b> to skip a column. Use <b>Add new custom field</b> only when needed.
@@ -1131,7 +1148,11 @@ export function ContactImportPage({ type }) {
             <div className={styles.stepCard}>
               <div className={styles.stepTitle}>
                 <div className={styles.stepTitleText}>Help</div>
-                <div className={styles.stepHint}>What columns can the import understand?</div>
+                <InfoHelpIcon
+                  title="Import help"
+                  modalTitle="What columns can import understand?"
+                  message="We match common header names (name, mobile, email, city, source, status). You can adjust Save as mappings anytime."
+                />
               </div>
               <div className={styles.footerNote}>
                 <div>

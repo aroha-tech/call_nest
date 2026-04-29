@@ -7,6 +7,7 @@ import { Select } from '../components/ui/Select';
 import { Card } from '../components/ui/Card';
 import { Checkbox } from '../components/ui/Checkbox';
 import { Alert } from '../components/ui/Alert';
+import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
 import { useMutation } from '../hooks/useAsyncData';
 import { tenantCompanyAPI } from '../services/tenantCompanyAPI';
 import { tenantIndustryFieldsAPI } from '../services/tenantIndustryFieldsAPI';
@@ -360,10 +361,11 @@ export function TenantCompanySettingsPage() {
         {tenant?.industry_id ? (
           <Card className={`${styles.card} ${styles.cardAside}`}>
             <h2 className={styles.sectionTitle}>Industry field packs</h2>
-            <p className={styles.muted}>
-              “Always on your forms” is fixed for your industry. Optional packs are in two columns: not using yet, then
-              active for your workspace — save when you are done.
-            </p>
+            <InfoHelpIcon
+              title="Industry field packs info"
+              modalTitle="Industry field packs"
+              message="Always on your forms is fixed for your industry. Optional packs are in two columns: not using yet, then active for your workspace. Save when you are done."
+            />
             {optionalIndustryError ? (
               <Alert variant="error" className={styles.alert}>
                 {optionalIndustryError}
@@ -376,9 +378,11 @@ export function TenantCompanySettingsPage() {
                 {sortedCoreIndustryFields.length > 0 ? (
                   <div className={`${styles.fieldGroup} ${styles.fieldGroupTop}`}>
                     <h3 className={styles.fieldGroupTitle}>Always on your forms</h3>
-                    <p className={styles.fieldGroupHint}>
-                      Shown on every lead and contact — not controlled by the lists below.
-                    </p>
+                    <InfoHelpIcon
+                      title="Always on fields info"
+                      modalTitle="Always on your forms"
+                      message="Shown on every lead and contact and not controlled by the lists below."
+                    />
                     <ul className={styles.fieldChipList}>
                       {sortedCoreIndustryFields.map((f) => (
                         <li key={f.id} className={styles.fieldChip}>
@@ -404,9 +408,11 @@ export function TenantCompanySettingsPage() {
                     <div className={styles.optionalPacksBlock}>
                       <div className={styles.optionalPacksHeading}>
                         <h3 className={styles.optionalPacksTitle}>Optional field packs</h3>
-                        <p className={styles.optionalPacksSubtitle}>
-                          Two side-by-side lists: off vs on. Adjust checkboxes, then save.
-                        </p>
+                        <InfoHelpIcon
+                          title="Optional packs info"
+                          modalTitle="Optional field packs"
+                          message="Two side-by-side lists: off vs on. Adjust checkboxes, then save."
+                        />
                       </div>
                       <div className={styles.optionalPacksRow}>
                         <div
@@ -421,7 +427,11 @@ export function TenantCompanySettingsPage() {
                               {availableOptionalIndustryFields.length}
                             </span>
                           </div>
-                          <p className={styles.optionalPackPaneHint}>Check a box to show this field on leads and contacts.</p>
+                          <InfoHelpIcon
+                            title="Not using yet info"
+                            modalTitle="Not using yet"
+                            message="Check a box to show this field on leads and contacts."
+                          />
                           {availableOptionalIndustryFields.length === 0 ? (
                             <p className={styles.optionalPackPaneEmpty}>All optional packs are turned on.</p>
                           ) : (
@@ -454,7 +464,11 @@ export function TenantCompanySettingsPage() {
                               {selectedOptionalIndustryFields.length}
                             </span>
                           </div>
-                          <p className={styles.optionalPackPaneHint}>Uncheck to hide from forms (after save).</p>
+                          <InfoHelpIcon
+                            title="Active packs info"
+                            modalTitle="Active for your workspace"
+                            message="Uncheck to hide from forms (after save)."
+                          />
                           {selectedOptionalIndustryFields.length === 0 ? (
                             <p className={styles.optionalPackPaneEmpty}>
                               None yet — turn on packs from “Not using yet.”

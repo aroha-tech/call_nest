@@ -1351,15 +1351,6 @@ export function DialerSessionPage() {
                 </div>
 
                 <div className={styles.preflightSection}>
-                  <div className={styles.preflightHeading}>Instructions</div>
-                  <ul className={styles.preflightBullets}>
-                    <li>Review the script and the disposition buttons before starting.</li>
-                    <li>Use Pause if you need to temporarily stop dialing.</li>
-                    <li>After each call, set the disposition to keep your session accurate.</li>
-                  </ul>
-                </div>
-
-                <div className={styles.preflightSection}>
                   <div className={styles.preflightHeading}>Legal & compliance</div>
                   <ul className={styles.preflightBullets}>
                     <li>Only call leads you are authorized to contact.</li>

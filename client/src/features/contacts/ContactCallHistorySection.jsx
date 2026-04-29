@@ -6,6 +6,7 @@ import { Alert } from '../../components/ui/Alert';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Button } from '../../components/ui/Button';
 import { MaterialSymbol } from '../../components/ui/MaterialSymbol';
+import { InfoHelpIcon } from '../../components/ui/InfoHelpIcon';
 import { formatDateTimeDisplay, formatRelativeTimeShort } from '../../utils/dateTimeDisplay';
 import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 import styles from './ContactCallHistorySection.module.scss';
@@ -225,7 +226,12 @@ export function ContactCallHistorySection({ contactId }) {
     <section className={styles.section} aria-labelledby="contact-section-call-history">
       <div className={styles.header}>
         <h2 id="contact-section-call-history" className={styles.title}>
-          Call history
+          <span>Call history</span>
+          <InfoHelpIcon
+            title="Call history info"
+            modalTitle="Call history"
+            message="One row per call outcome (disposition/status). Agent notes are hidden until you use the + button in the Notes column. Raw dial stubs are not listed. For the full CRM story (Activity, WhatsApp, deals) use Activity on the record header. Open call history for the full grid for this customer."
+          />
         </h2>
         <Button
           type="button"
@@ -238,13 +244,6 @@ export function ContactCallHistorySection({ contactId }) {
           Open call history
         </Button>
       </div>
-      <p className={styles.desc}>
-        One row per <strong>call outcome</strong> (disposition / status). Agent notes are hidden until you use the{' '}
-        <strong>+</strong> button in the Notes column. Raw dial stubs are not listed. For the full CRM story — Activity,
-        WhatsApp, deals — use <strong>Activity</strong> on the record header. Open call history for the full grid for this
-        customer.
-      </p>
-
       {error ? <Alert variant="error">{error}</Alert> : null}
 
       {loading ? (

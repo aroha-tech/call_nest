@@ -13,6 +13,16 @@
   margin-bottom: 2px;
 }
 
+.labelRow {
+  display: flex;
+  align-items: center;
+  gap: $space-1;
+}
+
+.hintInfoBtn {
+  margin-top: -1px;
+}
+
 .textarea {
   width: 100%;
   min-height: 96px;

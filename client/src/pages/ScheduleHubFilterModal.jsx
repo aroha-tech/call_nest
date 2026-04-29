@@ -21,6 +21,63 @@ function IconSliders() {
   );
 }
 
+function IconFieldTag({ kind }) {
+  if (kind === 'tab') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <rect x="3.5" y="4.5" width="7" height="6" rx="1.2" stroke="currentColor" strokeWidth="1.8" />
+        <rect x="13.5" y="4.5" width="7" height="6" rx="1.2" stroke="currentColor" strokeWidth="1.8" />
+        <rect x="3.5" y="13.5" width="17" height="6" rx="1.2" stroke="currentColor" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+  if (kind === 'team') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="8.5" cy="9" r="2.8" stroke="currentColor" strokeWidth="1.8" />
+        <circle cx="16.2" cy="10.2" r="2.2" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M3.8 18c.8-2.4 2.8-3.8 4.9-3.8s4.2 1.4 5 3.8M14 18c.4-1.5 1.5-2.4 2.9-2.4s2.5.9 2.9 2.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (kind === 'time') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M12 8v4l2.7 1.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (kind === 'status') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M8.5 12.2 10.8 14.5 15.8 9.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (kind === 'search') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="11" cy="11" r="6" stroke="currentColor" strokeWidth="1.8" />
+        <path d="m16 16 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  return null;
+}
+
+function FieldLabel({ kind, text }) {
+  return (
+    <span className={styles.fieldLabel}>
+      <span className={`${styles.fieldLabelIcon} ${styles[`fieldLabelIcon${kind.charAt(0).toUpperCase()}${kind.slice(1)}`] || ''}`}>
+        <IconFieldTag kind={kind} />
+      </span>
+      <span>{text}</span>
+    </span>
+  );
+}
+
 function normalizeFilterName(raw) {
   return String(raw ?? '').trim();
 }
@@ -151,12 +208,12 @@ export function ScheduleHubFilterModal({
             <span className={styles.sectionTitleIcon} aria-hidden>
               <IconSliders />
             </span>
-            <span className={styles.sectionTitleText}>Refine by field</span>
+            <span className={styles.sectionTitleText}>Quick filters</span>
           </div>
 
           <div className={styles.criteriaGrid}>
             <Select
-              label="Tab"
+              label={<FieldLabel kind="tab" text="Tab" />}
               value={tab}
               onChange={(e) => setTab(e.target.value)}
               options={[
@@ -165,34 +222,34 @@ export function ScheduleHubFilterModal({
               ]}
             />
             <Select
-              label="Team member"
+              label={<FieldLabel kind="team" text="Team member" />}
               value={fields.assignedUserId || ''}
               onChange={(e) => setDraft((p) => ({ ...p, assignedUserId: e.target.value }))}
               options={teamMemberOptions}
             />
             <Select
-              label="Time flag"
+              label={<FieldLabel kind="time" text="Time flag" />}
               value={fields.timeFlag || ''}
               onChange={(e) => setDraft((p) => ({ ...p, timeFlag: e.target.value }))}
               options={timeFlagOptions}
             />
             {tab === 'meetings' ? (
               <Select
-                label="Meeting status"
+                label={<FieldLabel kind="status" text="Meeting status" />}
                 value={fields.meetingStatus || ''}
                 onChange={(e) => setDraft((p) => ({ ...p, meetingStatus: e.target.value }))}
                 options={meetingStatusOptions}
               />
             ) : (
               <Select
-                label="Callback status"
+                label={<FieldLabel kind="status" text="Callback status" />}
                 value={fields.callbackStatus || ''}
                 onChange={(e) => setDraft((p) => ({ ...p, callbackStatus: e.target.value }))}
                 options={callbackStatusOptions}
               />
             )}
             <Input
-              label="Search"
+              label={<FieldLabel kind="search" text="Search" />}
               value={fields.searchQuery || ''}
               onChange={(e) => setDraft((p) => ({ ...p, searchQuery: e.target.value }))}
               placeholder="contact, phone, title, notes…"

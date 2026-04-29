@@ -7,6 +7,55 @@
   line-height: 1.45;
 }
 
+.modalTitleWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modalTitleIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: $radius-sm;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-subtle);
+  color: var(--color-chip-blue-text);
+
+  svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+  }
+}
+
+.modalTitleIconCampaign {
+  color: var(--color-chip-blue-text);
+  background: color-mix(in srgb, var(--color-chip-blue-border) 14%, transparent);
+}
+
+.modalTitleIconStatus {
+  color: var(--color-chip-green-text);
+  background: color-mix(in srgb, var(--color-chip-green-border) 14%, transparent);
+}
+
+.modalTitleIconManager {
+  color: var(--color-chip-purple-text);
+  background: color-mix(in srgb, var(--color-chip-purple-border) 14%, transparent);
+}
+
+.modalTitleIconAgent {
+  color: var(--color-chip-slate-text);
+  background: color-mix(in srgb, var(--color-chip-slate-border) 14%, transparent);
+}
+
+.modalTitleIconTag {
+  color: var(--color-chip-amber-text);
+  background: color-mix(in srgb, var(--color-chip-amber-border) 14%, transparent);
+}
+
 .statusBanner {
   display: flex;
   flex-direction: column;
@@ -48,17 +97,33 @@
 
 .panelIcon {
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: $radius-md;
-  font-size: 16px;
-  line-height: 1;
   background: var(--color-bg-subtle);
   border: 1px solid var(--color-border-subtle);
   color: var(--color-text-secondary);
+
+  svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+  }
+}
+
+.panelIconSort {
+  background: rgba(59, 130, 246, 0.14);
+  color: var(--color-chip-blue-text, #1d4ed8);
+  border-color: rgba(59, 130, 246, 0.24);
+}
+
+.panelIconFilter {
+  background: rgba(139, 92, 246, 0.14);
+  color: var(--color-chip-purple-text, #6d28d9);
+  border-color: rgba(139, 92, 246, 0.24);
 }
 
 .panelTitle {
@@ -66,6 +131,12 @@
   font-size: $font-size-md;
   font-weight: $font-weight-semibold;
   color: var(--color-text-primary);
+}
+
+.panelTitleRow {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
 }
 
 .panelHint {

@@ -1,0 +1,106 @@
+@use '../../styles/variables' as *;
+
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  margin-top: 1px;
+}
+
+.infoBtn {
+  width: 12px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 0;
+  transition: color $transition-fast, background $transition-fast;
+
+  &:hover {
+    color: var(--color-accent-brand);
+    background: color-mix(in srgb, var(--color-bg-subtle) 65%, transparent);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent-brand) 35%, transparent);
+  }
+}
+
+.glyph {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sm {
+  width: 14px;
+  height: 14px;
+}
+
+.md {
+  width: 16px;
+  height: 16px;
+}
+
+.lg {
+  width: 18px;
+  height: 18px;
+}
+
+.popover {
+  position: fixed;
+  z-index: 9999;
+  width: min(320px, 78vw);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-lg;
+  background: var(--color-bg-elevated);
+  box-shadow: $shadow-xl;
+  padding: $space-2 $space-3;
+}
+
+
+.popoverTitle {
+  margin: 0 0 $space-1;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  padding-right: 18px;
+}
+
+.closeBtn {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: $radius-sm;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0;
+
+  &:hover {
+    background: var(--color-bg-subtle);
+    color: var(--color-text-primary);
+  }
+
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+.message {
+  margin: 0;
+  font-size: $font-size-sm;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+  padding-right: 14px;
+}
