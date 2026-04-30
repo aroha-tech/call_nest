@@ -12,6 +12,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown';
 import { InfoHelpIcon } from '../../components/ui/InfoHelpIcon';
+import { MaterialSymbol } from '../../components/ui/MaterialSymbol';
 import { contactsAPI } from '../../services/contactsAPI';
 import { backgroundJobsAPI } from '../../services/backgroundJobsAPI';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
@@ -249,7 +250,7 @@ export function ContactImportPage({ type }) {
   }, []);
 
   const managerSelectOptions = useMemo(() => {
-    const base = [{ value: '', label: '— Not set (use normal rules) —' }];
+    const base = [{ value: '', label: '— No manager —' }];
     let mgrs = tenantUsers.filter((u) => u.role === 'manager');
     if (user?.role === 'manager' && user?.id) {
       mgrs = mgrs.filter((u) => Number(u.id) === Number(user.id));
@@ -266,7 +267,7 @@ export function ContactImportPage({ type }) {
   }, [tenantUsers, user]);
 
   const agentSelectOptions = useMemo(() => {
-    const base = [{ value: '', label: '— Not set (use normal rules) —' }];
+    const base = [{ value: '', label: '— No agent —' }];
     let agents = tenantUsers.filter((u) => u.role === 'agent');
     if (user?.role === 'manager' && user?.id) {
       agents = agents.filter((u) => Number(u.manager_id) === Number(user.id));
@@ -628,9 +629,11 @@ export function ContactImportPage({ type }) {
         actions={
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Button variant="secondary" onClick={() => navigate(historyPath)}>
+              <MaterialSymbol name="history" size="sm" />
               Import history
             </Button>
             <Button variant="secondary" onClick={() => navigate(type === 'lead' ? '/leads' : '/contacts')}>
+              <MaterialSymbol name="arrow_back" size="sm" />
               Back
             </Button>
           </div>
@@ -725,8 +728,15 @@ export function ContactImportPage({ type }) {
                   <div className={styles.footerNote} style={{ marginTop: 8 }}>
                     Keep required identity columns and a valid phone/email. Max file size: {CSV_IMPORT_MAX_MB} MB.
                     <div className={styles.sampleCsvBlock} style={{ marginTop: 8 }}>
-                      <div className={styles.sampleCsvTitle}>Sample CSV (download)</div>
-                      <p className={styles.sampleCsvIntro}>{importSampleIntro}</p>
+                      <div className={styles.sampleCsvTitle}>
+                        {/* <MaterialSymbol name="download" size="sm" /> */}
+                        <span>Sample CSV (download)</span>
+                        <InfoHelpIcon
+                          title="Sample CSV help"
+                          modalTitle="Sample CSV (download)"
+                          message={importSampleIntro}
+                        />
+                      </div>
                       <ul className={styles.sampleCsvList}>
                         {importSampleLinks.map(({ filename, label }) => (
                           <li key={filename}>
@@ -736,7 +746,8 @@ export function ContactImportPage({ type }) {
                               className={styles.sampleCsvLink}
                               title={filename}
                             >
-                              {label}
+                              <MaterialSymbol name="download" size="sm" />
+                              <span>Download {label}</span>
                             </a>
                           </li>
                         ))}
@@ -751,7 +762,7 @@ export function ContactImportPage({ type }) {
                     <InfoHelpIcon
                       title="Import settings info"
                       modalTitle="Import settings"
-                      message="Duplicates are matched by email."
+                      message="Duplicates are matched by email. File-level manager/agent values override defaults."
                     />
                   </div>
 
@@ -792,15 +803,17 @@ export function ContactImportPage({ type }) {
                     />
                     {canSetImportOwnership ? (
                       <div className={styles.grid2}>
-                        <Select
-                          label="Default manager (optional)"
-                          value={importManagerId}
-                          onChange={(e) => {
-                            setImportManagerId(e.target.value);
-                            setImportAssignedUserId('');
-                          }}
-                          options={managerSelectOptions}
-                        />
+                        {user?.role !== 'manager' ? (
+                          <Select
+                            label="Default manager (optional)"
+                            value={importManagerId}
+                            onChange={(e) => {
+                              setImportManagerId(e.target.value);
+                              setImportAssignedUserId('');
+                            }}
+                            options={managerSelectOptions}
+                          />
+                        ) : null}
                         <Select
                           label="Default assigned agent (optional)"
                           value={importAssignedUserId}
@@ -809,11 +822,6 @@ export function ContactImportPage({ type }) {
                         />
                       </div>
                     ) : null}
-                    <InfoHelpIcon
-                      title="Ownership override info"
-                      modalTitle="Import ownership"
-                      message="File-level manager/agent values override defaults."
-                    />
                   </div>
 
                   <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>

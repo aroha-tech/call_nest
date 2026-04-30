@@ -20,9 +20,11 @@ import { LeadColumnSortFilterModal } from '../features/contacts/LeadColumnSortFi
 import { ExportCsvModal } from '../features/contacts/ExportCsvModal';
 import contactPageStyles from '../features/contacts/ContactsPage.module.scss';
 import {
+  IconActions,
   IconChevronDown,
   IconColumns,
   IconExport,
+  IconSelectAll,
 } from '../features/contacts/ListActionsMenuIcons';
 import {
   getApplicableDialSessionsColumns,
@@ -107,6 +109,7 @@ export function DialSessionsPage() {
   const [filterUserOptions, setFilterUserOptions] = useState([{ value: '', label: 'Anyone' }]);
 
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [openedEditorFromAppliedButton, setOpenedEditorFromAppliedButton] = useState(false);
   const [exportCsvOpen, setExportCsvOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const actionsRef = useRef(null);
@@ -377,6 +380,7 @@ export function DialSessionsPage() {
       String(filterDurationMax || '').trim() ||
       columnFilters.length > 0
   );
+  const filterButtonLabel = hasActiveFilters ? 'Applied filters' : 'Filters';
 
   const resetAllFilters = useCallback(() => {
     setSearchQuery('');
@@ -468,6 +472,7 @@ export function DialSessionsPage() {
                 disabled={selectAllMatchingLoading}
                 onClick={() => void handleSelectAllMatchingToggle()}
               >
+                <IconSelectAll className={contactPageStyles.toolbarBtnIcon} />
                 {selectAllMatchingLoading
                   ? 'Loading…'
                   : selectionIsAllMatching && selectedIds.size > 0
@@ -476,8 +481,26 @@ export function DialSessionsPage() {
               </Button>
             ) : null}
 
-            <Button type="button" size="sm" variant="primary" onClick={() => setFiltersOpen(true)}>
-              Filters
+            <Button
+              type="button"
+              size="sm"
+              variant="primary"
+              className={hasActiveFilters ? contactPageStyles.toolbarFilterBtnActive : ''}
+              onClick={() => {
+                if (hasActiveFilters) {
+                  setOpenedEditorFromAppliedButton(true);
+                  setFiltersOpen(true);
+                  return;
+                }
+                setOpenedEditorFromAppliedButton(false);
+                setFiltersOpen(true);
+              }}
+            >
+              {filterButtonLabel}
+            </Button>
+            <Button type="button" size="sm" variant="secondary" onClick={() => setExportCsvOpen(true)}>
+              <IconExport className={contactPageStyles.toolbarBtnIcon} />
+              Export
             </Button>
 
             <div className={contactPageStyles.bulkActionsWrap} ref={actionsRef}>
@@ -491,6 +514,7 @@ export function DialSessionsPage() {
                 onClick={() => setActionsOpen((v) => !v)}
               >
                 <span className={contactPageStyles.actionsTriggerInner}>
+                  <IconActions className={contactPageStyles.toolbarBtnIcon} />
                   Actions
                   <IconChevronDown className={contactPageStyles.actionsTriggerChevron} />
                 </span>
@@ -498,15 +522,6 @@ export function DialSessionsPage() {
               {actionsOpen ? (
                 <div className={contactPageStyles.bulkActionsMenu} role="menu">
                   <div className={contactPageStyles.actionsMenuSection}>
-                    <DialSessionsActionsMenuItem
-                      icon={IconExport}
-                      onClick={() => {
-                        setActionsOpen(false);
-                        setExportCsvOpen(true);
-                      }}
-                    >
-                      Export CSV
-                    </DialSessionsActionsMenuItem>
                     <DialSessionsActionsMenuItem
                       icon={IconColumns}
                       onClick={() => {
@@ -601,9 +616,14 @@ export function DialSessionsPage() {
 
       <DialSessionsFilterModal
         isOpen={filtersOpen}
-        onClose={() => setFiltersOpen(false)}
+        onClose={() => {
+          setFiltersOpen(false);
+          setOpenedEditorFromAppliedButton(false);
+        }}
         showCreatedByFilter={canPickCreatedBy}
         createdByOptions={filterUserOptions}
+        applyButtonLabel={openedEditorFromAppliedButton ? 'Change' : 'Apply'}
+        showResetButton={openedEditorFromAppliedButton}
         values={{
           statusFilter,
           providerFilter,
@@ -690,6 +710,7 @@ export function DialSessionsPage() {
         selectedIds={selectedIds}
         totalMatching={pagination.total || 0}
       />
+
     </div>
   );
 }

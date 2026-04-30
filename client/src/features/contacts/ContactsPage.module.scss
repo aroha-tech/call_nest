@@ -48,6 +48,12 @@
   justify-content: center;
 }
 
+.toolbarBtnIcon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
 .toolbarResetIcon {
   flex-shrink: 0;
   display: block;
@@ -83,6 +89,58 @@
     width: 14px;
     height: 14px;
   }
+}
+
+.toolbarFilterBtnActive {
+  border-color: color-mix(in srgb, var(--color-primary-600) 58%, var(--color-border-subtle)) !important;
+  background: color-mix(in srgb, var(--color-primary-600) 14%, transparent) !important;
+  color: var(--color-text-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-600) 22%, transparent) inset;
+}
+
+.activeFiltersSummary {
+  display: inline-flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  max-width: min(100%, 860px);
+  padding: 6px 10px;
+  border-radius: $radius-md;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  font-size: $font-size-xs;
+}
+
+.activeFiltersLabel {
+  flex-shrink: 0;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  line-height: 22px;
+}
+
+.activeFiltersChips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.activeFilterChip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 240px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-primary-600) 28%, var(--color-border-subtle));
+  background: color-mix(in srgb, var(--color-primary-600) 10%, transparent);
+  color: var(--color-text-primary);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .bulkActionsWrap {

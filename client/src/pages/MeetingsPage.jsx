@@ -26,6 +26,16 @@ import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import styles from './MeetingsPage.module.scss';
 
+function UiIcon({ children, className = '' }) {
+  return (
+    <span className={`${styles.uiIcon} ${className}`.trim()} aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        {children}
+      </svg>
+    </span>
+  );
+}
+
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const MEETING_STATUS_OPTIONS = [
@@ -1130,25 +1140,43 @@ export function MeetingsPage() {
       <SlidePanel
         isOpen={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
-        title={editing ? 'Edit meeting' : 'New meeting'}
+        title={
+          <span className={styles.panelTitleWithIcon}>
+            <UiIcon className={styles.panelTitleIconMeeting}>
+              <rect x="3" y="5" width="18" height="16" rx="2" />
+              <path d="M3 10h18M8 3v4M16 3v4" />
+            </UiIcon>
+            {editing ? 'Edit meeting' : 'New meeting'}
+          </span>
+        }
         size="xl"
         closeOnOverlay={!saving}
         closeOnEscape={!saving}
         footer={
           <ModalFooter>
-            <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <div>
+            <div className={styles.modalFooterRow}>
+              <div className={styles.modalFooterLeft}>
                 {editing && canManage ? (
-                  <Button type="button" variant="danger" onClick={() => setDeleteTarget(editing)} disabled={saving}>
+                  <Button type="button" variant="danger" onClick={() => setDeleteTarget(editing)} disabled={saving} className={styles.footerBtn}>
                     Delete
                   </Button>
                 ) : null}
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <Button type="button" variant="secondary" onClick={() => navigate('/settings/meeting-attendee-emails')} disabled={saving}>
+              <div className={styles.modalFooterRight}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => navigate('/settings/meeting-attendee-emails')}
+                  disabled={saving}
+                  className={styles.footerBtnWide}
+                >
+                  <UiIcon>
+                    <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+                    <path d="m3.5 7 8.5 6 8.5-6" />
+                  </UiIcon>
                   Attendee email settings
                 </Button>
-                <Button type="button" variant="ghost" onClick={() => setModalOpen(false)} disabled={saving}>
+                <Button type="button" variant="ghost" onClick={() => setModalOpen(false)} disabled={saving} className={styles.footerBtn}>
                   {canManage ? 'Cancel' : 'Close'}
                 </Button>
                 {canManage ? (
@@ -1157,12 +1185,20 @@ export function MeetingsPage() {
                     variant="secondary"
                     onClick={openMeetingEmailPreview}
                     disabled={!form.email_account_id || saving}
+                    className={styles.footerBtnWide}
                   >
+                    <UiIcon>
+                      <path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z" />
+                      <circle cx="12" cy="12" r="2.75" />
+                    </UiIcon>
                     Preview & edit email
                   </Button>
                 ) : null}
                 {canManage ? (
-                  <Button type="submit" form="meeting-form" loading={saving} disabled={saving}>
+                  <Button type="submit" form="meeting-form" loading={saving} disabled={saving} className={styles.footerBtnPrimary}>
+                    <UiIcon>
+                      <path d="M20 7 9 18l-5-5" />
+                    </UiIcon>
                     Save
                   </Button>
                 ) : null}
@@ -1172,6 +1208,9 @@ export function MeetingsPage() {
         }
       >
         <form id="meeting-form" onSubmit={handleSave}>
+          <p className={styles.panelSubtitle}>
+            {editing ? 'Update meeting details and keep attendees in sync.' : 'Schedule and share a meeting with your contacts.'}
+          </p>
           {providerReconnectRequired ? (
             <Alert variant="warning" style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
@@ -1206,6 +1245,10 @@ export function MeetingsPage() {
                     setMeetingFormErrors((e2) => ({ ...e2, entity: undefined }));
                   }}
                 >
+                  <UiIcon>
+                    <circle cx="12" cy="12" r="3.5" />
+                    <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a1.8 1.8 0 0 1-2.5 2.5l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9v.2a1.8 1.8 0 0 1-3.6 0v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a1.8 1.8 0 1 1-2.5-2.5l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6h-.2a1.8 1.8 0 0 1 0-3.6h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a1.8 1.8 0 1 1 2.5-2.5l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9v-.2a1.8 1.8 0 0 1 3.6 0v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a1.8 1.8 0 0 1 2.5 2.5l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6h.2a1.8 1.8 0 0 1 0 3.6h-.2a1 1 0 0 0-.9.6Z" />
+                  </UiIcon>
                   Pick contact
                 </Button>
                 <Button
@@ -1221,6 +1264,13 @@ export function MeetingsPage() {
                     setMeetingFormErrors((e2) => ({ ...e2, entity: undefined }));
                   }}
                 >
+                  <UiIcon>
+                    <path d="M12 13v8" />
+                    <path d="M17 10v11" />
+                    <path d="M7 16v5" />
+                    <path d="M20 5H4a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1Z" />
+                    <circle cx="7.5" cy="8.5" r="1.2" />
+                  </UiIcon>
                   Pick lead
                 </Button>
               </div>
@@ -1251,172 +1301,259 @@ export function MeetingsPage() {
                 </div>
               ) : null}
             </div>
-            <Select
-              label="Email account *"
-              value={form.email_account_id}
-              onChange={(e) => {
-                setForm((f) => ({ ...f, email_account_id: e.target.value }));
-                setMeetingFormErrors((e2) => ({ ...e2, email_account_id: undefined }));
-              }}
-              options={formAccountOptions}
-              required
-              disabled={!canManage}
-              error={meetingFormErrors.email_account_id}
-            />
+            <div className={`${styles.iconField} ${styles.callbackIconBlue}`}>
+              <UiIcon>
+                <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+                <path d="m3.5 7 8.5 6 8.5-6" />
+              </UiIcon>
+              <Select
+                label="Email account *"
+                value={form.email_account_id}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, email_account_id: e.target.value }));
+                  setMeetingFormErrors((e2) => ({ ...e2, email_account_id: undefined }));
+                }}
+                options={formAccountOptions}
+                required
+                disabled={!canManage}
+                error={meetingFormErrors.email_account_id}
+              />
+            </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <p className={styles.listHint} style={{ margin: 0 }}>
                 Connected account permissions power native meeting links and future provider sync features. If any
                 provider action fails, reconnect the same account once to refresh scopes.
               </p>
             </div>
-            <Select
-              label="Assigned to *"
-              value={form.assigned_user_id}
-              onChange={(e) => {
-                setForm((f) => ({
-                  ...f,
-                  assigned_user_id: e.target.value,
-                  meeting_owner_user_id: f.meeting_owner_user_id || e.target.value,
-                }));
-                setMeetingFormErrors((e2) => ({ ...e2, assigned_user_id: undefined }));
-              }}
-              options={agentOptions}
-              disabled={!canManage}
-              error={meetingFormErrors.assigned_user_id}
-            />
-            <Select
-              label="Meeting owner *"
-              value={form.meeting_owner_user_id}
-              onChange={(e) => {
-                setForm((f) => ({ ...f, meeting_owner_user_id: e.target.value }));
-                setMeetingFormErrors((e2) => ({ ...e2, meeting_owner_user_id: undefined }));
-              }}
-              options={ownerOptions}
-              disabled={!canManage}
-              error={meetingFormErrors.meeting_owner_user_id}
-            />
-            <Select
-              label="Platform *"
-              value={form.meeting_platform}
-              onChange={(e) => {
-                setForm((f) => ({ ...f, meeting_platform: e.target.value }));
-                setMeetingFormErrors((e2) => ({ ...e2, meeting_platform: undefined }));
-              }}
-              options={[
-                { value: 'google_meet', label: 'Google Meet' },
-                { value: 'microsoft_teams', label: 'Microsoft Teams' },
-              ]}
-              disabled={!canManage}
-              error={meetingFormErrors.meeting_platform}
-            />
-            <Select
-              label="Duration *"
-              value={form.meeting_duration_min}
-              onChange={(e) => {
-                const mins = Number(e.target.value || 0);
-                setForm((f) => {
-                  const startMs = new Date(f.start_at).getTime();
-                  const endAt =
-                    Number.isFinite(startMs) && mins > 0
-                      ? formatDateTimeLocalInputValue(new Date(startMs + mins * 60000))
-                      : f.end_at;
-                  return { ...f, meeting_duration_min: e.target.value, end_at: endAt };
-                });
-                setMeetingFormErrors((e2) => ({ ...e2, meeting_duration_min: undefined }));
-              }}
-              options={[
-                { value: '15', label: '15 minutes' },
-                { value: '30', label: '30 minutes' },
-                { value: '45', label: '45 minutes' },
-                { value: '60', label: '60 minutes' },
-                { value: '90', label: '90 minutes' },
-              ]}
-              disabled={!canManage}
-              error={meetingFormErrors.meeting_duration_min}
-            />
-            <Input
-              label="Title *"
-              value={form.title}
-              onChange={(e) => {
-                setForm((f) => ({ ...f, title: e.target.value }));
-                setMeetingFormErrors((e2) => ({ ...e2, title: undefined }));
-              }}
-              required
-              disabled={!canManage}
-              error={meetingFormErrors.title}
-            />
-            <Input
-              label="Attendee email"
-              type="email"
-              value={form.attendee_email}
-              onChange={(e) => setForm((f) => ({ ...f, attendee_email: e.target.value }))}
-              placeholder="client@example.com"
-              disabled={!canManage}
-            />
-            <Input
-              label="Location"
-              value={form.location}
-              onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-              disabled={!canManage}
-            />
-            <Input
-              label="Start *"
-              type="datetime-local"
-              value={form.start_at}
-              min={formatDateTimeLocalInputValue(new Date())}
-              onChange={(e) =>
-                {
+            <div className={`${styles.iconField} ${styles.callbackIconIndigo}`}>
+              <UiIcon>
+                <path d="M20 21v-1.5a4 4 0 0 0-4-4h-8a4 4 0 0 0-4 4V21" />
+                <circle cx="12" cy="8" r="3.5" />
+              </UiIcon>
+              <Select
+                label="Assigned to *"
+                value={form.assigned_user_id}
+                onChange={(e) => {
+                  setForm((f) => ({
+                    ...f,
+                    assigned_user_id: e.target.value,
+                    meeting_owner_user_id: f.meeting_owner_user_id || e.target.value,
+                  }));
+                  setMeetingFormErrors((e2) => ({ ...e2, assigned_user_id: undefined }));
+                }}
+                options={agentOptions}
+                disabled={!canManage}
+                error={meetingFormErrors.assigned_user_id}
+              />
+            </div>
+            <div className={`${styles.iconField} ${styles.callbackIconSky}`}>
+              <UiIcon>
+                <circle cx="12" cy="7.8" r="3.3" />
+                <path d="M4 20.5c1.8-3.1 4.2-4.7 8-4.7s6.2 1.6 8 4.7" />
+              </UiIcon>
+              <Select
+                label="Meeting owner *"
+                value={form.meeting_owner_user_id}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, meeting_owner_user_id: e.target.value }));
+                  setMeetingFormErrors((e2) => ({ ...e2, meeting_owner_user_id: undefined }));
+                }}
+                options={ownerOptions}
+                disabled={!canManage}
+                error={meetingFormErrors.meeting_owner_user_id}
+              />
+            </div>
+            <div className={`${styles.iconField} ${styles.callbackIconTeal}`}>
+              <UiIcon>
+                <rect x="3" y="5" width="18" height="14" rx="3" />
+                <path d="M7 2.8v4M17 2.8v4M3 10h18" />
+              </UiIcon>
+              <Select
+                label="Platform *"
+                value={form.meeting_platform}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, meeting_platform: e.target.value }));
+                  setMeetingFormErrors((e2) => ({ ...e2, meeting_platform: undefined }));
+                }}
+                options={[
+                  { value: 'google_meet', label: 'Google Meet' },
+                  { value: 'microsoft_teams', label: 'Microsoft Teams' },
+                ]}
+                disabled={!canManage}
+                error={meetingFormErrors.meeting_platform}
+              />
+            </div>
+            <div className={`${styles.iconField} ${styles.callbackIconBlue}`}>
+              <UiIcon>
+                <circle cx="12" cy="12" r="8.5" />
+                <path d="M12 7.8v4.8l3 2" />
+              </UiIcon>
+              <Select
+                label="Duration *"
+                value={form.meeting_duration_min}
+                onChange={(e) => {
+                  const mins = Number(e.target.value || 0);
                   setForm((f) => {
-                    const mins = Number(f.meeting_duration_min || 0);
-                    const startMs = new Date(e.target.value).getTime();
+                    const startMs = new Date(f.start_at).getTime();
                     const endAt =
                       Number.isFinite(startMs) && mins > 0
                         ? formatDateTimeLocalInputValue(new Date(startMs + mins * 60000))
                         : f.end_at;
-                    return { ...f, start_at: e.target.value, end_at: endAt };
+                    return { ...f, meeting_duration_min: e.target.value, end_at: endAt };
                   });
-                  setMeetingFormErrors((e2) => ({ ...e2, start_at: undefined, end_at: undefined }));
+                  setMeetingFormErrors((e2) => ({ ...e2, meeting_duration_min: undefined }));
+                }}
+                options={[
+                  { value: '15', label: '15 minutes' },
+                  { value: '30', label: '30 minutes' },
+                  { value: '45', label: '45 minutes' },
+                  { value: '60', label: '60 minutes' },
+                  { value: '90', label: '90 minutes' },
+                ]}
+                disabled={!canManage}
+                error={meetingFormErrors.meeting_duration_min}
+              />
+            </div>
+            <div className={`${styles.iconField} ${styles.callbackIconIndigo}`}>
+              <UiIcon>
+                <path d="M4 7.5h16" />
+                <path d="M4 12h12" />
+                <path d="M4 16.5h9" />
+              </UiIcon>
+              <Input
+                label="Title *"
+                value={form.title}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, title: e.target.value }));
+                  setMeetingFormErrors((e2) => ({ ...e2, title: undefined }));
+                }}
+                required
+                disabled={!canManage}
+                error={meetingFormErrors.title}
+                inputClassName={styles.iconInput}
+              />
+            </div>
+            <div className={`${styles.iconField} ${styles.callbackIconSky}`}>
+              <UiIcon>
+                <rect x="2.5" y="5.5" width="19" height="13" rx="2.5" />
+                <path d="m3.5 8 8.5 5.5L20.5 8" />
+              </UiIcon>
+              <Input
+                label="Attendee email"
+                type="email"
+                value={form.attendee_email}
+                onChange={(e) => setForm((f) => ({ ...f, attendee_email: e.target.value }))}
+                placeholder="client@example.com"
+                disabled={!canManage}
+                inputClassName={styles.iconInput}
+              />
+            </div>
+            <div className={`${styles.iconField} ${styles.callbackIconTeal}`}>
+              <UiIcon>
+                <path d="M12 20.5s7-4.7 7-10a7 7 0 1 0-14 0c0 5.3 7 10 7 10Z" />
+                <circle cx="12" cy="10.5" r="2.3" />
+              </UiIcon>
+              <Input
+                label="Location"
+                value={form.location}
+                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                disabled={!canManage}
+                inputClassName={styles.iconInput}
+              />
+            </div>
+            <div className={`${styles.iconField} ${styles.callbackIconBlue}`}>
+              <UiIcon>
+                <rect x="3" y="5" width="18" height="16" rx="2" />
+                <path d="M3 10h18M8 3v4M16 3v4" />
+              </UiIcon>
+              <Input
+                label="Start *"
+                type="datetime-local"
+                value={form.start_at}
+                min={formatDateTimeLocalInputValue(new Date())}
+                onChange={(e) =>
+                  {
+                    setForm((f) => {
+                      const mins = Number(f.meeting_duration_min || 0);
+                      const startMs = new Date(e.target.value).getTime();
+                      const endAt =
+                        Number.isFinite(startMs) && mins > 0
+                          ? formatDateTimeLocalInputValue(new Date(startMs + mins * 60000))
+                          : f.end_at;
+                      return { ...f, start_at: e.target.value, end_at: endAt };
+                    });
+                    setMeetingFormErrors((e2) => ({ ...e2, start_at: undefined, end_at: undefined }));
+                  }
                 }
-              }
-              required
-              disabled={!canManage}
-              error={meetingFormErrors.start_at}
-            />
-            <Input
-              label="End *"
-              type="datetime-local"
-              value={form.end_at}
-              min={form.start_at || formatDateTimeLocalInputValue(new Date())}
-              onChange={(e) => {
-                setForm((f) => ({ ...f, end_at: e.target.value }));
-                setMeetingFormErrors((e2) => ({ ...e2, end_at: undefined }));
-              }}
-              required
-              disabled={!canManage}
-              error={meetingFormErrors.end_at}
-            />
-            <Select
-              label="Status"
-              value={form.meeting_status}
-              onChange={(e) => setForm((f) => ({ ...f, meeting_status: e.target.value }))}
-              options={MEETING_STATUS_OPTIONS}
-              disabled={!canManage}
-            />
+                required
+                disabled={!canManage}
+                error={meetingFormErrors.start_at}
+                inputClassName={styles.iconInput}
+              />
+            </div>
+            <div className={`${styles.iconField} ${styles.callbackIconIndigo}`}>
+              <UiIcon>
+                <rect x="3" y="5" width="18" height="16" rx="2" />
+                <path d="M3 10h18M8 3v4M16 3v4" />
+              </UiIcon>
+              <Input
+                label="End *"
+                type="datetime-local"
+                value={form.end_at}
+                min={form.start_at || formatDateTimeLocalInputValue(new Date())}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, end_at: e.target.value }));
+                  setMeetingFormErrors((e2) => ({ ...e2, end_at: undefined }));
+                }}
+                required
+                disabled={!canManage}
+                error={meetingFormErrors.end_at}
+                inputClassName={styles.iconInput}
+              />
+            </div>
+            <div className={styles.iconField}>
+              <UiIcon>
+                <path d="M4 12h16" />
+                <path d="M4 6h12" />
+                <path d="M4 18h10" />
+              </UiIcon>
+              <Select
+                label="Status"
+                value={form.meeting_status}
+                onChange={(e) => setForm((f) => ({ ...f, meeting_status: e.target.value }))}
+                options={MEETING_STATUS_OPTIONS}
+                disabled={!canManage}
+              />
+            </div>
           </div>
-          <p className={styles.listHint} style={{ marginTop: 4 }}>
-            Open <strong>Preview &amp; edit email</strong> to see the outgoing message, edit the template using placeholders
-            like <code>{'{{title}}'}</code>, and save it as your tenant default for this notification type (new / update /
-            cancelled).
-          </p>
+          <div className={styles.helperNotice}>
+            <UiIcon>
+              <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+              <path d="m3.5 7 8.5 6 8.5-6" />
+            </UiIcon>
+            <p className={styles.helperNoticeText}>
+              Open <strong>Preview &amp; edit email</strong> to see the outgoing message, edit the template using placeholders
+              like <code>{'{{title}}'}</code>, and save it as your tenant default for this notification type (new / update /
+              cancelled).
+            </p>
+          </div>
           <div style={{ marginTop: 12 }}>
-            <Textarea
-              label="Description"
-              value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              placeholder="Optional notes"
-              disabled={!canManage}
-              rows={3}
-            />
+            <div className={`${styles.iconField} ${styles.iconFieldTextarea} ${styles.callbackIconSky}`}>
+              <UiIcon>
+                <path d="M4 7.5h16" />
+                <path d="M4 12h16" />
+                <path d="M4 16.5h11" />
+              </UiIcon>
+              <Textarea
+                label="Description"
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder="Optional notes"
+                disabled={!canManage}
+                rows={3}
+                textareaClassName={styles.iconTextarea}
+              />
+            </div>
           </div>
         </form>
       </SlidePanel>

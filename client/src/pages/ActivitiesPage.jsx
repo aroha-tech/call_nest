@@ -35,10 +35,11 @@ import {
 } from './callHistoryTableConfig';
 import contactPageStyles from '../features/contacts/ContactsPage.module.scss';
 import {
+  IconActions,
   IconChevronDown,
   IconColumns,
   IconExport,
-  IconFilter,
+  IconSelectAll,
 } from '../features/contacts/ListActionsMenuIcons';
 import { ExportCsvModal } from '../features/contacts/ExportCsvModal';
 import {
@@ -82,6 +83,7 @@ function IconReset() {
     </svg>
   );
 }
+
 
 export function ActivitiesPage() {
   const { formatDateTime } = useDateTimeDisplay();
@@ -163,6 +165,7 @@ export function ActivitiesPage() {
   const [tenantAgents, setTenantAgents] = useState([]);
   const [savedFilters, setSavedFilters] = useState([]);
   const [filterOptionsOpen, setFilterOptionsOpen] = useState(false);
+  const [openedEditorFromAppliedButton, setOpenedEditorFromAppliedButton] = useState(false);
   const [browseSavedOpen, setBrowseSavedOpen] = useState(false);
   const [editingSavedFilterId, setEditingSavedFilterId] = useState(null);
   const [editingSavedFilterName, setEditingSavedFilterName] = useState('');
@@ -650,6 +653,41 @@ export function ActivitiesPage() {
       timeRangePreset !== TIME_RANGE_PRESET.ALL_TIME ||
       callHistoryColumnFilters.length > 0
   );
+  const filterButtonLabel = editingSavedFilterName?.trim()
+    ? editingSavedFilterName.trim()
+    : hasActiveFilters
+      ? 'Applied filters'
+      : 'Filters';
+
+  const resetAllFilters = useCallback(() => {
+    setContactFilter('');
+    setDialerSessionFilter('');
+    setSearchQuery('');
+    setDispositionFilterMulti('');
+    setDirectionFilterMulti('');
+    setStatusFilterMulti('');
+    setConnectedFilterMulti('');
+    setAgentFilterMulti('');
+    setTimeRangePreset(TIME_RANGE_PRESET.ALL_TIME);
+    setTimeRangeCustomAfter('');
+    setTimeRangeCustomBefore('');
+    clearSelection();
+    setEditingSavedFilterId(null);
+    setEditingSavedFilterName('');
+    setEditingSavedFilterSnapshot(null);
+    setPage(1);
+    setCallHistoryColumnFilters([]);
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete('q');
+        p.delete('contact_id');
+        p.delete('dialer_session_id');
+        return p;
+      },
+      { replace: true }
+    );
+  }, [clearSelection, setContactFilter, setDialerSessionFilter, setSearchParams]);
 
   return (
     <div className={listStyles.page}>
@@ -727,35 +765,7 @@ export function ActivitiesPage() {
                 type="button"
                 size="sm"
                 variant="secondary"
-                onClick={() => {
-                  setContactFilter('');
-                  setDialerSessionFilter('');
-                  setSearchQuery('');
-                  setDispositionFilterMulti('');
-                  setDirectionFilterMulti('');
-                  setStatusFilterMulti('');
-                  setConnectedFilterMulti('');
-                  setAgentFilterMulti('');
-                  setTimeRangePreset(TIME_RANGE_PRESET.ALL_TIME);
-                  setTimeRangeCustomAfter('');
-                  setTimeRangeCustomBefore('');
-                  clearSelection();
-                  setEditingSavedFilterId(null);
-                  setEditingSavedFilterName('');
-                  setEditingSavedFilterSnapshot(null);
-                  setPage(1);
-                  setCallHistoryColumnFilters([]);
-                  setSearchParams(
-                    (prev) => {
-                      const p = new URLSearchParams(prev);
-                      p.delete('q');
-                      p.delete('contact_id');
-                      p.delete('dialer_session_id');
-                      return p;
-                    },
-                    { replace: true }
-                  );
-                }}
+                onClick={resetAllFilters}
                 className={styles.toolbarControlBtn}
               >
                 <IconReset />
@@ -772,6 +782,7 @@ export function ActivitiesPage() {
                 disabled={selectAllMatchingLoading}
                 onClick={() => void handleSelectAllMatchingToggle()}
               >
+                <IconSelectAll className={contactPageStyles.toolbarBtnIcon} />
                 {selectAllMatchingLoading
                   ? 'Loading…'
                   : selectionIsAllMatching && selectedIds.size > 0
@@ -780,8 +791,26 @@ export function ActivitiesPage() {
               </Button>
             ) : null}
 
-            <Button type="button" size="sm" variant="primary" onClick={() => setFiltersOpen(true)}>
-              Filters
+            <Button
+              type="button"
+              size="sm"
+              variant="primary"
+              className={hasActiveFilters ? contactPageStyles.toolbarFilterBtnActive : ''}
+              onClick={() => {
+                if (hasActiveFilters) {
+                  setOpenedEditorFromAppliedButton(true);
+                  setFiltersOpen(true);
+                  return;
+                }
+                setOpenedEditorFromAppliedButton(false);
+                setFilterOptionsOpen(true);
+              }}
+            >
+              {filterButtonLabel}
+            </Button>
+            <Button type="button" size="sm" variant="secondary" onClick={() => setExportCsvOpen(true)}>
+              <IconExport className={contactPageStyles.toolbarBtnIcon} />
+              Export
             </Button>
 
             <div className={contactPageStyles.bulkActionsWrap} ref={callHistoryActionsRef}>
@@ -795,6 +824,7 @@ export function ActivitiesPage() {
                 onClick={() => setCallHistoryActionsOpen((v) => !v)}
               >
                 <span className={contactPageStyles.actionsTriggerInner}>
+                  <IconActions className={contactPageStyles.toolbarBtnIcon} />
                   Actions
                   <IconChevronDown className={contactPageStyles.actionsTriggerChevron} />
                 </span>
@@ -802,24 +832,6 @@ export function ActivitiesPage() {
               {callHistoryActionsOpen ? (
                 <div className={contactPageStyles.bulkActionsMenu} role="menu">
                   <div className={contactPageStyles.actionsMenuSection}>
-                    <CallHistoryActionsMenuItem
-                      icon={IconFilter}
-                      onClick={() => {
-                        setCallHistoryActionsOpen(false);
-                        setFilterOptionsOpen(true);
-                      }}
-                    >
-                      Saved filters…
-                    </CallHistoryActionsMenuItem>
-                    <CallHistoryActionsMenuItem
-                      icon={IconExport}
-                      onClick={() => {
-                        setCallHistoryActionsOpen(false);
-                        setExportCsvOpen(true);
-                      }}
-                    >
-                      Export CSV
-                    </CallHistoryActionsMenuItem>
                     <CallHistoryActionsMenuItem
                       icon={IconColumns}
                       onClick={() => {
@@ -942,7 +954,10 @@ export function ActivitiesPage() {
 
       <CallHistoryFilterModal
         isOpen={filtersOpen}
-        onClose={() => setFiltersOpen(false)}
+        onClose={() => {
+          setFiltersOpen(false);
+          setOpenedEditorFromAppliedButton(false);
+        }}
         values={{
           contactFilter,
           dispositionFilterMulti,
@@ -961,6 +976,9 @@ export function ActivitiesPage() {
         statusOptions={statusOptions}
         connectedOptions={connectedOptions}
         canPickAgents={user?.role === 'admin' || user?.role === 'manager'}
+        showResetButton={openedEditorFromAppliedButton}
+        applyButtonLabel={openedEditorFromAppliedButton ? 'Change' : 'Apply'}
+        onReset={resetAllFilters}
         onApply={(next) => {
           setContactFilter(next?.contactFilter ?? '');
           setDispositionFilterMulti(next?.dispositionFilterMulti ?? '');
@@ -1084,6 +1102,7 @@ export function ActivitiesPage() {
         selectedIds={selectedIds}
         totalMatching={pagination.total || 0}
       />
+
     </div>
   );
 }

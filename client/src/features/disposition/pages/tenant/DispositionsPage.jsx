@@ -613,8 +613,22 @@ export function DispositionsPage({ readOnly = false }) {
           
           {/* Form Grid - 2 columns on desktop, 1 on mobile */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
-            <Input label="Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: e.target.value })} error={formErrors.name} placeholder="e.g. Interested - Call Back" />
-            <Select label="Disposition Type" value={formData.dispo_type_id || ''} onChange={(e) => setFormData({ ...formData, dispo_type_id: e.target.value })} options={dispoTypeOptions} error={formErrors.dispo_type_id} />
+            <Input
+              label="Name"
+              value={formData.name || ''}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              error={formErrors.name}
+              placeholder="e.g. Interested - Call Back"
+              required
+            />
+            <Select
+              label="Disposition Type"
+              value={formData.dispo_type_id || ''}
+              onChange={(e) => setFormData({ ...formData, dispo_type_id: e.target.value })}
+              options={dispoTypeOptions}
+              error={formErrors.dispo_type_id}
+              required
+            />
             <Select label="Contact Status (optional)" value={formData.contact_status_id || ''} onChange={(e) => setFormData({ ...formData, contact_status_id: e.target.value })} options={statusOptions} error={formErrors.contact_status_id} placeholder="Select..." />
             <Select label="Contact Temperature (optional)" value={formData.contact_temperature_id || ''} onChange={(e) => setFormData({ ...formData, contact_temperature_id: e.target.value })} options={tempOptions} error={formErrors.contact_temperature_id} placeholder="Select..." />
             <Select label="Next Action (optional)" value={formData.next_action || ''} onChange={(e) => setFormData({ ...formData, next_action: e.target.value })} options={NEXT_ACTION_OPTIONS} error={formErrors.next_action} placeholder="Select next action..." />

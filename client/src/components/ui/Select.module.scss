@@ -50,6 +50,10 @@
   margin-bottom: 2px;
 }
 
+.requiredMark {
+  color: var(--color-danger, #ef4444);
+}
+
 .error {
   font-size: $font-size-xs;
   color: var(--color-danger);

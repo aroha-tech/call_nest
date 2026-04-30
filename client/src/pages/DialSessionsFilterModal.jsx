@@ -50,6 +50,8 @@ export function DialSessionsFilterModal({
   onReset,
   createdByOptions = [{ value: '', label: 'Anyone' }],
   showCreatedByFilter = false,
+  applyButtonLabel = 'Apply',
+  showResetButton = false,
 }) {
   const [draft, setDraft] = useState(values);
 
@@ -91,16 +93,29 @@ export function DialSessionsFilterModal({
       closeOnEscape
       footer={
         <ModalFooter>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => {
-              onReset?.();
-              onClose();
-            }}
-          >
-            Clear & close
-          </Button>
+          {showResetButton ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                onReset?.();
+                onClose();
+              }}
+            >
+              Reset
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                onReset?.();
+                onClose();
+              }}
+            >
+              Clear & close
+            </Button>
+          )}
           <Button
             type="button"
             variant="primary"
@@ -109,7 +124,7 @@ export function DialSessionsFilterModal({
               onClose();
             }}
           >
-            Apply
+            {applyButtonLabel}
           </Button>
         </ModalFooter>
       }

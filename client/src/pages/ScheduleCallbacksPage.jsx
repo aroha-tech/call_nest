@@ -19,6 +19,16 @@ import { CallbackMetricCards } from '../features/callbacks/CallbackMetricCards';
 import { contactsAPI } from '../services/contactsAPI';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 
+function UiIcon({ children, className = '' }) {
+  return (
+    <span className={`${styles.uiIcon} ${className}`.trim()} aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        {children}
+      </svg>
+    </span>
+  );
+}
+
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const NEAR_WINDOW_MINUTES = 120;
 
@@ -687,25 +697,41 @@ export function ScheduleCallbacksPage() {
           setCallbackModalOpen(false);
           setEditingCallback(null);
         }}
-        title={editingCallback?.id ? 'Edit callback' : 'Schedule callback'}
+        title={
+          <span className={styles.panelTitleWithIcon}>
+            <UiIcon className={styles.panelTitleIconCallback}>
+              <path d="M6 10a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6" />
+              <path d="M10.5 19a1.5 1.5 0 0 0 3 0" />
+              <circle cx="18.5" cy="6.5" r="1.5" />
+            </UiIcon>
+            {editingCallback?.id ? 'Edit callback' : 'Schedule callback'}
+          </span>
+        }
         size="xl"
         closeOnOverlay={!callbackSaving}
         closeOnEscape={!callbackSaving}
         footer={
           <ModalFooter>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', width: '100%' }}>
-              <div style={{ display: 'flex', gap: 8 }}>
+            <div className={styles.modalFooterRow}>
+              <div className={styles.modalFooterLeft}>
                 {editingCallback?.id ? (
-                  <Button type="button" variant="danger" disabled={callbackSaving} onClick={() => setConfirmDeleteOpen(true)}>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    disabled={callbackSaving}
+                    onClick={() => setConfirmDeleteOpen(true)}
+                    className={styles.footerBtn}
+                  >
                     Delete
                   </Button>
                 ) : null}
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div className={styles.modalFooterRight}>
                 <Button
                   type="button"
                   variant="secondary"
                   disabled={callbackSaving}
+                  className={styles.footerBtn}
                   onClick={() => {
                     setCallbackModalOpen(false);
                     setEditingCallback(null);
@@ -713,7 +739,10 @@ export function ScheduleCallbacksPage() {
                 >
                   Cancel
                 </Button>
-                <Button type="button" variant="primary" disabled={!canSaveCallback} onClick={saveCallback}>
+                <Button type="button" variant="primary" disabled={!canSaveCallback} onClick={saveCallback} className={styles.footerBtnPrimary}>
+                  <UiIcon>
+                    <path d="M20 7 9 18l-5-5" />
+                  </UiIcon>
                   {callbackSaving ? 'Saving…' : 'Save'}
                 </Button>
               </div>
@@ -726,6 +755,11 @@ export function ScheduleCallbacksPage() {
             {callbackModalError}
           </Alert>
         ) : null}
+        <p className={styles.panelSubtitle}>
+          {editingCallback?.id
+            ? 'Update callback details and adjust timing or outcome notes.'
+            : 'Create a callback reminder for your team and linked contact or lead.'}
+        </p>
 
         <div className={styles.formGrid}>
           <div className={styles.formRowFull}>
@@ -743,6 +777,10 @@ export function ScheduleCallbacksPage() {
                   setPickerOpen(true);
                 }}
               >
+                <UiIcon>
+                  <circle cx="12" cy="12" r="3.5" />
+                  <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a1.8 1.8 0 0 1-2.5 2.5l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9v.2a1.8 1.8 0 0 1-3.6 0v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a1.8 1.8 0 1 1-2.5-2.5l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6h-.2a1.8 1.8 0 0 1 0-3.6h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a1.8 1.8 0 1 1 2.5-2.5l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9v-.2a1.8 1.8 0 0 1 3.6 0v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a1.8 1.8 0 0 1 2.5 2.5l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6h.2a1.8 1.8 0 0 1 0 3.6h-.2a1 1 0 0 0-.9.6Z" />
+                </UiIcon>
                 Pick contact
               </Button>
               <Button
@@ -757,6 +795,13 @@ export function ScheduleCallbacksPage() {
                   setPickerOpen(true);
                 }}
               >
+                <UiIcon>
+                  <path d="M12 13v8" />
+                  <path d="M17 10v11" />
+                  <path d="M7 16v5" />
+                  <path d="M20 5H4a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1Z" />
+                  <circle cx="7.5" cy="8.5" r="1.2" />
+                </UiIcon>
                 Pick lead
               </Button>
             </div>
@@ -790,15 +835,21 @@ export function ScheduleCallbacksPage() {
           <div className={styles.formRowFull}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
               <div className={styles.formRow}>
-                <Select
-                  label="Assigned to"
-                  value={formAssignedUserId}
-                  onChange={(e) => {
-                    setFormAssignedUserId(e.target.value);
-                    setCallbackFormErrors((err) => ({ ...err, assigned_user_id: undefined }));
-                  }}
-                  options={[{ value: '', label: 'Select team member' }, ...teamMemberOptions.filter((o) => o.value !== '')]}
-                />
+                <div className={`${styles.iconField} ${styles.callbackIconBlue}`}>
+                  <UiIcon>
+                    <path d="M20 21v-1.5a4 4 0 0 0-4-4h-8a4 4 0 0 0-4 4V21" />
+                    <circle cx="12" cy="8" r="3.5" />
+                  </UiIcon>
+                  <Select
+                    label="Assigned to"
+                    value={formAssignedUserId}
+                    onChange={(e) => {
+                      setFormAssignedUserId(e.target.value);
+                      setCallbackFormErrors((err) => ({ ...err, assigned_user_id: undefined }));
+                    }}
+                    options={[{ value: '', label: 'Select team member' }, ...teamMemberOptions.filter((o) => o.value !== '')]}
+                  />
+                </div>
                 {callbackFormErrors.assigned_user_id ? (
                   <div className={styles.listHint} style={{ marginTop: 6, color: 'var(--color-danger, #ef4444)', fontWeight: 600 }}>
                     {callbackFormErrors.assigned_user_id}
@@ -806,50 +857,89 @@ export function ScheduleCallbacksPage() {
                 ) : null}
               </div>
               <div className={styles.formRow}>
-                <Select
-                  label="Phone"
-                  value={formPhoneId}
-                  onChange={(e) => setFormPhoneId(e.target.value)}
-                  options={
-                    entitySelectedId
-                      ? phoneOptions.length
-                        ? phoneOptions
-                        : [{ value: '', label: 'No phones found' }]
-                      : [{ value: '', label: 'Select contact/lead first' }]
-                  }
-                />
+                <div className={`${styles.iconField} ${styles.callbackIconIndigo}`}>
+                  <UiIcon>
+                    <path d="M22 16.5V20a2 2 0 0 1-2.2 2A19 19 0 0 1 11.2 19a18.7 18.7 0 0 1-5.8-5.8A19 19 0 0 1 2.4 4.2 2 2 0 0 1 4.4 2h3.5a2 2 0 0 1 2 1.7 13.8 13.8 0 0 0 .7 2.9 2 2 0 0 1-.5 2.1L8.8 10a15.1 15.1 0 0 0 5.2 5.2l1.3-1.3a2 2 0 0 1 2.1-.5 13.8 13.8 0 0 0 2.9.7 2 2 0 0 1 1.7 2Z" />
+                  </UiIcon>
+                  <Select
+                    label="Phone"
+                    value={formPhoneId}
+                    onChange={(e) => setFormPhoneId(e.target.value)}
+                    options={
+                      entitySelectedId
+                        ? phoneOptions.length
+                          ? phoneOptions
+                          : [{ value: '', label: 'No phones found' }]
+                        : [{ value: '', label: 'Select contact/lead first' }]
+                    }
+                  />
+                </div>
               </div>
             </div>
           </div>
           <div className={styles.formRow}>
-            <Input
-              label="When"
-              type="datetime-local"
-              value={formScheduledAt}
-              onChange={(e) => {
-                setFormScheduledAt(e.target.value);
-                setCallbackFormErrors((err) => ({ ...err, scheduled_at: undefined }));
-              }}
-              error={callbackFormErrors.scheduled_at}
-            />
+            <div className={`${styles.iconField} ${styles.callbackIconSky}`}>
+              <UiIcon>
+                <rect x="3" y="5" width="18" height="16" rx="2" />
+                <path d="M3 10h18M8 3v4M16 3v4" />
+              </UiIcon>
+              <Input
+                label="When"
+                type="datetime-local"
+                value={formScheduledAt}
+                onChange={(e) => {
+                  setFormScheduledAt(e.target.value);
+                  setCallbackFormErrors((err) => ({ ...err, scheduled_at: undefined }));
+                }}
+                error={callbackFormErrors.scheduled_at}
+                inputClassName={styles.iconInput}
+              />
+            </div>
           </div>
           <div className={styles.formRow}>
-            <Select
-              label="Status"
-              value={formStatus}
-              onChange={(e) => setFormStatus(e.target.value)}
-              options={[
-                { value: 'pending', label: 'Pending' },
-                { value: 'completed', label: 'Completed' },
-                { value: 'cancelled', label: 'Cancelled' },
-              ]}
-            />
+            <div className={`${styles.iconField} ${styles.callbackIconTeal}`}>
+              <UiIcon>
+                <path d="M4 12h16" />
+                <path d="M4 6h12" />
+                <path d="M4 18h10" />
+              </UiIcon>
+              <Select
+                label="Status"
+                value={formStatus}
+                onChange={(e) => setFormStatus(e.target.value)}
+                options={[
+                  { value: 'pending', label: 'Pending' },
+                  { value: 'completed', label: 'Completed' },
+                  { value: 'cancelled', label: 'Cancelled' },
+                ]}
+              />
+            </div>
           </div>
           <div className={styles.formRowFull}>
-            <Textarea label="Notes" value={formNotes} onChange={(e) => setFormNotes(e.target.value)} rows={3} />
+            <div className={`${styles.iconField} ${styles.iconFieldTextarea} ${styles.callbackIconBlue}`}>
+              <UiIcon>
+                <path d="M4 7.5h16" />
+                <path d="M4 12h16" />
+                <path d="M4 16.5h11" />
+              </UiIcon>
+              <Textarea label="Notes" value={formNotes} onChange={(e) => setFormNotes(e.target.value)} rows={3} textareaClassName={styles.iconTextarea} />
+            </div>
           </div>
           <div className={styles.formRowFull}>
-            <Textarea label="Outcome notes" value={formOutcomeNotes} onChange={(e) => setFormOutcomeNotes(e.target.value)} rows={3} />
+            <div className={`${styles.iconField} ${styles.iconFieldTextarea} ${styles.callbackIconIndigo}`}>
+              <UiIcon>
+                <path d="M4 7.5h16" />
+                <path d="M4 12h16" />
+                <path d="M4 16.5h11" />
+              </UiIcon>
+              <Textarea
+                label="Outcome notes"
+                value={formOutcomeNotes}
+                onChange={(e) => setFormOutcomeNotes(e.target.value)}
+                rows={3}
+                textareaClassName={styles.iconTextarea}
+              />
+            </div>
           </div>
         </div>
       </SlidePanel>

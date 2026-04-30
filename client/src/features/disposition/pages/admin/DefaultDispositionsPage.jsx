@@ -425,6 +425,7 @@ export function DefaultDispositionsPage() {
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               error={formErrors.name}
               placeholder="e.g. Interested - Call Back"
+              required
             />
             <Select
               label="Disposition Type"
@@ -432,6 +433,7 @@ export function DefaultDispositionsPage() {
               onChange={(e) => setFormData({ ...formData, dispo_type_id: e.target.value })}
               options={dispoTypeOptions}
               error={formErrors.dispo_type_id}
+              required
             />
             <Select
               label="Contact Status (optional)"

@@ -249,6 +249,7 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
           </span>
           <span className="ql-formats">
             <button type="button" className="ql-link" />
+            <button type="button" className="ql-image" />
           </span>
           {!hideVariableMenu ? (
             <span className={`ql-formats ${styles.variableFormat}`} ref={varMenuWrapRef}>
@@ -261,7 +262,7 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
                 aria-expanded={varMenuOpen}
                 ref={varBtnRef}
               >
-                Variable ▾
+                Variables ▾
               </button>
             </span>
           ) : null}

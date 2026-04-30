@@ -16,10 +16,10 @@ import { Pagination, PaginationPageSize } from '../../components/ui/Pagination';
 import { callScriptsAPI } from '../../services/dispositionAPI';
 import { useMutation } from '../../hooks/useAsyncData';
 import { useTemplateVariableAutocomplete } from '../../hooks/useTemplateVariables';
+import { useTemplateVariables } from '../../hooks/useTemplateVariables';
 import { renderPreview, linkify, linkifyHtml, stripHtml, DEFAULT_PREVIEW_DATA } from '../../utils/templateVariables';
 import { templateVariablesAPI } from '../../services/templateVariablesAPI';
 import { ScriptBodyEditor } from './ScriptBodyEditor';
-import { InfoHelpIcon } from '../../components/ui/InfoHelpIcon';
 import styles from './CallScriptsPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
@@ -61,6 +61,7 @@ export function CallScriptsPage() {
   const [editingId, setEditingId] = useState(null);
   const [scriptName, setScriptName] = useState('');
   const [scriptBody, setScriptBody] = useState('');
+  const [variableSearch, setVariableSearch] = useState('');
   const [editorPlainText, setEditorPlainText] = useState('');
   const [editorCursorIndex, setEditorCursorIndex] = useState(0);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -179,6 +180,7 @@ export function CallScriptsPage() {
     editorPlainText,
     editorCursorIndex
   );
+  const { flat: allTemplateVariables } = useTemplateVariables();
 
   const openCreate = () => {
     setEditingId(null);
@@ -188,6 +190,7 @@ export function CallScriptsPage() {
     setEditorCursorIndex(0);
     setShowPreviewModal(false);
     setFormError(null);
+    setVariableSearch('');
     setShowModal(true);
   };
 
@@ -199,6 +202,7 @@ export function CallScriptsPage() {
     setEditorCursorIndex(0);
     setShowPreviewModal(false);
     setFormError(null);
+    setVariableSearch('');
     setShowModal(true);
   };
 
@@ -208,6 +212,20 @@ export function CallScriptsPage() {
     editorRef.current?.replaceRange(autocompleteContext.startIndex, editorCursorIndex, insert);
     editorRef.current?.focus();
   };
+
+  const handleInsertVariableChip = (key) => {
+    if (!key) return;
+    editorRef.current?.insertAtCursor(`{{${key}}}`);
+    editorRef.current?.focus();
+  };
+
+  const variableSearchQuery = variableSearch.trim().toLowerCase();
+  const filteredTemplateVariables = allTemplateVariables.filter((variable) => {
+    if (!variableSearchQuery) return true;
+    const key = String(variable.key || '').toLowerCase();
+    const label = String(variable.label || '').toLowerCase();
+    return key.includes(variableSearchQuery) || label.includes(variableSearchQuery);
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -413,7 +431,7 @@ export function CallScriptsPage() {
       <SlidePanel
         isOpen={showModal}
         onClose={() => setShowModal(false)}
-        title={editingId ? 'Edit Script' : 'Add Script'}
+        title={null}
         size="wide"
         closeOnOverlay
         closeOnEscape
@@ -421,7 +439,7 @@ export function CallScriptsPage() {
           <ModalFooter>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
             <Button onClick={handleSubmit} loading={createMutation.loading || updateMutation.loading}>
-              {editingId ? 'Save' : 'Create'}
+              {editingId ? 'Update Script' : 'Create Script'}
             </Button>
           </ModalFooter>
         }
@@ -429,45 +447,134 @@ export function CallScriptsPage() {
         <form onSubmit={handleSubmit} className={styles.form}>
           {formError && <Alert variant="error">{formError}</Alert>}
 
-          <Input
-            label="Script Name"
-            value={scriptName}
-            onChange={(e) => setScriptName(e.target.value)}
-            placeholder="e.g. Welcome Call"
-            required
-          />
+          <div className={styles.modalIntro}>
+            <div className={styles.sectionIcon} aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M8 3h6l5 5v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+                <path d="M14 3v5h5" />
+                <path d="M9 12h6M9 16h6" />
+              </svg>
+            </div>
+            <div>
+              <h3 className={styles.modalIntroTitle}>{editingId ? 'Edit Script' : 'Add Script'}</h3>
+              <p className={styles.modalIntroDescription}>Create a reusable call script for your team.</p>
+            </div>
+          </div>
+
+          <div className={styles.sectionCard}>
+            <Input
+              label="Script Name"
+              value={scriptName}
+              onChange={(e) => setScriptName(e.target.value)}
+              placeholder="e.g. Welcome Call"
+              required
+            />
+            <p className={styles.fieldHint}>Give your script a clear and descriptive name.</p>
+          </div>
 
           <div className={styles.bodyRow}>
             <div className={styles.bodyCol}>
-              <label className={styles.label}>Script Body</label>
-              <ScriptBodyEditor
-                ref={editorRef}
-                value={scriptBody}
-                onChange={setScriptBody}
-                onEditorState={(plain, index) => {
-                  setEditorPlainText(plain);
-                  setEditorCursorIndex(index ?? 0);
-                }}
-                placeholder="Hello {{contact_first_name | Customer}}, my name is {{agent_name}} from {{company_name}}..."
-              />
-              {autocompleteActive && suggestions.length > 0 && (
-                <div className={styles.autocomplete}>
-                  {suggestions.slice(0, 8).map((v) => (
+              <div className={styles.sectionCard}>
+                <label className={styles.label}>
+                  <span className={styles.labelIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </span>
+                  Script Body
+                  <span className={styles.requiredMark} aria-hidden="true">
+                    {' *'}
+                  </span>
+                </label>
+                <ScriptBodyEditor
+                  ref={editorRef}
+                  value={scriptBody}
+                  onChange={setScriptBody}
+                  onEditorState={(plain, index) => {
+                    setEditorPlainText(plain);
+                    setEditorCursorIndex(index ?? 0);
+                  }}
+                  placeholder="Hello {{contact_first_name | Customer}}, my name is {{agent_name}} from {{company_name}}..."
+                />
+                {autocompleteActive && suggestions.length > 0 && (
+                  <div className={styles.autocomplete}>
+                    {suggestions.slice(0, 8).map((v) => (
+                      <button
+                        key={v.key}
+                        type="button"
+                        className={styles.autocompleteItem}
+                        onClick={() => handleAutocompleteSelect(v.key)}
+                      >
+                        {v.label} <code>{v.key}</code>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className={styles.sectionCard}>
+                <div className={styles.variablesHeader}>
+                  <div className={styles.variablesTitleWrap}>
+                    <span className={styles.labelIcon} aria-hidden="true">
+                      <svg viewBox="0 0 24 24">
+                        <path d="M9 5 4 12l5 7M15 5l5 7-5 7" />
+                      </svg>
+                    </span>
+                    <div>
+                      <h4 className={styles.variablesTitle}>Available Variables</h4>
+                      <p className={styles.variablesHint}>Click on a variable to insert it into your script.</p>
+                    </div>
+                  </div>
+                  <div className={styles.variablesSearchPlaceholder}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="m20 20-3.5-3.5" />
+                    </svg>
+                    <input
+                      type="text"
+                      value={variableSearch}
+                      onChange={(e) => setVariableSearch(e.target.value)}
+                      placeholder="Search variables..."
+                      aria-label="Search variables"
+                    />
+                  </div>
+                </div>
+                <div className={styles.variableChips}>
+                  {filteredTemplateVariables.slice(0, 20).map((variable) => (
                     <button
-                      key={v.key}
                       type="button"
-                      className={styles.autocompleteItem}
-                      onClick={() => handleAutocompleteSelect(v.key)}
+                      key={variable.key}
+                      className={styles.variableChip}
+                      onClick={() => handleInsertVariableChip(variable.key)}
+                      title={`Insert {{${variable.key}}}`}
                     >
-                      {v.label} <code>{v.key}</code>
+                      {`{{${variable.key}}}`}
                     </button>
                   ))}
+                  {filteredTemplateVariables.length === 0 ? (
+                    <p className={styles.noVariablesFound}>No variables match your search.</p>
+                  ) : null}
                 </div>
-              )}
-              <div className={styles.previewRow}>
-                <Button type="button" variant="secondary" size="sm" onClick={() => setShowPreviewModal(true)}>
-                  Show Preview
-                </Button>
+              </div>
+
+              <div className={styles.previewCard}>
+                <div className={styles.previewTitleWrap}>
+                  <span className={styles.previewIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </span>
+                  <div>
+                    <h4 className={styles.previewTitle}>Preview</h4>
+                    <p className={styles.previewHint}>See how your script will look with sample data.</p>
+                  </div>
+                </div>
+                <div className={styles.previewRow}>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setShowPreviewModal(true)}>
+                    Show Preview
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -478,18 +585,16 @@ export function CallScriptsPage() {
         isOpen={showPreviewModal}
         onClose={() => setShowPreviewModal(false)}
         title="Script Preview"
-        size="md"
+        size="lg"
         footer={
           <ModalFooter>
             <Button variant="ghost" onClick={() => setShowPreviewModal(false)}>Close</Button>
           </ModalFooter>
         }
       >
-        <InfoHelpIcon
-          title="Preview sample info"
-          modalTitle="Script preview"
-          message="Sample data: contact_first_name, agent_name, company_name, links, etc."
-        />
+        <div className={styles.previewModalMeta}>
+          Preview uses sample contact/company/agent data.
+        </div>
         <div
           className={styles.previewModalContent}
           dangerouslySetInnerHTML={{

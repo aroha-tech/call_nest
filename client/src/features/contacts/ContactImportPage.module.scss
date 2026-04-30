@@ -178,8 +178,8 @@
 
 .stepTitle {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: flex-start;
   gap: $space-3;
   margin-bottom: $space-3;
 }
@@ -318,6 +318,9 @@
 }
 
 .sampleCsvTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: $font-size-sm;
   font-weight: $font-weight-semibold;
   color: var(--color-text-primary);
@@ -341,15 +344,23 @@
 }
 
 .sampleCsvLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: $font-size-xs;
   font-weight: $font-weight-medium;
-  color: var(--color-accent-brand);
+  color: var(--color-primary-600) !important;
   text-decoration: none;
 
   &:hover {
-    color: var(--color-accent-brand);
+    color: var(--color-primary-700) !important;
     text-decoration: none;
     opacity: 0.95;
+  }
+
+  &:visited,
+  &:active {
+    color: var(--color-primary-600) !important;
   }
 
   &:focus-visible {
@@ -357,6 +368,10 @@
     outline-offset: 2px;
     border-radius: 2px;
   }
+}
+
+.sampleCsvLink :global(.material-symbols-outlined) {
+  color: inherit !important;
 }
 
 .reviewScroll {

@@ -61,6 +61,7 @@ import { ExportCsvModal } from './ExportCsvModal';
 import { LeadPipelineCards } from './LeadPipelineCards';
 import { ContactDashboardCards } from './ContactDashboardCards';
 import {
+  IconActions,
   IconChevronDown,
   IconColumns,
   IconExport,
@@ -68,6 +69,7 @@ import {
   IconImport,
   IconPhone,
   IconPlus,
+  IconSelectAll,
   IconTag,
   IconTagOff,
   IconTarget,
@@ -166,14 +168,11 @@ function ListActionsMenuItem({ icon: Icon, children, danger, disabled, className
 
 /** Single Actions menu: list tools (filters, import, export, add, columns) + selection + bulk ops. */
 function ListActionsMenu({
-  showFiltersEntry,
-  onOpenFilters,
   canRead,
   canCreate,
   type,
   navigate,
   onCustomizeColumns,
-  onOpenExport,
   isDialer,
   onCallSelected,
   canBulkAssign,
@@ -253,7 +252,6 @@ function ListActionsMenu({
   const bulkDisabled = noBulkSelection || bulkBusy;
 
   const hasMenu =
-    showFiltersEntry ||
     canRead ||
     canCreate ||
     (isDialer && type === 'lead') ||
@@ -263,9 +261,7 @@ function ListActionsMenu({
 
   if (!hasMenu) return null;
 
-  const hasImportExport = canCreate || canRead;
-  /** Divider after Filters when any list actions follow (import/export/new/customize). */
-  const showDividerAfterFilters = showFiltersEntry;
+  const hasPrimaryActions = canCreate;
 
   const menu =
     open && menuPos
@@ -277,18 +273,6 @@ function ListActionsMenu({
             role="menu"
           >
             <div className={pageStyles.actionsMenuSection}>
-              {showFiltersEntry ? (
-                <ListActionsMenuItem
-                  icon={IconFilter}
-                  onClick={() => {
-                    setOpen(false);
-                    onOpenFilters();
-                  }}
-                >
-                  Filters…
-                </ListActionsMenuItem>
-              ) : null}
-              {showDividerAfterFilters ? <ListActionsMenuDivider /> : null}
               {canCreate ? (
                 <ListActionsMenuItem
                   icon={IconImport}
@@ -300,18 +284,7 @@ function ListActionsMenu({
                   Import CSV
                 </ListActionsMenuItem>
               ) : null}
-              {canRead ? (
-                <ListActionsMenuItem
-                  icon={IconExport}
-                  onClick={() => {
-                    setOpen(false);
-                    onOpenExport();
-                  }}
-                >
-                  Export CSV
-                </ListActionsMenuItem>
-              ) : null}
-              {hasImportExport ? <ListActionsMenuDivider /> : null}
+              {hasPrimaryActions ? <ListActionsMenuDivider /> : null}
               {canCreate ? (
                 <ListActionsMenuItem
                   icon={IconPlus}
@@ -450,6 +423,7 @@ function ListActionsMenu({
           onClick={() => setOpen((o) => !o)}
         >
           <span className={pageStyles.actionsTriggerInner}>
+            <IconActions className={pageStyles.toolbarBtnIcon} />
             Actions
             <IconChevronDown className={pageStyles.actionsTriggerChevron} />
           </span>
@@ -637,6 +611,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
   const [appliedAdminManagersMulti, setAppliedAdminManagersMulti] = useState('');
   const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false);
   const [filterOptionsOpen, setFilterOptionsOpen] = useState(false);
+  const [openedEditorFromAppliedButton, setOpenedEditorFromAppliedButton] = useState(false);
   const [browseFiltersOpen, setBrowseFiltersOpen] = useState(false);
   const [savedFilters, setSavedFilters] = useState([]);
   const [editingSavedFilterId, setEditingSavedFilterId] = useState(null);
@@ -1813,6 +1788,11 @@ export function ContactsPage({ type, mode = 'crm' }) {
   }, [editingSavedFilterSnapshot, editingSavedFilterId, type]);
 
   const showListReset = canRead && (hasActiveFilters || Boolean(searchQuery.trim()));
+  const filterButtonLabel = editingSavedFilterName?.trim()
+    ? editingSavedFilterName.trim()
+    : hasActiveFilters
+      ? 'Applied filters'
+      : 'Add filter';
 
   return (
     <div className={listStyles.page}>
@@ -1833,6 +1813,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
             </Button>
           ) : canRead ? (
             <Button variant="secondary" onClick={() => setExportCsvOpen(true)}>
+              <IconExport className={pageStyles.toolbarBtnIcon} />
               Export
             </Button>
           ) : null
@@ -1868,11 +1849,19 @@ export function ContactsPage({ type, mode = 'crm' }) {
                 type="button"
                 size="sm"
                 variant="secondary"
-                className={pageStyles.toolbarFilterBtn}
-                onClick={() => setFilterOptionsOpen(true)}
+                className={`${pageStyles.toolbarFilterBtn} ${hasActiveFilters ? pageStyles.toolbarFilterBtnActive : ''}`.trim()}
+                onClick={() => {
+                  if (hasActiveFilters) {
+                    setOpenedEditorFromAppliedButton(true);
+                    setAdvancedFilterOpen(true);
+                    return;
+                  }
+                  setOpenedEditorFromAppliedButton(false);
+                  setFilterOptionsOpen(true);
+                }}
               >
                 <IconFilter />
-                Add filter
+                {filterButtonLabel}
               </Button>
             ) : null}
             {showRowCheckboxes && contacts.length > 0 ? (
@@ -1907,6 +1896,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
                 disabled={selectAllMatchingLoading}
                 onClick={() => void handleSelectAllToggle()}
               >
+                <IconSelectAll className={pageStyles.toolbarBtnIcon} />
                 {selectAllMatchingLoading
                   ? 'Loading…'
                   : selectionIsAllMatching && selectedIds.size > 0
@@ -1917,8 +1907,6 @@ export function ContactsPage({ type, mode = 'crm' }) {
             {canRead || canCreate || showRowCheckboxes || (isDialer && type === 'lead') ? (
               <div className={pageStyles.toolbarBulkActionsGroup}>
                 <ListActionsMenu
-                  showFiltersEntry={canRead}
-                  onOpenFilters={() => setFilterOptionsOpen(true)}
                   canRead={canRead}
                   canCreate={canCreate}
                   type={type}
@@ -1926,7 +1914,6 @@ export function ContactsPage({ type, mode = 'crm' }) {
                   onCustomizeColumns={() =>
                     type === 'lead' ? setLeadCustomizeOpen(true) : setContactCustomizeOpen(true)
                   }
-                  onOpenExport={() => setExportCsvOpen(true)}
                   isDialer={isDialer}
                   onCallSelected={() => openStartModal()}
                   canBulkAssign={canBulkAssign}
@@ -2376,6 +2363,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
             isOpen={advancedFilterOpen}
             onClose={() => {
               setAdvancedFilterOpen(false);
+              setOpenedEditorFromAppliedButton(false);
               setEditingSavedFilterId(null);
               setEditingSavedFilterName('');
               setEditingSavedFilterSnapshot(null);
@@ -2422,6 +2410,9 @@ export function ContactsPage({ type, mode = 'crm' }) {
             }
             industryFieldRuleOptions={industryFieldRuleOptions}
             existingSavedFilters={savedFilters.map((f) => ({ id: f.id, name: f.name }))}
+            applyButtonLabel={openedEditorFromAppliedButton ? 'Change' : 'Apply'}
+            showResetButton={openedEditorFromAppliedButton}
+            onReset={resetAllListFilters}
           />
         </>
       ) : null}

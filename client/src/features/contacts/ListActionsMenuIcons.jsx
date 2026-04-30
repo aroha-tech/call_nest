@@ -193,3 +193,26 @@ export function IconChevronDown(props) {
     </svg>
   );
 }
+
+export function IconSelectAll(props) {
+  return (
+    <svg {...svgProps} {...props}>
+      <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M8 12l3 3 5-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconActions(props) {
+  return (
+    <svg {...svgProps} {...props}>
+      <path
+        d="M4 6h16M4 12h16M4 18h16M9 6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM16.5 12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM12 18a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}

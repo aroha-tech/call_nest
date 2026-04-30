@@ -217,6 +217,9 @@ export function CallHistoryFilterModal({
   existingSavedFilters = [],
   onSaveNamedFilter,
   onUpdateNamedFilter,
+  applyButtonLabel = 'Apply',
+  showResetButton = false,
+  onReset,
 }) {
   const [draft, setDraft] = useState(values);
   const [filterName, setFilterName] = useState('');
@@ -282,6 +285,11 @@ export function CallHistoryFilterModal({
 
   const handleApply = () => {
     onApply?.(buildFilterPayload());
+    onClose();
+  };
+
+  const handleReset = () => {
+    onReset?.();
     onClose();
   };
 
@@ -470,11 +478,16 @@ export function CallHistoryFilterModal({
         </div>
       </div>
       <ModalFooter>
+        {showResetButton ? (
+          <Button type="button" variant="ghost" onClick={handleReset}>
+            Reset
+          </Button>
+        ) : null}
         <Button type="button" variant="secondary" onClick={onClose}>
           Cancel
         </Button>
         <Button type="button" variant="primary" onClick={handleApply}>
-          Apply
+          {applyButtonLabel}
         </Button>
         <Button type="button" variant="primary" onClick={handleSave} disabled={!normalizeFilterName(filterName)}>
           Save

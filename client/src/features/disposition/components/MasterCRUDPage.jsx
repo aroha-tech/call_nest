@@ -304,6 +304,7 @@ export function MasterCRUDPage({
                   placeholder={field.placeholder || 'Select...'}
                   disabled={isDisabled}
                   error={formErrors[field.name]}
+                  required={!!field.required}
                 />
               );
             }
@@ -317,6 +318,7 @@ export function MasterCRUDPage({
                 placeholder={field.placeholder}
                 disabled={isDisabled}
                 hint={isDisabled && editingItem && field.readOnlyOnEdit ? 'Code cannot be changed after creation' : field.hint}
+                required={!!field.required}
               />
             );
           })}

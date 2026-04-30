@@ -2,6 +2,17 @@ import React, { useCallback, useId, useMemo } from 'react';
 import ReactSelect from 'react-select';
 import styles from './Select.module.scss';
 
+function parseLabel(label) {
+  if (typeof label !== 'string') {
+    return { text: label, hasInlineRequiredMark: false };
+  }
+  const trimmed = label.trimEnd();
+  if (!trimmed.endsWith('*')) {
+    return { text: label, hasInlineRequiredMark: false };
+  }
+  return { text: trimmed.slice(0, -1).trimEnd(), hasInlineRequiredMark: true };
+}
+
 function createSelectStyles({ compact = false } = {}) {
   const minHeight = compact ? 34 : 40;
   const fontSize = compact ? '12px' : undefined;
@@ -130,10 +141,13 @@ export function Select({
   /** Smaller control + menu rows (e.g. dense tables). */
   compact = false,
   components: userComponents,
+  required = false,
   ...rest
 }) {
   const autoId = useId();
   const inputId = id || autoId;
+  const { text: labelText, hasInlineRequiredMark } = parseLabel(label);
+  const showRequiredMark = required || hasInlineRequiredMark;
   const selectOptions = useMemo(() => normalizeOptions(options), [options]);
   const emptyChoice = useMemo(() => selectOptions.find((o) => o.value === ''), [selectOptions]);
 
@@ -162,7 +176,12 @@ export function Select({
     <div className={`${styles.wrapper} ${className} ${wrapperClassName}`.trim()}>
       {label ? (
         <label htmlFor={inputId} className={`${styles.label} ${labelClassName}`.trim()}>
-          {label}
+          {labelText}
+          {showRequiredMark ? (
+            <span className={styles.requiredMark} aria-hidden="true">
+              {' *'}
+            </span>
+          ) : null}
         </label>
       ) : null}
       <ReactSelect

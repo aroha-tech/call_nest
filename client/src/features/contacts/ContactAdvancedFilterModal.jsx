@@ -236,6 +236,9 @@ export function ContactAdvancedFilterModal({
   existingSavedFilters = [],
   /** `{ value: 'ind:field_key', label }[]` — tenant industry profile fields */
   industryFieldRuleOptions = [],
+  applyButtonLabel = 'Apply',
+  showResetButton = false,
+  onReset,
 }) {
   const [filterName, setFilterName] = useState('');
   const [filterNameError, setFilterNameError] = useState('');
@@ -358,6 +361,11 @@ export function ContactAdvancedFilterModal({
 
   const handleApply = () => {
     onApply?.(buildPayload());
+    onClose?.();
+  };
+
+  const handleReset = () => {
+    onReset?.();
     onClose?.();
   };
 
@@ -617,11 +625,16 @@ export function ContactAdvancedFilterModal({
         </div>
       </div>
       <ModalFooter>
+        {showResetButton ? (
+          <Button type="button" variant="ghost" onClick={handleReset}>
+            Reset
+          </Button>
+        ) : null}
         <Button type="button" variant="secondary" onClick={onClose}>
           Cancel
         </Button>
         <Button type="button" variant="primary" onClick={handleApply}>
-          Apply
+          {applyButtonLabel}
         </Button>
         <Button type="button" variant="primary" onClick={handleSave} disabled={!String(filterName || '').trim()}>
           Save
