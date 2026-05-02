@@ -356,8 +356,47 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 12px;
+  gap: 12px 16px;
   margin-bottom: 16px;
+}
+
+.toolbarPrimary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-width: min(100%, 260px);
+}
+
+.toolbarFilters {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 12px;
+  flex: 1 1 360px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.toolbarFilterSlot {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 220px;
+}
+
+@media (max-width: 1100px) {
+  .toolbarFilters {
+    flex-wrap: wrap;
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+
+  .toolbarFilterSlot {
+    flex: 1 1 calc(33.333% - 8px);
+    max-width: none;
+    min-width: 160px;
+  }
 }
 
 .viewToggle {
@@ -412,6 +451,50 @@
   flex-direction: column;
   gap: 6px;
   grid-column: 1 / -1;
+}
+
+.scheduleFollowUpMetaRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px 16px;
+  width: 100%;
+  align-items: start;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.scheduleFuWhenWrap {
+  min-width: 0;
+}
+
+.listBulkDialBtn {
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.listRowDialBtn {
+  min-width: 40px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.listDialCellMuted {
+  display: inline-block;
+  min-width: 1.25rem;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-tertiary, #94a3b8);
+  user-select: none;
+}
+
+.listDialHdr {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--color-text-secondary, #64748b);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .entityCard {
@@ -504,19 +587,19 @@
   transform: none;
 }
 
-.callbackIconBlue > .uiIcon {
+.followUpIconBlue > .uiIcon {
   color: #0ea5e9;
 }
 
-.callbackIconIndigo > .uiIcon {
+.followUpIconIndigo > .uiIcon {
   color: #6366f1;
 }
 
-.callbackIconSky > .uiIcon {
+.followUpIconSky > .uiIcon {
   color: #06b6d4;
 }
 
-.callbackIconTeal > .uiIcon {
+.followUpIconTeal > .uiIcon {
   color: #14b8a6;
 }
 
@@ -563,7 +646,7 @@
   color: var(--color-primary-500, #6366f1);
 }
 
-.panelTitleIconCallback {
+.panelTitleIconFollowUp {
   color: var(--color-primary-500, #6366f1);
 }
 
@@ -694,6 +777,9 @@
 }
 
 .calHeaderCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 8px 6px;
   text-align: center;
   font-size: 11px;

@@ -18,10 +18,8 @@ export function InfoHelpIcon({
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const resolvedModalTitle = useMemo(() => modalTitle || title || 'Information', [modalTitle, title]);
 
-  if (!message) return null;
-
   useEffect(() => {
-    if (!open) return undefined;
+    if (!message || !open) return undefined;
     const onPointerDown = (event) => {
       if (!wrapRef.current?.contains(event.target)) setOpen(false);
     };
@@ -34,10 +32,10 @@ export function InfoHelpIcon({
       document.removeEventListener('mousedown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [open]);
+  }, [open, message]);
 
   useLayoutEffect(() => {
-    if (!open || !btnRef.current || !popRef.current) return;
+    if (!message || !open || !btnRef.current || !popRef.current) return;
     const btnRect = btnRef.current.getBoundingClientRect();
     const popRect = popRef.current.getBoundingClientRect();
     const vw = window.innerWidth;
@@ -57,6 +55,8 @@ export function InfoHelpIcon({
 
     setPos({ top, left });
   }, [open, message, resolvedModalTitle]);
+
+  if (!message) return null;
 
   return (
     <span ref={wrapRef} className={`${styles.wrap} ${className}`.trim()}>

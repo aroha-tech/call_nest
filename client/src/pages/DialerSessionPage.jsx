@@ -9,6 +9,8 @@ import { Spinner } from '../components/ui/Spinner';
 import { Skeleton } from '../components/ui/Skeleton';
 import { Select } from '../components/ui/Select';
 import { Input } from '../components/ui/Input';
+import { DateTimePickerField } from '../components/ui/DateTimePickerField';
+import { formatDateTimeLocalInputValue } from '../components/ui/dateTimePickerUtils';
 import { Modal, ModalFooter } from '../components/ui/Modal';
 import { SlidePanel } from '../components/ui/SlidePanel';
 import { callsAPI } from '../services/callsAPI';
@@ -161,15 +163,6 @@ function localDatetimeToMysql(s) {
   const n = t.replace('T', ' ');
   if (n.length === 16) return `${n}:00`;
   return n.length === 19 ? n : n;
-}
-
-function formatDateTimeLocalInputValue(d) {
-  const dt = d instanceof Date ? d : new Date(d);
-  if (Number.isNaN(dt.getTime())) return '';
-  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(
-    2,
-    '0'
-  )}T${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
 }
 
 function isProviderReauthError(errorLike) {
@@ -1113,11 +1106,12 @@ export function DialerSessionPage() {
     setActionModalError('');
     setActionModalNeedsReconnect(false);
     try {
-      await scheduleHubAPI.createCallback({
+      await scheduleHubAPI.createFollowUp({
         contact_id: Number(currentItem.contact_id),
         assigned_user_id: Number(callbackForm.assigned_user_id),
         scheduled_at: callbackForm.scheduled_at,
         notes: callbackForm.notes?.trim() || null,
+        follow_up_type: 'callback',
       });
       setCallbackModalOpen(false);
       await advanceDispositionFlow();
@@ -2240,11 +2234,11 @@ export function DialerSessionPage() {
                 onChange={(e) => setCallbackForm((prev) => ({ ...prev, assigned_user_id: e.target.value }))}
                 options={[{ value: '', label: 'Select agent' }, ...teamAgentOptions]}
               />
-              <Input
+              <DateTimePickerField
                 label="When"
-                type="datetime-local"
+                mode="datetime"
                 value={callbackForm.scheduled_at}
-                onChange={(e) => setCallbackForm((prev) => ({ ...prev, scheduled_at: e.target.value }))}
+                onChange={(v) => setCallbackForm((prev) => ({ ...prev, scheduled_at: v }))}
               />
               <Input
                 label="Notes"
@@ -2363,26 +2357,25 @@ export function DialerSessionPage() {
                 value={meetingForm.attendee_email}
                 onChange={(e) => setMeetingForm((prev) => ({ ...prev, attendee_email: e.target.value }))}
               />
-              <Input
+              <DateTimePickerField
                 label="Start"
-                type="datetime-local"
+                mode="datetime"
                 value={meetingForm.start_at}
                 min={minimumNowLocal}
-                onChange={(e) =>
+                onChange={(v) =>
                   setMeetingForm((prev) => ({
                     ...prev,
-                    start_at: e.target.value,
-                    end_at:
-                      syncMeetingEndFromStart(e.target.value, prev.meeting_duration_min) || prev.end_at,
+                    start_at: v,
+                    end_at: syncMeetingEndFromStart(v, prev.meeting_duration_min) || prev.end_at,
                   }))
                 }
               />
-              <Input
+              <DateTimePickerField
                 label="End"
-                type="datetime-local"
+                mode="datetime"
                 value={meetingForm.end_at}
                 min={meetingForm.start_at || minimumNowLocal}
-                onChange={(e) => setMeetingForm((prev) => ({ ...prev, end_at: e.target.value }))}
+                onChange={(v) => setMeetingForm((prev) => ({ ...prev, end_at: v }))}
               />
               <Input
                 label="Location"

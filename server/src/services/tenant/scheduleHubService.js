@@ -1,5 +1,6 @@
 import { query } from '../../config/db.js';
 import { getCreatedByUserIdsForScope } from './userMessageScopeService.js';
+import { FOLLOW_UP_TYPE_SET } from './scheduledFollowUpsService.js';
 
 const NEAR_WINDOW_MINUTES = 120;
 
@@ -323,10 +324,10 @@ export async function listMeetingsPaged(
   return { rows, total, page: pg, limit: lim, totalPages };
 }
 
-export async function listCallbacksPaged(
+export async function listFollowUpsPaged(
   tenantId,
   actingUser,
-  { from, to, assigned_user_id, page = 1, limit = 20, status = null, q = null, time_flag = null } = {}
+  { from, to, assigned_user_id, page = 1, limit = 20, status = null, follow_up_type = null, q = null, time_flag = null } = {}
 ) {
   const scopedIds = await getAssignedUserIdsForScope(tenantId, actingUser);
   const { effectiveIds } = enforceRequestedUserIdInScope(assigned_user_id, scopedIds);
@@ -345,6 +346,8 @@ export async function listCallbacksPaged(
 
   const statusList = parseCsvList(status);
   const statusClause = statusList.length ? ` AND sc.status IN (${statusList.map(() => '?').join(',')}) ` : '';
+  const typeList = parseCsvList(follow_up_type).filter((t) => FOLLOW_UP_TYPE_SET.has(t));
+  const typeClause = typeList.length ? ` AND sc.follow_up_type IN (${typeList.map(() => '?').join(',')}) ` : '';
   const qq = trimStr(q);
   const qClause = qq
     ? ' AND (c.display_name LIKE ? OR cp.phone LIKE ? OR sc.notes LIKE ? OR sc.outcome_notes LIKE ?) '
@@ -364,6 +367,7 @@ export async function listCallbacksPaged(
       ${dr.clause}
       ${scopeClause}
       ${statusClause}
+      ${typeClause}
       ${qClause}
       ${tf.clause}
   `;
@@ -372,6 +376,7 @@ export async function listCallbacksPaged(
     ...dr.params,
     ...scopeParams,
     ...statusList,
+    ...typeList,
     ...qParams,
   ]);
   const total = Number(countRow?.c) || 0;
@@ -384,6 +389,7 @@ export async function listCallbacksPaged(
     SELECT
       sc.id,
       sc.contact_id,
+      sc.contact_phone_id,
       c.type AS contact_type,
       c.display_name AS contact_name,
       cp.phone AS contact_phone,
@@ -392,6 +398,7 @@ export async function listCallbacksPaged(
       u.email AS assigned_email,
       sc.scheduled_at,
       sc.status,
+      sc.follow_up_type,
       sc.notes,
       sc.outcome_notes,
       sc.completed_at
@@ -406,19 +413,20 @@ export async function listCallbacksPaged(
       ${dr.clause}
       ${scopeClause}
       ${statusClause}
+      ${typeClause}
       ${qClause}
       ${tf.clause}
     ORDER BY sc.scheduled_at ASC, sc.id ASC
     LIMIT ${limInt} OFFSET ${offsetInt}
   `;
-  const rows = await query(sql, [tenantId, ...dr.params, ...scopeParams, ...statusList, ...qParams]);
+  const rows = await query(sql, [tenantId, ...dr.params, ...scopeParams, ...statusList, ...typeList, ...qParams]);
   return { rows, total, page: pg, limit: lim, totalPages };
 }
 
-export async function listCallbacksInRange(
+export async function listFollowUpsInRange(
   tenantId,
   actingUser,
-  { from, to, assigned_user_id, status = null } = {}
+  { from, to, assigned_user_id, status = null, follow_up_type = null } = {}
 ) {
   const scopedIds = await getAssignedUserIdsForScope(tenantId, actingUser);
   const { effectiveIds } = enforceRequestedUserIdInScope(assigned_user_id, scopedIds);
@@ -431,11 +439,14 @@ export async function listCallbacksInRange(
 
   const statusList = parseCsvList(status);
   const statusClause = statusList.length ? ` AND sc.status IN (${statusList.map(() => '?').join(',')}) ` : '';
+  const typeList = parseCsvList(follow_up_type).filter((t) => FOLLOW_UP_TYPE_SET.has(t));
+  const typeClause = typeList.length ? ` AND sc.follow_up_type IN (${typeList.map(() => '?').join(',')}) ` : '';
 
   const sql = `
     SELECT
       sc.id,
       sc.contact_id,
+      sc.contact_phone_id,
       c.type AS contact_type,
       c.display_name AS contact_name,
       cp.phone AS contact_phone,
@@ -444,6 +455,7 @@ export async function listCallbacksInRange(
       u.email AS assigned_email,
       sc.scheduled_at,
       sc.status,
+      sc.follow_up_type,
       sc.notes,
       sc.outcome_notes,
       sc.completed_at
@@ -458,8 +470,9 @@ export async function listCallbacksInRange(
       ${dr.clause}
       ${scopeClause}
       ${statusClause}
+      ${typeClause}
     ORDER BY sc.scheduled_at ASC, sc.id ASC
   `;
-  return query(sql, [tenantId, ...dr.params, ...scopeParams, ...statusList]);
+  return query(sql, [tenantId, ...dr.params, ...scopeParams, ...statusList, ...typeList]);
 }
 

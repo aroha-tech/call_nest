@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
 import { Select } from './Select';
-import { Input } from './Input';
 import {
   TIME_RANGE_PRESET,
   TIME_RANGE_PRESET_OPTIONS,
   TIME_RANGE_LEGACY_TODAY_OPTION,
 } from '../../utils/dateRangePresets';
+import { CustomDateRangeFields } from './CustomDateRangeFields';
 import styles from './DateRangePresetControl.module.scss';
 
 /**
@@ -38,7 +38,6 @@ export function DateRangePresetControl({
 
   const sl = startLabel || (variant === 'date' ? 'From' : 'Started after');
   const el = endLabel || (variant === 'date' ? 'To' : 'Started before');
-  const inputType = variant === 'date' ? 'date' : 'datetime-local';
 
   const isPanel = tone === 'panel';
 
@@ -53,9 +52,16 @@ export function DateRangePresetControl({
         selectClassName={isPanel ? styles.panelSelect : ''}
       />
       {preset === TIME_RANGE_PRESET.CUSTOM ? (
-        <div className={`${styles.customRow} ${isPanel ? styles.customRowPanel : ''}`}>
-          <Input label={sl} type={inputType} value={customStart} onChange={(e) => onCustomStartChange(e.target.value)} />
-          <Input label={el} type={inputType} value={customEnd} onChange={(e) => onCustomEndChange(e.target.value)} />
+        <div className={`${isPanel ? styles.customRowPanel : ''}`.trim()}>
+          <CustomDateRangeFields
+            variant={variant}
+            startValue={customStart}
+            endValue={customEnd}
+            onCustomStartChange={onCustomStartChange}
+            onCustomEndChange={onCustomEndChange}
+            startLabel={sl}
+            endLabel={el}
+          />
         </div>
       ) : null}
     </div>

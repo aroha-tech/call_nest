@@ -19,6 +19,7 @@ import {
   computeDashboardInclusiveDates,
 } from '../utils/dateRangePresets';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
+import { followUpTypeLabel } from '../utils/followUpTypeLabels';
 import {
   ActivityFeedTable,
   ActivityFullHistoryLink,
@@ -148,7 +149,11 @@ export function TenantDashboardPage() {
   useEffect(() => {
     if (!rangeMenuOpen) return;
     function handleDocMouseDown(e) {
-      if (rangeWrapRef.current && !rangeWrapRef.current.contains(e.target)) {
+      const t = e.target;
+      /* Range calendar is portaled to document.body; keep menu open while using it */
+      if (typeof t?.closest === 'function' && t.closest('[data-cnr-custom-range-popover]')) return;
+      if (typeof t?.closest === 'function' && t.closest('[data-cnr-datetime-picker-popover]')) return;
+      if (rangeWrapRef.current && !rangeWrapRef.current.contains(t)) {
         setRangeMenuOpen(false);
       }
     }
@@ -705,24 +710,24 @@ export function TenantDashboardPage() {
               <div className={styles.panelHead}>
                 <h2 className={styles.panelTitleWithIcon}>
                   {can(PERMISSIONS.SCHEDULE_VIEW) ? (
-                    <Link to="/schedule/callbacks" className={styles.panelTitleAnchor}>
+                    <Link to="/schedule/follow-ups" className={styles.panelTitleAnchor}>
                       <span className={`${styles.sectionIconChip} ${styles.sectionIconChipPurple}`}>
                         <MaterialSymbol name="ring_volume" size="sm" className={styles.panelTitleIcon} />
                       </span>
-                      Pending callbacks
+                      Pending follow-ups
                     </Link>
                   ) : (
                     <>
                       <span className={`${styles.sectionIconChip} ${styles.sectionIconChipPurple}`}>
                         <MaterialSymbol name="ring_volume" size="sm" className={styles.panelTitleIcon} />
                       </span>
-                      Pending callbacks
+                      Pending follow-ups
                     </>
                   )}
                 </h2>
                 {can(PERMISSIONS.SCHEDULE_VIEW) ? (
-                  <Link to="/schedule/callbacks" className={styles.panelLink}>
-                    Open callbacks
+                  <Link to="/schedule/follow-ups" className={styles.panelLink}>
+                    Open follow-ups
                   </Link>
                 ) : null}
               </div>
@@ -733,9 +738,9 @@ export function TenantDashboardPage() {
                       <span className={styles.dashPurpleEmptyIcon}>
                         <MaterialSymbol name="ring_volume" size="xl" />
                       </span>
-                      <p className={styles.connectedEmptyText}>No pending callbacks in your scope.</p>
-                      <Link to="/schedule/callbacks" className={styles.connectedEmptyLink}>
-                        Open callbacks {'\u2192'}
+                      <p className={styles.connectedEmptyText}>No pending follow-ups in your scope.</p>
+                      <Link to="/schedule/follow-ups" className={styles.connectedEmptyLink}>
+                        Open follow-ups {'\u2192'}
                       </Link>
                     </div>
                   ) : (
@@ -747,12 +752,13 @@ export function TenantDashboardPage() {
                           const overdue = isPendingCallbackOverdue(cb.scheduled_at);
                           const showAssignee = role === 'admin' || role === 'manager';
                           const metaParts = [
+                            followUpTypeLabel(cb.follow_up_type),
                             cb.contact_phone?.trim() || null,
                             showAssignee && cb.assigned_name?.trim() ? cb.assigned_name.trim() : null,
                           ].filter(Boolean);
                           const title =
                             cb.contact_name?.trim() ||
-                            (cb.contact_id ? `Contact #${cb.contact_id}` : 'Callback');
+                            (cb.contact_id ? `Contact #${cb.contact_id}` : 'Follow-up');
                           return (
                             <li key={cb.id} className={`${styles.meetingRow} ${styles.dashboardSlotRow}`}>
                               <span
@@ -781,7 +787,7 @@ export function TenantDashboardPage() {
                                   {cb.notes?.trim() ? ` · ${cb.notes.trim()}` : ''}
                                 </p>
                               </div>
-                              <Link to="/schedule/callbacks" className={styles.joinBtn}>
+                              <Link to="/schedule/follow-ups" className={styles.joinBtn}>
                                 <span className={styles.joinBtnInner}>
                                   <MaterialSymbol name="event" size="sm" />
                                   Open
@@ -796,11 +802,11 @@ export function TenantDashboardPage() {
                   )}
                   {callbacksHasMore ? (
                     <Link
-                      to="/schedule/callbacks"
+                      to="/schedule/follow-ups"
                       className={styles.panelLink}
                       style={{ marginTop: 12, display: 'inline-block' }}
                     >
-                      All callbacks ({pendingCallbacks.length}) {'\u2192'}
+                      All follow-ups ({pendingCallbacks.length}) {'\u2192'}
                     </Link>
                   ) : null}
                   {pendingCallbacks.length === 0 ? (
@@ -828,7 +834,7 @@ export function TenantDashboardPage() {
               ) : (
                 <>
                   <p className={styles.skeletonNote}>
-                    Scheduled callbacks live in the Schedule hub when your role includes schedule access. For call
+                    Scheduled follow-ups live in the Schedule hub when your role includes schedule access. For call
                     context, use{' '}
                     {canCallHistory ? (
                       <Link to="/calls/history" className={styles.inlineDashLink}>

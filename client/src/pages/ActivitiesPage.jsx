@@ -8,8 +8,6 @@ import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { Spinner } from '../components/ui/Spinner';
 import { Pagination } from '../components/ui/Pagination';
-import { Select } from '../components/ui/Select';
-import { Input } from '../components/ui/Input';
 import { callsAPI } from '../services/callsAPI';
 import { dispositionsAPI } from '../services/dispositionAPI';
 import { tenantUsersAPI } from '../services/tenantUsersAPI';
@@ -39,6 +37,7 @@ import {
   IconChevronDown,
   IconColumns,
   IconExport,
+  IconFilter,
   IconSelectAll,
 } from '../features/contacts/ListActionsMenuIcons';
 import { ExportCsvModal } from '../features/contacts/ExportCsvModal';
@@ -48,6 +47,8 @@ import {
   resolveCallHistoryListParams,
 } from '../utils/dateRangePresets';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
+import { BulkActionsDropdown } from '../components/ui/BulkActionsDropdown';
+import { CallsWorkspaceTabs, useCallsWorkspaceShowTabs } from './CallsWorkspaceTabs';
 
 function IconBlank() {
   return <span style={{ display: 'block', width: 18, height: 18 }} aria-hidden />;
@@ -148,10 +149,6 @@ export function ActivitiesPage() {
   const [hasCompletedInitialFetch, setHasCompletedInitialFetch] = useState(false);
   const [error, setError] = useState('');
   const [payload, setPayload] = useState(null);
-
-  const [provider, setProvider] = useState('dummy');
-  const [contactIdDraft, setContactIdDraft] = useState('');
-  const [starting, setStarting] = useState(false);
 
   const [dispositions, setDispositions] = useState([]);
   const [dispositionFilterMulti, setDispositionFilterMulti] = useState('');
@@ -592,42 +589,6 @@ export function ActivitiesPage() {
 
   const [callHistoryActionsOpen, setCallHistoryActionsOpen] = useState(false);
   const [exportCsvOpen, setExportCsvOpen] = useState(false);
-  const callHistoryActionsRef = useRef(null);
-  useEffect(() => {
-    const onDoc = (e) => {
-      const el = callHistoryActionsRef.current;
-      if (!callHistoryActionsOpen || !el) return;
-      if (!el.contains(e.target)) setCallHistoryActionsOpen(false);
-    };
-    const onKey = (e) => {
-      if (e.key === 'Escape') setCallHistoryActionsOpen(false);
-    };
-    document.addEventListener('mousedown', onDoc);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDoc);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [callHistoryActionsOpen]);
-
-  const startSingle = async () => {
-    setStarting(true);
-    setError('');
-    try {
-      const cid = Number(contactIdDraft);
-      if (!cid) {
-        setError('Enter a valid contact/lead id to start a dummy call.');
-        return;
-      }
-      await callsAPI.start({ contact_id: cid, provider });
-      setContactIdDraft('');
-      await load();
-    } catch (e) {
-      setError(e?.response?.data?.error || e?.message || 'Failed to start call');
-    } finally {
-      setStarting(false);
-    }
-  };
 
   if (!canView) {
     return (
@@ -640,7 +601,8 @@ export function ActivitiesPage() {
     );
   }
 
-  const canStartCall = canAny(['dial.execute']);
+  const showCallsWorkspaceTabs = useCallsWorkspaceShowTabs();
+
   const hasActiveFilters = Boolean(
     String(searchQuery || '').trim() ||
       String(contactFilter || '').trim() ||
@@ -695,24 +657,9 @@ export function ActivitiesPage() {
         title="Call history"
         description="Call attempts. Open a row to filter that customer’s calls; full CRM activity is on the lead/contact Activity tab."
         actions={
-          canStartCall ? (
+          showCallsWorkspaceTabs ? (
             <div className={styles.headerActions}>
-              <Select
-                label="Provider"
-                value={provider}
-                onChange={(e) => setProvider(e.target.value)}
-                options={[{ value: 'dummy', label: 'Dummy (dev)' }]}
-              />
-              <Input
-                label="Lead or contact (numeric key)"
-                value={contactIdDraft}
-                onChange={(e) => setContactIdDraft(e.target.value)}
-                placeholder="e.g. 123"
-                inputMode="numeric"
-              />
-              <Button onClick={startSingle} disabled={starting || loading}>
-                {starting ? 'Calling…' : 'Start call'}
-              </Button>
+              <CallsWorkspaceTabs />
             </div>
           ) : undefined
         }
@@ -749,14 +696,28 @@ export function ActivitiesPage() {
       <div className={listStyles.tableCard}>
         <div className={`${listStyles.tableCardToolbarTop} ${listStyles.tableCardToolbarTopLead}`}>
           <div className={listStyles.tableCardToolbarLeft}>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className={`${contactPageStyles.toolbarFilterBtn} ${hasActiveFilters ? contactPageStyles.toolbarFilterBtnActive : ''}`.trim()}
+              onClick={() => {
+                if (hasActiveFilters) {
+                  setOpenedEditorFromAppliedButton(true);
+                  setFiltersOpen(true);
+                  return;
+                }
+                setOpenedEditorFromAppliedButton(false);
+                setFilterOptionsOpen(true);
+              }}
+            >
+              <IconFilter />
+              {filterButtonLabel}
+            </Button>
             <div className={listStyles.bulkToolbarSlot}>
               {selectedIds.size > 0 ? (
                 <span className={listStyles.bulkSelectionCount}>{selectedIds.size} selected</span>
-              ) : (
-                <span className={listStyles.bulkToolbarHint}>
-                  Select rows for bulk actions. Use Filters or the search bar to narrow the list.
-                </span>
-              )}
+              ) : null}
             </div>
           </div>
           <div className={styles.toolbarSearchAndBulk}>
@@ -791,75 +752,59 @@ export function ActivitiesPage() {
               </Button>
             ) : null}
 
-            <Button
-              type="button"
-              size="sm"
-              variant="primary"
-              className={hasActiveFilters ? contactPageStyles.toolbarFilterBtnActive : ''}
-              onClick={() => {
-                if (hasActiveFilters) {
-                  setOpenedEditorFromAppliedButton(true);
-                  setFiltersOpen(true);
-                  return;
-                }
-                setOpenedEditorFromAppliedButton(false);
-                setFilterOptionsOpen(true);
-              }}
-            >
-              {filterButtonLabel}
-            </Button>
             <Button type="button" size="sm" variant="secondary" onClick={() => setExportCsvOpen(true)}>
               <IconExport className={contactPageStyles.toolbarBtnIcon} />
               Export
             </Button>
 
-            <div className={contactPageStyles.bulkActionsWrap} ref={callHistoryActionsRef}>
-              <Button
-                type="button"
-                size="sm"
-                variant="primary"
-                className={contactPageStyles.toolbarControlBtn}
-                aria-haspopup="menu"
-                aria-expanded={callHistoryActionsOpen}
-                onClick={() => setCallHistoryActionsOpen((v) => !v)}
-              >
-                <span className={contactPageStyles.actionsTriggerInner}>
-                  <IconActions className={contactPageStyles.toolbarBtnIcon} />
-                  Actions
-                  <IconChevronDown className={contactPageStyles.actionsTriggerChevron} />
-                </span>
-              </Button>
-              {callHistoryActionsOpen ? (
-                <div className={contactPageStyles.bulkActionsMenu} role="menu">
-                  <div className={contactPageStyles.actionsMenuSection}>
-                    <CallHistoryActionsMenuItem
-                      icon={IconColumns}
-                      onClick={() => {
-                        setCallHistoryActionsOpen(false);
-                        setCallHistoryCustomizeOpen(true);
-                      }}
-                    >
-                      Customize columns
-                    </CallHistoryActionsMenuItem>
-                  </div>
-                  <div className={contactPageStyles.actionsMenuDivider} role="separator" />
-                  <p className={contactPageStyles.listActionsMenuHint}>With rows selected</p>
-                  <div className={contactPageStyles.actionsMenuSection}>
-                    <CallHistoryActionsMenuItem
-                      icon={IconBlank}
-                      disabled={selectedIds.size === 0}
-                      onClick={() => {
-                        if (selectedIds.size === 0) return;
-                        clearSelection();
-                        setCallHistoryActionsOpen(false);
-                      }}
-                    >
-                      Clear selection
-                    </CallHistoryActionsMenuItem>
-                  </div>
-                </div>
-              ) : null}
-            </div>
+            <BulkActionsDropdown
+              open={callHistoryActionsOpen}
+              onOpenChange={setCallHistoryActionsOpen}
+              trigger={
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="primary"
+                  className={contactPageStyles.toolbarControlBtn}
+                  aria-haspopup="menu"
+                  aria-expanded={callHistoryActionsOpen}
+                  onClick={() => setCallHistoryActionsOpen((v) => !v)}
+                >
+                  <span className={contactPageStyles.actionsTriggerInner}>
+                    <IconActions className={contactPageStyles.toolbarBtnIcon} />
+                    Actions
+                    <IconChevronDown className={contactPageStyles.actionsTriggerChevron} />
+                  </span>
+                </Button>
+              }
+            >
+              <div className={contactPageStyles.actionsMenuSection}>
+                <CallHistoryActionsMenuItem
+                  icon={IconColumns}
+                  onClick={() => {
+                    setCallHistoryActionsOpen(false);
+                    setCallHistoryCustomizeOpen(true);
+                  }}
+                >
+                  Customize columns
+                </CallHistoryActionsMenuItem>
+              </div>
+              <div className={contactPageStyles.actionsMenuDivider} role="separator" />
+              <p className={contactPageStyles.listActionsMenuHint}>With rows selected</p>
+              <div className={contactPageStyles.actionsMenuSection}>
+                <CallHistoryActionsMenuItem
+                  icon={IconBlank}
+                  disabled={selectedIds.size === 0}
+                  onClick={() => {
+                    if (selectedIds.size === 0) return;
+                    clearSelection();
+                    setCallHistoryActionsOpen(false);
+                  }}
+                >
+                  Clear selection
+                </CallHistoryActionsMenuItem>
+              </div>
+            </BulkActionsDropdown>
 
             <SearchInput
               value={searchQuery}

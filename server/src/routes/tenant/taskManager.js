@@ -37,6 +37,7 @@ router.get('/daily-logs/:id/note-history', tasksView, taskManagerController.list
 router.get('/reports/summary', reportsView, taskManagerController.rolewiseSummary);
 router.get('/reports/calendar', reportsView, taskManagerController.calendar);
 router.get('/reports/trend', reportsView, taskManagerController.trend);
+router.get('/reports/dials-by-hour', reportsView, taskManagerController.dialsByHour);
 router.get('/reports/coaching-insights', reportsView, taskManagerController.coachingInsights);
 router.get('/reports/export.csv', reportsExport, taskManagerController.exportSummaryCsv);
 

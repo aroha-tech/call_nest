@@ -64,18 +64,24 @@
   }
 }
 
-// Custom scrollbar
+// Custom scrollbar (vertical + horizontal on any overflow container)
 @mixin custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+
   &::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
+  }
+  &::-webkit-scrollbar-corner {
+    background: transparent;
   }
   &::-webkit-scrollbar-track {
     background: transparent;
   }
   &::-webkit-scrollbar-thumb {
     background: var(--scrollbar-thumb);
-    border-radius: 3px;
+    border-radius: $radius-xs;
     &:hover {
       background: var(--scrollbar-thumb-hover);
     }

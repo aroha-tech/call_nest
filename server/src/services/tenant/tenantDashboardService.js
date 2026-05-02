@@ -2,7 +2,7 @@ import { query } from '../../config/db.js';
 import { sqlDateBetweenInclusive } from '../../utils/dateRangeQuery.js';
 import { getCreatedByUserIdsForScope } from './userMessageScopeService.js';
 import { listTenantActivityFeed } from './tenantActivityLogService.js';
-import { listDashboardPendingCallbacks } from './scheduledCallbacksService.js';
+import { listDashboardPendingFollowUps } from './scheduledFollowUpsService.js';
 
 async function buildActivityFeed(tenantId, actingUser) {
   return listTenantActivityFeed(tenantId, actingUser, { limit: 45 });
@@ -337,7 +337,7 @@ async function getAdminDashboard(tenantId, actingUser, range) {
     callsTrend,
   ] = await Promise.all([
     listUpcomingMeetings(tenantId, actingUser, 6),
-    listDashboardPendingCallbacks(tenantId, actingUser, 6),
+    listDashboardPendingFollowUps(tenantId, actingUser, 6),
     listRecentConnectedCalls(tenantId, actingUser, 8),
     getCallsTodayStats(tenantId, actingUser),
     getOutboundSentEmailCount(tenantId, actingUser, range),
@@ -451,7 +451,7 @@ async function getManagerDashboard(tenantId, actingUser, range) {
     callsTrend,
   ] = await Promise.all([
     listUpcomingMeetings(tenantId, actingUser, 6),
-    listDashboardPendingCallbacks(tenantId, actingUser, 6),
+    listDashboardPendingFollowUps(tenantId, actingUser, 6),
     listRecentConnectedCalls(tenantId, actingUser, 8),
     getCallsTodayStats(tenantId, actingUser),
     getOutboundSentEmailCount(tenantId, actingUser, range),
@@ -523,7 +523,7 @@ async function getAgentDashboard(tenantId, actingUser, range) {
     callsTrend,
   ] = await Promise.all([
     listUpcomingMeetings(tenantId, actingUser, 6),
-    listDashboardPendingCallbacks(tenantId, actingUser, 6),
+    listDashboardPendingFollowUps(tenantId, actingUser, 6),
     listRecentConnectedCalls(tenantId, actingUser, 8),
     getCallsTodayStats(tenantId, actingUser),
     getOutboundSentEmailCount(tenantId, actingUser, range),

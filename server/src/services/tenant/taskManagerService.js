@@ -87,6 +87,9 @@ function buildUserScope(actingUser) {
   return { sql: ' AND u.id = ? ', params: [actingUser.id] };
 }
 
+/** Performance reports (summary, trend, calendar, CRM rollups, dials-by-hour): agents only — not tenant admins/managers. */
+const PERF_REPORTS_AGENT_ROLE_SQL = ` AND LOWER(TRIM(COALESCE(u.role, ''))) = 'agent' `;
+
 async function getScoringConfig(tenantId) {
   const [row] = await query(
     `SELECT calls_weight, meetings_weight, deals_weight, low_performance_threshold, medium_performance_threshold,
@@ -148,21 +151,45 @@ function scoreFromWeights(targets, achieved, cfg) {
 }
 
 function completionPercent(targets, achieved) {
-  const t = n(targets.calls) + n(targets.meetings) + n(targets.deals);
-  const a = n(achieved.calls) + n(achieved.meetings) + n(achieved.deals);
-  if (t <= 0) return a > 0 ? 100 : 0;
-  return Number(((a / t) * 100).toFixed(2));
+  const dims = [
+    [n(targets.calls), n(achieved.calls)],
+    [n(targets.meetings), n(achieved.meetings)],
+    [n(targets.deals), n(achieved.deals)],
+  ];
+  const parts = [];
+  for (const [t, a] of dims) {
+    if (t <= 0) continue;
+    parts.push(Math.min(100, (n(a) / Math.max(1, t)) * 100));
+  }
+  if (!parts.length) {
+    const anyAch = dims.some(([, a]) => n(a) > 0);
+    return anyAch ? 100 : 0;
+  }
+  return Number((parts.reduce((s, p) => s + p, 0) / parts.length).toFixed(2));
 }
 
+/** Pending / in_progress / achieved use per-dimension targets (not summed). */
 function logStatus(targets, achieved) {
-  const totalTarget = n(targets.calls) + n(targets.meetings) + n(targets.deals);
-  const totalAch = n(achieved.calls) + n(achieved.meetings) + n(achieved.deals);
-  if (totalTarget === 0) return 'no_task';
-  // Missed status is handled by scheduled cron after day close.
-  // Runtime recompute should keep untouched/zero-achievement logs as pending.
-  if (totalAch <= 0) return 'pending';
-  if (totalAch >= totalTarget) return 'achieved';
+  const dims = [
+    [n(targets.calls), n(achieved.calls)],
+    [n(targets.meetings), n(achieved.meetings)],
+    [n(targets.deals), n(achieved.deals)],
+  ];
+  const active = dims.filter(([t]) => t > 0);
+  if (!active.length) return 'no_task';
+  const allMet = active.every(([t, a]) => n(a) >= t);
+  if (allMet) return 'achieved';
+  const anyProgress = active.some(([, a]) => n(a) > 0);
+  if (!anyProgress) return 'pending';
   return 'in_progress';
+}
+
+function finalizedLogStatus(targets, achieved, taskDateYmd, todayYmd) {
+  let status = logStatus(targets, achieved);
+  if (taskDateYmd && todayYmd && taskDateYmd < todayYmd && status !== 'achieved' && status !== 'no_task') {
+    status = 'missed';
+  }
+  return status;
 }
 
 export async function listTemplates(tenantId, { includeInactive = false } = {}) {
@@ -228,37 +255,6 @@ function shouldCreateForDate(pattern, ymd) {
   return pattern.weekdays.map((x) => Number(x)).includes(wd);
 }
 
-async function findDailyLogConflicts(tenantId, assignedToUserId, startDate, endDate) {
-  const rows = await query(
-    `SELECT l.task_date, l.assignment_id, a.title AS assignment_title
-     FROM daily_task_logs l
-     LEFT JOIN task_assignments a
-       ON a.id = l.assignment_id
-      AND a.tenant_id = l.tenant_id
-      AND a.deleted_at IS NULL
-     WHERE l.tenant_id = ?
-       AND l.user_id = ?
-       AND l.deleted_at IS NULL
-       AND l.task_date BETWEEN ? AND ?
-     ORDER BY l.task_date ASC
-     LIMIT 20`,
-    [tenantId, assignedToUserId, startDate, endDate]
-  );
-  return rows || [];
-}
-
-function throwDailyConflictError(conflicts) {
-  const days = [...new Set((conflicts || []).map((r) => dateOnly(r.task_date)).filter(Boolean))];
-  const sample = days.slice(0, 5).join(', ');
-  const more = days.length > 5 ? ` (+${days.length - 5} more)` : '';
-  const err = new Error(
-    `This agent already has a task assigned on: ${sample}${more}. ` +
-      `Only one task per day is allowed. Remove the existing assignment(s) or choose different dates.`
-  );
-  err.status = 409;
-  throw err;
-}
-
 async function createDailyLogsForAssignment(tenantId, assignment, actingUserId) {
   const cfg = await getScoringConfig(tenantId);
   const patt = assignment.recurring_pattern ? JSON.parse(assignment.recurring_pattern) : null;
@@ -283,44 +279,35 @@ async function createDailyLogsForAssignment(tenantId, assignment, actingUserId) 
     const completion = completionPercent(targets, achieved);
     const score = scoreFromWeights(targets, achieved, cfg);
     const status = logStatus(targets, achieved);
-    try {
-      await query(
-        `INSERT INTO daily_task_logs (
-          tenant_id, assignment_id, user_id, task_date, target_calls, target_meetings, target_deals,
-          achieved_calls, achieved_meetings, achieved_deals, completion_percent, score, status, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          target_calls = VALUES(target_calls),
-          target_meetings = VALUES(target_meetings),
-          target_deals = VALUES(target_deals),
-          updated_by = VALUES(updated_by),
-          updated_at = CURRENT_TIMESTAMP`,
-        [
-          tenantId,
-          assignment.id,
-          assignment.assigned_to_user_id,
-          ymd,
-          targets.calls,
-          targets.meetings,
-          targets.deals,
-          achieved.calls,
-          achieved.meetings,
-          achieved.deals,
-          completion,
-          score,
-          status,
-          actingUserId ?? null,
-          actingUserId ?? null,
-        ]
-      );
-    } catch (e) {
-      // Race-condition safety: if unique per-day constraint rejects the insert, surface a friendly 409.
-      if (String(e?.code || '') === 'ER_DUP_ENTRY') {
-        const conflicts = await findDailyLogConflicts(tenantId, assignment.assigned_to_user_id, ymd, ymd);
-        throwDailyConflictError(conflicts.length ? conflicts : [{ task_date: ymd }]);
-      }
-      throw e;
-    }
+    await query(
+      `INSERT INTO daily_task_logs (
+        tenant_id, assignment_id, user_id, task_date, target_calls, target_meetings, target_deals,
+        achieved_calls, achieved_meetings, achieved_deals, completion_percent, score, status, created_by, updated_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        target_calls = VALUES(target_calls),
+        target_meetings = VALUES(target_meetings),
+        target_deals = VALUES(target_deals),
+        updated_by = VALUES(updated_by),
+        updated_at = CURRENT_TIMESTAMP`,
+      [
+        tenantId,
+        assignment.id,
+        assignment.assigned_to_user_id,
+        ymd,
+        targets.calls,
+        targets.meetings,
+        targets.deals,
+        achieved.calls,
+        achieved.meetings,
+        achieved.deals,
+        completion,
+        score,
+        status,
+        actingUserId ?? null,
+        actingUserId ?? null,
+      ]
+    );
   }
 }
 
@@ -433,11 +420,6 @@ export async function createAssignment(tenantId, actingUser, payload) {
     throw err;
   }
 
-  // Hard rule: only one task per agent per calendar day (regardless of time windows).
-  const conflicts = await findDailyLogConflicts(tenantId, assignedTo, startDate, endDate);
-  if (conflicts.length) throwDailyConflictError(conflicts);
-
-  await assertNoOverlappingAssignment(tenantId, assignedTo, startDate, endDate, startAt, endAt);
   let template = null;
   if (payload?.template_id) {
     const [tmp] = await query(
@@ -588,38 +570,6 @@ export async function createAssignment(tenantId, actingUser, payload) {
   return row;
 }
 
-/**
- * Block creating a second active/paused assignment for the same agent when date ranges overlap (inclusive).
- */
-async function assertNoOverlappingAssignment(tenantId, assignedToUserId, startDate, endDate, startAt, endAt) {
-  const s = mysqlDateTime(startAt) || `${dateOnly(startDate)} 00:00:00`;
-  const e = mysqlDateTime(endAt) || `${dateOnly(endDate)} 23:59:59`;
-  const overlaps = await query(
-    `SELECT id, title, start_date, end_date, start_at, end_at, status
-     FROM task_assignments
-     WHERE tenant_id = ?
-       AND deleted_at IS NULL
-       AND assigned_to_user_id = ?
-       AND status IN ('active', 'paused')
-       AND COALESCE(start_at, CONCAT(start_date, ' 00:00:00')) <= ?
-       AND COALESCE(end_at, CONCAT(end_date, ' 23:59:59')) >= ?`,
-    [tenantId, assignedToUserId, e, s]
-  );
-  if (!overlaps.length) return;
-  const parts = overlaps.slice(0, 3).map((r) => {
-    const sd = String(r.start_at || r.start_date || '').replace('T', ' ').slice(0, 16);
-    const ed = String(r.end_at || r.end_date || '').replace('T', ' ').slice(0, 16);
-    return `"${String(r.title || '').trim() || 'Task'}" (${sd} → ${ed})`;
-  });
-  const more = overlaps.length > 3 ? ` (+${overlaps.length - 3} more)` : '';
-  const err = new Error(
-    `This agent already has a task overlapping these dates: ${parts.join('; ')}${more}. ` +
-      `Delete or change the existing assignment first, or pick dates that do not overlap.`
-  );
-  err.status = 409;
-  throw err;
-}
-
 export async function deleteAssignment(tenantId, actingUser, assignmentId) {
   assertCanManageTasks(actingUser);
   const id = Number(assignmentId);
@@ -736,8 +686,7 @@ export async function recomputeLogs(tenantId, actingUser, { from, to, userId, lo
   const us = buildUserScope(actingUser);
   const todayYmd = dateOnly(new Date());
 
-  // Business rule for manual sync:
-  // mark previous-day pending logs as missed for the same scoped users.
+  // Fast path: stale pending rows on past dates (loop below still corrects status from live metrics).
   if (todayYmd) {
     const overdueWhere = ['l.tenant_id = ?', 'l.deleted_at IS NULL', "l.status = 'pending'", 'l.task_date < ?'];
     const overdueParams = [tenantId, todayYmd];
@@ -791,7 +740,8 @@ export async function recomputeLogs(tenantId, actingUser, { from, to, userId, lo
     };
     const completion = completionPercent(targets, achieved);
     const score = scoreFromWeights(targets, achieved, cfg);
-    const status = logStatus(targets, achieved);
+    const taskDate = dateOnly(log.task_date);
+    const status = finalizedLogStatus(targets, achieved, taskDate, nowYmd);
     const oldStatus = String(log.status || '').toLowerCase();
     await query(
       `UPDATE daily_task_logs
@@ -809,7 +759,6 @@ export async function recomputeLogs(tenantId, actingUser, { from, to, userId, lo
         log.id,
       ]
     );
-    const taskDate = dateOnly(log.task_date);
     if (taskDate && oldStatus !== status && taskDate <= nowYmd && (status === 'achieved' || status === 'missed')) {
       await createAndDispatchNotification(tenantId, actingUser?.id, {
         moduleKey: 'tasks',
@@ -916,11 +865,12 @@ export async function recomputeLogs(tenantId, actingUser, { from, to, userId, lo
 export async function listDailyLogs(
   tenantId,
   actingUser,
-  { from, to, userId, page = 1, limit = 20, sort = 'desc', view } = {}
+  { from, to, userId, page = 1, limit = 20, sort = 'desc', view, as_of, asOf } = {}
 ) {
   await backfillDailyLogsInRange(tenantId, actingUser, { from, to, userId });
   const us = buildUserScope(actingUser);
   const todayYmd = dateOnly(new Date());
+  const currentAnchorYmd = dateOnly(as_of || asOf) || todayYmd;
   const viewMode = String(view || '').toLowerCase();
   const where = ['l.tenant_id = ?', 'l.deleted_at IS NULL'];
   const params = [tenantId];
@@ -936,17 +886,21 @@ export async function listDailyLogs(
     where.push('l.user_id = ?');
     params.push(Number(userId));
   }
-  if (viewMode === 'current' && todayYmd) {
+  if (viewMode === 'current' && currentAnchorYmd) {
     where.push('l.task_date = ?');
     where.push('COALESCE(DATE(a.start_at), a.start_date) <= ?');
     where.push('COALESCE(DATE(a.end_at), a.end_date) >= ?');
-    params.push(todayYmd, todayYmd, todayYmd);
+    params.push(currentAnchorYmd, currentAnchorYmd, currentAnchorYmd);
   } else if (viewMode === 'upcoming' && todayYmd) {
     where.push('COALESCE(DATE(a.start_at), a.start_date) > ?');
     params.push(todayYmd);
+    where.push(
+      'l.task_date = (SELECT MIN(l2.task_date) FROM daily_task_logs l2 WHERE l2.tenant_id = l.tenant_id AND l2.assignment_id = l.assignment_id AND l2.user_id = l.user_id AND l2.deleted_at IS NULL)'
+    );
   } else if (viewMode === 'history' && todayYmd) {
     where.push('l.task_date < ?');
     params.push(todayYmd);
+    where.push('(a.id IS NULL OR l.task_date = DATE(COALESCE(a.end_at, a.end_date)))');
   }
   const lim = Math.max(1, Math.min(100, Number(limit) || 20));
   const pg = Math.max(1, Number(page) || 1);
@@ -963,6 +917,7 @@ export async function listDailyLogs(
   );
   const rows = await query(
     `SELECT l.*, u.name AS user_name, u.role AS user_role, a.title AS assignment_title,
+            a.priority AS assignment_priority,
             a.start_date AS assignment_start_date, a.end_date AS assignment_end_date,
             a.start_at AS assignment_start_at, a.end_at AS assignment_end_at,
             CASE
@@ -1131,6 +1086,134 @@ export async function listAssignmentComments(tenantId, actingUser, assignmentId)
   );
 }
 
+async function getAgentCrmRollups(tenantId, actingUser, from, to) {
+  const us = buildUserScope(actingUser);
+  const fromD = dateOnly(from);
+  const toD = dateOnly(to);
+  if (!fromD || !toD) {
+    return new Map();
+  }
+  const scopeParams = [...us.params];
+  const p = [tenantId, fromD, toD, ...scopeParams];
+
+  const [callsRows, followUpRows, meetingRows, oppRows] = await Promise.all([
+    query(
+      `SELECT u.id AS user_id, COUNT(*) AS crm_total_calls
+       FROM contact_call_attempts cca
+       INNER JOIN users u ON u.id = cca.agent_user_id AND u.tenant_id = cca.tenant_id AND u.is_deleted = 0
+       WHERE cca.tenant_id = ?
+         AND cca.agent_user_id IS NOT NULL
+         AND DATE(cca.created_at) >= ? AND DATE(cca.created_at) <= ?
+         ${us.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
+       GROUP BY u.id`,
+      p
+    ),
+    query(
+      `SELECT u.id AS user_id,
+              COUNT(*) AS crm_scheduled_follow_ups,
+              SUM(CASE WHEN sc.follow_up_type = 'callback' THEN 1 ELSE 0 END) AS crm_follow_up_phone,
+              SUM(CASE WHEN sc.follow_up_type = 'email' THEN 1 ELSE 0 END) AS crm_follow_up_email,
+              SUM(CASE WHEN sc.follow_up_type = 'meeting' THEN 1 ELSE 0 END) AS crm_follow_up_meeting,
+              SUM(CASE WHEN sc.follow_up_type = 'other' THEN 1 ELSE 0 END) AS crm_follow_up_other
+       FROM scheduled_callbacks sc
+       INNER JOIN users u ON u.id = sc.assigned_user_id AND u.tenant_id = sc.tenant_id AND u.is_deleted = 0
+       WHERE sc.tenant_id = ?
+         AND sc.deleted_at IS NULL
+         AND sc.status IN ('pending', 'completed')
+         AND DATE(sc.scheduled_at) >= ? AND DATE(sc.scheduled_at) <= ?
+         ${us.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
+       GROUP BY u.id`,
+      p
+    ),
+    query(
+      `SELECT u.id AS user_id, COUNT(*) AS crm_calendar_meetings
+       FROM tenant_meetings tm
+       INNER JOIN users u ON u.tenant_id = tm.tenant_id AND u.is_deleted = 0
+         AND u.id = COALESCE(tm.assigned_user_id, tm.meeting_owner_user_id)
+       WHERE tm.tenant_id = ?
+         AND tm.deleted_at IS NULL
+         AND COALESCE(tm.assigned_user_id, tm.meeting_owner_user_id) IS NOT NULL
+         AND DATE(tm.start_at) >= ? AND DATE(tm.start_at) <= ?
+         ${us.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
+       GROUP BY u.id`,
+      p
+    ),
+    query(
+      `SELECT u.id AS user_id,
+              COUNT(*) AS crm_opportunities_count,
+              COALESCE(SUM(COALESCE(o.amount, o.expected_revenue, 0)), 0) AS crm_opportunities_amount
+       FROM opportunities o
+       INNER JOIN users u ON u.tenant_id = o.tenant_id AND u.is_deleted = 0
+         AND u.id = COALESCE(o.owner_id, o.created_by)
+       WHERE o.tenant_id = ?
+         AND o.deleted_at IS NULL
+         AND DATE(o.created_at) >= ? AND DATE(o.created_at) <= ?
+         ${us.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
+       GROUP BY u.id`,
+      p
+    ),
+  ]);
+
+  const map = new Map();
+  function ingest(rows, pick) {
+    for (const r of rows) {
+      const id = Number(r.user_id);
+      if (!Number.isFinite(id)) continue;
+      const cur = map.get(id) || {};
+      map.set(id, { ...cur, ...pick(r) });
+    }
+  }
+  ingest(callsRows, (r) => ({ crm_total_calls: Number(r.crm_total_calls || 0) }));
+  ingest(followUpRows, (r) => ({
+    crm_scheduled_follow_ups: Number(r.crm_scheduled_follow_ups || 0),
+    crm_follow_up_phone: Number(r.crm_follow_up_phone || 0),
+    crm_follow_up_email: Number(r.crm_follow_up_email || 0),
+    crm_follow_up_meeting: Number(r.crm_follow_up_meeting || 0),
+    crm_follow_up_other: Number(r.crm_follow_up_other || 0),
+  }));
+  ingest(meetingRows, (r) => ({ crm_calendar_meetings: Number(r.crm_calendar_meetings || 0) }));
+  ingest(oppRows, (r) => ({
+    crm_opportunities_count: Number(r.crm_opportunities_count || 0),
+    crm_opportunities_amount: Number(r.crm_opportunities_amount || 0),
+  }));
+  return map;
+}
+
+/**
+ * Dial attempts aggregated by clock hour (0–23) for the date range, server local time.
+ * Scoped like other performance reports (agent / manager / admin).
+ */
+export async function getDialsByHour(tenantId, actingUser, { from, to, userId } = {}) {
+  const us = buildUserScope(actingUser);
+  const where = ['cca.tenant_id = ?', 'cca.agent_user_id IS NOT NULL'];
+  const params = [tenantId];
+  if (from) {
+    where.push('DATE(cca.created_at) >= ?');
+    params.push(dateOnly(from));
+  }
+  if (to) {
+    where.push('DATE(cca.created_at) <= ?');
+    params.push(dateOnly(to));
+  }
+  if (userId) {
+    where.push('cca.agent_user_id = ?');
+    params.push(Number(userId));
+  }
+  const rows = await query(
+    `SELECT HOUR(cca.created_at) AS hour_of_day, COUNT(*) AS dials
+     FROM contact_call_attempts cca
+     INNER JOIN users u ON u.id = cca.agent_user_id AND u.tenant_id = cca.tenant_id AND u.is_deleted = 0
+     WHERE ${where.join(' AND ')} ${us.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
+     GROUP BY HOUR(cca.created_at)
+     ORDER BY hour_of_day ASC`,
+    [...params, ...us.params]
+  );
+  return rows.map((r) => ({
+    hour_of_day: Number(r.hour_of_day),
+    dials: Number(r.dials || 0),
+  }));
+}
+
 export async function getRolewiseSummary(tenantId, actingUser, { from, to, userId } = {}) {
   const us = buildUserScope(actingUser);
   const where = ['l.tenant_id = ?', 'l.deleted_at IS NULL'];
@@ -1152,6 +1235,8 @@ export async function getRolewiseSummary(tenantId, actingUser, { from, to, userI
       u.id AS user_id,
       u.name AS user_name,
       u.role,
+      u.manager_id,
+      mgr.name AS manager_name,
       COUNT(*) AS assigned_days,
       SUM(CASE WHEN l.status = 'achieved' THEN 1 ELSE 0 END) AS achieved_days,
       SUM(CASE WHEN l.status = 'missed' THEN 1 ELSE 0 END) AS missed_days,
@@ -1165,11 +1250,13 @@ export async function getRolewiseSummary(tenantId, actingUser, { from, to, userI
       SUM(l.achieved_deals) AS achieved_deals
      FROM daily_task_logs l
      INNER JOIN users u ON u.id = l.user_id AND u.tenant_id = l.tenant_id AND u.is_deleted = 0
-     WHERE ${where.join(' AND ')} ${us.sql}
-     GROUP BY u.id, u.name, u.role
+     LEFT JOIN users mgr ON mgr.id = u.manager_id AND mgr.tenant_id = u.tenant_id AND mgr.is_deleted = 0
+     WHERE ${where.join(' AND ')} ${us.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
+     GROUP BY u.id, u.name, u.role, u.manager_id, mgr.name
      ORDER BY avg_score DESC, u.name ASC`,
     [...params, ...us.params]
   );
+  const crmByUser = await getAgentCrmRollups(tenantId, actingUser, from, to);
   return rows.map((r) => {
     const assignedDays = Number(r.assigned_days || 0);
     const achievedDays = Number(r.achieved_days || 0);
@@ -1178,11 +1265,21 @@ export async function getRolewiseSummary(tenantId, actingUser, { from, to, userI
       Number(r.achieved_calls || 0) > 0 ? (Number(r.achieved_meetings || 0) / Number(r.achieved_calls || 0)) * 100 : 0;
     const meetingToDeal =
       Number(r.achieved_meetings || 0) > 0 ? (Number(r.achieved_deals || 0) / Number(r.achieved_meetings || 0)) * 100 : 0;
+    const crm = crmByUser.get(Number(r.user_id)) || {};
     return {
       ...r,
       consistency_score: Number(consistency.toFixed(2)),
       calls_to_meeting_conversion: Number(callsToMeeting.toFixed(2)),
       meeting_to_deal_conversion: Number(meetingToDeal.toFixed(2)),
+      crm_total_calls: Number(crm.crm_total_calls || 0),
+      crm_scheduled_follow_ups: Number(crm.crm_scheduled_follow_ups || 0),
+      crm_follow_up_phone: Number(crm.crm_follow_up_phone || 0),
+      crm_follow_up_email: Number(crm.crm_follow_up_email || 0),
+      crm_follow_up_meeting: Number(crm.crm_follow_up_meeting || 0),
+      crm_follow_up_other: Number(crm.crm_follow_up_other || 0),
+      crm_calendar_meetings: Number(crm.crm_calendar_meetings || 0),
+      crm_opportunities_count: Number(crm.crm_opportunities_count || 0),
+      crm_opportunities_amount: Number(Number(crm.crm_opportunities_amount || 0).toFixed(2)),
     };
   });
 }
@@ -1200,7 +1297,7 @@ export async function getCalendarData(tenantId, actingUser, { userId, month }) {
     `SELECT l.task_date, l.status, COUNT(*) AS logs_count, AVG(l.completion_percent) AS completion_percent
      FROM daily_task_logs l
      INNER JOIN users u ON u.id = l.user_id AND u.tenant_id = l.tenant_id AND u.is_deleted = 0
-     WHERE ${where.join(' AND ')} ${us.sql}
+     WHERE ${where.join(' AND ')} ${us.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
      GROUP BY l.task_date, l.status
      ORDER BY l.task_date ASC`,
     [...params, ...us.params]
@@ -1230,7 +1327,7 @@ export async function getTrend(tenantId, actingUser, { from, to, groupBy = 'week
     `SELECT ${bucket} AS bucket, AVG(l.completion_percent) AS avg_completion, AVG(l.score) AS avg_score, COUNT(*) AS logs_count
      FROM daily_task_logs l
      INNER JOIN users u ON u.id = l.user_id AND u.tenant_id = l.tenant_id AND u.is_deleted = 0
-     WHERE ${where.join(' AND ')} ${us.sql}
+     WHERE ${where.join(' AND ')} ${us.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
      GROUP BY bucket
      ORDER BY bucket ASC`,
     [...params, ...us.params]
@@ -1255,6 +1352,7 @@ export async function getCoachingInsights(tenantId, actingUser, { from, to } = {
       user_id: r.user_id,
       user_name: r.user_name,
       role: r.role,
+      manager_name: r.manager_name || null,
       avg_score: Number(Number(r.avg_score || 0).toFixed(2)),
       consistency_score: Number(r.consistency_score || 0),
       missed_days: Number(r.missed_days || 0),
@@ -1272,6 +1370,7 @@ export async function exportRolewiseCsv(tenantId, actingUser, filters) {
   const header = [
     'User',
     'Role',
+    'Manager',
     'Assigned Days',
     'Achieved Days',
     'Missed Days',
@@ -1283,6 +1382,15 @@ export async function exportRolewiseCsv(tenantId, actingUser, filters) {
     'Achieved Meetings',
     'Target Deals',
     'Achieved Deals',
+    'CRM Dial Attempts',
+    'Follow-ups (total)',
+    'Follow-ups · Phone',
+    'Follow-ups · Email',
+    'Follow-ups · Meeting',
+    'Follow-ups · Other',
+    'Calendar Meetings',
+    'New Opportunities',
+    'Opportunity Amount (sum)',
     'Consistency %',
     'Calls->Meetings %',
     'Meetings->Deals %',
@@ -1297,6 +1405,7 @@ export async function exportRolewiseCsv(tenantId, actingUser, filters) {
       [
         r.user_name,
         r.role,
+        r.manager_name || '',
         r.assigned_days,
         r.achieved_days,
         r.missed_days,
@@ -1308,6 +1417,15 @@ export async function exportRolewiseCsv(tenantId, actingUser, filters) {
         r.achieved_meetings,
         r.target_deals,
         r.achieved_deals,
+        r.crm_total_calls,
+        r.crm_scheduled_follow_ups,
+        r.crm_follow_up_phone,
+        r.crm_follow_up_email,
+        r.crm_follow_up_meeting,
+        r.crm_follow_up_other,
+        r.crm_calendar_meetings,
+        r.crm_opportunities_count,
+        r.crm_opportunities_amount,
         r.consistency_score,
         r.calls_to_meeting_conversion,
         r.meeting_to_deal_conversion,

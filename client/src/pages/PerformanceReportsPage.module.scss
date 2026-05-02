@@ -43,6 +43,69 @@
   gap: 8px;
 }
 
+.filterToolbar {
+  @include premium-panel;
+  border-radius: $radius-lg;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filterToolbarMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.filterToolbarLabel {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.filterToolbarRange {
+  margin: 0;
+  font-size: 14px;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  word-break: break-word;
+}
+
+.filterToolbarActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.filtersModalGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 14px;
+
+  @media (max-width: 520px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.filtersModalFull {
+  grid-column: 1 / -1;
+}
+
+.chartsSectionTitle {
+  margin: 0 0 10px;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-secondary);
+}
+
 .filtersCard {
   @include premium-panel;
   border-radius: $radius-lg;
@@ -77,6 +140,133 @@
   @media (max-width: 640px) {
     grid-template-columns: 1fr;
   }
+}
+
+.activityBand {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: $radius-lg;
+  border: 1px solid var(--color-border-subtle);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-primary-500) 8%, var(--color-bg-subtle)),
+    color-mix(in srgb, var(--color-bg-subtle) 92%, transparent)
+  );
+}
+
+.activityBandTitle {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.activityCardsRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 10px;
+
+  @media (max-width: 1100px) {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+
+  @media (max-width: 520px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.activityMini {
+  border-radius: $radius-md;
+  border: 1px solid color-mix(in srgb, var(--color-border-subtle) 80%, transparent);
+  background: var(--color-bg-elevated, var(--color-bg-subtle));
+  padding: 10px 12px;
+}
+
+.activityMiniLabel {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-tertiary);
+  margin-bottom: 4px;
+}
+
+.activityMiniValue {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-bold;
+  line-height: 1.2;
+}
+
+.activityMiniSub {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+.filterHint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.tableScroll {
+  overflow-x: auto;
+  margin: 0 -2px;
+  padding-bottom: 4px;
+
+  table {
+    min-width: 720px;
+  }
+}
+
+.wideTable table {
+  min-width: 1100px;
+}
+
+.managerGroup {
+  margin-bottom: 16px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.managerGroupTitle {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-secondary);
+  padding: 6px 10px;
+  border-radius: $radius-sm;
+  background: color-mix(in srgb, var(--color-primary-500) 6%, var(--color-bg-subtle));
+  border-left: 3px solid var(--color-primary-500);
+}
+
+.scorePill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: $font-weight-semibold;
+}
+
+.scorePillHigh {
+  background: color-mix(in srgb, var(--color-success, #22c55e) 18%, transparent);
+  color: var(--color-success, #15803d);
+}
+
+.scorePillMid {
+  background: color-mix(in srgb, var(--color-warning, #eab308) 22%, transparent);
+  color: color-mix(in srgb, var(--color-warning, #ca8a04) 90%, #000);
+}
+
+.scorePillLow {
+  background: color-mix(in srgb, var(--color-danger, #ef4444) 16%, transparent);
+  color: var(--color-danger, #b91c1c);
 }
 
 .miniCard {

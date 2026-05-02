@@ -1,746 +1,1229 @@
-@use '../styles/variables' as *;
-@use '../styles/mixins' as *;
+  @use '../styles/variables' as *;
+  @use '../styles/mixins' as *;
 
-.page {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.alerts {
-  display: grid;
-  gap: 10px;
-  margin-bottom: $space-4;
-}
-
-.hero {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: $space-3;
-  margin-bottom: $space-5;
-
-  @media (max-width: 720px) {
-    grid-template-columns: 1fr;
+  .page {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
   }
-}
 
-.heroCard {
-  @include premium-panel;
-  display: flex;
-  align-items: flex-start;
-  gap: $space-3;
-  padding: $space-4;
-  border-radius: $radius-lg;
-  border: 1px solid var(--color-border-subtle);
-  background: linear-gradient(
-    145deg,
-    var(--color-bg-elevated, var(--color-bg-subtle)) 0%,
-    var(--color-bg-subtle) 100%
-  );
-}
-
-.heroBody {
-  min-width: 0;
-}
-
-.heroIcon {
-  flex-shrink: 0;
-  color: var(--color-primary-400);
-  opacity: 0.9;
-}
-
-.heroLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: $font-size-2xs;
-  font-weight: $font-weight-semibold;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-text-tertiary);
-  margin-bottom: 2px;
-}
-
-.heroValue {
-  font-size: $font-size-xl;
-  font-weight: $font-weight-bold;
-  color: var(--color-text-primary);
-  line-height: 1.2;
-}
-
-.heroSubtext {
-  margin: $space-1 0 0;
-  font-size: $font-size-xs;
-  color: var(--color-text-secondary);
-}
-
-.glanceStats {
-  margin-top: $space-1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: $space-2;
-  font-size: $font-size-xs;
-  font-weight: $font-weight-medium;
-}
-
-.glanceStatDone {
-  color: #14b86a;
-}
-
-.glanceStatMissed {
-  color: #e15858;
-}
-
-.glanceStatPending {
-  color: #d39322;
-}
-
-.heroHint {
-  margin-top: $space-2;
-  font-size: $font-size-xs;
-  color: var(--color-text-secondary);
-  line-height: 1.45;
-}
-
-.assignmentsSection {
-  margin-bottom: $space-5;
-}
-
-.managerSwitchSection {
-  margin-bottom: $space-3;
-}
-
-.assignmentsSectionHead {
-  margin-bottom: $space-3;
-}
-
-.assignmentsTitle {
-  display: inline-flex;
-  align-items: center;
-  gap: $space-1;
-  margin: 0;
-  font-size: $font-size-base;
-  font-weight: $font-weight-semibold;
-  color: var(--color-text-primary);
-}
-
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: $space-3;
-  margin-bottom: $space-2;
-}
-
-.toolbarLeft {
-  display: flex;
-  flex-wrap: wrap;
-  gap: $space-3;
-  flex: 1 1 280px;
-}
-
-.toolbarRight {
-  display: flex;
-  flex-wrap: wrap;
-  gap: $space-2;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.toolbarBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: $space-2;
-}
-
-.filterWrap {
-  min-width: 220px;
-  max-width: 320px;
-  flex: 1;
-}
-
-.tabHint {
-  margin: 0 0 $space-4;
-  font-size: $font-size-sm;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-}
-
-.tabCount {
-  margin-left: $space-2;
-  padding: 2px 8px;
-  border-radius: $radius-full;
-  font-size: $font-size-2xs;
-  font-weight: $font-weight-semibold;
-  background: var(--color-bg-muted);
-  color: var(--color-text-secondary);
-}
-
-.cardGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
-  gap: $space-4;
-}
-
-.taskCard {
-  @include premium-panel;
-  border-radius: $radius-lg;
-  padding: $space-3;
-  border: 1px solid #e8ecf4;
-  background: var(--color-bg-elevated, var(--color-bg-subtle));
-  display: flex;
-  flex-direction: column;
-  gap: $space-3;
-  transition: border-color $transition-fast, box-shadow $transition-fast;
-
-  &:hover {
-    border-color: var(--color-border);
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  .alerts {
+    display: grid;
+    gap: 10px;
+    margin-bottom: $space-4;
   }
-}
 
-.taskCardTop {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: $space-3;
-}
+  .hero {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: $space-3;
+    margin-bottom: $space-5;
 
-.taskCardTitles {
-  min-width: 0;
-}
-
-.taskCardTitle {
-  margin: 0 0 $space-2;
-  font-size: $font-size-base;
-  font-weight: $font-weight-semibold;
-  color: var(--color-text-primary);
-  line-height: 1.35;
-}
-
-.taskCardSchedule {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 $space-2;
-  padding: 6px 10px;
-  border-radius: $radius-md;
-  background: rgba(99, 102, 241, 0.12);
-  border: 1px solid rgba(99, 102, 241, 0.22);
-  font-size: $font-size-sm;
-  font-weight: $font-weight-semibold;
-  color: var(--color-primary-400, #818cf8);
-  line-height: 1.35;
-}
-
-.taskCardScheduleIcon {
-  flex-shrink: 0;
-  opacity: 0.95;
-}
-
-.taskCardMeta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: $space-3;
-  font-size: $font-size-xs;
-  color: var(--color-text-tertiary);
-}
-
-.taskCardDate,
-.taskCardAgent {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.taskMetrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: $space-1;
-
-  @media (max-width: 520px) {
-    grid-template-columns: repeat(2, 1fr);
+    @media (max-width: 720px) {
+      grid-template-columns: 1fr;
+    }
   }
-}
 
-.taskMetric {
-  padding: $space-2 $space-2;
-  border-radius: $radius-md;
-  background: #f8f9fe;
-  border: 1px solid #e7edf8;
-}
+  .heroCard {
+    @include premium-panel;
+    display: flex;
+    align-items: flex-start;
+    gap: $space-3;
+    padding: $space-4;
+    border-radius: $radius-lg;
+    border: 1px solid var(--color-border-subtle);
+    background: linear-gradient(
+      145deg,
+      var(--color-bg-elevated, var(--color-bg-subtle)) 0%,
+      var(--color-bg-subtle) 100%
+    );
+  }
 
-.taskMetricLabel {
-  display: block;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-text-tertiary);
-  margin-bottom: 2px;
-}
+  .heroBody {
+    min-width: 0;
+  }
 
-.taskMetricVal {
-  font-size: $font-size-sm;
-  font-weight: $font-weight-semibold;
-  color: var(--color-text-primary);
-}
+  .heroIcon {
+    flex-shrink: 0;
+    color: var(--color-primary-400);
+    opacity: 0.9;
+  }
 
-.progressTrack {
-  height: 6px;
-  border-radius: $radius-full;
-  background: var(--color-bg-muted);
-  overflow: hidden;
-}
+  .heroLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: $font-size-2xs;
+    font-weight: $font-weight-semibold;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-tertiary);
+    margin-bottom: 2px;
+  }
 
-.progressFill {
-  height: 100%;
-  border-radius: $radius-full;
-  background: linear-gradient(90deg, var(--color-primary-600, #4f46e5), var(--color-primary-400, #818cf8));
-  transition: width 0.35s ease;
-}
+  .heroValue {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    color: var(--color-text-primary);
+    line-height: 1.2;
+  }
 
-.taskCardActions {
-  display: flex;
-  gap: $space-2;
-  flex-wrap: wrap;
-  border-top: 1px solid #eef2f9;
-  padding-top: $space-2;
-  justify-content: space-between;
-}
+  .heroSubtext {
+    margin: $space-1 0 0;
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+  }
 
-.inlineNoteLabel {
-  font-size: 10px;
-  font-weight: $font-weight-semibold;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-text-tertiary);
-}
+  .glanceStats {
+    margin-top: $space-1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-2;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+  }
 
-.emptyState {
-  text-align: center;
-  padding: $space-6 $space-4;
-  border-radius: $radius-lg;
-  border: 1px dashed var(--color-border-subtle);
-  background: var(--color-bg-subtle);
-}
+  .glanceStatDone {
+    color: #14b86a;
+  }
 
-.emptyIcon {
-  color: var(--color-text-tertiary);
-  opacity: 0.5;
-  margin-bottom: $space-2;
-}
+  .glanceStatMissed {
+    color: #e15858;
+  }
 
-.emptyTitle {
-  margin: 0 0 $space-2;
-  font-size: $font-size-base;
-  font-weight: $font-weight-semibold;
-  color: var(--color-text-primary);
-}
+  .glanceStatPending {
+    color: #d39322;
+  }
 
-.emptyText {
-  margin: 0;
-  font-size: $font-size-sm;
-  color: var(--color-text-secondary);
-  max-width: 420px;
-  margin-inline: auto;
-  line-height: 1.5;
-}
+  .heroHint {
+    margin-top: $space-2;
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    line-height: 1.45;
+  }
 
-.emptyHints {
-  margin: $space-4 auto 0;
-  padding: 0 $space-4;
-  max-width: 520px;
-  text-align: left;
-  font-size: $font-size-sm;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
+  .assignmentsSection {
+    margin-bottom: $space-5;
+  }
 
-  li {
+  .managerSwitchSection {
+    margin-bottom: $space-3;
+  }
+
+  .assignmentsSectionHead {
+    margin-bottom: $space-3;
+  }
+
+  .assignmentsTitle {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    margin: 0;
+    font-size: $font-size-base;
+    font-weight: $font-weight-semibold;
+    color: var(--color-text-primary);
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: $space-3;
     margin-bottom: $space-2;
   }
-}
 
-.tableEmpty {
-  padding: $space-2 0;
-}
-
-.tableMono {
-  font-family: ui-monospace, monospace;
-  font-size: $font-size-2xs;
-  color: var(--color-text-secondary);
-}
-
-.search {
-  min-width: 0;
-  flex: 0 1 auto;
-  max-width: 420px;
-}
-
-.muted {
-  font-size: $font-size-xs;
-  color: var(--color-text-muted);
-  margin-top: $space-2;
-}
-
-.modalForm {
-  display: flex;
-  flex-direction: column;
-  gap: $space-4;
-}
-
-.modalLead {
-  margin: 0;
-  font-size: $font-size-sm;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-}
-
-.noteHistoryPanel {
-  border-top: 1px solid var(--color-border-subtle);
-  padding-top: $space-3;
-}
-
-.noteHistoryList {
-  display: grid;
-  gap: $space-2;
-  max-height: 260px;
-  overflow-y: auto;
-  padding-right: 2px;
-}
-
-.noteHistoryItem {
-  border: 1px solid var(--color-border-subtle);
-  border-radius: $radius-md;
-  background: var(--color-bg-subtle);
-  padding: $space-2;
-  display: grid;
-  gap: 6px;
-}
-
-.noteHistoryMeta {
-  display: flex;
-  justify-content: space-between;
-  gap: $space-2;
-  flex-wrap: wrap;
-  font-size: $font-size-2xs;
-  color: var(--color-text-tertiary);
-}
-
-.noteHistoryText {
-  font-size: $font-size-sm;
-  color: var(--color-text-primary);
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.chatThread {
-  display: flex;
-  flex-direction: column;
-  gap: $space-3;
-  max-height: 430px;
-  overflow-y: auto;
-  padding: $space-2;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: $radius-md;
-  background: var(--color-bg-subtle);
-}
-
-.chatMessage {
-  display: flex;
-  gap: $space-2;
-  align-items: flex-start;
-  width: 100%;
-}
-
-.chatMessageOwn {
-  flex-direction: row-reverse;
-  justify-content: flex-start;
-}
-
-.chatSender {
-  font-size: $font-size-xs;
-  font-weight: $font-weight-semibold;
-  color: var(--color-text-secondary);
-  padding-inline: 2px;
-}
-
-.chatTime {
-  font-size: 10px;
-  color: var(--color-text-tertiary);
-  padding-inline: 2px;
-}
-
-.chatBubble {
-  max-width: min(92%, 560px);
-  width: fit-content;
-  padding: 10px 12px;
-  border-radius: 14px 14px 14px 6px;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-subtle);
-  color: var(--color-text-primary);
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-word;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-
-  .chatMessageOwn & {
-    background: rgba(59, 130, 246, 0.2);
-    border-color: rgba(59, 130, 246, 0.35);
-    border-radius: 14px 14px 6px 14px;
+  .toolbarLeft {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-3;
+    flex: 1 1 280px;
   }
-}
 
-.chatAvatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  flex: 0 0 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: $font-weight-semibold;
-  background: #ece8ff;
-  color: #5a43d5;
-}
-
-.chatContent {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.chatMessageOwn .chatContent {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-.chatComposerRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: $space-2;
-  align-items: center;
-  margin-top: $space-2;
-}
-
-.commentsModalLayout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(240px, 0.9fr);
-  gap: $space-4;
-
-  @media (max-width: 980px) {
-    grid-template-columns: 1fr;
+  .toolbarRight {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-2;
+    align-items: center;
+    justify-content: flex-end;
   }
-}
 
-.commentsMain {
-  min-width: 0;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: $radius-lg;
-  padding: $space-4;
-  background: var(--color-bg-elevated);
-}
+  .toolbarBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+  }
 
-.commentsMainHead {
-  display: flex;
-  justify-content: space-between;
-  gap: $space-2;
-  align-items: flex-start;
-  margin-bottom: $space-2;
+  .filterWrap {
+    min-width: 220px;
+    max-width: 320px;
+    flex: 1;
+  }
 
-  @media (max-width: 720px) {
+  .tabHint {
+    margin: 0 0 $space-4;
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+  }
+
+  .tabCount {
+    margin-left: $space-2;
+    padding: 2px 8px;
+    border-radius: $radius-full;
+    font-size: $font-size-2xs;
+    font-weight: $font-weight-semibold;
+    background: var(--color-bg-muted);
+    color: var(--color-text-secondary);
+  }
+
+  .cardGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+    gap: $space-4;
+  }
+
+  .executionBoardShell {
+    border-radius: $radius-lg;
+    border: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-muted);
+    padding: $space-4;
+    margin-bottom: $space-2;
+  }
+
+  .boardToolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: $space-3;
+    align-items: end;
+    margin-bottom: $space-4;
+    padding-bottom: $space-3;
+    border-bottom: 1px solid var(--color-border-subtle);
+
+    @media (max-width: 720px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .boardToolbarSearch {
+    min-width: 0;
+  }
+
+  .boardToolbarFilters {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: $space-2;
+    align-items: flex-end;
+    justify-content: flex-end;
+
+    @media (max-width: 720px) {
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      width: 100%;
+    }
+
+    :global(.cn-select__control) {
+      min-width: 128px;
+    }
+  }
+
+  .boardCustomDate {
+    min-width: 160px;
+  }
+
+  .boardNoSearchHits {
+    padding: $space-5 $space-3;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: $font-size-sm;
+    border-radius: $radius-lg;
+    border: 1px dashed var(--color-border-subtle);
+    background: var(--color-bg-subtle);
+    margin-bottom: $space-3;
+
+    p {
+      margin: 0;
+    }
+  }
+
+  .kanbanBoard {
+    display: grid;
+    grid-template-columns: repeat(var(--kanban-cols, 3), minmax(0, 392px));
+    gap: $space-3;
+    align-items: start;
+    justify-content: start;
+
+    @media (max-width: 1100px) {
+      grid-template-columns: repeat(var(--kanban-cols, 3), minmax(0, 1fr));
+    }
+
+    @media (max-width: 960px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .kanbanColumn {
+    border-radius: $radius-lg;
+    padding: $space-2;
+    min-height: 0;
+    border: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-elevated);
+  }
+
+  .kanbanColumnPending {
+    border-left: 3px solid #7c3aed;
+  }
+
+  .kanbanColumnProgress {
+    border-left: 3px solid #ea580c;
+  }
+
+  .kanbanColumnComplete {
+    border-left: 3px solid #14b86a;
+  }
+
+  .kanbanColumnHead {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    margin-bottom: $space-3;
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .kanbanDot {
+    width: 10px;
+    height: 10px;
+    border-radius: $radius-full;
+    flex-shrink: 0;
+  }
+
+  .kanbanDotPending {
+    background: #7c3aed;
+  }
+
+  .kanbanDotInProgress {
+    background: #ea580c;
+  }
+
+  .kanbanDotComplete {
+    background: #14b86a;
+  }
+
+  .kanbanColumnTitle {
+    margin: 0;
+    flex: 1 1 auto;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: var(--color-text-primary);
+  }
+
+  .kanbanCount {
+    font-size: $font-size-2xs;
+    font-weight: $font-weight-bold;
+    padding: 2px 8px;
+    border-radius: $radius-full;
+    background: var(--color-bg-elevated, #fff);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border-subtle);
+  }
+
+  .kanbanCards {
+    display: flex;
     flex-direction: column;
+    gap: $space-3;
   }
-}
 
-.commentsSortMeta {
-  font-size: $font-size-xs;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-}
+  .kanbanEmpty {
+    text-align: center;
+    padding: $space-4 $space-2;
+    color: var(--color-text-secondary);
+    font-size: $font-size-sm;
+    line-height: 1.45;
 
-.commentsSide {
-  display: grid;
-  align-content: start;
-  gap: $space-3;
-  min-width: 0;
-}
-
-.commentTaskCard,
-.commentParticipantsCard {
-  border: 1px solid var(--color-border-subtle);
-  border-radius: $radius-lg;
-  padding: $space-3;
-  background: var(--color-bg-subtle);
-}
-
-.commentSideHeading {
-  margin: 0 0 $space-2;
-  font-size: $font-size-sm;
-  font-weight: $font-weight-semibold;
-  color: var(--color-text-primary);
-}
-
-.commentTaskTitle {
-  margin: 0;
-  font-size: $font-size-sm;
-  color: var(--color-text-primary);
-}
-
-.commentTaskDate {
-  margin: $space-2 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: $font-size-xs;
-  color: var(--color-text-secondary);
-}
-
-.commentMetricGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: $space-2;
-  margin-top: $space-2;
-}
-
-.commentMetricTile {
-  border: 1px solid var(--color-border-subtle);
-  border-radius: $radius-md;
-  background: var(--color-bg-elevated);
-  padding: $space-2;
-  display: grid;
-  gap: 2px;
-}
-
-.commentMetricLabel {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-text-tertiary);
-}
-
-.commentMetricValue {
-  font-size: $font-size-sm;
-  font-weight: $font-weight-semibold;
-  color: var(--color-text-primary);
-}
-
-.commentNotesBlock {
-  margin-top: $space-3;
-  padding-top: $space-2;
-  border-top: 1px solid var(--color-border-subtle);
-}
-
-.commentNotesText {
-  margin: 0;
-  font-size: $font-size-sm;
-  color: var(--color-text-secondary);
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.commentParticipantList {
-  display: grid;
-  gap: $space-2;
-}
-
-.commentParticipantRow {
-  display: flex;
-  align-items: center;
-  gap: $space-2;
-  padding: 2px 0;
-}
-
-.commentParticipantName {
-  font-size: $font-size-sm;
-  color: var(--color-text-primary);
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.commentParticipantRole {
-  font-size: $font-size-2xs;
-  color: var(--color-text-primary);
-  border-radius: $radius-full;
-  padding: 3px 10px;
-  border: 1px solid transparent;
-  font-weight: $font-weight-semibold;
-}
-
-.commentParticipantRoleAdmin {
-  background: rgba(59, 130, 246, 0.18);
-  border-color: rgba(59, 130, 246, 0.32);
-}
-
-.commentParticipantRoleManager {
-  background: rgba(168, 85, 247, 0.2);
-  border-color: rgba(168, 85, 247, 0.34);
-}
-
-.commentParticipantRoleDefault {
-  background: var(--color-bg-muted);
-  border-color: var(--color-border-subtle);
-}
-
-.formGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: $space-3 $space-4;
-}
-
-.full {
-  grid-column: 1 / -1;
-}
-
-.formSectionTitle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin: 0 0 4px;
-  font-size: $font-size-sm;
-  font-weight: $font-weight-semibold;
-  color: var(--color-text-primary);
-}
-
-.formSectionHint {
-  margin: 0;
-  font-size: $font-size-xs;
-  color: var(--color-text-tertiary);
-  line-height: 1.45;
-}
-
-/* Legacy: formsGrid / card used only if referenced elsewhere */
-.formsGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-bottom: 16px;
-
-  @media (max-width: 980px) {
-    grid-template-columns: 1fr;
+    p {
+      margin: 0;
+    }
   }
-}
 
-.card {
-  @include premium-panel;
-  border-radius: $radius-lg;
-  padding: $space-4;
-}
+  .kanbanEmptyIcon {
+    display: block;
+    margin: 0 auto $space-2;
+    opacity: 0.45;
+    color: var(--color-text-tertiary);
+  }
 
-.cardTitle {
-  margin: 0 0 4px;
-  font-size: $font-size-base;
-  font-weight: $font-weight-semibold;
-}
+  .targetsDetailModal {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+  }
 
-.cardHint {
-  margin: 0 0 12px;
-  font-size: $font-size-xs;
-  color: var(--color-text-tertiary);
-}
+  .historyTargetsCell {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .historyTargetsIconBtn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    min-width: 28px !important;
+    padding: 0 !important;
+  }
+
+  .historyTargetsIconGlyph {
+    font-size: 14px !important;
+    line-height: 1;
+    width: 14px;
+    height: 14px;
+    display: block;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+  }
+
+  .historyTargetsSkeletonIcon {
+    display: inline-block;
+    vertical-align: middle;
+  }
+
+  .historyRowActions {
+    display: inline-flex;
+    gap: 2px;
+    align-items: center;
+  }
+
+  .taskMetricsIconsRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .taskCardMetricsRow {
+    flex-wrap: nowrap;
+    gap: 6px;
+    margin-top: -2px;
+
+    .metricChip {
+      flex-shrink: 0;
+    }
+  }
+
+  .metricChipCompact {
+    padding: 4px 8px;
+    gap: 4px;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    box-shadow: none;
+  }
+
+  .taskCardMetricGlyph {
+    font-size: 14px !important;
+    line-height: 1 !important;
+    width: 14px;
+    height: 14px;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .metricChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: $radius-md;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border-subtle);
+    box-shadow: 0 1px 2px var(--premium-panel-shadow);
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+  }
+
+  .metricChipIcon {
+    flex-shrink: 0;
+    opacity: 0.9;
+  }
+
+  .metricChipText {
+    line-height: 1.2;
+  }
+
+  .metricChipExtra {
+    margin-left: 2px;
+    font-size: $font-size-2xs;
+    font-weight: $font-weight-bold;
+    color: var(--color-chip-green-text, #14b86a);
+  }
+
+  .metricChipCalls {
+    .metricChipIcon,
+    .metricChipText {
+      color: var(--color-chip-blue-text, #2563eb);
+    }
+  }
+
+  .metricChipMeetings {
+    .metricChipIcon,
+    .metricChipText {
+      color: var(--color-chip-purple-text, #7c3aed);
+    }
+  }
+
+  .metricChipDeals {
+    .metricChipIcon,
+    .metricChipText {
+      color: var(--color-text-primary);
+    }
+  }
+
+  .metricChipScore {
+    .metricChipIcon,
+    .metricChipText {
+      color: var(--color-text-primary);
+    }
+  }
+
+  .taskCard {
+    @include premium-panel;
+    border-radius: $radius-lg;
+    padding: $space-3;
+    border: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-elevated);
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+    max-width: 100%;
+    transition: border-color $transition-fast, box-shadow $transition-fast;
+
+    &:hover {
+      border-color: var(--color-border);
+      box-shadow: 0 8px 28px var(--premium-panel-shadow);
+    }
+  }
+
+  .boardSkeleton {
+    margin-bottom: $space-2;
+  }
+
+  .kanbanColumnSkeleton {
+    border-left: 3px solid var(--color-border-subtle);
+  }
+
+  .boardSkeletonColumnHead {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    margin-bottom: $space-3;
+  }
+
+  .boardSkeletonDot {
+    flex-shrink: 0;
+  }
+
+  .boardSkeletonCount {
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .boardSkeletonCard {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+    padding: $space-2 0 0;
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  .boardSkeletonMetrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .boardSkeletonPill {
+    border-radius: $radius-md !important;
+  }
+
+  .boardSkeletonProgress {
+    border-radius: $radius-full !important;
+    max-width: 100%;
+  }
+
+  .boardSkeletonCardActions {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding-top: $space-2;
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  .boardSkeletonIconBtn {
+    flex-shrink: 0;
+    border-radius: $radius-md !important;
+  }
+
+  .boardSkeletonLink {
+    margin-left: auto;
+    align-self: center;
+  }
+
+  .upcomingSkeletonCard {
+    @include premium-panel;
+    border-radius: $radius-lg;
+    padding: $space-3;
+    border: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-elevated);
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  .viewDetailsLink {
+    padding: 0;
+    border: none;
+    background: none;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    color: var(--color-primary-500, #6366f1);
+    cursor: pointer;
+    white-space: nowrap;
+    margin-left: auto;
+    align-self: center;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .taskCardTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: $space-3;
+  }
+
+  .taskCardTitles {
+    min-width: 0;
+  }
+
+  .taskCardTitle {
+    margin: 0 0 $space-2;
+    font-size: $font-size-base;
+    font-weight: $font-weight-semibold;
+    color: var(--color-text-primary);
+    line-height: 1.35;
+  }
+
+  .taskCardSchedule {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 $space-2;
+    padding: 6px 10px;
+    border-radius: $radius-md;
+    background: rgba(99, 102, 241, 0.12);
+    border: 1px solid rgba(99, 102, 241, 0.22);
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: var(--color-primary-400, #818cf8);
+    line-height: 1.35;
+  }
+
+  .taskCardScheduleIcon {
+    flex-shrink: 0;
+    opacity: 0.95;
+  }
+
+  .taskCardMeta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-3;
+    font-size: $font-size-xs;
+    color: var(--color-text-tertiary);
+  }
+
+  .taskCardDate,
+  .taskCardAgent {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .taskCardMetaIcon {
+    font-size: 14px !important;
+    line-height: 1 !important;
+    opacity: 0.85;
+  }
+
+  .taskMetrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: $space-1;
+
+    @media (max-width: 520px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .taskMetric {
+    padding: $space-2 $space-2;
+    border-radius: $radius-md;
+    background: #f8f9fe;
+    border: 1px solid #e7edf8;
+  }
+
+  .taskMetricLabel {
+    display: block;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-tertiary);
+    margin-bottom: 2px;
+  }
+
+  .taskMetricVal {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: var(--color-text-primary);
+  }
+
+  .progressTrack {
+    height: 6px;
+    border-radius: $radius-full;
+    background: var(--color-bg-muted);
+    overflow: hidden;
+  }
+
+  .progressFill {
+    height: 100%;
+    border-radius: $radius-full;
+    background: linear-gradient(90deg, var(--color-primary-600, #4f46e5), var(--color-primary-400, #818cf8));
+    transition: width 0.35s ease;
+  }
+
+  .taskCardActions {
+    display: flex;
+    gap: $space-2;
+    flex-wrap: wrap;
+    align-items: center;
+    border-top: 1px solid var(--color-border-subtle);
+    padding-top: $space-2;
+    justify-content: space-between;
+  }
+
+  .taskDetailsModal {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+  }
+
+  .taskDetailsModalHead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: $space-3;
+    flex-wrap: wrap;
+  }
+
+  .taskDetailsTitle {
+    margin: 0;
+    font-size: $font-size-md;
+    font-weight: $font-weight-semibold;
+    color: var(--color-text-primary);
+    line-height: 1.3;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .taskDetailsMeta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-3;
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+
+    span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+  }
+
+  .taskDetailsRange {
+    margin: 0;
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    line-height: 1.45;
+  }
+
+  .taskDetailsDonePct {
+    margin: 0;
+    font-size: $font-size-2xs;
+    color: var(--color-text-tertiary);
+  }
+
+  .taskCardActionsLeft {
+    display: inline-flex;
+    gap: 2px;
+    align-items: center;
+  }
+
+  .taskCardIconBtn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 26px !important;
+    min-width: 26px !important;
+    height: 26px !important;
+    padding: 0 !important;
+    border-radius: $radius-sm !important;
+  }
+
+  .taskCardActionIcon {
+    font-size: 15px !important;
+    line-height: 1 !important;
+    width: 15px;
+    height: 15px;
+    display: block;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+  }
+
+  .inlineNoteLabel {
+    font-size: 10px;
+    font-weight: $font-weight-semibold;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-tertiary);
+  }
+
+  .emptyState {
+    text-align: center;
+    padding: $space-6 $space-4;
+    border-radius: $radius-lg;
+    border: 1px dashed var(--color-border-subtle);
+    background: var(--color-bg-subtle);
+  }
+
+  .emptyIcon {
+    color: var(--color-text-tertiary);
+    opacity: 0.5;
+    margin-bottom: $space-2;
+  }
+
+  .emptyTitle {
+    margin: 0 0 $space-2;
+    font-size: $font-size-base;
+    font-weight: $font-weight-semibold;
+    color: var(--color-text-primary);
+  }
+
+  .emptyText {
+    margin: 0;
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    max-width: 420px;
+    margin-inline: auto;
+    line-height: 1.5;
+  }
+
+  .emptyHints {
+    margin: $space-4 auto 0;
+    padding: 0 $space-4;
+    max-width: 520px;
+    text-align: left;
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+
+    li {
+      margin-bottom: $space-2;
+    }
+  }
+
+  .tableEmpty {
+    padding: $space-2 0;
+  }
+
+  .tableMono {
+    font-family: ui-monospace, monospace;
+    font-size: $font-size-2xs;
+    color: var(--color-text-secondary);
+  }
+
+  .search {
+    min-width: 0;
+    flex: 0 1 auto;
+    max-width: 420px;
+  }
+
+  .muted {
+    font-size: $font-size-xs;
+    color: var(--color-text-muted);
+    margin-top: $space-2;
+  }
+
+  .modalForm {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+  }
+
+  .modalLead {
+    margin: 0;
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+  }
+
+  .noteHistoryPanel {
+    border-top: 1px solid var(--color-border-subtle);
+    padding-top: $space-3;
+  }
+
+  .noteHistoryList {
+    display: grid;
+    gap: $space-2;
+    max-height: 260px;
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+
+  .noteHistoryItem {
+    border: 1px solid var(--color-border-subtle);
+    border-radius: $radius-md;
+    background: var(--color-bg-subtle);
+    padding: $space-2;
+    display: grid;
+    gap: 6px;
+  }
+
+  .noteHistoryMeta {
+    display: flex;
+    justify-content: space-between;
+    gap: $space-2;
+    flex-wrap: wrap;
+    font-size: $font-size-2xs;
+    color: var(--color-text-tertiary);
+  }
+
+  .noteHistoryText {
+    font-size: $font-size-sm;
+    color: var(--color-text-primary);
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .chatThread {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+    max-height: 430px;
+    overflow-y: auto;
+    padding: $space-2;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: $radius-md;
+    background: var(--color-bg-subtle);
+  }
+
+  .chatMessage {
+    display: flex;
+    gap: $space-2;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .chatMessageOwn {
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+  }
+
+  .chatSender {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    color: var(--color-text-secondary);
+    padding-inline: 2px;
+  }
+
+  .chatTime {
+    font-size: 10px;
+    color: var(--color-text-tertiary);
+    padding-inline: 2px;
+  }
+
+  .chatBubble {
+    max-width: min(92%, 560px);
+    width: fit-content;
+    padding: 10px 12px;
+    border-radius: 14px 14px 14px 6px;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border-subtle);
+    color: var(--color-text-primary);
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+
+    .chatMessageOwn & {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: rgba(59, 130, 246, 0.35);
+      border-radius: 14px 14px 6px 14px;
+    }
+  }
+
+  .chatAvatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    flex: 0 0 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: $font-weight-semibold;
+    background: #ece8ff;
+    color: #5a43d5;
+  }
+
+  .chatContent {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .chatMessageOwn .chatContent {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .chatComposerRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: $space-2;
+    align-items: center;
+    margin-top: $space-2;
+  }
+
+  .commentsModalLayout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(240px, 0.9fr);
+    gap: $space-4;
+
+    @media (max-width: 980px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .commentsMain {
+    min-width: 0;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: $radius-lg;
+    padding: $space-4;
+    background: var(--color-bg-elevated);
+  }
+
+  .commentsMainHead {
+    display: flex;
+    justify-content: space-between;
+    gap: $space-2;
+    align-items: flex-start;
+    margin-bottom: $space-2;
+
+    @media (max-width: 720px) {
+      flex-direction: column;
+    }
+  }
+
+  .commentsSortMeta {
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+  }
+
+  .commentsSide {
+    display: grid;
+    align-content: start;
+    gap: $space-3;
+    min-width: 0;
+  }
+
+  .commentTaskCard,
+  .commentParticipantsCard {
+    border: 1px solid var(--color-border-subtle);
+    border-radius: $radius-lg;
+    padding: $space-3;
+    background: var(--color-bg-subtle);
+  }
+
+  .commentSideHeading {
+    margin: 0 0 $space-2;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: var(--color-text-primary);
+  }
+
+  .commentTaskTitle {
+    margin: 0;
+    font-size: $font-size-sm;
+    color: var(--color-text-primary);
+  }
+
+  .commentTaskDate {
+    margin: $space-2 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+  }
+
+  .commentMetricGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: $space-2;
+    margin-top: $space-2;
+  }
+
+  .commentMetricTile {
+    border: 1px solid var(--color-border-subtle);
+    border-radius: $radius-md;
+    background: var(--color-bg-elevated);
+    padding: $space-2;
+    display: grid;
+    gap: 2px;
+  }
+
+  .commentMetricLabel {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-tertiary);
+  }
+
+  .commentMetricValue {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: var(--color-text-primary);
+  }
+
+  .commentNotesBlock {
+    margin-top: $space-3;
+    padding-top: $space-2;
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  .commentNotesText {
+    margin: 0;
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .commentParticipantList {
+    display: grid;
+    gap: $space-2;
+  }
+
+  .commentParticipantRow {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: 2px 0;
+  }
+
+  .commentParticipantName {
+    font-size: $font-size-sm;
+    color: var(--color-text-primary);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .commentParticipantRole {
+    font-size: $font-size-2xs;
+    color: var(--color-text-primary);
+    border-radius: $radius-full;
+    padding: 3px 10px;
+    border: 1px solid transparent;
+    font-weight: $font-weight-semibold;
+  }
+
+  .commentParticipantRoleAdmin {
+    background: rgba(59, 130, 246, 0.18);
+    border-color: rgba(59, 130, 246, 0.32);
+  }
+
+  .commentParticipantRoleManager {
+    background: rgba(168, 85, 247, 0.2);
+    border-color: rgba(168, 85, 247, 0.34);
+  }
+
+  .commentParticipantRoleDefault {
+    background: var(--color-bg-muted);
+    border-color: var(--color-border-subtle);
+  }
+
+  .formGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-3 $space-4;
+  }
+
+  .full {
+    grid-column: 1 / -1;
+  }
+
+  .formSectionTitle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0 0 4px;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: var(--color-text-primary);
+  }
+
+  .formSectionHint {
+    margin: 0;
+    font-size: $font-size-xs;
+    color: var(--color-text-tertiary);
+    line-height: 1.45;
+  }
+
+  /* Legacy: formsGrid / card used only if referenced elsewhere */
+  .formsGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 16px;
+
+    @media (max-width: 980px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .card {
+    @include premium-panel;
+    border-radius: $radius-lg;
+    padding: $space-4;
+  }
+
+  .cardTitle {
+    margin: 0 0 4px;
+    font-size: $font-size-base;
+    font-weight: $font-weight-semibold;
+  }
+
+  .cardHint {
+    margin: 0 0 12px;
+    font-size: $font-size-xs;
+    color: var(--color-text-tertiary);
+  }

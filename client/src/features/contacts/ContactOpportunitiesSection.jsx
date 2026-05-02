@@ -5,6 +5,7 @@ import { selectUser } from '../../features/auth/authSelectors';
 import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
 import { Input } from '../../components/ui/Input';
+import { DateTimePickerField } from '../../components/ui/DateTimePickerField';
 import { Alert } from '../../components/ui/Alert';
 import { Modal, ModalFooter, ConfirmModal } from '../../components/ui/Modal';
 import { SlidePanel } from '../../components/ui/SlidePanel';
@@ -464,11 +465,11 @@ export function ContactOpportunitiesSection({ contactId, contactType, accountNam
                 step="0.01"
                 min={0}
               />
-              <Input
+              <DateTimePickerField
                 label="Closing date"
-                type="date"
+                mode="date"
                 value={form.closingDate}
-                onChange={(e) => setForm((f) => ({ ...f, closingDate: e.target.value }))}
+                onChange={(v) => setForm((f) => ({ ...f, closingDate: v }))}
               />
               <Input
                 label="Probability % (optional override)"
@@ -578,11 +579,11 @@ export function ContactOpportunitiesSection({ contactId, contactType, accountNam
                 step="0.01"
                 min={0}
               />
-              <Input
+              <DateTimePickerField
                 label="Closing date"
-                type="date"
+                mode="date"
                 value={editForm.closingDate}
-                onChange={(e) => setEditForm((f) => ({ ...f, closingDate: e.target.value }))}
+                onChange={(v) => setEditForm((f) => ({ ...f, closingDate: v }))}
               />
               <Input
                 label="Probability % (optional)"

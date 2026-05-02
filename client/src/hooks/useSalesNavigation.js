@@ -88,10 +88,10 @@ const TENANT_ADMIN_NAV_ITEMS = [
     label: 'Schedule hub',
     path: '/schedule/meetings',
     permission: PERMISSIONS.SCHEDULE_VIEW,
-    activePaths: ['/schedule/meetings', '/schedule/callbacks'],
+    activePaths: ['/schedule/meetings', '/schedule/follow-ups', '/schedule/callbacks'],
     children: [
       { key: 'schedule-meetings', label: 'Meetings', path: '/schedule/meetings', permission: PERMISSIONS.SCHEDULE_VIEW },
-      { key: 'schedule-callbacks', label: 'Callbacks', path: '/schedule/callbacks', permission: PERMISSIONS.SCHEDULE_VIEW },
+      { key: 'schedule-follow-ups', label: 'Scheduled follow-ups', path: '/schedule/follow-ups', permission: PERMISSIONS.SCHEDULE_VIEW },
     ],
   },
   {
@@ -274,10 +274,10 @@ const MANAGER_NAV_ITEMS = [
     label: 'Schedule hub',
     path: '/schedule/meetings',
     permission: PERMISSIONS.SCHEDULE_VIEW,
-    activePaths: ['/schedule/meetings', '/schedule/callbacks'],
+    activePaths: ['/schedule/meetings', '/schedule/follow-ups', '/schedule/callbacks'],
     children: [
       { key: 'schedule-meetings', label: 'Meetings', path: '/schedule/meetings', permission: PERMISSIONS.SCHEDULE_VIEW },
-      { key: 'schedule-callbacks', label: 'Callbacks', path: '/schedule/callbacks', permission: PERMISSIONS.SCHEDULE_VIEW },
+      { key: 'schedule-follow-ups', label: 'Scheduled follow-ups', path: '/schedule/follow-ups', permission: PERMISSIONS.SCHEDULE_VIEW },
     ],
   },
   {
@@ -425,10 +425,10 @@ const AGENT_NAV_ITEMS = [
     label: 'Schedule hub',
     path: '/schedule/meetings',
     permission: PERMISSIONS.SCHEDULE_VIEW,
-    activePaths: ['/schedule/meetings', '/schedule/callbacks'],
+    activePaths: ['/schedule/meetings', '/schedule/follow-ups', '/schedule/callbacks'],
     children: [
       { key: 'schedule-meetings', label: 'Meetings', path: '/schedule/meetings', permission: PERMISSIONS.SCHEDULE_VIEW },
-      { key: 'schedule-callbacks', label: 'Callbacks', path: '/schedule/callbacks', permission: PERMISSIONS.SCHEDULE_VIEW },
+      { key: 'schedule-follow-ups', label: 'Scheduled follow-ups', path: '/schedule/follow-ups', permission: PERMISSIONS.SCHEDULE_VIEW },
     ],
   },
   {

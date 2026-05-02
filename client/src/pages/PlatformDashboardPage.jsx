@@ -97,7 +97,10 @@ export function PlatformDashboardPage() {
   useEffect(() => {
     if (!rangeMenuOpen) return;
     function handleDocMouseDown(e) {
-      if (rangeWrapRef.current && !rangeWrapRef.current.contains(e.target)) {
+      const t = e.target;
+      if (typeof t?.closest === 'function' && t.closest('[data-cnr-custom-range-popover]')) return;
+      if (typeof t?.closest === 'function' && t.closest('[data-cnr-datetime-picker-popover]')) return;
+      if (rangeWrapRef.current && !rangeWrapRef.current.contains(t)) {
         setRangeMenuOpen(false);
       }
     }

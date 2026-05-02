@@ -1,0 +1,32 @@
+@use '../styles/variables' as *;
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+  min-height: 0;
+}
+
+.heading {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+
+  svg {
+    flex-shrink: 0;
+    opacity: 0.85;
+  }
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2;
+  padding-top: $space-3;
+  margin-top: auto;
+  border-top: 1px solid var(--color-border-subtle);
+}

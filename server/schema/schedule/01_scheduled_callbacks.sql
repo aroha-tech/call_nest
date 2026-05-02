@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS scheduled_callbacks (
   assigned_user_id BIGINT UNSIGNED NOT NULL,
   scheduled_at DATETIME NOT NULL,
   status ENUM('pending', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
+  follow_up_type ENUM('callback', 'email', 'meeting', 'other') NOT NULL DEFAULT 'callback',
   notes TEXT NULL,
   source_call_attempt_id BIGINT UNSIGNED NULL,
   completed_call_attempt_id BIGINT UNSIGNED NULL,

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from './Button';
 import styles from './Modal.module.scss';
 
@@ -40,17 +41,17 @@ export function Modal({
 
   if (!isOpen) return null;
 
-  return (
-    <div 
+  return createPortal(
+    <div
       ref={overlayRef}
-      className={styles.overlay} 
+      className={styles.overlay}
       onClick={handleOverlayClick}
     >
       <div className={`${styles.modal} ${styles[size]}`}>
         <div className={styles.header}>
           <h2 className={styles.title}>{title}</h2>
-          <button 
-            type="button" 
+          <button
+            type="button"
             className={styles.closeBtn}
             onClick={onClose}
             aria-label="Close"
@@ -61,7 +62,8 @@ export function Modal({
         <div className={styles.body}>{children}</div>
         {footer && <div className={styles.footer}>{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

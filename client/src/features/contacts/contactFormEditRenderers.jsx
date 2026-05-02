@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { DateTimePickerField } from '../../components/ui/DateTimePickerField';
 import { Select, SelectOncePick } from '../../components/ui/Select';
 import { Checkbox } from '../../components/ui/Checkbox';
 import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown';
@@ -223,11 +224,11 @@ export function createContactFormEditSectionRenderers(ctx) {
             placeholder="example.com"
             error={formErrors.website}
           />
-          <Input
+          <DateTimePickerField
             label="Date of birth"
+            mode="date"
             value={formData.date_of_birth}
-            onChange={(e) => setFormData((p) => ({ ...p, date_of_birth: e.target.value }))}
-            type="date"
+            onChange={(v) => setFormData((p) => ({ ...p, date_of_birth: v }))}
           />
           <Input
             label="GST / PAN / Tax ID"
@@ -804,13 +805,27 @@ export function createContactFormEditSectionRenderers(ctx) {
               );
             }
 
+            if (f.type === 'date') {
+              return (
+                <DateTimePickerField
+                  key={f.field_key}
+                  label={lbl}
+                  mode="date"
+                  value={value}
+                  onChange={(v) => setIndustryMap(f.field_key, v)}
+                  placeholder={req ? 'Required' : 'Optional'}
+                  error={indFieldErr}
+                />
+              );
+            }
+
             return (
               <Input
                 key={f.field_key}
                 label={lbl}
                 value={value}
                 onChange={(e) => setIndustryMap(f.field_key, e.target.value)}
-                type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
+                type={f.type === 'number' ? 'number' : 'text'}
                 placeholder={req ? 'Required' : 'Optional'}
                 error={indFieldErr}
               />
@@ -957,6 +972,25 @@ export function createContactFormEditSectionRenderers(ctx) {
               );
             }
 
+            if (f.type === 'date') {
+              return (
+                <DateTimePickerField
+                  key={f.field_id}
+                  label={lbl}
+                  mode="date"
+                  value={value}
+                  onChange={(v) => {
+                    clearDynamicFieldError('custom', f.field_id);
+                    const nextMap = { ...(formData.customValuesMap || {}) };
+                    nextMap[f.field_id] = v;
+                    setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
+                  }}
+                  placeholder={req ? 'Required' : 'Optional'}
+                  error={cfFieldErr}
+                />
+              );
+            }
+
             return (
               <Input
                 key={f.field_id}
@@ -968,7 +1002,7 @@ export function createContactFormEditSectionRenderers(ctx) {
                   nextMap[f.field_id] = e.target.value;
                   setFormData((prev) => ({ ...prev, customValuesMap: nextMap }));
                 }}
-                type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
+                type={f.type === 'number' ? 'number' : 'text'}
                 placeholder={req ? 'Required' : 'Optional'}
                 error={cfFieldErr}
               />

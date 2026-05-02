@@ -1,95 +1,273 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
+  padding-bottom: 32px;
 }
 
-.toolbar {
+.hero {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: flex-end;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 20px;
+  padding: 8px 0 4px;
 }
 
-.toolbarActions {
+@media (min-width: 900px) {
+  .hero {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+  }
+}
+
+.heroLeft {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.list {
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.item {
-  border-bottom: 1px solid var(--color-border-subtle);
-  padding: 12px;
-  background: var(--color-bg-elevated);
-}
-
-.itemUnread {
-  background: color-mix(in srgb, var(--color-primary-600) 10%, transparent);
-}
-
-.itemTop {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.title {
-  font-weight: 600;
-}
-
-.meta {
-  font-size: 12px;
-  color: var(--color-text-tertiary);
-}
-
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: flex-end;
-}
-
-.itemMain {
+  gap: 20px;
+  align-items: flex-start;
   min-width: 0;
 }
 
-.itemTime {
+.heroIcon {
   flex-shrink: 0;
-  text-align: right;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--color-primary-500, #6366f1) 85%, #fff) 0%,
+    var(--color-primary-500, #6366f1) 100%
+  );
+  color: #fff;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-primary-500, #6366f1) 35%, transparent);
 }
 
-.body {
-  margin-top: 8px;
-  font-size: 14px;
+.heroTitle {
+  margin: 0;
+  font-size: clamp(1.5rem, 2.5vw, 1.75rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--color-text-primary);
+}
+
+.heroDesc {
+  margin: 8px 0 0;
+  font-size: 15px;
   color: var(--color-text-secondary);
-  line-height: 1.45;
+  line-height: 1.5;
+  max-width: 520px;
 }
 
-.itemActions {
+.heroMeta {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  line-height: 1.45;
+  max-width: 640px;
+}
+
+.heroActions {
   display: flex;
   flex-wrap: wrap;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.heroMarkRead {
+  border-color: color-mix(in srgb, var(--color-primary-500, #6366f1) 45%, var(--color-border-subtle)) !important;
+}
+
+.heroClear {
+  border: 1px solid var(--color-border-subtle) !important;
+}
+
+.heroBtnIcon {
+  flex-shrink: 0;
+  color: var(--color-accent-brand, var(--color-primary-500));
+}
+
+.heroBtnIconMuted {
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .layout {
+    grid-template-columns: minmax(260px, 300px) 1fr;
+    gap: 28px;
+  }
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.filterCard {
+  padding: 18px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  background: var(--color-bg-elevated);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.filterHeading {
+  display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.openLink {
+  gap: 8px;
+  margin: 0 0 14px;
   font-size: 14px;
-  font-weight: 500;
-  color: var(--color-accent-brand);
-  text-decoration: none;
+  font-weight: 700;
+  color: var(--color-text-primary);
 }
 
-.openLink:hover {
-  text-decoration: none;
+.filterHeadingIcon {
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+}
+
+.filterFields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.summaryCard {
+  padding: 18px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  background: var(--color-bg-elevated);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.summaryTitle {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.summaryList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summaryRow,
+.summaryRowStatic {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--color-text-primary);
+}
+
+.summaryRow {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.summaryRow:hover {
+  background: var(--color-bg-hover);
+}
+
+.summaryRowActive {
+  background: color-mix(in srgb, var(--color-primary-500, #6366f1) 10%, var(--color-bg-elevated));
+  outline: 1px solid color-mix(in srgb, var(--color-primary-500, #6366f1) 22%, var(--color-border-subtle));
+}
+
+.summaryRowStatic {
+  cursor: default;
+  opacity: 0.95;
+}
+
+.summaryCount {
+  font-weight: 700;
+  font-size: 13px;
+  min-width: 1.5rem;
+  text-align: center;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+}
+
+.summaryBadgeUnread {
+  background: color-mix(in srgb, #fecaca 55%, var(--color-bg-elevated));
+  color: #b91c1c;
+}
+
+.summaryBadgeToday {
+  background: color-mix(in srgb, #bfdbfe 50%, var(--color-bg-elevated));
+  color: #1d4ed8;
+}
+
+.summaryBadgeWeek {
+  background: color-mix(in srgb, #bbf7d0 55%, var(--color-bg-elevated));
+  color: #15803d;
+}
+
+.summaryHint {
+  margin: 12px 0 0;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  line-height: 1.4;
+}
+
+.main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.listHeaderLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.emptyState {
+  padding: 48px 24px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-text-tertiary);
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: 14px;
+  background: var(--color-bg-subtle);
 }
 
 .infiniteSentinel {
@@ -99,10 +277,8 @@
 }
 
 .infiniteLoading {
-  padding: 12px;
+  padding: 14px;
   text-align: center;
   font-size: 13px;
   color: var(--color-text-tertiary);
-  border-top: 1px solid var(--color-border);
 }
-

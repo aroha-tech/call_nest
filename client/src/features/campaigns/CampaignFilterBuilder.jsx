@@ -1,6 +1,7 @@
 import React from 'react';
 import { Select, SelectOncePick } from '../../components/ui/Select';
 import { Input } from '../../components/ui/Input';
+import { DateTimePickerField } from '../../components/ui/DateTimePickerField';
 import { Button } from '../../components/ui/Button';
 import {
   CAMPAIGN_FILTER_PROPERTIES,
@@ -129,11 +130,12 @@ function RuleValue({
 
   if (meta.valueType === 'datetime') {
     return (
-      <Input
-        type="datetime-local"
+      <DateTimePickerField
+        mode="datetime"
         value={rule.value || ''}
-        onChange={(e) => onPatch({ value: e.target.value })}
+        onChange={(v) => onPatch({ value: v })}
         className={styles.valueInput}
+        aria-label="Filter value"
       />
     );
   }

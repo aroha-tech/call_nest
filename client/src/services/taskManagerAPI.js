@@ -16,6 +16,7 @@ export const taskManagerAPI = {
   getSummary: (params = {}) => axiosInstance.get('/api/tenant/task-manager/reports/summary', { params }),
   getCalendar: (params = {}) => axiosInstance.get('/api/tenant/task-manager/reports/calendar', { params }),
   getTrend: (params = {}) => axiosInstance.get('/api/tenant/task-manager/reports/trend', { params }),
+  getDialsByHour: (params = {}) => axiosInstance.get('/api/tenant/task-manager/reports/dials-by-hour', { params }),
   getCoachingInsights: (params = {}) => axiosInstance.get('/api/tenant/task-manager/reports/coaching-insights', { params }),
   exportCsv: (params = {}) =>
     axiosInstance.get('/api/tenant/task-manager/reports/export.csv', { params, responseType: 'blob' }),

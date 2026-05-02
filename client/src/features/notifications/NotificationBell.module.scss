@@ -40,61 +40,115 @@
 .panel {
   position: absolute;
   right: 0;
-  top: calc(100% + 8px);
-  width: 380px;
+  top: calc(100% + 10px);
+  width: min(520px, calc(100vw - 24px));
   display: flex;
   flex-direction: column;
-  max-height: min(460px, calc(100vh - 96px));
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
+  max-height: min(520px, calc(100vh - 96px));
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 16px;
   background: var(--color-bg-elevated);
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.06),
+    0 20px 40px -12px rgba(0, 0, 0, 0.14);
   z-index: 200;
+  overflow: hidden;
 }
 
 .panelHeader {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-border);
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 18px 16px;
+  border-bottom: 1px solid var(--color-border-subtle);
   flex-shrink: 0;
+}
+
+@media (min-width: 400px) {
+  .panelHeader {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+}
+
+.panelHeaderMain {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.panelBellCircle {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--color-primary-500, #6366f1) 16%, var(--color-bg-subtle, #f8fafc));
+  color: var(--color-primary-500, #6366f1);
+}
+
+.panelBellGlyph {
+  display: block;
+}
+
+.panelTitles {
+  min-width: 0;
+}
+
+.panelTitle {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.panelSubtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
 }
 
 .panelHeaderActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 10px;
+  gap: 8px 12px;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
-.panelHeaderBtn {
+.panelActionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
   border: 0;
   background: transparent;
-  color: var(--color-primary-500);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
+  color: var(--color-primary-500, #6366f1);
   cursor: pointer;
-  padding: 4px 6px;
   border-radius: 6px;
 }
 
-.panelHeaderBtn:hover {
-  background: var(--color-bg-hover);
+.panelActionBtn:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-.panelHeaderBtn:disabled {
+.panelActionBtn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.panelHeaderBtn:disabled:hover {
-  background: transparent;
-}
-
-.panelTitle {
-  font-weight: 600;
+.panelActionIcon {
+  flex-shrink: 0;
+  color: var(--color-primary-500, #6366f1);
 }
 
 .panelScroll {
@@ -109,81 +163,67 @@
   flex-direction: column;
 }
 
-.itemRow {
-  display: flex;
-  align-items: stretch;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.item {
-  flex: 1;
-  min-width: 0;
-  padding: 10px 8px 10px 12px;
-  text-decoration: none;
-  color: inherit;
-  display: block;
-}
-
-.itemDismiss {
-  flex-shrink: 0;
-  width: 36px;
-  border: 0;
-  background: transparent;
-  color: var(--color-text-tertiary);
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 8px 0;
-  border-radius: 6px;
-}
-
-.itemDismiss:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-secondary);
-}
-
 .panelSentinel {
   height: 1px;
 }
 
 .panelLoadingMore {
-  padding: 8px 12px;
+  padding: 10px 16px;
   font-size: 12px;
   color: var(--color-text-tertiary);
   text-align: center;
 }
 
-.itemUnread {
-  background: color-mix(in srgb, var(--color-primary-500) 10%, transparent);
+.panelFooter {
+  padding: 12px 18px 14px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
-.meta {
-  font-size: 12px;
-  color: var(--color-text-tertiary);
-}
-
-.title {
-  margin-top: 3px;
+/*
+ * global.scss sets `:root[data-color-scheme='light'] a { color: text-primary }` (0,2,1).
+ * Plain `a.viewAllLink` is only (0,1,1) and loses in light mode — repeat :root + anchor + class.
+ */
+.viewAllLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 14px;
   font-weight: 600;
-}
-
-.body {
-  margin-top: 3px;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
-.panelFooter {
-  padding: 8px 12px;
-  text-align: right;
-  flex-shrink: 0;
-  border-top: 1px solid var(--color-border);
-}
-
-.linkBtn {
-  color: var(--color-primary-500);
   text-decoration: none;
-  font-size: 13px;
 }
 
+a.viewAllLink,
+a.viewAllLink:link,
+a.viewAllLink:visited {
+  color: var(--color-primary-600, #4f46e5);
+  opacity: 1;
+}
+
+a.viewAllLink:hover,
+a.viewAllLink:focus-visible {
+  color: var(--color-primary-500, #6366f1);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  opacity: 1;
+}
+
+/* Light: global `a` uses :root[data-color-scheme='light'] a — need class + data-attr to win */
+:global(:root[data-color-scheme='light']) a.viewAllLink[data-notification-view-all],
+:global(:root[data-color-scheme='light']) a.viewAllLink[data-notification-view-all]:visited {
+  color: var(--color-primary-600, #4f46e5);
+  opacity: 1;
+}
+
+:global(:root[data-color-scheme='light']) a.viewAllLink[data-notification-view-all]:hover,
+:global(:root[data-color-scheme='light']) a.viewAllLink[data-notification-view-all]:focus-visible {
+  color: var(--color-primary-500, #6366f1);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  opacity: 1;
+}
+
+.viewAllChevron {
+  flex-shrink: 0;
+  color: currentColor;
+}

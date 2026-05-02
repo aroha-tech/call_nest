@@ -171,6 +171,15 @@ export async function coachingInsights(req, res, next) {
   }
 }
 
+export async function dialsByHour(req, res, next) {
+  try {
+    const data = await taskManagerService.getDialsByHour(getTenantId(req), req.user, req.query || {});
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function exportSummaryCsv(req, res, next) {
   try {
     const csv = await taskManagerService.exportRolewiseCsv(getTenantId(req), req.user, req.query || {});

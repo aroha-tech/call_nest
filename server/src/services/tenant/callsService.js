@@ -1173,7 +1173,7 @@ export async function setAttemptDisposition(
         recipientUserIds: escalationRecipients,
         entityType: 'call_attempt',
         entityId: id,
-        ctaPath: '/schedule/callbacks',
+        ctaPath: '/schedule/follow-ups',
         eventHash: `calling:followup:${tenantId}:${id}`,
       });
     }

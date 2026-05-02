@@ -103,6 +103,7 @@ export function ScheduleHubFilterModal({
   timeFlagOptions,
   meetingStatusOptions,
   callbackStatusOptions,
+  callbackFollowUpTypeOptions = [{ value: '', label: 'All follow-up types' }],
   initialTab = 'meetings',
   savedFilterId = null,
   initialSavedFilterName = '',
@@ -138,6 +139,7 @@ export function ScheduleHubFilterModal({
     timeFlag: fields.timeFlag ?? '',
     meetingStatus: fields.meetingStatus ?? '',
     callbackStatus: fields.callbackStatus ?? '',
+    callbackFollowUpType: fields.callbackFollowUpType ?? '',
     searchQuery: fields.searchQuery ?? '',
   });
 
@@ -218,7 +220,7 @@ export function ScheduleHubFilterModal({
               onChange={(e) => setTab(e.target.value)}
               options={[
                 { value: 'meetings', label: 'Meetings' },
-                { value: 'callbacks', label: 'Callbacks' },
+                { value: 'callbacks', label: 'Follow-ups' },
               ]}
             />
             <Select
@@ -241,12 +243,20 @@ export function ScheduleHubFilterModal({
                 options={meetingStatusOptions}
               />
             ) : (
-              <Select
-                label={<FieldLabel kind="status" text="Callback status" />}
-                value={fields.callbackStatus || ''}
-                onChange={(e) => setDraft((p) => ({ ...p, callbackStatus: e.target.value }))}
-                options={callbackStatusOptions}
-              />
+              <>
+                <Select
+                  label={<FieldLabel kind="status" text="Follow-up status" />}
+                  value={fields.callbackStatus || ''}
+                  onChange={(e) => setDraft((p) => ({ ...p, callbackStatus: e.target.value }))}
+                  options={callbackStatusOptions}
+                />
+                <Select
+                  label={<FieldLabel kind="status" text="Follow-up type" />}
+                  value={fields.callbackFollowUpType || ''}
+                  onChange={(e) => setDraft((p) => ({ ...p, callbackFollowUpType: e.target.value }))}
+                  options={callbackFollowUpTypeOptions}
+                />
+              </>
             )}
             <Input
               label={<FieldLabel kind="search" text="Search" />}

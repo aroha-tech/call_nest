@@ -4,11 +4,15 @@ import { selectUser } from '../features/auth/authSelectors';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { DateTimePickerField } from '../components/ui/DateTimePickerField';
 import { Select } from '../components/ui/Select';
 import { Alert } from '../components/ui/Alert';
 import { Tabs, TabList, Tab, TabPanel } from '../components/ui/Tabs';
 import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
+import { Modal, ModalFooter } from '../components/ui/Modal';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '../components/ui/Table';
+import { PerformanceReportsCharts } from './PerformanceReportsCharts';
+import { PerformanceReportsGuide } from './PerformanceReportsGuide';
 import { taskManagerAPI } from '../services/taskManagerAPI';
 import { tenantUsersAPI } from '../services/tenantUsersAPI';
 import { usePermissions } from '../hooks/usePermission';
@@ -29,6 +33,26 @@ const ROLE_LABEL = {
   agent: 'Agent',
 };
 
+function formatInt(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return '0';
+  return x.toLocaleString();
+}
+
+function formatMoney(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return '0';
+  return x.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function scoreTier(score) {
+  const s = Number(score);
+  if (!Number.isFinite(s)) return 'low';
+  if (s >= 75) return 'high';
+  if (s >= 50) return 'mid';
+  return 'low';
+}
+
 export function PerformanceReportsPage() {
   const now = new Date();
   const user = useAppSelector(selectUser);
@@ -47,10 +71,16 @@ export function PerformanceReportsPage() {
   const [calendar, setCalendar] = useState([]);
   const [trend, setTrend] = useState([]);
   const [coaching, setCoaching] = useState([]);
+  const [dialsByHour, setDialsByHour] = useState([]);
   const [scoring, setScoring] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [draftFrom, setDraftFrom] = useState(from);
+  const [draftTo, setDraftTo] = useState(to);
+  const [draftMonth, setDraftMonth] = useState(month);
+  const [draftUserId, setDraftUserId] = useState(userId);
   const { canAny } = usePermissions();
   const { formatDate } = useDateTimeDisplay();
   const canExport = canAny([PERMISSIONS.REPORTS_PERFORMANCE_EXPORT, PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.REPORTS_VIEW]);
@@ -93,15 +123,46 @@ export function PerformanceReportsPage() {
     if (viewMode !== 'individual' && userId) setUserId('');
   }, [viewMode, userId]);
 
+  useEffect(() => {
+    if (viewMode !== 'team' && activeTab === 'managers') setActiveTab('overview');
+  }, [viewMode, activeTab]);
+
+  function openFilterModal() {
+    setDraftFrom(from);
+    setDraftTo(to);
+    setDraftMonth(month);
+    setDraftUserId(userId);
+    setFilterOpen(true);
+  }
+
+  function applyFilters() {
+    setFrom(draftFrom);
+    setTo(draftTo);
+    setMonth(draftMonth);
+    setUserId(draftUserId);
+    setFilterOpen(false);
+  }
+
+  const filterSummaryLine = useMemo(() => {
+    const parts = [`${from} → ${to}`, `Calendar month ${month}`];
+    if (canViewTeam && viewMode === 'individual' && userId) {
+      parts.push(selectedUserLabel);
+    } else if (canViewTeam && viewMode === 'team') {
+      parts.push('All agents in scope');
+    }
+    return parts.join(' · ');
+  }, [from, to, month, canViewTeam, viewMode, userId, selectedUserLabel]);
+
   async function load() {
     setError('');
     setLoading(true);
     try {
       const params = { from, to, userId: effectiveUserId };
-      const [sRes, cRes, tRes, iRes, uRes, cfgRes] = await Promise.all([
+      const [sRes, cRes, tRes, dhRes, iRes, uRes, cfgRes] = await Promise.all([
         taskManagerAPI.getSummary(params),
         taskManagerAPI.getCalendar({ month, userId: effectiveUserId }),
         taskManagerAPI.getTrend({ ...params, groupBy: 'week' }),
+        taskManagerAPI.getDialsByHour(params),
         taskManagerAPI.getCoachingInsights(params),
         tenantUsersAPI.getAll({ role: 'agent', limit: 300 }),
         taskManagerAPI.getScoringConfig(),
@@ -109,6 +170,7 @@ export function PerformanceReportsPage() {
       setSummary(sRes?.data?.data || []);
       setCalendar(cRes?.data?.data || []);
       setTrend(tRes?.data?.data || []);
+      setDialsByHour(dhRes?.data?.data || []);
       setCoaching(iRes?.data?.data || []);
       setUsers((uRes?.data?.data || []).filter((u) => String(u.role || '').toLowerCase() === 'agent'));
       setScoring(cfgRes?.data?.data || null);
@@ -165,6 +227,49 @@ export function PerformanceReportsPage() {
     return { totalAgents, avgScore, avgConsistency, totalMissed };
   }, [summary]);
 
+  const activityTotals = useMemo(() => {
+    return summary.reduce(
+      (acc, s) => ({
+        crmCalls: acc.crmCalls + Number(s.crm_total_calls || 0),
+        scheduledFollowUps: acc.scheduledFollowUps + Number(s.crm_scheduled_follow_ups || 0),
+        fuCall: acc.fuCall + Number(s.crm_follow_up_phone || 0),
+        fuEmail: acc.fuEmail + Number(s.crm_follow_up_email || 0),
+        fuMtg: acc.fuMtg + Number(s.crm_follow_up_meeting || 0),
+        fuOther: acc.fuOther + Number(s.crm_follow_up_other || 0),
+        calMeetings: acc.calMeetings + Number(s.crm_calendar_meetings || 0),
+        dealAmt: acc.dealAmt + Number(s.crm_opportunities_amount || 0),
+        opps: acc.opps + Number(s.crm_opportunities_count || 0),
+        taskCalls: acc.taskCalls + Number(s.achieved_calls || 0),
+        taskMeetings: acc.taskMeetings + Number(s.achieved_meetings || 0),
+        taskDeals: acc.taskDeals + Number(s.achieved_deals || 0),
+      }),
+      {
+        crmCalls: 0,
+        scheduledFollowUps: 0,
+        fuCall: 0,
+        fuEmail: 0,
+        fuMtg: 0,
+        fuOther: 0,
+        calMeetings: 0,
+        dealAmt: 0,
+        opps: 0,
+        taskCalls: 0,
+        taskMeetings: 0,
+        taskDeals: 0,
+      }
+    );
+  }, [summary]);
+
+  const rowsByManager = useMemo(() => {
+    const map = new Map();
+    for (const s of summary) {
+      const label = (s.manager_name && String(s.manager_name).trim()) || 'No manager assigned';
+      if (!map.has(label)) map.set(label, []);
+      map.get(label).push(s);
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [summary]);
+
   const reportCards = useMemo(
     () => [
       { label: isAgent ? 'My Score' : 'Avg Team Score', value: rollup.avgScore.toFixed(1), hint: 'Weighted quality score' },
@@ -208,12 +313,30 @@ export function PerformanceReportsPage() {
     );
   }
 
+  const chartProps = useMemo(
+    () => ({
+      summary,
+      trend,
+      calendarSlices: calendarHighlights,
+      dialsByHour,
+      formatInt,
+      formatMoney,
+    }),
+    [summary, trend, calendarHighlights, dialsByHour]
+  );
+
   return (
     <div className={styles.page}>
       <PageHeader
         title="Performance Reports"
         description={isAgent ? 'Personal KPI tracking, trend, consistency, and coaching guidance.' : 'Team and individual KPI tracking with trend, consistency, and coaching guidance.'}
-        actions={canExport ? <Button onClick={exportCsv} disabled={loading}>Export CSV</Button> : undefined}
+        actions={
+          canExport ? (
+            <Button type="button" onClick={exportCsv} disabled={loading}>
+              Export CSV
+            </Button>
+          ) : undefined
+        }
       />
       {error ? <Alert variant="error">{error}</Alert> : null}
       {ok ? <Alert variant="success">{ok}</Alert> : null}
@@ -252,24 +375,64 @@ export function PerformanceReportsPage() {
         ) : null}
       </div>
 
-      <div className={styles.filtersCard}>
-        <div className={styles.filtersGrid}>
-          <Input type="date" label="From" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <Input type="date" label="To" value={to} onChange={(e) => setTo(e.target.value)} />
-          <Input type="month" label="Calendar Month" value={month} onChange={(e) => setMonth(e.target.value)} />
-          {canViewTeam ? (
-            <Select
-              label={viewMode === 'individual' ? 'Select Agent' : 'Agent Filter'}
-              value={viewMode === 'individual' ? userId : ''}
-              onChange={(e) => setUserId(e.target.value)}
-              options={userOptions}
-              disabled={viewMode !== 'individual'}
-            />
-          ) : (
-            <Input type="text" label="Role" value={ROLE_LABEL[currentRole] || 'Agent'} disabled />
-          )}
+      <div className={styles.filterToolbar}>
+        <div className={styles.filterToolbarMeta}>
+          <p className={styles.filterToolbarLabel}>Active filters</p>
+          <p className={styles.filterToolbarRange}>{filterSummaryLine}</p>
+        </div>
+        <div className={styles.filterToolbarActions}>
+          <Button type="button" variant="primary" size="sm" onClick={openFilterModal} disabled={loading}>
+            Filters
+          </Button>
         </div>
       </div>
+
+      <Modal
+        isOpen={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        title="Report filters"
+        size="lg"
+        closeOnOverlay
+        closeOnEscape
+        footer={
+          <ModalFooter>
+            <Button type="button" variant="secondary" onClick={() => setFilterOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={applyFilters}>
+              Apply
+            </Button>
+          </ModalFooter>
+        }
+      >
+        <div className={styles.filtersModalGrid}>
+          <DateTimePickerField mode="date" label="From" value={draftFrom} onChange={setDraftFrom} />
+          <DateTimePickerField mode="date" label="To" value={draftTo} onChange={setDraftTo} />
+          <div className={styles.filtersModalFull}>
+            <Input type="month" label="Calendar Month" value={draftMonth} onChange={(e) => setDraftMonth(e.target.value)} />
+          </div>
+          {canViewTeam ? (
+            <div className={styles.filtersModalFull}>
+              <Select
+                label={viewMode === 'individual' ? 'Agent' : 'Agent (switch to Individual to choose)'}
+                value={viewMode === 'individual' ? draftUserId : ''}
+                onChange={(e) => setDraftUserId(e.target.value)}
+                options={userOptions}
+                disabled={viewMode !== 'individual'}
+              />
+            </div>
+          ) : (
+            <div className={styles.filtersModalFull}>
+              <Input type="text" label="Role" value={ROLE_LABEL[currentRole] || 'Agent'} disabled />
+            </div>
+          )}
+        </div>
+        <p className={styles.filterHint}>
+          Task scores use daily task logs. CRM metrics (dials, scheduled follow-ups by type, meetings, new opportunities) use the same From/To range. The calendar month controls the status mix chart and calendar table.
+        </p>
+      </Modal>
+
+      <PerformanceReportsGuide isAgent={isAgent} canViewTeam={canViewTeam} viewMode={viewMode} />
 
       <div className={styles.cardsRow}>
         {reportCards.map((card) => (
@@ -287,6 +450,42 @@ export function PerformanceReportsPage() {
         ))}
       </div>
 
+      <div className={styles.activityBand}>
+        <div className={styles.activityBandTitle}>
+          <span>Activity &amp; pipeline (same date range)</span>
+          <InfoHelpIcon
+            title="Activity metrics"
+            modalTitle="How these numbers are counted"
+            message="Dial attempts: outbound/inbound attempts logged on the dialer for the agent. Follow-ups: schedule hub items (phone, email, meeting, other) assigned to the agent (pending or completed) with a scheduled time in range. Meetings: calendar meetings where the agent is owner or assignee. Opportunities: deals created in range, attributed to opportunity owner (or creator if owner is blank); amount is the sum of Amount or Expected revenue."
+          />
+        </div>
+        <div className={styles.activityCardsRow}>
+          <div className={styles.activityMini}>
+            <div className={styles.activityMiniLabel}>Dial attempts</div>
+            <div className={styles.activityMiniValue}>{formatInt(activityTotals.crmCalls)}</div>
+            <div className={styles.activityMiniSub}>Task log calls: {formatInt(activityTotals.taskCalls)}</div>
+          </div>
+          <div className={styles.activityMini}>
+            <div className={styles.activityMiniLabel}>Calendar meetings</div>
+            <div className={styles.activityMiniValue}>{formatInt(activityTotals.calMeetings)}</div>
+            <div className={styles.activityMiniSub}>Logged in tasks: {formatInt(activityTotals.taskMeetings)}</div>
+          </div>
+          <div className={styles.activityMini}>
+            <div className={styles.activityMiniLabel}>Scheduled follow-ups</div>
+            <div className={styles.activityMiniValue}>{formatInt(activityTotals.scheduledFollowUps)}</div>
+            <div className={styles.activityMiniSub}>
+              Phone {formatInt(activityTotals.fuCall)} · Email {formatInt(activityTotals.fuEmail)} · Meeting{' '}
+              {formatInt(activityTotals.fuMtg)} · Other {formatInt(activityTotals.fuOther)}
+            </div>
+          </div>
+          <div className={styles.activityMini}>
+            <div className={styles.activityMiniLabel}>New deals &amp; value</div>
+            <div className={styles.activityMiniValue}>{formatInt(activityTotals.opps)} opps</div>
+            <div className={styles.activityMiniSub}>Total amount: {formatMoney(activityTotals.dealAmt)} · Task &quot;deals&quot; achieved: {formatInt(activityTotals.taskDeals)}</div>
+          </div>
+        </div>
+      </div>
+
       <div className={styles.quickInsights}>
         <div className={styles.highlightCard}>
           <p className={styles.highlightLabel}>Top Performer</p>
@@ -295,6 +494,12 @@ export function PerformanceReportsPage() {
             Score: {topPerformer ? Number(topPerformer.avg_score || 0).toFixed(2) : '0.00'} | Completion:{' '}
             {topPerformer ? Number(topPerformer.avg_completion_percent || 0).toFixed(2) : '0.00'}%
           </p>
+          {topPerformer ? (
+            <p className={styles.highlightMeta}>
+              Dials {formatInt(topPerformer.crm_total_calls)} · Follow-ups {formatInt(topPerformer.crm_scheduled_follow_ups)} ·
+              Meetings {formatInt(topPerformer.crm_calendar_meetings)} · Deal value {formatMoney(topPerformer.crm_opportunities_amount)}
+            </p>
+          ) : null}
         </div>
         <div className={styles.highlightCard}>
           <p className={styles.highlightLabel}>Needs Attention</p>
@@ -320,6 +525,9 @@ export function PerformanceReportsPage() {
           <TabList>
             <Tab isActive={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>Overview</Tab>
             <Tab isActive={activeTab === 'kpi'} onClick={() => setActiveTab('kpi')}>{isAgent ? 'My KPI' : 'Team KPI'}</Tab>
+            {canViewTeam && viewMode === 'team' ? (
+              <Tab isActive={activeTab === 'managers'} onClick={() => setActiveTab('managers')}>By manager</Tab>
+            ) : null}
             <Tab isActive={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')}>Calendar & Trend</Tab>
             <Tab isActive={activeTab === 'coaching'} onClick={() => setActiveTab('coaching')}>Coaching</Tab>
             {scoring ? (
@@ -328,89 +536,218 @@ export function PerformanceReportsPage() {
           </TabList>
 
           <TabPanel isActive={activeTab === 'overview'}>
-            <div className={styles.overviewGrid}>
-              <div className={styles.innerCard}>
-                <h3 className={styles.sectionTitle}>{isAgent ? 'My KPI Snapshot' : 'Top KPI Snapshot'}</h3>
-                <div className={listStyles.tableCardBody}>
+            <p className={styles.chartsSectionTitle}>Visual dashboard</p>
+            <PerformanceReportsCharts {...chartProps} mode="full" />
+            <div className={styles.innerCard}>
+              <h3 className={styles.sectionTitle}>
+                {isAgent ? 'My performance at a glance' : 'Team performance at a glance'}
+                <InfoHelpIcon
+                  title="Snapshot columns"
+                  modalTitle="Reading this table"
+                  message="Task columns come from daily task assignments. Dials, scheduled follow-ups (with type breakdown), and meetings are pulled from the dialer, schedule hub, and calendar. Deal value sums new opportunities created in the period (amount or expected revenue)."
+                />
+              </h3>
+              <div className={`${listStyles.tableCardBody} ${styles.tableScroll} ${styles.wideTable}`}>
                   <Table>
                     <TableHead>
                       <TableRow>
                         <TableHeaderCell>User</TableHeaderCell>
+                        <TableHeaderCell>Manager</TableHeaderCell>
                         <TableHeaderCell>Role</TableHeaderCell>
                         <TableHeaderCell>Completion %</TableHeaderCell>
-                        <TableHeaderCell>Avg Score</TableHeaderCell>
+                        <TableHeaderCell>Avg score</TableHeaderCell>
+                        <TableHeaderCell>Task calls</TableHeaderCell>
+                        <TableHeaderCell>Task meetings</TableHeaderCell>
+                        <TableHeaderCell>Task deals</TableHeaderCell>
+                        <TableHeaderCell>Dials</TableHeaderCell>
+                        <TableHeaderCell>Follow-ups</TableHeaderCell>
+                        <TableHeaderCell>FU phone</TableHeaderCell>
+                        <TableHeaderCell>FU email</TableHeaderCell>
+                        <TableHeaderCell>FU mtg</TableHeaderCell>
+                        <TableHeaderCell>FU other</TableHeaderCell>
+                        <TableHeaderCell>Cal. meetings</TableHeaderCell>
+                        <TableHeaderCell>New opps</TableHeaderCell>
+                        <TableHeaderCell>Deal value</TableHeaderCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {summary.length ? summary.slice(0, 5).map((s) => (
-                        <TableRow key={s.user_id}>
-                          <TableCell>{s.user_name}</TableCell>
-                          <TableCell>{s.role}</TableCell>
-                          <TableCell>{Number(s.avg_completion_percent || 0).toFixed(2)}%</TableCell>
-                          <TableCell>{Number(s.avg_score || 0).toFixed(2)}</TableCell>
-                        </TableRow>
-                      )) : renderEmptyState(4, 'No snapshot rows available.')}
+                      {summary.length ? summary.map((s) => {
+                        const tier = scoreTier(s.avg_score);
+                        const pillClass =
+                          tier === 'high' ? styles.scorePillHigh : tier === 'mid' ? styles.scorePillMid : styles.scorePillLow;
+                        return (
+                          <TableRow key={s.user_id}>
+                            <TableCell>{s.user_name}</TableCell>
+                            <TableCell>{s.manager_name || '—'}</TableCell>
+                            <TableCell>{ROLE_LABEL[String(s.role || '').toLowerCase()] || s.role}</TableCell>
+                            <TableCell>{Number(s.avg_completion_percent || 0).toFixed(1)}%</TableCell>
+                            <TableCell>
+                              <span className={`${styles.scorePill} ${pillClass}`}>
+                                {Number(s.avg_score || 0).toFixed(1)}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              {formatInt(s.achieved_calls)}
+                              {Number(s.target_calls) > 0 ? ` / ${formatInt(s.target_calls)}` : ''}
+                            </TableCell>
+                            <TableCell>
+                              {formatInt(s.achieved_meetings)}
+                              {Number(s.target_meetings) > 0 ? ` / ${formatInt(s.target_meetings)}` : ''}
+                            </TableCell>
+                            <TableCell>
+                              {formatInt(s.achieved_deals)}
+                              {Number(s.target_deals) > 0 ? ` / ${formatInt(s.target_deals)}` : ''}
+                            </TableCell>
+                            <TableCell>{formatInt(s.crm_total_calls)}</TableCell>
+                            <TableCell>{formatInt(s.crm_scheduled_follow_ups)}</TableCell>
+                            <TableCell>{formatInt(s.crm_follow_up_phone)}</TableCell>
+                            <TableCell>{formatInt(s.crm_follow_up_email)}</TableCell>
+                            <TableCell>{formatInt(s.crm_follow_up_meeting)}</TableCell>
+                            <TableCell>{formatInt(s.crm_follow_up_other)}</TableCell>
+                            <TableCell>{formatInt(s.crm_calendar_meetings)}</TableCell>
+                            <TableCell>{formatInt(s.crm_opportunities_count)}</TableCell>
+                            <TableCell>{formatMoney(s.crm_opportunities_amount)}</TableCell>
+                          </TableRow>
+                        );
+                      }) : renderEmptyState(17, 'No snapshot rows available.')}
                     </TableBody>
                   </Table>
                 </div>
-              </div>
-              <div className={styles.innerCard}>
-                <h3 className={styles.sectionTitle}>Weekly Momentum</h3>
-                <div className={styles.momentumList}>
-                  {trend.length ? trend.slice(0, 6).map((t, i) => {
-                    const completion = Math.max(0, Math.min(100, Number(t.avg_completion || 0)));
-                    return (
-                      <div key={`${t.bucket}-${i}`} className={styles.momentumRow}>
-                        <div className={styles.momentumHeader}>
-                          <span>{t.bucket}</span>
-                          <span>{completion.toFixed(1)}%</span>
-                        </div>
-                        <div className={styles.progressTrack}>
-                          <span className={styles.progressFill} style={{ width: `${completion}%` }} />
-                        </div>
-                      </div>
-                    );
-                  }) : <div className={styles.emptyState}>No weekly momentum data yet.</div>}
-                </div>
-              </div>
             </div>
           </TabPanel>
 
           <TabPanel isActive={activeTab === 'kpi'}>
+            <p className={styles.chartsSectionTitle}>Visual dashboard</p>
+            <PerformanceReportsCharts {...chartProps} mode="full" />
             <h3 className={styles.sectionTitle}>{isAgent ? 'My KPI Summary' : 'Role-wise KPI Summary'}</h3>
-            <div className={listStyles.tableCardBody}>
+            <div className={`${listStyles.tableCardBody} ${styles.tableScroll} ${styles.wideTable}`}>
               <Table>
                 <TableHead>
                   <TableRow>
                     <TableHeaderCell>User</TableHeaderCell>
+                    <TableHeaderCell>Manager</TableHeaderCell>
                     <TableHeaderCell>Role</TableHeaderCell>
-                    <TableHeaderCell>Assigned</TableHeaderCell>
+                    <TableHeaderCell>Assigned days</TableHeaderCell>
                     <TableHeaderCell>Achieved</TableHeaderCell>
                     <TableHeaderCell>Missed</TableHeaderCell>
                     <TableHeaderCell>Completion %</TableHeaderCell>
                     <TableHeaderCell>Consistency %</TableHeaderCell>
-                    <TableHeaderCell>Avg Score</TableHeaderCell>
+                    <TableHeaderCell>Avg score</TableHeaderCell>
+                    <TableHeaderCell>Calls ach. / target</TableHeaderCell>
+                    <TableHeaderCell>Mtgs ach. / target</TableHeaderCell>
+                    <TableHeaderCell>Deals ach. / target</TableHeaderCell>
+                    <TableHeaderCell>Conv. call→mtg %</TableHeaderCell>
+                    <TableHeaderCell>Conv. mtg→deal %</TableHeaderCell>
+                    <TableHeaderCell>Dials</TableHeaderCell>
+                    <TableHeaderCell>Follow-ups</TableHeaderCell>
+                    <TableHeaderCell>FU phone</TableHeaderCell>
+                    <TableHeaderCell>FU email</TableHeaderCell>
+                    <TableHeaderCell>FU mtg</TableHeaderCell>
+                    <TableHeaderCell>FU other</TableHeaderCell>
+                    <TableHeaderCell>Cal. mtgs</TableHeaderCell>
+                    <TableHeaderCell>New opps</TableHeaderCell>
+                    <TableHeaderCell>Deal value</TableHeaderCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {summary.length ? summary.map((s) => (
                     <TableRow key={s.user_id}>
                       <TableCell>{s.user_name}</TableCell>
-                      <TableCell>{s.role}</TableCell>
+                      <TableCell>{s.manager_name || '—'}</TableCell>
+                      <TableCell>{ROLE_LABEL[String(s.role || '').toLowerCase()] || s.role}</TableCell>
                       <TableCell>{s.assigned_days}</TableCell>
                       <TableCell>{s.achieved_days}</TableCell>
                       <TableCell>{s.missed_days}</TableCell>
                       <TableCell>{Number(s.avg_completion_percent || 0).toFixed(2)}%</TableCell>
                       <TableCell>{Number(s.consistency_score || 0).toFixed(2)}%</TableCell>
                       <TableCell>{Number(s.avg_score || 0).toFixed(2)}</TableCell>
+                      <TableCell>
+                        {formatInt(s.achieved_calls)} / {formatInt(s.target_calls)}
+                      </TableCell>
+                      <TableCell>
+                        {formatInt(s.achieved_meetings)} / {formatInt(s.target_meetings)}
+                      </TableCell>
+                      <TableCell>
+                        {formatInt(s.achieved_deals)} / {formatInt(s.target_deals)}
+                      </TableCell>
+                      <TableCell>{Number(s.calls_to_meeting_conversion || 0).toFixed(1)}%</TableCell>
+                      <TableCell>{Number(s.meeting_to_deal_conversion || 0).toFixed(1)}%</TableCell>
+                      <TableCell>{formatInt(s.crm_total_calls)}</TableCell>
+                      <TableCell>{formatInt(s.crm_scheduled_follow_ups)}</TableCell>
+                      <TableCell>{formatInt(s.crm_follow_up_phone)}</TableCell>
+                      <TableCell>{formatInt(s.crm_follow_up_email)}</TableCell>
+                      <TableCell>{formatInt(s.crm_follow_up_meeting)}</TableCell>
+                      <TableCell>{formatInt(s.crm_follow_up_other)}</TableCell>
+                      <TableCell>{formatInt(s.crm_calendar_meetings)}</TableCell>
+                      <TableCell>{formatInt(s.crm_opportunities_count)}</TableCell>
+                      <TableCell>{formatMoney(s.crm_opportunities_amount)}</TableCell>
                     </TableRow>
-                  )) : renderEmptyState(8, 'No KPI summary found for the selected filters.')}
+                  )) : renderEmptyState(23, 'No KPI summary found for the selected filters.')}
                 </TableBody>
               </Table>
             </div>
           </TabPanel>
 
+          <TabPanel isActive={activeTab === 'managers'}>
+            <h3 className={styles.sectionTitle}>
+              Team rollup by manager
+              <InfoHelpIcon
+                title="Manager groups"
+                modalTitle="Organizing by manager"
+                message="Agents are grouped using the Manager field on their user profile. Use this view in 1:1s with team leads to review everyone reporting to the same manager."
+              />
+            </h3>
+            {rowsByManager.length ? rowsByManager.map(([mgrLabel, rows]) => (
+              <div key={mgrLabel} className={styles.managerGroup}>
+                <p className={styles.managerGroupTitle}>{mgrLabel} · {rows.length} agent{rows.length === 1 ? '' : 's'}</p>
+                <div className={`${listStyles.tableCardBody} ${styles.tableScroll} ${styles.wideTable}`}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableHeaderCell>User</TableHeaderCell>
+                        <TableHeaderCell>Role</TableHeaderCell>
+                        <TableHeaderCell>Score</TableHeaderCell>
+                        <TableHeaderCell>Completion %</TableHeaderCell>
+                        <TableHeaderCell>Task calls / mtgs / deals</TableHeaderCell>
+                        <TableHeaderCell>Dials</TableHeaderCell>
+                        <TableHeaderCell>Follow-ups</TableHeaderCell>
+                        <TableHeaderCell>FU · phone / email / mtg / oth</TableHeaderCell>
+                        <TableHeaderCell>Meetings</TableHeaderCell>
+                        <TableHeaderCell>Deal value</TableHeaderCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {rows.map((s) => (
+                        <TableRow key={s.user_id}>
+                          <TableCell>{s.user_name}</TableCell>
+                          <TableCell>{ROLE_LABEL[String(s.role || '').toLowerCase()] || s.role}</TableCell>
+                          <TableCell>{Number(s.avg_score || 0).toFixed(1)}</TableCell>
+                          <TableCell>{Number(s.avg_completion_percent || 0).toFixed(1)}%</TableCell>
+                          <TableCell>
+                            {formatInt(s.achieved_calls)} / {formatInt(s.achieved_meetings)} / {formatInt(s.achieved_deals)}
+                          </TableCell>
+                          <TableCell>{formatInt(s.crm_total_calls)}</TableCell>
+                          <TableCell>{formatInt(s.crm_scheduled_follow_ups)}</TableCell>
+                          <TableCell>
+                            {formatInt(s.crm_follow_up_phone)} / {formatInt(s.crm_follow_up_email)} /{' '}
+                            {formatInt(s.crm_follow_up_meeting)} / {formatInt(s.crm_follow_up_other)}
+                          </TableCell>
+                          <TableCell>{formatInt(s.crm_calendar_meetings)}</TableCell>
+                          <TableCell>{formatMoney(s.crm_opportunities_amount)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )) : (
+              <div className={styles.emptyState}>No rows for this scope.</div>
+            )}
+          </TabPanel>
+
           <TabPanel isActive={activeTab === 'calendar'}>
+            <p className={styles.chartsSectionTitle}>Trend &amp; calendar visuals</p>
+            <PerformanceReportsCharts {...chartProps} mode="trendCalendar" />
             <div className={styles.overviewGrid}>
               <div className={styles.innerCard}>
                 <h3 className={styles.sectionTitle}>Calendar Status Buckets ({month})</h3>
@@ -466,12 +803,15 @@ export function PerformanceReportsPage() {
           </TabPanel>
 
           <TabPanel isActive={activeTab === 'coaching'}>
+            <p className={styles.chartsSectionTitle}>Visual queue</p>
+            <PerformanceReportsCharts {...chartProps} mode="coachingBars" coaching={coaching} />
             <h3 className={styles.sectionTitle}>{isAgent ? 'My Coaching Insights' : 'Coaching Insights'}</h3>
-            <div className={listStyles.tableCardBody}>
+            <div className={`${listStyles.tableCardBody} ${styles.tableScroll}`}>
               <Table>
                 <TableHead>
                   <TableRow>
                     <TableHeaderCell>Agent</TableHeaderCell>
+                    {!isAgent ? <TableHeaderCell>Manager</TableHeaderCell> : null}
                     <TableHeaderCell>Avg Score</TableHeaderCell>
                     <TableHeaderCell>Consistency %</TableHeaderCell>
                     <TableHeaderCell>Missed Days</TableHeaderCell>
@@ -482,12 +822,13 @@ export function PerformanceReportsPage() {
                   {coaching.length ? coaching.map((c) => (
                     <TableRow key={c.user_id}>
                       <TableCell>{c.user_name}</TableCell>
+                      {!isAgent ? <TableCell>{c.manager_name || '—'}</TableCell> : null}
                       <TableCell>{Number(c.avg_score || 0).toFixed(2)}</TableCell>
                       <TableCell>{Number(c.consistency_score || 0).toFixed(2)}%</TableCell>
                       <TableCell>{c.missed_days}</TableCell>
                       <TableCell>{c.recommendation}</TableCell>
                     </TableRow>
-                  )) : renderEmptyState(5, 'No coaching recommendations for this scope yet.')}
+                  )) : renderEmptyState(isAgent ? 5 : 6, 'No coaching recommendations for this scope yet.')}
                 </TableBody>
               </Table>
             </div>

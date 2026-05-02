@@ -1,0 +1,467 @@
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.dashboardRoot {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  margin-bottom: 16px;
+}
+
+.dashSection {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.dashSectionHead {
+  padding-bottom: 2px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border-subtle) 70%, transparent);
+}
+
+.dashSectionKicker {
+  display: block;
+  font-size: 10px;
+  font-weight: $font-weight-semibold;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  margin-bottom: 4px;
+}
+
+.dashSectionTitle {
+  margin: 0;
+  font-size: $font-size-md;
+  font-weight: $font-weight-bold;
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.dashSectionLede {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+  max-width: 52rem;
+}
+
+.dashStack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.dashRow2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+  min-width: 0;
+
+  @media (max-width: 960px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chartsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chartsSpanFull {
+  grid-column: 1 / -1;
+}
+
+.chartScrollX {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Do not force width: 100% — narrow viewBoxes became huge on screen (zoomed text/bars). */
+.barChartSvg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 200px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.dialsHourSvg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 240px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.axisYLabel {
+  fill: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.axisXLabel {
+  fill: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.pipelineSvg {
+  display: block;
+  width: 100%;
+  max-width: 920px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.pipelineCaption {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+.gaugeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 20px 32px;
+  padding: 4px 4px 8px;
+}
+
+.gaugeItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.gaugeLabel {
+  font-size: 11px;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-secondary);
+  max-width: 120px;
+  line-height: 1.3;
+}
+
+.gaugeValue {
+  font-size: 13px;
+  font-weight: $font-weight-bold;
+  color: var(--color-text-primary);
+}
+
+.gaugeSvg {
+  display: block;
+}
+
+.diagramNote {
+  margin: 8px 0 0;
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+.chartCard {
+  @include premium-panel;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-md;
+  background-color: color-mix(in srgb, var(--color-bg-elevated) 88%, var(--color-bg-subtle));
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.chartCardTall {
+  @media (min-width: 901px) {
+    min-height: 220px;
+  }
+}
+
+.chartCardHeader {
+  flex-shrink: 0;
+}
+
+.chartCardBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+
+  &:has(.gaugeRow) {
+    justify-content: center;
+    align-items: center;
+    padding: 8px 0 12px;
+  }
+}
+
+.chartInsight {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-bg-subtle) 65%, transparent);
+  border-radius: $radius-sm;
+  border-left: 3px solid var(--color-border-strong);
+}
+
+.chartTitle {
+  margin: 0 0 4px;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+}
+
+.chartSubtitle {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.chartInner {
+  width: 100%;
+}
+
+.chartEmpty {
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: $radius-sm;
+}
+
+.hList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hAgentBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border-subtle);
+
+  &:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+}
+
+.hAgentName {
+  font-size: 12px;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  margin-bottom: 2px;
+}
+
+.hRow {
+  display: grid;
+  grid-template-columns: minmax(72px, 22%) 1fr minmax(40px, 15%);
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.hRowLabel {
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hRowTrack {
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-border-subtle) 55%, transparent);
+  overflow: hidden;
+}
+
+.hRowFill {
+  height: 100%;
+  border-radius: inherit;
+  min-width: 2px;
+  transition: width 0.25s ease;
+}
+
+.hRowValue {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+  font-weight: $font-weight-semibold;
+}
+
+.stackList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stackBlock {
+  display: grid;
+  grid-template-columns: minmax(72px, 22%) 1fr minmax(28px, 10%);
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.stackLabel {
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stackTrack {
+  display: flex;
+  height: 14px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--color-border-subtle);
+}
+
+.stackSeg {
+  min-width: 2px;
+  height: 100%;
+  transition: width 0.25s ease;
+}
+
+.stackEmpty {
+  padding: 0 8px;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  align-self: center;
+}
+
+.stackTotal {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: $font-weight-semibold;
+}
+
+.trendWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  flex: 1;
+  min-height: 200px;
+  justify-content: center;
+}
+
+.trendSvg {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: 240px;
+  aspect-ratio: 420 / 216;
+  margin: 0 auto;
+}
+
+.svgTick {
+  fill: var(--color-text-tertiary);
+  font-size: 9px;
+}
+
+.svgBarValue {
+  fill: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.svgBarLabel {
+  fill: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.svgBarLabelHour {
+  fill: var(--color-text-secondary);
+  font-size: 10px;
+}
+
+.svgGridLine {
+  stroke: var(--color-border-subtle);
+  stroke-width: 1px;
+  stroke-dasharray: 5 5;
+  opacity: 0.85;
+  vector-effect: non-scaling-stroke;
+}
+
+.svgAxisBaseline {
+  stroke: var(--color-border-subtle);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+
+.trendLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.lgSwatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.pieRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 24px;
+  justify-content: center;
+}
+
+.donutSvg {
+  width: 180px;
+  max-width: 45%;
+  height: auto;
+  flex-shrink: 0;
+}
+
+.pieLegend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+}

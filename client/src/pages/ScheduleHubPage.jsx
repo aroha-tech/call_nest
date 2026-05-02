@@ -5,6 +5,7 @@ import { selectUser } from '../features/auth/authSelectors';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { DateTimePickerField } from '../components/ui/DateTimePickerField';
 import { Alert } from '../components/ui/Alert';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
@@ -20,6 +21,7 @@ import { BrowseSavedFiltersModal } from '../features/contacts/BrowseSavedFilters
 import { savedListFiltersAPI } from '../services/savedListFiltersAPI';
 import { ScheduleHubFilterModal } from './ScheduleHubFilterModal';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
+import { FOLLOW_UP_TYPE_OPTIONS, followUpTypeLabel } from '../utils/followUpTypeLabels';
 
 function pad2(n) {
   return String(n).padStart(2, '0');
@@ -113,6 +115,7 @@ export function ScheduleHubPage() {
   const [timeFlag, setTimeFlag] = useState('');
   const [meetingStatus, setMeetingStatus] = useState('');
   const [callbackStatus, setCallbackStatus] = useState('');
+  const [callbackFollowUpType, setCallbackFollowUpType] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
   const [savedFilters, setSavedFilters] = useState([]);
@@ -155,9 +158,10 @@ export function ScheduleHubPage() {
         String(timeFlag || '').trim() ||
         String(meetingStatus || '').trim() ||
         String(callbackStatus || '').trim() ||
+        String(callbackFollowUpType || '').trim() ||
         String(searchQuery || '').trim()
     );
-  }, [assignedUserId, callbackStatus, from, meetingStatus, searchQuery, timeFlag, to, today]);
+  }, [assignedUserId, callbackFollowUpType, callbackStatus, from, meetingStatus, searchQuery, timeFlag, to, today]);
 
   const resetAllFilters = () => {
     setFrom(toYmd(today));
@@ -166,6 +170,7 @@ export function ScheduleHubPage() {
     setTimeFlag('');
     setMeetingStatus('');
     setCallbackStatus('');
+    setCallbackFollowUpType('');
     setSearchQuery('');
     setMeetingsPage(1);
     setCallbacksPage(1);
@@ -261,6 +266,7 @@ export function ScheduleHubPage() {
     setTimeFlag(snap.timeFlag ?? '');
     setMeetingStatus(snap.meetingStatus ?? '');
     setCallbackStatus(snap.callbackStatus ?? '');
+    setCallbackFollowUpType(snap.callbackFollowUpType ?? '');
     setSearchQuery(snap.searchQuery ?? '');
     if (snap.tab === 'callbacks') setTab('callbacks');
     else setTab('meetings');
@@ -275,6 +281,7 @@ export function ScheduleHubPage() {
     timeFlag: payload?.timeFlag ?? timeFlag,
     meetingStatus: payload?.meetingStatus ?? meetingStatus,
     callbackStatus: payload?.callbackStatus ?? callbackStatus,
+    callbackFollowUpType: payload?.callbackFollowUpType ?? callbackFollowUpType,
     searchQuery: payload?.searchQuery ?? searchQuery,
   });
 
@@ -310,6 +317,11 @@ export function ScheduleHubPage() {
     []
   );
 
+  const callbackFollowUpTypeOptions = useMemo(
+    () => [{ value: '', label: 'All follow-up types' }, ...FOLLOW_UP_TYPE_OPTIONS],
+    []
+  );
+
   const requestParamsBase = useMemo(
     () => ({
       from,
@@ -339,9 +351,10 @@ export function ScheduleHubPage() {
           page: resetPages ? 1 : meetingsPage,
           limit: meetingsLimit,
         }),
-        scheduleHubAPI.callbacks({
+        scheduleHubAPI.followUps({
           ...requestParamsBase,
           status: callbackStatus || undefined,
+          follow_up_type: callbackFollowUpType || undefined,
           page: resetPages ? 1 : callbacksPage,
           limit: callbacksLimit,
         }),
@@ -372,7 +385,7 @@ export function ScheduleHubPage() {
   useEffect(() => {
     void loadAll({ resetPages: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from, to, assignedUserId, timeFlag, meetingStatus, callbackStatus, searchQuery]);
+  }, [from, to, assignedUserId, timeFlag, meetingStatus, callbackStatus, callbackFollowUpType, searchQuery]);
 
   useEffect(() => {
     if (!hasCompletedInitialFetch) return;
@@ -405,7 +418,7 @@ export function ScheduleHubPage() {
                 className={`${dashStyles.activityTab} ${activeTab === 'callbacks' ? dashStyles.activityTabActive : ''}`.trim()}
                 onClick={() => setTab('callbacks')}
               >
-                Callbacks
+                Follow-ups
               </button>
             </div>
           ) : null}
@@ -544,7 +557,7 @@ export function ScheduleHubPage() {
                 className={`${dashStyles.activityTab} ${activeTab === 'callbacks' ? dashStyles.activityTabActive : ''}`.trim()}
                 onClick={() => setTab('callbacks')}
               >
-                Callbacks
+                Follow-ups
               </button>
             </div>
           ) : null}
@@ -597,6 +610,7 @@ export function ScheduleHubPage() {
                   <TableHeaderCell width="150px">Phone</TableHeaderCell>
                   <TableHeaderCell>Assigned to</TableHeaderCell>
                   <TableHeaderCell width="120px">Status</TableHeaderCell>
+                  <TableHeaderCell width="140px">Type</TableHeaderCell>
                   <TableHeaderCell>Notes</TableHeaderCell>
                 </TableRow>
               </TableHead>
@@ -633,6 +647,7 @@ export function ScheduleHubPage() {
                         {r.status || '—'}
                       </Badge>
                     </TableCell>
+                    <TableCell noTruncate>{followUpTypeLabel(r.follow_up_type)}</TableCell>
                     <TableCell>{r.notes || '—'}</TableCell>
                   </TableRow>
                 ))}
@@ -661,7 +676,7 @@ export function ScheduleHubPage() {
     <div className={styles.page}>
       <PageHeader
         title="Schedule hub"
-        description="Meetings and scheduled callbacks in one place."
+        description="Meetings and scheduled follow-ups in one place."
         actions={
           <div className={styles.viewToggle} role="group" aria-label="View mode">
             <Button type="button" size="sm" variant={viewMode === 'block' ? 'primary' : 'secondary'} onClick={() => setView('block')}>
@@ -678,8 +693,8 @@ export function ScheduleHubPage() {
 
       <div className={styles.toolbarRow}>
         <div className={styles.toolbarFilters} aria-busy={loadingMeta ? 'true' : 'false'}>
-          <Input label="From" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <Input label="To" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <DateTimePickerField label="From" mode="date" value={from} onChange={setFrom} />
+          <DateTimePickerField label="To" mode="date" value={to} onChange={setTo} />
         </div>
         <div className={styles.toolbarActions}>
           <Button
@@ -691,8 +706,8 @@ export function ScheduleHubPage() {
           >
             Refresh
           </Button>
-          <Button type="button" size="sm" disabled title="Coming soon">
-            Schedule callback
+          <Button type="button" size="sm" disabled title="Use Schedule follow-ups page to create">
+            Schedule follow-up
           </Button>
         </div>
       </div>
@@ -744,7 +759,7 @@ export function ScheduleHubPage() {
           <div className={styles.sectionTitle}>Meetings</div>
           {meetingsTable}
 
-          <div className={styles.sectionTitle}>Scheduled callbacks</div>
+          <div className={styles.sectionTitle}>Scheduled follow-ups</div>
           {callbacksTable}
         </div>
       ) : (
@@ -803,6 +818,7 @@ export function ScheduleHubPage() {
           timeFlag,
           meetingStatus,
           callbackStatus,
+          callbackFollowUpType,
           searchQuery,
         }}
         initialTab={editingSavedFilterSnapshot?.tab ?? activeTab}
@@ -810,6 +826,7 @@ export function ScheduleHubPage() {
         timeFlagOptions={timeFlagOptions}
         meetingStatusOptions={meetingStatusOptions}
         callbackStatusOptions={callbackStatusOptions}
+        callbackFollowUpTypeOptions={callbackFollowUpTypeOptions}
         savedFilterId={editingSavedFilterId}
         initialSavedFilterName={editingSavedFilterName}
         existingSavedFilters={savedFilters.map((x) => ({ id: x.id, name: x.name }))}

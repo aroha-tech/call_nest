@@ -12,6 +12,7 @@ import { PERMISSIONS } from '../utils/permissionUtils';
 import { sanitizeAttemptNotesForDisplay } from '../utils/callAttemptNotesDisplay';
 import { formatDateTimeDisplay, formatRelativeTimeShort } from '../utils/dateTimeDisplay';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
+import { followUpTypeLabel } from '../utils/followUpTypeLabels';
 import styles from './ContactActivityPanel.module.scss';
 
 function safeDateTime(v, mode = 'ist_fixed', preferences = {}) {
@@ -309,10 +310,14 @@ function contactTimelineRowModel(ev, mode = 'ist_fixed', preferences = {}) {
       const details = p.payload_json || {};
       const callbackStatus = String(details.status || '').toLowerCase();
       const statusVariant = callbackStatus === 'completed' ? 'teal' : callbackStatus === 'cancelled' ? 'rose' : 'amber';
+      const fuLabel = followUpTypeLabel(details.follow_up_type);
       return {
         ...base,
-        title: ev.type === 'callback_created' ? 'Callback scheduled' : 'Callback updated',
-        subtitle: details.assigned_user_id ? `Assigned user #${details.assigned_user_id}` : cat,
+        title: ev.type === 'callback_created' ? 'Follow-up scheduled' : 'Follow-up updated',
+        subtitle:
+          details.assigned_user_id != null
+            ? `Assigned user #${details.assigned_user_id} · ${fuLabel}`
+            : fuLabel,
         detail: details.notes || details.outcome_notes || null,
         info: details.scheduled_at ? safeDateTime(details.scheduled_at, mode, preferences) : '—',
         statusLabel: callbackStatus ? humanizeKey(callbackStatus) : 'Pending',
@@ -372,9 +377,9 @@ function typeLabel(type) {
     case 'meeting_created':
       return 'Meeting';
     case 'callback_created':
-      return 'Callback';
+      return 'Follow-up';
     case 'callback_updated':
-      return 'Callback updated';
+      return 'Follow-up updated';
     case 'opportunity_created':
       return 'Deal / opportunity';
     case 'opportunity_updated':

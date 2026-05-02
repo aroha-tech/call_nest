@@ -33,6 +33,8 @@ const TENANT_PATH_OVERRIDES = {
   '/contacts/import': 'Import contacts',
   '/contacts/import/history': 'Import history',
   '/contacts/new': 'New contact',
+  '/schedule/follow-ups': 'Scheduled follow-ups',
+  '/schedule/callbacks': 'Scheduled follow-ups',
   '/unauthorized': 'Unauthorized',
 };
 

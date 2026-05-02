@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, ModalFooter } from '../components/ui/Modal';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { DateTimePickerField } from '../components/ui/DateTimePickerField';
 import { MultiSelectDropdown } from '../components/ui/MultiSelectDropdown';
 import { Select } from '../components/ui/Select';
 import { DateRangePresetControl } from '../components/ui/DateRangePresetControl';
@@ -439,18 +440,32 @@ export function CallHistoryFilterModal({
                   options={OP_OPTIONS}
                   className={styles.opSel}
                 />
-                <Input
-                  label=""
-                  aria-label={`Property value, row ${idx + 1}`}
-                  type={inputCfg.type}
-                  value={row.value}
-                  onChange={(e) => patchRow(idx, { value: e.target.value })}
-                  placeholder={needsValue(row.op) ? inputCfg.placeholder : '—'}
-                  disabled={!needsValue(row.op)}
-                  inputMode={inputCfg.inputMode}
-                  className={styles.valInp}
-                  inputClassName={styles.valueInputControl}
-                />
+                {inputCfg.type === 'date' ? (
+                  <DateTimePickerField
+                    label=""
+                    mode="date"
+                    aria-label={`Property value, row ${idx + 1}`}
+                    value={row.value}
+                    onChange={(v) => patchRow(idx, { value: v })}
+                    placeholder={needsValue(row.op) ? inputCfg.placeholder : '—'}
+                    disabled={!needsValue(row.op)}
+                    className={styles.valInp}
+                    inputClassName={styles.valueInputControl}
+                  />
+                ) : (
+                  <Input
+                    label=""
+                    aria-label={`Property value, row ${idx + 1}`}
+                    type={inputCfg.type}
+                    value={row.value}
+                    onChange={(e) => patchRow(idx, { value: e.target.value })}
+                    placeholder={needsValue(row.op) ? inputCfg.placeholder : '—'}
+                    disabled={!needsValue(row.op)}
+                    inputMode={inputCfg.inputMode}
+                    className={styles.valInp}
+                    inputClassName={styles.valueInputControl}
+                  />
+                )}
                 <button
                   type="button"
                   className={styles.removeRowBtn}

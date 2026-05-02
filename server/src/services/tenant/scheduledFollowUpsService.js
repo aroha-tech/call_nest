@@ -95,6 +95,20 @@ function normalizeStatus(raw) {
   return s;
 }
 
+export const FOLLOW_UP_TYPE_VALUES = ['callback', 'email', 'meeting', 'other'];
+export const FOLLOW_UP_TYPE_SET = new Set(FOLLOW_UP_TYPE_VALUES);
+
+function normalizeFollowUpType(raw) {
+  const s = String(raw || '').trim().toLowerCase();
+  if (!s) return 'callback';
+  if (!FOLLOW_UP_TYPE_SET.has(s)) {
+    const err = new Error('Invalid follow_up_type');
+    err.status = 400;
+    throw err;
+  }
+  return s;
+}
+
 function normalizeMysqlDatetime(raw) {
   const t = String(raw || '').trim();
   if (!t) return null;
@@ -108,10 +122,10 @@ function normalizeMysqlDatetime(raw) {
 }
 
 /**
- * Pending callbacks for the tenant dashboard widget (same assignee scope as list/metrics).
+ * Pending scheduled follow-ups for the tenant dashboard widget (same assignee scope as list/metrics).
  * Oldest scheduled first (overdue pending appears before future).
  */
-export async function listDashboardPendingCallbacks(tenantId, actingUser, limit = 6) {
+export async function listDashboardPendingFollowUps(tenantId, actingUser, limit = 6) {
   const scopedIds = await getAssignedUserIdsForScope(tenantId, actingUser);
   const lim = Math.min(20, Math.max(1, limit));
   const scopeClause =
@@ -119,7 +133,7 @@ export async function listDashboardPendingCallbacks(tenantId, actingUser, limit 
   const scopeParams = scopedIds == null ? [] : scopedIds;
 
   const rows = await query(
-    `SELECT sc.id, sc.contact_id, sc.scheduled_at, sc.status, sc.notes,
+    `SELECT sc.id, sc.contact_id, sc.scheduled_at, sc.status, sc.follow_up_type, sc.notes,
             c.display_name AS contact_name, c.type AS contact_type,
             cp.phone AS contact_phone,
             u.name AS assigned_name
@@ -142,6 +156,7 @@ export async function listDashboardPendingCallbacks(tenantId, actingUser, limit 
     contact_id: r.contact_id,
     scheduled_at: r.scheduled_at,
     status: r.status,
+    follow_up_type: r.follow_up_type || 'callback',
     notes: r.notes,
     contact_name: r.contact_name,
     contact_type: r.contact_type,
@@ -150,7 +165,7 @@ export async function listDashboardPendingCallbacks(tenantId, actingUser, limit 
   }));
 }
 
-export async function getCallbackMetrics(tenantId, actingUser, { assigned_user_id = null } = {}) {
+export async function getFollowUpMetrics(tenantId, actingUser, { assigned_user_id = null } = {}) {
   const scopedIds = await getAssignedUserIdsForScope(tenantId, actingUser);
   const { effectiveIds } = enforceRequestedUserIdInScope(assigned_user_id, scopedIds);
   if (effectiveIds && effectiveIds.length === 0) {
@@ -186,7 +201,7 @@ export async function getCallbackMetrics(tenantId, actingUser, { assigned_user_i
   };
 }
 
-export async function findCallbackById(tenantId, id) {
+export async function findFollowUpById(tenantId, id) {
   const cid = Number(id);
   if (!Number.isFinite(cid) || cid <= 0) return null;
   const [row] = await query(
@@ -211,7 +226,7 @@ export async function findCallbackById(tenantId, id) {
   return row || null;
 }
 
-export async function createCallback(tenantId, user, payload) {
+export async function createFollowUp(tenantId, user, payload) {
   const contact_id = await assertContact(tenantId, payload.contact_id);
   const assigned_user_id = await assertUser(tenantId, payload.assigned_user_id);
   const contact_phone_id = await assertPhoneOptional(tenantId, contact_id, payload.contact_phone_id);
@@ -222,6 +237,7 @@ export async function createCallback(tenantId, user, payload) {
     throw err;
   }
   const status = normalizeStatus(payload.status);
+  const follow_up_type = normalizeFollowUpType(payload.follow_up_type);
 
   const notes = trimStr(payload.notes);
   const outcome_notes = trimStr(payload.outcome_notes);
@@ -230,8 +246,8 @@ export async function createCallback(tenantId, user, payload) {
 
   const result = await query(
     `INSERT INTO scheduled_callbacks
-      (tenant_id, contact_id, contact_phone_id, assigned_user_id, scheduled_at, status, notes, completed_at, outcome_notes, created_by, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (tenant_id, contact_id, contact_phone_id, assigned_user_id, scheduled_at, status, follow_up_type, notes, completed_at, outcome_notes, created_by, updated_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
       contact_id,
@@ -239,6 +255,7 @@ export async function createCallback(tenantId, user, payload) {
       assigned_user_id,
       scheduled_at,
       status,
+      follow_up_type,
       notes,
       completed_at,
       outcome_notes,
@@ -246,17 +263,18 @@ export async function createCallback(tenantId, user, payload) {
       user?.id ?? null,
     ]
   );
-  const row = await findCallbackById(tenantId, result.insertId);
+  const row = await findFollowUpById(tenantId, result.insertId);
   if (row?.contact_id) {
     await insertContactActivityEvent(tenantId, {
       contactId: row.contact_id,
       eventType: 'callback_created',
       actorUserId: user?.id ?? null,
-      summary: `Callback scheduled for ${row?.scheduled_at || 'selected time'}`,
+      summary: `Follow-up scheduled for ${row?.scheduled_at || 'selected time'}`,
       payloadJson: {
         callback_id: row?.id ?? null,
         scheduled_at: row?.scheduled_at ?? null,
         status: row?.status ?? null,
+        follow_up_type: row?.follow_up_type ?? 'callback',
         assigned_user_id: row?.assigned_user_id ?? null,
         notes: row?.notes ?? null,
       },
@@ -265,10 +283,10 @@ export async function createCallback(tenantId, user, payload) {
   return row;
 }
 
-export async function updateCallback(tenantId, user, id, payload) {
-  const existing = await findCallbackById(tenantId, id);
+export async function updateFollowUp(tenantId, user, id, payload) {
+  const existing = await findFollowUpById(tenantId, id);
   if (!existing) {
-    const err = new Error('Callback not found');
+    const err = new Error('Follow-up not found');
     err.status = 404;
     throw err;
   }
@@ -323,6 +341,10 @@ export async function updateCallback(tenantId, user, id, payload) {
       params.push(null);
     }
   }
+  if (payload.follow_up_type !== undefined) {
+    sets.push('follow_up_type = ?');
+    params.push(normalizeFollowUpType(payload.follow_up_type));
+  }
 
   if (sets.length === 0) return existing;
 
@@ -337,17 +359,18 @@ export async function updateCallback(tenantId, user, id, payload) {
     params
   );
 
-  const row = await findCallbackById(tenantId, id);
+  const row = await findFollowUpById(tenantId, id);
   if (row?.contact_id) {
     await insertContactActivityEvent(tenantId, {
       contactId: row.contact_id,
       eventType: 'callback_updated',
       actorUserId: user?.id ?? null,
-      summary: `Callback ${row?.status || 'updated'}`,
+      summary: `Follow-up ${row?.status || 'updated'}`,
       payloadJson: {
         callback_id: row?.id ?? null,
         scheduled_at: row?.scheduled_at ?? null,
         status: row?.status ?? null,
+        follow_up_type: row?.follow_up_type ?? 'callback',
         assigned_user_id: row?.assigned_user_id ?? null,
         notes: row?.notes ?? null,
         outcome_notes: row?.outcome_notes ?? null,
@@ -358,10 +381,10 @@ export async function updateCallback(tenantId, user, id, payload) {
   return row;
 }
 
-export async function removeCallback(tenantId, user, id) {
-  const existing = await findCallbackById(tenantId, id);
+export async function removeFollowUp(tenantId, user, id) {
+  const existing = await findFollowUpById(tenantId, id);
   if (!existing) {
-    const err = new Error('Callback not found');
+    const err = new Error('Follow-up not found');
     err.status = 404;
     throw err;
   }

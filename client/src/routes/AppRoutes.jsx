@@ -64,7 +64,7 @@ import { DialerSessionPage } from '../pages/DialerSessionPage';
 import { DialerSessionSetupPage } from '../pages/DialerSessionSetupPage';
 import { StandalonePageLayout } from '../layouts/StandalonePageLayout';
 import { ScheduleMeetingsPage } from '../pages/ScheduleMeetingsPage';
-import { ScheduleCallbacksPage } from '../pages/ScheduleCallbacksPage';
+import { ScheduleFollowUpsPage } from '../pages/ScheduleFollowUpsPage';
 import { TaskManagerPage } from '../pages/TaskManagerPage';
 import { PerformanceReportsPage } from '../pages/PerformanceReportsPage';
 import { NotificationsPage } from '../features/notifications/NotificationsPage';
@@ -631,7 +631,17 @@ function TenantRoutes() {
         element={
           <ProtectedRoute permission={PERMISSIONS.SCHEDULE_VIEW}>
             <AppShellLayout>
-              <ScheduleCallbacksPage />
+              <Navigate to="/schedule/follow-ups" replace />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/schedule/follow-ups"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.SCHEDULE_VIEW}>
+            <AppShellLayout>
+              <ScheduleFollowUpsPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

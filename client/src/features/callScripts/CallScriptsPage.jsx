@@ -32,6 +32,16 @@ import { dialerPreferencesAPI } from '../../services/dialerPreferencesAPI';
 
 const defaultPagination = { page: 1, limit: 10, total: 0, totalPages: 1 };
 
+function UiIcon({ children, className = '' }) {
+  return (
+    <span className={`${styles.uiIcon} ${className}`.trim()} aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        {children}
+      </svg>
+    </span>
+  );
+}
+
 export function CallScriptsPage() {
   const { can } = usePermissions();
   const user = useAppSelector(selectUser);
@@ -431,7 +441,16 @@ export function CallScriptsPage() {
       <SlidePanel
         isOpen={showModal}
         onClose={() => setShowModal(false)}
-        title={null}
+        title={
+          <span className={styles.panelTitleWithIcon}>
+            <UiIcon className={styles.panelTitleIconScript}>
+              <path d="M8 3h6l5 5v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+              <path d="M14 3v5h5" />
+              <path d="M9 12h6M9 16h6" />
+            </UiIcon>
+            {editingId ? 'Edit script' : 'Add script'}
+          </span>
+        }
         size="wide"
         closeOnOverlay
         closeOnEscape
@@ -447,19 +466,11 @@ export function CallScriptsPage() {
         <form onSubmit={handleSubmit} className={styles.form}>
           {formError && <Alert variant="error">{formError}</Alert>}
 
-          <div className={styles.modalIntro}>
-            <div className={styles.sectionIcon} aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M8 3h6l5 5v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
-                <path d="M14 3v5h5" />
-                <path d="M9 12h6M9 16h6" />
-              </svg>
-            </div>
-            <div>
-              <h3 className={styles.modalIntroTitle}>{editingId ? 'Edit Script' : 'Add Script'}</h3>
-              <p className={styles.modalIntroDescription}>Create a reusable call script for your team.</p>
-            </div>
-          </div>
+          <p className={styles.panelSubtitle}>
+            {editingId
+              ? 'Update the script name, body, and variables for your team.'
+              : 'Create a reusable call script for your team.'}
+          </p>
 
           <div className={styles.sectionCard}>
             <Input

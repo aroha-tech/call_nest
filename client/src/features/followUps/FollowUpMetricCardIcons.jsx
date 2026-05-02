@@ -9,7 +9,7 @@ const common = {
   'aria-hidden': true,
 };
 
-export function CallbackCardIcon({ variant, className = '' }) {
+export function FollowUpMetricCardIcon({ variant, className = '' }) {
   const c = className;
   switch (variant) {
     case 'total':
@@ -68,4 +68,3 @@ export function CallbackCardIcon({ variant, className = '' }) {
       );
   }
 }
-

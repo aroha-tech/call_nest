@@ -23,6 +23,8 @@ import { TableDataRegion } from '../components/admin/TableDataRegion';
 import listStyles from '../components/admin/adminDataList.module.scss';
 import { ScriptBodyEditor } from '../features/callScripts/ScriptBodyEditor';
 import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
+import { DateTimePickerField } from '../components/ui/DateTimePickerField';
+import { formatDateTimeLocalInputValue } from '../components/ui/dateTimePickerUtils';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import styles from './MeetingsPage.module.scss';
 
@@ -73,14 +75,6 @@ function mysqlToDatetimeLocal(mysql) {
   if (!mysql) return '';
   const s = String(mysql).replace(' ', 'T').slice(0, 16);
   return s;
-}
-
-function formatDateTimeLocalInputValue(d) {
-  const dt = d instanceof Date ? d : new Date(d);
-  if (Number.isNaN(dt.getTime())) return '';
-  return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}T${pad2(dt.getHours())}:${pad2(
-    dt.getMinutes()
-  )}`;
 }
 
 /** Human label for merge-field keys shown on chips (e.g. start_at → Start At). */
@@ -1301,7 +1295,7 @@ export function MeetingsPage() {
                 </div>
               ) : null}
             </div>
-            <div className={`${styles.iconField} ${styles.callbackIconBlue}`}>
+            <div className={`${styles.iconField} ${styles.followUpIconBlue}`}>
               <UiIcon>
                 <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
                 <path d="m3.5 7 8.5 6 8.5-6" />
@@ -1325,7 +1319,7 @@ export function MeetingsPage() {
                 provider action fails, reconnect the same account once to refresh scopes.
               </p>
             </div>
-            <div className={`${styles.iconField} ${styles.callbackIconIndigo}`}>
+            <div className={`${styles.iconField} ${styles.followUpIconIndigo}`}>
               <UiIcon>
                 <path d="M20 21v-1.5a4 4 0 0 0-4-4h-8a4 4 0 0 0-4 4V21" />
                 <circle cx="12" cy="8" r="3.5" />
@@ -1346,7 +1340,7 @@ export function MeetingsPage() {
                 error={meetingFormErrors.assigned_user_id}
               />
             </div>
-            <div className={`${styles.iconField} ${styles.callbackIconSky}`}>
+            <div className={`${styles.iconField} ${styles.followUpIconSky}`}>
               <UiIcon>
                 <circle cx="12" cy="7.8" r="3.3" />
                 <path d="M4 20.5c1.8-3.1 4.2-4.7 8-4.7s6.2 1.6 8 4.7" />
@@ -1363,7 +1357,7 @@ export function MeetingsPage() {
                 error={meetingFormErrors.meeting_owner_user_id}
               />
             </div>
-            <div className={`${styles.iconField} ${styles.callbackIconTeal}`}>
+            <div className={`${styles.iconField} ${styles.followUpIconTeal}`}>
               <UiIcon>
                 <rect x="3" y="5" width="18" height="14" rx="3" />
                 <path d="M7 2.8v4M17 2.8v4M3 10h18" />
@@ -1383,7 +1377,7 @@ export function MeetingsPage() {
                 error={meetingFormErrors.meeting_platform}
               />
             </div>
-            <div className={`${styles.iconField} ${styles.callbackIconBlue}`}>
+            <div className={`${styles.iconField} ${styles.followUpIconBlue}`}>
               <UiIcon>
                 <circle cx="12" cy="12" r="8.5" />
                 <path d="M12 7.8v4.8l3 2" />
@@ -1414,7 +1408,7 @@ export function MeetingsPage() {
                 error={meetingFormErrors.meeting_duration_min}
               />
             </div>
-            <div className={`${styles.iconField} ${styles.callbackIconIndigo}`}>
+            <div className={`${styles.iconField} ${styles.followUpIconIndigo}`}>
               <UiIcon>
                 <path d="M4 7.5h16" />
                 <path d="M4 12h12" />
@@ -1433,7 +1427,7 @@ export function MeetingsPage() {
                 inputClassName={styles.iconInput}
               />
             </div>
-            <div className={`${styles.iconField} ${styles.callbackIconSky}`}>
+            <div className={`${styles.iconField} ${styles.followUpIconSky}`}>
               <UiIcon>
                 <rect x="2.5" y="5.5" width="19" height="13" rx="2.5" />
                 <path d="m3.5 8 8.5 5.5L20.5 8" />
@@ -1448,7 +1442,7 @@ export function MeetingsPage() {
                 inputClassName={styles.iconInput}
               />
             </div>
-            <div className={`${styles.iconField} ${styles.callbackIconTeal}`}>
+            <div className={`${styles.iconField} ${styles.followUpIconTeal}`}>
               <UiIcon>
                 <path d="M12 20.5s7-4.7 7-10a7 7 0 1 0-14 0c0 5.3 7 10 7 10Z" />
                 <circle cx="12" cy="10.5" r="2.3" />
@@ -1461,48 +1455,46 @@ export function MeetingsPage() {
                 inputClassName={styles.iconInput}
               />
             </div>
-            <div className={`${styles.iconField} ${styles.callbackIconBlue}`}>
+            <div className={`${styles.iconField} ${styles.followUpIconBlue}`}>
               <UiIcon>
                 <rect x="3" y="5" width="18" height="16" rx="2" />
                 <path d="M3 10h18M8 3v4M16 3v4" />
               </UiIcon>
-              <Input
+              <DateTimePickerField
                 label="Start *"
-                type="datetime-local"
+                mode="datetime"
                 value={form.start_at}
                 min={formatDateTimeLocalInputValue(new Date())}
-                onChange={(e) =>
-                  {
-                    setForm((f) => {
-                      const mins = Number(f.meeting_duration_min || 0);
-                      const startMs = new Date(e.target.value).getTime();
-                      const endAt =
-                        Number.isFinite(startMs) && mins > 0
-                          ? formatDateTimeLocalInputValue(new Date(startMs + mins * 60000))
-                          : f.end_at;
-                      return { ...f, start_at: e.target.value, end_at: endAt };
-                    });
-                    setMeetingFormErrors((e2) => ({ ...e2, start_at: undefined, end_at: undefined }));
-                  }
-                }
+                onChange={(v) => {
+                  setForm((f) => {
+                    const mins = Number(f.meeting_duration_min || 0);
+                    const startMs = new Date(v).getTime();
+                    const endAt =
+                      Number.isFinite(startMs) && mins > 0
+                        ? formatDateTimeLocalInputValue(new Date(startMs + mins * 60000))
+                        : f.end_at;
+                    return { ...f, start_at: v, end_at: endAt };
+                  });
+                  setMeetingFormErrors((e2) => ({ ...e2, start_at: undefined, end_at: undefined }));
+                }}
                 required
                 disabled={!canManage}
                 error={meetingFormErrors.start_at}
                 inputClassName={styles.iconInput}
               />
             </div>
-            <div className={`${styles.iconField} ${styles.callbackIconIndigo}`}>
+            <div className={`${styles.iconField} ${styles.followUpIconIndigo}`}>
               <UiIcon>
                 <rect x="3" y="5" width="18" height="16" rx="2" />
                 <path d="M3 10h18M8 3v4M16 3v4" />
               </UiIcon>
-              <Input
+              <DateTimePickerField
                 label="End *"
-                type="datetime-local"
+                mode="datetime"
                 value={form.end_at}
                 min={form.start_at || formatDateTimeLocalInputValue(new Date())}
-                onChange={(e) => {
-                  setForm((f) => ({ ...f, end_at: e.target.value }));
+                onChange={(v) => {
+                  setForm((f) => ({ ...f, end_at: v }));
                   setMeetingFormErrors((e2) => ({ ...e2, end_at: undefined }));
                 }}
                 required
@@ -1538,7 +1530,7 @@ export function MeetingsPage() {
             </p>
           </div>
           <div style={{ marginTop: 12 }}>
-            <div className={`${styles.iconField} ${styles.iconFieldTextarea} ${styles.callbackIconSky}`}>
+            <div className={`${styles.iconField} ${styles.iconFieldTextarea} ${styles.followUpIconSky}`}>
               <UiIcon>
                 <path d="M4 7.5h16" />
                 <path d="M4 12h16" />

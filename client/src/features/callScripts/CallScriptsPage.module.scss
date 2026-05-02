@@ -41,45 +41,46 @@
   padding-top: 0.15rem;
 }
 
-.modalIntro {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  margin-bottom: 0.2rem;
-}
-
-.sectionIcon {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
+.uiIcon {
   display: inline-flex;
+  width: 16px;
+  height: 16px;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--color-primary-500, #6366f1) 16%, var(--color-bg-subtle, #f8fafc));
-  border: 1px solid color-mix(in srgb, var(--color-primary-500, #6366f1) 28%, var(--color-border-subtle, #e2e8f0));
-  color: var(--color-primary-500, #6366f1);
+  color: color-mix(in srgb, var(--color-primary-500, #6366f1) 75%, var(--color-text-tertiary, #94a3b8));
+  flex: 0 0 auto;
 
   svg {
-    width: 19px;
-    height: 19px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    width: 16px;
+    height: 16px;
   }
 }
 
-.modalIntroTitle {
-  margin: 0;
-  font-size: 1.02rem;
-  color: var(--color-text-primary);
+.panelSubtitle {
+  margin: 0 0 4px;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary, #64748b);
 }
 
-.modalIntroDescription {
-  margin: 0.15rem 0 0;
-  color: var(--color-text-muted);
-  font-size: 0.82rem;
+.panelTitleWithIcon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panelTitleWithIcon .uiIcon {
+  width: 20px;
+  height: 20px;
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.panelTitleIconScript {
+  color: var(--color-primary-500, #6366f1);
 }
 
 .sectionCard {

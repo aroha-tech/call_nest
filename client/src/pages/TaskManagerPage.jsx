@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { DateTimePickerField } from '../components/ui/DateTimePickerField';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { MultiSelectDropdown } from '../components/ui/MultiSelectDropdown';
@@ -15,6 +16,7 @@ import { Tabs, TabList, Tab, TabPanel } from '../components/ui/Tabs';
 import { Badge } from '../components/ui/Badge';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
 import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
+import { Skeleton } from '../components/ui/Skeleton';
 import { taskManagerAPI } from '../services/taskManagerAPI';
 import { tenantUsersAPI } from '../services/tenantUsersAPI';
 import { campaignsAPI } from '../services/campaignsAPI';
@@ -133,8 +135,26 @@ function statusBadgeVariant(status) {
 }
 
 function formatStatusLabel(status) {
+  const key = String(status || '').toLowerCase().replace(/-/g, '_');
+  const map = {
+    achieved: 'Complete',
+    in_progress: 'In progress',
+    pending: 'Pending',
+    missed: 'Missed',
+    no_task: 'No targets',
+  };
+  if (map[key]) return map[key];
   const s = String(status || '').replace(/_/g, ' ');
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : '—';
+}
+
+/** Omit when target is 0; cap display when achieved exceeds target (e.g. 110/100 → 100/100 (+10)). */
+function formatAchievedTargetPair(achieved, target) {
+  const t = Math.max(0, Number(target) || 0);
+  const a = Math.max(0, Number(achieved) || 0);
+  if (t <= 0) return null;
+  if (a <= t) return { text: `${a}/${t}`, overBy: 0 };
+  return { text: `${t}/${t}`, overBy: a - t };
 }
 
 function formatRoleLabel(role) {
@@ -199,11 +219,18 @@ export function TaskManagerPage() {
   const [users, setUsers] = useState([]);
   const [agentFilter, setAgentFilter] = useState('');
   const [historyQuery, setHistoryQuery] = useState('');
+  const [boardDayPreset, setBoardDayPreset] = useState('today');
+  const [boardCustomYmd, setBoardCustomYmd] = useState('');
+  const [boardSearch, setBoardSearch] = useState('');
+  const [boardSort, setBoardSort] = useState('priority');
+  const [loadingExecutionBoard, setLoadingExecutionBoard] = useState(false);
 
   const [todayLogs, setTodayLogs] = useState([]);
   const [upcomingLogs, setUpcomingLogs] = useState([]);
   const [historyLogs, setHistoryLogs] = useState([]);
   const [historyPagination, setHistoryPagination] = useState({ total: 0, page: 1, limit: 20, totalPages: 1 });
+  const [upcomingTotal, setUpcomingTotal] = useState(0);
+  const [historyTotal, setHistoryTotal] = useState(0);
 
   const [loadingShell, setLoadingShell] = useState(false);
   const [loadingTab, setLoadingTab] = useState(false);
@@ -224,6 +251,8 @@ export function TaskManagerPage() {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [noteHistory, setNoteHistory] = useState([]);
   const [noteHistoryLoading, setNoteHistoryLoading] = useState(false);
+  const [historyTargetsLog, setHistoryTargetsLog] = useState(null);
+  const [taskDetailsLog, setTaskDetailsLog] = useState(null);
   const chatScrollTimersRef = useRef({});
 
   const [templateForm, setTemplateForm] = useState({
@@ -262,7 +291,16 @@ export function TaskManagerPage() {
   const todayStr = toYmd(new Date());
   const todayDisplay = formatDate(todayStr);
 
+  const boardAnchorYmd = useMemo(() => {
+    if (boardDayPreset === 'yesterday') return addDaysYmd(todayStr, -1);
+    if (boardDayPreset === 'custom' && boardCustomYmd) return ymdFromLocalDatetime(boardCustomYmd) || todayStr;
+    return todayStr;
+  }, [todayStr, boardDayPreset, boardCustomYmd]);
+
+  const boardDateDisplay = formatDate(boardAnchorYmd);
+
   const currentUserNameLower = String(user?.name || user?.email || '').trim().toLowerCase();
+  const executionSyncKeyRef = useRef('');
 
   useEffect(
     () => () => {
@@ -277,8 +315,30 @@ export function TaskManagerPage() {
   const showAssignmentsBoard = canManage && managerView === 'assignments';
   const historyColSpan = showAgentFilter ? 8 : 7;
 
-  // Product rule: if a row exists for today's task_date, show it in Current.
-  const effectiveTodayLogs = useMemo(() => todayLogs, [todayLogs]);
+  const filteredBoardLogs = useMemo(() => {
+    const q = boardSearch.trim().toLowerCase();
+    if (!q) return todayLogs;
+    return todayLogs.filter((l) =>
+      `${l.user_name || ''} ${l.assignment_title || ''}`.toLowerCase().includes(q)
+    );
+  }, [todayLogs, boardSearch]);
+
+  const effectiveTodayLogs = useMemo(() => {
+    const list = [...filteredBoardLogs];
+    const pr = { high: 0, medium: 1, low: 2 };
+    if (boardSort === 'priority') {
+      list.sort(
+        (a, b) =>
+          (pr[String(a.assignment_priority || '').toLowerCase()] ?? 1) -
+          (pr[String(b.assignment_priority || '').toLowerCase()] ?? 1)
+      );
+    } else if (boardSort === 'score') {
+      list.sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+    } else {
+      list.sort((a, b) => String(a.assignment_title || '').localeCompare(String(b.assignment_title || ''), undefined, { sensitivity: 'base' }));
+    }
+    return list;
+  }, [filteredBoardLogs, boardSort]);
 
   const assignmentsForHints = useMemo(() => {
     if (!agentFilter) return assignments;
@@ -289,22 +349,22 @@ export function TaskManagerPage() {
 
   const todayEmptyHints = useMemo(() => {
     const hints = [];
-    const coversToday = assignmentsForHints.filter((a) => assignmentCoversYmd(a, todayStr));
-    if (assignmentsForHints.length > 0 && coversToday.length === 0) {
+    const coversDay = assignmentsForHints.filter((a) => assignmentCoversYmd(a, boardAnchorYmd));
+    if (assignmentsForHints.length > 0 && coversDay.length === 0) {
       hints.push(
-        `The app is showing today as ${todayDisplay}. None of the listed assignments include that calendar date (check start/end dates — wrong year is a common reason).`
+        `Tasks are filtered to ${boardDateDisplay}. None of the listed assignments include that calendar date (check start/end dates — wrong year is a common reason).`
       );
     }
-    if (coversToday.length > 0 && todayLogs.length === 0) {
+    if (coversDay.length > 0 && todayLogs.length === 0) {
       hints.push(
-        'An assignment covers today, but there are no daily task rows for this date. Remove the assignment and publish again, or recreate it so daily logs are generated.'
+        'An assignment covers this date, but there are no daily task rows for it. Remove the assignment and publish again, or recreate it so daily logs are generated.'
       );
     }
     if (showAgentFilter && agentFilter) {
       hints.push('Agent filter is set — you only see tasks for that rep.');
     }
     return hints;
-  }, [assignmentsForHints, todayStr, todayDisplay, todayLogs.length, effectiveTodayLogs.length, showAgentFilter, agentFilter]);
+  }, [assignmentsForHints, boardAnchorYmd, boardDateDisplay, todayLogs.length, showAgentFilter, agentFilter]);
 
   const duePresetOptionsWithDate = useMemo(() => {
     const map = {
@@ -381,6 +441,20 @@ export function TaskManagerPage() {
     return Number.isFinite(n) && n > 0 ? n : undefined;
   }, [isAgentRole, agentFilter]);
 
+  const refreshTabCounts = useCallback(async () => {
+    const common = userIdParam ? { userId: userIdParam } : {};
+    try {
+      const [up, hi] = await Promise.all([
+        taskManagerAPI.listDailyLogs({ ...common, view: 'upcoming', limit: 1, sort: 'asc' }),
+        taskManagerAPI.listDailyLogs({ ...common, view: 'history', limit: 1, sort: 'desc', page: 1 }),
+      ]);
+      setUpcomingTotal(Number(up?.data?.pagination?.total ?? 0));
+      setHistoryTotal(Number(hi?.data?.pagination?.total ?? 0));
+    } catch {
+      /* keep previous totals */
+    }
+  }, [userIdParam]);
+
   const pageDescription = useMemo(() => {
     if (isAgentRole) {
       return 'Your targets, schedule, and history—notes visible to you and your manager.';
@@ -442,26 +516,58 @@ export function TaskManagerPage() {
     setAssignForm((s) => ({ ...s, assigned_to_user_id: String(user.id) }));
   }, [assignModalOpen, assignForm.assigned_to_user_id, user]);
 
-  /** Keep “today” in sync for the hero and Today tab without blocking other tabs. */
+  /** Recompute when user or calendar day changes; refresh execution board when Current tab is active. */
   useEffect(() => {
     let cancelled = false;
+    const syncKey = `${userIdParam ?? ''}|${todayStr}`;
+    const shouldRecompute = executionSyncKeyRef.current !== syncKey;
+
     (async () => {
       try {
+        setError('');
+        if (shouldRecompute) {
+          setSyncing(true);
+          await taskManagerAPI.recomputeLogs({
+            from: addDaysYmd(todayStr, -400),
+            to: todayStr,
+            ...(userIdParam ? { userId: userIdParam } : {}),
+          });
+          if (cancelled) return;
+          executionSyncKeyRef.current = syncKey;
+        }
+      } catch (e) {
+        if (!cancelled) setError(e?.response?.data?.error || e?.message || 'Failed to sync task metrics');
+      } finally {
+        if (!cancelled) setSyncing(false);
+      }
+
+      if (!cancelled) {
+        await refreshTabCounts();
+      }
+
+      if (cancelled || mainTab !== 'current') return;
+
+      try {
+        setLoadingExecutionBoard(true);
         const res = await taskManagerAPI.listDailyLogs({
           ...(userIdParam ? { userId: userIdParam } : {}),
           view: 'current',
+          as_of: boardAnchorYmd,
           limit: 80,
           sort: 'desc',
         });
         if (!cancelled) setTodayLogs(res?.data?.data || []);
       } catch (e) {
-        if (!cancelled) setError(e?.response?.data?.error || e?.message || 'Failed to load today’s tasks');
+        if (!cancelled) setError(e?.response?.data?.error || e?.message || 'Failed to load tasks for this day');
+      } finally {
+        if (!cancelled) setLoadingExecutionBoard(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [userIdParam, todayStr]);
+  }, [mainTab, userIdParam, todayStr, boardAnchorYmd, refreshTabCounts]);
 
   useEffect(() => {
     if (mainTab !== 'upcoming') return undefined;
@@ -535,15 +641,55 @@ export function TaskManagerPage() {
   }, [historyLogs, historyQuery]);
 
   const todayStats = useMemo(() => {
-    let n = effectiveTodayLogs.length;
+    let n = todayLogs.length;
     let done = 0;
     let risk = 0;
-    for (const l of effectiveTodayLogs) {
+    for (const l of todayLogs) {
       if (l.status === 'achieved') done += 1;
       if (l.status === 'missed') risk += 1;
     }
     return { n, done, risk };
+  }, [todayLogs]);
+
+  const currentBuckets = useMemo(() => {
+    const pending = [];
+    const inProgress = [];
+    const complete = [];
+    for (const log of effectiveTodayLogs) {
+      const s = String(log.status || '').toLowerCase();
+      if (s === 'achieved') complete.push(log);
+      else if (s === 'in_progress' || s === 'missed') inProgress.push(log);
+      else pending.push(log);
+    }
+    return { pending, inProgress, complete };
   }, [effectiveTodayLogs]);
+
+  const visibleKanbanColumns = useMemo(() => {
+    const defs = [
+      {
+        columnKey: 'pending',
+        title: 'Pending',
+        dotClass: styles.kanbanDotPending,
+        variantClass: styles.kanbanColumnPending,
+        logs: currentBuckets.pending,
+      },
+      {
+        columnKey: 'in_progress',
+        title: 'In progress',
+        dotClass: styles.kanbanDotInProgress,
+        variantClass: styles.kanbanColumnProgress,
+        logs: currentBuckets.inProgress,
+      },
+      {
+        columnKey: 'complete',
+        title: 'Completed',
+        dotClass: styles.kanbanDotComplete,
+        variantClass: styles.kanbanColumnComplete,
+        logs: currentBuckets.complete,
+      },
+    ];
+    return defs.filter((d) => d.logs.length > 0);
+  }, [currentBuckets]);
 
   async function refetchTaskViews() {
     const common = userIdParam ? { userId: userIdParam } : {};
@@ -551,6 +697,7 @@ export function TaskManagerPage() {
       const todayRes = await taskManagerAPI.listDailyLogs({
         ...common,
         view: 'current',
+        as_of: boardAnchorYmd,
         limit: 80,
         sort: 'desc',
       });
@@ -587,6 +734,7 @@ export function TaskManagerPage() {
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || 'Failed to refresh tasks');
     }
+    await refreshTabCounts();
   }
 
   async function onSyncAchievements() {
@@ -595,11 +743,11 @@ export function TaskManagerPage() {
     setOk('');
     try {
       await taskManagerAPI.recomputeLogs({
-        from: todayStr,
+        from: addDaysYmd(todayStr, -400),
         to: todayStr,
         ...(userIdParam ? { userId: userIdParam } : {}),
       });
-      setOk('Live metrics refreshed. Previous pending days were marked missed where applicable.');
+      setOk('Live metrics refreshed.');
       await refetchTaskViews();
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || 'Failed to sync');
@@ -937,9 +1085,16 @@ export function TaskManagerPage() {
     }
   }
 
+  function openTaskDetailsModal(log) {
+    setTaskDetailsLog(log);
+  }
+
   function renderTaskCard(log, { showAgent }) {
-    const pct = Math.min(100, Math.max(0, Number(log.completion_percent || 0)));
     const agentLabel = log.user_name || 'Agent';
+    const pct = Math.min(100, Math.max(0, Number(log.completion_percent || 0)));
+    const callsP = formatAchievedTargetPair(log.achieved_calls, log.target_calls);
+    const meetP = formatAchievedTargetPair(log.achieved_meetings, log.target_meetings);
+    const dealsP = formatAchievedTargetPair(log.achieved_deals, log.target_deals);
     return (
       <article key={`${log.id}-${log.task_date}`} className={styles.taskCard}>
         <div className={styles.taskCardTop}>
@@ -947,12 +1102,12 @@ export function TaskManagerPage() {
             <h3 className={styles.taskCardTitle}>{log.assignment_title || 'Task'}</h3>
             <div className={styles.taskCardMeta}>
               <span className={styles.taskCardDate}>
-                <MaterialSymbol name="calendar_today" size="sm" />
+                <MaterialSymbol name="calendar_today" size="sm" className={styles.taskCardMetaIcon} />
                 {formatDate(log.task_date)}
               </span>
               {showAgent ? (
                 <span className={styles.taskCardAgent}>
-                  <MaterialSymbol name="person" size="sm" />
+                  <MaterialSymbol name="person" size="sm" className={styles.taskCardMetaIcon} />
                   {agentLabel}
                 </span>
               ) : null}
@@ -963,28 +1118,46 @@ export function TaskManagerPage() {
           </Badge>
         </div>
 
-        <div className={styles.taskMetrics}>
-          <div className={styles.taskMetric}>
-            <span className={styles.taskMetricLabel}>Calls</span>
-            <span className={styles.taskMetricVal}>
-              {log.achieved_calls ?? 0}/{log.target_calls ?? 0}
-            </span>
-          </div>
-          <div className={styles.taskMetric}>
-            <span className={styles.taskMetricLabel}>Meetings</span>
-            <span className={styles.taskMetricVal}>
-              {log.achieved_meetings ?? 0}/{log.target_meetings ?? 0}
-            </span>
-          </div>
-          <div className={styles.taskMetric}>
-            <span className={styles.taskMetricLabel}>Deals</span>
-            <span className={styles.taskMetricVal}>
-              {log.achieved_deals ?? 0}/{log.target_deals ?? 0}
-            </span>
-          </div>
-          <div className={styles.taskMetric}>
-            <span className={styles.taskMetricLabel}>Score</span>
-            <span className={styles.taskMetricVal}>{Number(log.score || 0).toFixed(0)}</span>
+        <div className={`${styles.taskMetricsIconsRow} ${styles.taskCardMetricsRow}`}>
+          {callsP ? (
+            <div
+              className={`${styles.metricChip} ${styles.metricChipCompact} ${styles.metricChipCalls}`}
+              title={callsP.overBy ? `Achieved ${log.achieved_calls} (target ${log.target_calls})` : undefined}
+            >
+              <MaterialSymbol name="call" className={`${styles.metricChipIcon} ${styles.taskCardMetricGlyph}`} />
+              <span className={styles.metricChipText}>
+                {callsP.text}
+                {callsP.overBy > 0 ? <span className={styles.metricChipExtra}>+{callsP.overBy}</span> : null}
+              </span>
+            </div>
+          ) : null}
+          {meetP ? (
+            <div
+              className={`${styles.metricChip} ${styles.metricChipCompact} ${styles.metricChipMeetings}`}
+              title={meetP.overBy ? `Achieved ${log.achieved_meetings} (target ${log.target_meetings})` : undefined}
+            >
+              <MaterialSymbol name="groups" className={`${styles.metricChipIcon} ${styles.taskCardMetricGlyph}`} />
+              <span className={styles.metricChipText}>
+                {meetP.text}
+                {meetP.overBy > 0 ? <span className={styles.metricChipExtra}>+{meetP.overBy}</span> : null}
+              </span>
+            </div>
+          ) : null}
+          {dealsP ? (
+            <div
+              className={`${styles.metricChip} ${styles.metricChipCompact} ${styles.metricChipDeals}`}
+              title={dealsP.overBy ? `Achieved ${log.achieved_deals} (target ${log.target_deals})` : undefined}
+            >
+              <MaterialSymbol name="payments" className={`${styles.metricChipIcon} ${styles.taskCardMetricGlyph}`} />
+              <span className={styles.metricChipText}>
+                {dealsP.text}
+                {dealsP.overBy > 0 ? <span className={styles.metricChipExtra}>+{dealsP.overBy}</span> : null}
+              </span>
+            </div>
+          ) : null}
+          <div className={`${styles.metricChip} ${styles.metricChipCompact} ${styles.metricChipScore}`}>
+            <MaterialSymbol name="target" className={`${styles.metricChipIcon} ${styles.taskCardMetricGlyph}`} />
+            <span className={styles.metricChipText}>{Number(log.score || 0).toFixed(0)}</span>
           </div>
         </div>
 
@@ -993,37 +1166,63 @@ export function TaskManagerPage() {
         </div>
 
         <div className={styles.taskCardActions}>
-          <Button size="sm" variant="ghost" onClick={() => openNotesModal(log)}>
-            <MaterialSymbol name="description" size="sm" />
-            Notes
-          </Button>
-          {log.assignment_id ? (
+          <div className={styles.taskCardActionsLeft}>
             <Button
-              size="sm"
+              size="xs"
               variant="ghost"
-              onClick={() =>
-                openCommentsModal({
-                  id: log.assignment_id,
-                  title: log.assignment_title,
-                  task_date: log.task_date,
-                  status: log.status,
-                  score: log.score,
-                  achieved_calls: log.achieved_calls,
-                  target_calls: log.target_calls,
-                  achieved_meetings: log.achieved_meetings,
-                  target_meetings: log.target_meetings,
-                  achieved_deals: log.achieved_deals,
-                  target_deals: log.target_deals,
-                  notes: log.agent_note || log.manager_note || '',
-                })
-              }
+              className={styles.taskCardIconBtn}
+              onClick={() => openNotesModal(log)}
+              title="Notes"
+              aria-label="Open notes"
             >
-              <MaterialSymbol name="comment" size="sm" />
-              Comments
+              <MaterialSymbol name="sticky_note_2" className={styles.taskCardActionIcon} />
             </Button>
-          ) : null}
+            {log.assignment_id ? (
+              <Button
+                size="xs"
+                variant="ghost"
+                className={styles.taskCardIconBtn}
+                title="Comments"
+                aria-label="Open comments"
+                onClick={() =>
+                  openCommentsModal({
+                    id: log.assignment_id,
+                    title: log.assignment_title,
+                    task_date: log.task_date,
+                    status: log.status,
+                    score: log.score,
+                    achieved_calls: log.achieved_calls,
+                    target_calls: log.target_calls,
+                    achieved_meetings: log.achieved_meetings,
+                    target_meetings: log.target_meetings,
+                    achieved_deals: log.achieved_deals,
+                    target_deals: log.target_deals,
+                    notes: log.agent_note || log.manager_note || '',
+                  })
+                }
+              >
+                <MaterialSymbol name="chat_bubble" className={styles.taskCardActionIcon} />
+              </Button>
+            ) : null}
+          </div>
+          <button type="button" className={styles.viewDetailsLink} onClick={() => openTaskDetailsModal(log)}>
+            View details →
+          </button>
         </div>
       </article>
+    );
+  }
+
+  function renderKanbanColumn({ title, dotClass, variantClass, logs }) {
+    return (
+      <div className={`${styles.kanbanColumn} ${variantClass}`}>
+        <header className={styles.kanbanColumnHead}>
+          <span className={`${styles.kanbanDot} ${dotClass}`} aria-hidden />
+          <h3 className={styles.kanbanColumnTitle}>{title}</h3>
+          <span className={styles.kanbanCount}>{logs.length}</span>
+        </header>
+        <div className={styles.kanbanCards}>{logs.map((log) => renderTaskCard(log, { showAgent: showAgentFilter }))}</div>
+      </div>
     );
   }
 
@@ -1049,6 +1248,66 @@ export function TaskManagerPage() {
     );
   }
 
+  function renderExecutionBoardSkeleton() {
+    return (
+      <div className={styles.boardSkeleton} aria-busy="true" aria-label="Loading task board">
+        <div
+          className={styles.kanbanBoard}
+          style={{ '--kanban-cols': 3 }}
+        >
+          {[0, 1, 2].map((col) => (
+            <div key={`board-skel-col-${col}`} className={`${styles.kanbanColumn} ${styles.kanbanColumnSkeleton}`}>
+              <div className={styles.boardSkeletonColumnHead}>
+                <Skeleton width={10} height={10} circle className={styles.boardSkeletonDot} />
+                <Skeleton width="52%" height={14} />
+                <Skeleton width={28} height={22} className={styles.boardSkeletonCount} />
+              </div>
+              <div className={styles.boardSkeletonCard}>
+                <Skeleton width="78%" height={16} />
+                <Skeleton width="55%" height={12} />
+                <div className={styles.boardSkeletonMetrics}>
+                  <Skeleton width={56} height={24} className={styles.boardSkeletonPill} />
+                  <Skeleton width={52} height={24} className={styles.boardSkeletonPill} />
+                  <Skeleton width={40} height={24} className={styles.boardSkeletonPill} />
+                </div>
+                <Skeleton width="100%" height={6} className={styles.boardSkeletonProgress} />
+                <div className={styles.boardSkeletonCardActions}>
+                  <Skeleton width={26} height={26} className={styles.boardSkeletonIconBtn} />
+                  <Skeleton width={26} height={26} className={styles.boardSkeletonIconBtn} />
+                  <Skeleton width={72} height={14} className={styles.boardSkeletonLink} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function renderUpcomingSkeleton() {
+    return (
+      <div className={styles.cardGrid} aria-busy="true" aria-label="Loading upcoming tasks">
+        {[0, 1, 2].map((i) => (
+          <div key={`up-skel-${i}`} className={styles.upcomingSkeletonCard}>
+            <Skeleton width="70%" height={16} />
+            <Skeleton width="45%" height={12} />
+            <div className={styles.boardSkeletonMetrics}>
+              <Skeleton width={56} height={24} className={styles.boardSkeletonPill} />
+              <Skeleton width={52} height={24} className={styles.boardSkeletonPill} />
+              <Skeleton width={40} height={24} className={styles.boardSkeletonPill} />
+            </div>
+            <Skeleton width="100%" height={6} className={styles.boardSkeletonProgress} />
+            <div className={styles.boardSkeletonCardActions}>
+              <Skeleton width={26} height={26} className={styles.boardSkeletonIconBtn} />
+              <Skeleton width={26} height={26} className={styles.boardSkeletonIconBtn} />
+              <Skeleton width={72} height={14} className={styles.boardSkeletonLink} />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className={styles.page}>
       <PageHeader title="Task Manager" description={pageDescription} />
@@ -1070,30 +1329,35 @@ export function TaskManagerPage() {
                 message="All today targets use this calendar date."
               />
             </div>
-            <div className={styles.heroValue}>{todayDisplay}</div>
-            <p className={styles.heroSubtext}>All today targets use this calendar date.</p>
+            <div className={styles.heroValue}>{boardDateDisplay}</div>
+            <p className={styles.heroSubtext}>
+              {boardAnchorYmd === todayStr
+                ? 'All today targets use this calendar date.'
+                : `Viewing task rows for ${boardDateDisplay}. Switch the board date filter to return to today.`}
+            </p>
           </div>
         </div>
         <div className={styles.heroCard}>
           <MaterialSymbol name="target" size="md" className={styles.heroIcon} />
           <div className={styles.heroBody}>
             <div className={styles.heroLabel}>
-              <span>Today at a glance</span>
+              <span>{boardAnchorYmd === todayStr ? 'Today at a glance' : 'Day at a glance'}</span>
               <InfoHelpIcon
-                title="Today stats info"
-                modalTitle="Today at a glance"
-                message={`${todayStats.done} achieved · ${todayStats.risk} missed · ${Math.max(
-                  0,
-                  todayStats.n - todayStats.done - todayStats.risk
-                )} in progress or pending`}
+                title="Day stats"
+                modalTitle={boardAnchorYmd === todayStr ? 'Today at a glance' : 'Day at a glance'}
+                message={`${boardDateDisplay}: ${todayStats.done} complete${
+                  todayStats.risk > 0 ? ` · ${todayStats.risk} missed` : ''
+                } · ${Math.max(0, todayStats.n - todayStats.done - todayStats.risk)} in progress or pending (all tasks for this date, not filtered by search).`}
               />
             </div>
             <div className={styles.heroValue}>{todayStats.n}</div>
             <div className={styles.glanceStats}>
-              <span className={styles.glanceStatDone}>{todayStats.done} Achieved</span>
-              <span className={styles.glanceStatMissed}>{todayStats.risk} Missed</span>
+              <span className={styles.glanceStatDone}>{todayStats.done} Complete</span>
+              {todayStats.risk > 0 ? (
+                <span className={styles.glanceStatMissed}>{todayStats.risk} Missed</span>
+              ) : null}
               <span className={styles.glanceStatPending}>
-                {Math.max(0, todayStats.n - todayStats.done - todayStats.risk)} In Progress or Pending
+                {Math.max(0, todayStats.n - todayStats.done - todayStats.risk)} In progress or pending
               </span>
             </div>
           </div>
@@ -1164,7 +1428,7 @@ export function TaskManagerPage() {
               <InfoHelpIcon
                 title="Active assignments info"
                 modalTitle="Active assignments"
-                message="Remove a mistaken schedule here. Each agent can have only one active task window at a time (overlapping dates are blocked). Call activity still counts the same for any open tasks on the same day."
+                message="Remove a mistaken schedule here. Multiple assignments can overlap the same dates or the same day for an agent; daily logs and metrics stay tied to each assignment. Delete a row if it was created by mistake."
               />
             </h2>
           </div>
@@ -1229,7 +1493,7 @@ export function TaskManagerPage() {
                               title="Comments"
                               aria-label="Open comments"
                             >
-                              <MaterialSymbol name="comment" size="sm" />
+                              <MaterialSymbol name="chat_bubble" size="sm" />
                             </Button>
                             <Button
                               size="sm"
@@ -1257,31 +1521,86 @@ export function TaskManagerPage() {
             <Tab isActive={mainTab === 'current'} onClick={() => setMainTab('current')}>
               <MaterialSymbol name="event_available" size="sm" />
               Current
-              {effectiveTodayLogs.length ? <span className={styles.tabCount}>{effectiveTodayLogs.length}</span> : null}
+              <span className={styles.tabCount}>{todayLogs.length}</span>
             </Tab>
             <Tab isActive={mainTab === 'upcoming'} onClick={() => setMainTab('upcoming')}>
               <MaterialSymbol name="date_range" size="sm" />
               Upcoming
-              {upcomingLogs.length ? <span className={styles.tabCount}>{upcomingLogs.length}</span> : null}
+              <span className={styles.tabCount}>{upcomingTotal}</span>
             </Tab>
             <Tab isActive={mainTab === 'history'} onClick={() => setMainTab('history')}>
               <MaterialSymbol name="history" size="sm" />
               History
-              {historyPagination.total ? <span className={styles.tabCount}>{historyPagination.total}</span> : null}
+              <span className={styles.tabCount}>{historyTotal}</span>
             </Tab>
           </TabList>
 
           <TabPanel isActive={mainTab === 'current'}>
-            {!effectiveTodayLogs.length ? renderEmpty('current', todayEmptyHints) : null}
-            {effectiveTodayLogs.length ? (
-              <div className={styles.cardGrid}>
-                {effectiveTodayLogs.map((log) => renderTaskCard(log, { showAgent: showAgentFilter }))}
+            <div className={styles.executionBoardShell}>
+              <div className={styles.boardToolbar}>
+                <div className={styles.boardToolbarSearch}>
+                  <SearchInput
+                    value={boardSearch}
+                    onSearch={(v) => setBoardSearch(v)}
+                    placeholder="Search tasks… (press Enter)"
+                  />
+                </div>
+                <div className={styles.boardToolbarFilters}>
+                  <Select
+                    label="Date"
+                    value={boardDayPreset}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setBoardDayPreset(v);
+                      if (v === 'custom' && !boardCustomYmd) setBoardCustomYmd(todayStr);
+                    }}
+                    options={[
+                      { value: 'today', label: 'Today' },
+                      { value: 'yesterday', label: 'Yesterday' },
+                      { value: 'custom', label: 'Custom date' },
+                    ]}
+                  />
+                  {boardDayPreset === 'custom' ? (
+                    <Input
+                      label="Pick date"
+                      type="date"
+                      value={boardCustomYmd || ''}
+                      onChange={(e) => setBoardCustomYmd(e.target.value)}
+                      className={styles.boardCustomDate}
+                    />
+                  ) : null}
+                  <Select
+                    label="Sort by"
+                    value={boardSort}
+                    onChange={(e) => setBoardSort(e.target.value)}
+                    options={[
+                      { value: 'priority', label: 'Priority' },
+                      { value: 'score', label: 'Score' },
+                      { value: 'title', label: 'Task name' },
+                    ]}
+                  />
+                </div>
               </div>
-            ) : null}
+              {loadingExecutionBoard ? renderExecutionBoardSkeleton() : null}
+              {!loadingExecutionBoard && !todayLogs.length ? renderEmpty('current', todayEmptyHints) : null}
+              {!loadingExecutionBoard && todayLogs.length && !effectiveTodayLogs.length ? (
+                <div className={styles.boardNoSearchHits}>
+                  <p>No tasks match your search. Clear the search box or try different keywords.</p>
+                </div>
+              ) : null}
+              {!loadingExecutionBoard && effectiveTodayLogs.length ? (
+                <div
+                  className={styles.kanbanBoard}
+                  style={{ '--kanban-cols': visibleKanbanColumns.length }}
+                >
+                  {visibleKanbanColumns.map((col) => renderKanbanColumn(col))}
+                </div>
+              ) : null}
+            </div>
           </TabPanel>
 
           <TabPanel isActive={mainTab === 'upcoming'}>
-            {loadingTab ? <p className={styles.muted}>Loading upcoming…</p> : null}
+            {loadingTab ? renderUpcomingSkeleton() : null}
             {!loadingTab && !upcomingLogs.length ? renderEmpty('upcoming') : null}
             {!loadingTab && upcomingLogs.length ? (
               <div className={styles.cardGrid}>{upcomingLogs.map((log) => renderTaskCard(log, { showAgent: showAgentFilter }))}</div>
@@ -1324,11 +1643,41 @@ export function TaskManagerPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {loadingTab ? (
-                    <TableRow>
-                      <TableCell colSpan={historyColSpan}>Loading…</TableCell>
-                    </TableRow>
-                  ) : null}
+                  {loadingTab
+                    ? [0, 1, 2, 3, 4, 5].map((i) => (
+                        <TableRow key={`hist-skel-${i}`}>
+                          <TableCell>
+                            <Skeleton height={14} width={72} />
+                          </TableCell>
+                          {showAgentFilter ? (
+                            <TableCell>
+                              <Skeleton height={14} width="80%" />
+                            </TableCell>
+                          ) : null}
+                          <TableCell>
+                            <Skeleton height={14} width="70%" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton height={24} width={76} />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton height={14} width={40} />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton height={14} width={36} />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton width={26} height={26} circle className={styles.historyTargetsSkeletonIcon} />
+                          </TableCell>
+                          <TableCell>
+                            <div className={styles.historyRowActions}>
+                              <Skeleton width={26} height={26} className={styles.boardSkeletonIconBtn} />
+                              <Skeleton width={26} height={26} className={styles.boardSkeletonIconBtn} />
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    : null}
                   {!loadingTab && !filteredHistoryLogs.length ? (
                     <TableRow>
                       <TableCell colSpan={historyColSpan}>
@@ -1348,15 +1697,57 @@ export function TaskManagerPage() {
                           <TableCell>{Number(log.completion_percent || 0).toFixed(1)}%</TableCell>
                           <TableCell>{Number(log.score || 0).toFixed(1)}</TableCell>
                           <TableCell>
-                            <span className={styles.tableMono}>
-                              {log.achieved_calls}/{log.target_calls} · {log.achieved_meetings}/{log.target_meetings} ·{' '}
-                              {log.achieved_deals}/{log.target_deals}
-                            </span>
+                            <div className={styles.historyTargetsCell}>
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                className={styles.historyTargetsIconBtn}
+                                onClick={() => setHistoryTargetsLog(log)}
+                                title="View targets"
+                                aria-label="View targets"
+                              >
+                                <MaterialSymbol name="visibility" size="sm" className={styles.historyTargetsIconGlyph} />
+                              </Button>
+                            </div>
                           </TableCell>
                           <TableCell>
-                            <Button size="sm" variant="ghost" onClick={() => openNotesModal(log)}>
-                              Notes
-                            </Button>
+                            <div className={styles.historyRowActions}>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => openNotesModal(log)}
+                                title="Notes"
+                                aria-label="Open notes"
+                              >
+                                <MaterialSymbol name="sticky_note_2" size="sm" />
+                              </Button>
+                              {log.assignment_id ? (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Comments"
+                                  aria-label="Open comments"
+                                  onClick={() =>
+                                    openCommentsModal({
+                                      id: log.assignment_id,
+                                      title: log.assignment_title,
+                                      task_date: log.task_date,
+                                      status: log.status,
+                                      score: log.score,
+                                      achieved_calls: log.achieved_calls,
+                                      target_calls: log.target_calls,
+                                      achieved_meetings: log.achieved_meetings,
+                                      target_meetings: log.target_meetings,
+                                      achieved_deals: log.achieved_deals,
+                                      target_deals: log.target_deals,
+                                      notes: log.agent_note || log.manager_note || '',
+                                    })
+                                  }
+                                >
+                                  <MaterialSymbol name="chat_bubble" size="sm" />
+                                </Button>
+                              ) : null}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
@@ -1421,6 +1812,7 @@ export function TaskManagerPage() {
               value={assignForm.assigned_to_user_id}
               onChange={(e) => setAssignForm((s) => ({ ...s, assigned_to_user_id: e.target.value }))}
               options={agentOptions}
+              required
             />
             <div className={styles.full}>
               <Input
@@ -1445,12 +1837,14 @@ export function TaskManagerPage() {
               value={assignForm.task_type}
               onChange={(e) => setAssignForm((s) => ({ ...s, task_type: e.target.value }))}
               options={taskTypeOptions}
+              required
             />
             <Select
               label="Priority"
               value={assignForm.priority}
               onChange={(e) => setAssignForm((s) => ({ ...s, priority: e.target.value }))}
               options={priorityOptions}
+              required
             />
             <div className={styles.full}>
               <h4 className={styles.formSectionTitle}>
@@ -1467,6 +1861,7 @@ export function TaskManagerPage() {
               value={assignForm.schedule_window}
               onChange={(e) => setAssignForm((s) => ({ ...s, schedule_window: e.target.value }))}
               options={scheduleWindowOptions}
+              required
             />
             {assignForm.schedule_window === 'current' ? (
               <>
@@ -1475,34 +1870,35 @@ export function TaskManagerPage() {
                   value={assignForm.due_preset}
                   onChange={(e) => setAssignForm((s) => ({ ...s, due_preset: e.target.value }))}
                   options={duePresetOptionsWithDate}
+                  required
                 />
                 {assignForm.due_preset === 'custom' ? (
-                  <Input
+                  <DateTimePickerField
                     label="Custom due date"
-                    type="date"
+                    mode="date"
                     value={assignForm.end_date}
                     min={todayStr}
-                    onChange={(e) => setAssignForm((s) => ({ ...s, end_date: e.target.value }))}
+                    onChange={(v) => setAssignForm((s) => ({ ...s, end_date: v }))}
                     required
                   />
                 ) : null}
               </>
             ) : (
               <>
-                <Input
+                <DateTimePickerField
                   label="Start date"
-                  type="date"
+                  mode="date"
                   value={assignForm.start_date}
                   min={todayStr}
-                  onChange={(e) => setAssignForm((s) => ({ ...s, start_date: e.target.value }))}
+                  onChange={(v) => setAssignForm((s) => ({ ...s, start_date: v }))}
                   required
                 />
-                <Input
+                <DateTimePickerField
                   label="Due date"
-                  type="date"
+                  mode="date"
                   value={assignForm.end_date}
                   min={assignForm.start_date || todayStr}
-                  onChange={(e) => setAssignForm((s) => ({ ...s, end_date: e.target.value }))}
+                  onChange={(v) => setAssignForm((s) => ({ ...s, end_date: v }))}
                   required
                 />
               </>
@@ -1542,12 +1938,12 @@ export function TaskManagerPage() {
                   modalTitle="Meeting and targets"
                   message={
                     assignForm.task_type === 'todo'
-                      ? 'To-do tracks calls, meetings, and deals.'
+                      ? 'To-do tracks calls, meetings, and deals. At least one target must be greater than zero (fields without a star are optional individually, but not all three may be zero).'
                       : assignForm.task_type === 'meeting'
-                        ? 'Meeting tasks only track meetings.'
+                        ? 'Meeting tasks only track meetings; target meetings is required.'
                         : assignForm.task_type === 'call'
-                          ? 'Call tasks only track calls.'
-                          : 'Deal tasks only track deals.'
+                          ? 'Call tasks only track calls; target calls is required.'
+                          : 'Deal tasks only track deals; target deals is required.'
                   }
                 />
               </h4>
@@ -1598,6 +1994,7 @@ export function TaskManagerPage() {
                     target_calls: normalizeNonNegativeIntegerInput(e.target.value, s.target_calls),
                   }))
                 }
+                required={assignForm.task_type === 'call'}
               />
             ) : null}
             {assignForm.task_type === 'todo' || assignForm.task_type === 'meeting' ? (
@@ -1611,6 +2008,7 @@ export function TaskManagerPage() {
                     target_meetings: normalizeNonNegativeIntegerInput(e.target.value, s.target_meetings),
                   }))
                 }
+                required={assignForm.task_type === 'meeting'}
               />
             ) : null}
             {assignForm.task_type === 'todo' || assignForm.task_type === 'deal' ? (
@@ -1624,6 +2022,7 @@ export function TaskManagerPage() {
                     target_deals: normalizeNonNegativeIntegerInput(e.target.value, s.target_deals),
                   }))
                 }
+                required={assignForm.task_type === 'deal'}
               />
             ) : null}
             <div className={styles.full}>
@@ -1699,6 +2098,230 @@ export function TaskManagerPage() {
             />
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={!!taskDetailsLog}
+        onClose={() => setTaskDetailsLog(null)}
+        title="Task details"
+        size="md"
+        closeOnOverlay
+        closeOnEscape
+        footer={
+          <ModalFooter>
+            <Button variant="ghost" onClick={() => setTaskDetailsLog(null)}>
+              Close
+            </Button>
+            {taskDetailsLog ? (
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    const log = taskDetailsLog;
+                    setTaskDetailsLog(null);
+                    void openNotesModal(log);
+                  }}
+                >
+                  <MaterialSymbol name="sticky_note_2" size="sm" />
+                  Notes
+                </Button>
+                {taskDetailsLog.assignment_id ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      const log = taskDetailsLog;
+                      if (!log?.assignment_id) return;
+                      setTaskDetailsLog(null);
+                      openCommentsModal({
+                        id: log.assignment_id,
+                        title: log.assignment_title,
+                        task_date: log.task_date,
+                        status: log.status,
+                        score: log.score,
+                        achieved_calls: log.achieved_calls,
+                        target_calls: log.target_calls,
+                        achieved_meetings: log.achieved_meetings,
+                        target_meetings: log.target_meetings,
+                        achieved_deals: log.achieved_deals,
+                        target_deals: log.target_deals,
+                        notes: log.agent_note || log.manager_note || '',
+                      });
+                    }}
+                  >
+                    <MaterialSymbol name="chat_bubble" size="sm" />
+                    Comments
+                  </Button>
+                ) : null}
+              </>
+            ) : null}
+          </ModalFooter>
+        }
+      >
+        {taskDetailsLog ? (
+          <div className={styles.taskDetailsModal}>
+            <div className={styles.taskDetailsModalHead}>
+              <h3 className={styles.taskDetailsTitle}>{taskDetailsLog.assignment_title || 'Task'}</h3>
+              <Badge variant={statusBadgeVariant(taskDetailsLog.status)} size="md">
+                {formatStatusLabel(taskDetailsLog.status)}
+              </Badge>
+            </div>
+            <div className={styles.taskDetailsMeta}>
+              <span>
+                <MaterialSymbol name="calendar_today" size="sm" />
+                {formatDate(taskDetailsLog.task_date)}
+              </span>
+              {taskDetailsLog.user_name ? (
+                <span>
+                  <MaterialSymbol name="person" size="sm" />
+                  {taskDetailsLog.user_name}
+                </span>
+              ) : null}
+              {taskDetailsLog.assignment_priority ? (
+                <span>
+                  <MaterialSymbol name="flag" size="sm" />
+                  {formatStatusLabel(taskDetailsLog.assignment_priority)} priority
+                </span>
+              ) : null}
+            </div>
+            {taskDetailsLog.assignment_start_date || taskDetailsLog.assignment_end_date ? (
+              <p className={styles.taskDetailsRange}>
+                Assignment window:{' '}
+                {taskDetailsLog.assignment_start_date
+                  ? formatDate(taskDetailsLog.assignment_start_date)
+                  : taskDetailsLog.assignment_start_at
+                    ? formatDate(taskDetailsLog.assignment_start_at)
+                    : '—'}{' '}
+                →{' '}
+                {taskDetailsLog.assignment_end_date
+                  ? formatDate(taskDetailsLog.assignment_end_date)
+                  : taskDetailsLog.assignment_end_at
+                    ? formatDate(taskDetailsLog.assignment_end_at)
+                    : '—'}
+              </p>
+            ) : null}
+            <div className={styles.taskMetricsIconsRow}>
+              {(() => {
+                const log = taskDetailsLog;
+                const callsP = formatAchievedTargetPair(log.achieved_calls, log.target_calls);
+                const meetP = formatAchievedTargetPair(log.achieved_meetings, log.target_meetings);
+                const dealsP = formatAchievedTargetPair(log.achieved_deals, log.target_deals);
+                return (
+                  <>
+                    {callsP ? (
+                      <div className={`${styles.metricChip} ${styles.metricChipCalls}`}>
+                        <MaterialSymbol name="call" size="sm" className={styles.metricChipIcon} />
+                        <span className={styles.metricChipText}>
+                          {callsP.text}
+                          {callsP.overBy > 0 ? <span className={styles.metricChipExtra}>+{callsP.overBy}</span> : null}
+                        </span>
+                      </div>
+                    ) : null}
+                    {meetP ? (
+                      <div className={`${styles.metricChip} ${styles.metricChipMeetings}`}>
+                        <MaterialSymbol name="groups" size="sm" className={styles.metricChipIcon} />
+                        <span className={styles.metricChipText}>
+                          {meetP.text}
+                          {meetP.overBy > 0 ? <span className={styles.metricChipExtra}>+{meetP.overBy}</span> : null}
+                        </span>
+                      </div>
+                    ) : null}
+                    {dealsP ? (
+                      <div className={`${styles.metricChip} ${styles.metricChipDeals}`}>
+                        <MaterialSymbol name="payments" size="sm" className={styles.metricChipIcon} />
+                        <span className={styles.metricChipText}>
+                          {dealsP.text}
+                          {dealsP.overBy > 0 ? <span className={styles.metricChipExtra}>+{dealsP.overBy}</span> : null}
+                        </span>
+                      </div>
+                    ) : null}
+                    <div className={`${styles.metricChip} ${styles.metricChipScore}`}>
+                      <MaterialSymbol name="target" size="sm" className={styles.metricChipIcon} />
+                      <span className={styles.metricChipText}>{Number(log.score || 0).toFixed(0)}</span>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+            <div className={styles.progressTrack}>
+              <div
+                className={styles.progressFill}
+                style={{
+                  width: `${Math.min(100, Math.max(0, Number(taskDetailsLog.completion_percent || 0)))}%`,
+                }}
+              />
+            </div>
+            <p className={styles.taskDetailsDonePct}>
+              Done {Number(taskDetailsLog.completion_percent || 0).toFixed(1)}% · Daily log #{taskDetailsLog.id}
+            </p>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        isOpen={!!historyTargetsLog}
+        onClose={() => setHistoryTargetsLog(null)}
+        title="Targets"
+        size="sm"
+        closeOnOverlay
+        closeOnEscape
+        footer={
+          <ModalFooter>
+            <Button variant="ghost" onClick={() => setHistoryTargetsLog(null)}>
+              Close
+            </Button>
+          </ModalFooter>
+        }
+      >
+        {historyTargetsLog ? (
+          <div className={styles.targetsDetailModal}>
+            <p className={styles.modalLead}>
+              {historyTargetsLog.assignment_title || 'Task'} · {formatDate(historyTargetsLog.task_date)}
+            </p>
+            <div className={styles.taskMetrics}>
+              {(() => {
+                const log = historyTargetsLog;
+                const c = formatAchievedTargetPair(log.achieved_calls, log.target_calls);
+                const m = formatAchievedTargetPair(log.achieved_meetings, log.target_meetings);
+                const d = formatAchievedTargetPair(log.achieved_deals, log.target_deals);
+                return (
+                  <>
+                    {c ? (
+                      <div className={styles.taskMetric}>
+                        <span className={styles.taskMetricLabel}>Calls</span>
+                        <span className={styles.taskMetricVal}>
+                          {c.text}
+                          {c.overBy > 0 ? ` (+${c.overBy})` : ''}
+                        </span>
+                      </div>
+                    ) : null}
+                    {m ? (
+                      <div className={styles.taskMetric}>
+                        <span className={styles.taskMetricLabel}>Meetings</span>
+                        <span className={styles.taskMetricVal}>
+                          {m.text}
+                          {m.overBy > 0 ? ` (+${m.overBy})` : ''}
+                        </span>
+                      </div>
+                    ) : null}
+                    {d ? (
+                      <div className={styles.taskMetric}>
+                        <span className={styles.taskMetricLabel}>Deals</span>
+                        <span className={styles.taskMetricVal}>
+                          {d.text}
+                          {d.overBy > 0 ? ` (+${d.overBy})` : ''}
+                        </span>
+                      </div>
+                    ) : null}
+                    <div className={styles.taskMetric}>
+                      <span className={styles.taskMetricLabel}>Score</span>
+                      <span className={styles.taskMetricVal}>{Number(log.score || 0).toFixed(0)}</span>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        ) : null}
       </Modal>
 
       <Modal

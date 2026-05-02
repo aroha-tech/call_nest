@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { notificationAPI } from '../../services/notificationAPI';
 import { connectTenantRealtimeSocket } from '../../services/tenantRealtimeSocket';
 import { showForegroundBrowserNotification } from '../../services/notificationPush';
@@ -11,6 +11,7 @@ import styles from './NotificationBell.module.scss';
 
 export function NotificationBell() {
   const user = useAppSelector(selectUser);
+  const wrapRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [clearAllOpen, setClearAllOpen] = useState(false);
@@ -54,6 +55,25 @@ export function NotificationBell() {
     });
     return () => disconnect();
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!open || clearAllOpen) return;
+    function onDocMouseDown(e) {
+      const el = wrapRef.current;
+      if (el && !el.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    function onKeyDown(e) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onDocMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onDocMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open, clearAllOpen]);
 
   function handleBellToggle() {
     setOpen((prev) => {
@@ -113,7 +133,7 @@ export function NotificationBell() {
   const badgeText = useMemo(() => (unreadCount > 99 ? '99+' : String(unreadCount)), [unreadCount]);
 
   return (
-    <div className={styles.bellWrap}>
+    <div ref={wrapRef} className={styles.bellWrap}>
       <button type="button" className={styles.bellBtn} onClick={handleBellToggle} aria-label="Notifications">
         <svg className={styles.bellIcon} viewBox="0 0 24 24" width={22} height={22} aria-hidden fill="none">
           <path
@@ -134,6 +154,7 @@ export function NotificationBell() {
       {open ? (
         <NotificationPanel
           items={items}
+          unreadCount={unreadCount}
           onMarkRead={handleMarkRead}
           onMarkAllRead={handleMarkAllRead}
           onClearAll={() => setClearAllOpen(true)}
@@ -152,7 +173,7 @@ export function NotificationBell() {
         onConfirm={handleClearAllConfirm}
         title="Clear all notifications"
         message="Remove every alert from your list for now? You can still receive new ones; items older than the retention window stay hidden automatically."
-        confirmText="Clear all"
+        confirmText="Remove all"
         variant="danger"
         loading={clearAllLoading}
       />

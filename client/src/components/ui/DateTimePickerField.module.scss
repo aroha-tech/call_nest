@@ -1,0 +1,450 @@
+@use '../../styles/variables' as *;
+
+/* Light popover surface (reference UI) on top of app chrome */
+$picker-accent: #5a4fcf;
+$picker-accent-soft: rgba(90, 79, 207, 0.12);
+$picker-surface: #ffffff;
+$picker-text: #1a1d26;
+$picker-muted: #8b92a8;
+$picker-border: rgba(26, 29, 38, 0.12);
+$picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+  width: 100%;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+}
+
+.label {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: var(--color-text-secondary);
+}
+
+.requiredMark {
+  color: var(--color-danger);
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  width: 100%;
+  min-height: 40px;
+  padding: $space-2 $space-3;
+  font-family: var(--font-sans);
+  font-size: $font-size-sm;
+  color: var(--color-text-primary);
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-input-border);
+  border-radius: $radius-md;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color $transition-fast, box-shadow $transition-fast;
+
+  &:hover {
+    border-color: var(--color-input-border-hover);
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-color: var(--color-input-border-focus);
+    box-shadow: 0 0 0 2px var(--color-focus-ring);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.triggerValue {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.triggerPlaceholder {
+  color: var(--color-text-placeholder);
+}
+
+.triggerHasError {
+  border-color: var(--color-danger);
+}
+
+.error {
+  margin: 0;
+  font-size: $font-size-xs;
+  color: var(--color-danger);
+}
+
+.popover {
+  position: fixed;
+  z-index: 10050;
+  display: flex;
+  align-items: stretch;
+  max-height: calc(100vh - 24px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: $picker-surface;
+  border: 1px solid $picker-border;
+  border-radius: $radius-lg;
+  box-shadow: $picker-shadow;
+  font-family: var(--font-sans);
+  color: $picker-text;
+}
+
+.dateSection {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  padding: $space-4;
+  min-width: 280px;
+  box-sizing: border-box;
+}
+
+.timeSection {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 200px;
+  min-height: 0;
+  border-left: 1px solid $picker-border;
+  padding: $space-4;
+  box-sizing: border-box;
+  background: rgba(90, 79, 207, 0.03);
+}
+
+.monthHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $space-3;
+  gap: $space-2;
+}
+
+.monthTitleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: $picker-text;
+  background: transparent;
+  border: none;
+  border-radius: $radius-sm;
+  cursor: pointer;
+
+  &:hover {
+    background: $picker-accent-soft;
+  }
+}
+
+.monthNav {
+  display: flex;
+  gap: 4px;
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: $picker-accent;
+  background: $picker-surface;
+  border: 1px solid $picker-border;
+  border-radius: $radius-sm;
+  cursor: pointer;
+
+  &:hover {
+    background: $picker-accent-soft;
+  }
+}
+
+.monthPanel {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+  margin-bottom: $space-3;
+}
+
+.monthSelectRow {
+  display: flex;
+  gap: $space-2;
+}
+
+.monthSelect {
+  flex: 1;
+  min-height: 36px;
+  padding: 0 $space-2;
+  font-size: $font-size-sm;
+  color: $picker-text;
+  background: $picker-surface;
+  border: 1px solid $picker-border;
+  border-radius: $radius-sm;
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.weekday {
+  text-align: center;
+  font-size: $font-size-2xs;
+  font-weight: $font-weight-semibold;
+  color: $picker-muted;
+  text-transform: uppercase;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.dayCell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: $picker-text;
+  background: transparent;
+  border: none;
+  border-radius: $radius-sm;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: $picker-accent-soft;
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+.dayMuted {
+  color: $picker-muted;
+}
+
+.dayToday {
+  box-shadow: inset 0 0 0 1.5px $picker-accent;
+}
+
+.daySelected {
+  background: $picker-accent !important;
+  color: #fff !important;
+}
+
+.dateFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-2;
+  margin-top: auto;
+  padding-top: $space-3;
+}
+
+.dateFooterActions {
+  display: flex;
+  gap: $space-2;
+  margin-left: auto;
+}
+
+.ghostBtn {
+  padding: 8px 14px;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  color: $picker-accent;
+  background: transparent;
+  border: 1px solid $picker-accent;
+  border-radius: $radius-md;
+  cursor: pointer;
+
+  &:hover {
+    background: $picker-accent-soft;
+  }
+}
+
+.timeHeader {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  margin-bottom: $space-3;
+  color: $picker-text;
+}
+
+.segmentRow {
+  display: flex;
+  background: $picker-surface;
+  border: 1px solid $picker-border;
+  border-radius: $radius-md;
+  padding: 2px;
+  margin-bottom: $space-3;
+}
+
+.segment {
+  flex: 1;
+  padding: 8px 4px;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  color: $picker-muted;
+  background: transparent;
+  border: none;
+  border-radius: $radius-sm;
+  cursor: pointer;
+}
+
+.segmentActive {
+  background: $picker-accent;
+  color: #fff;
+}
+
+.timeSectionBody {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  justify-content: center;
+}
+
+.columns {
+  display: flex;
+  gap: $space-3;
+  justify-content: center;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 140px;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  min-width: 52px;
+}
+
+.columnLabel {
+  font-size: 10px;
+  font-weight: $font-weight-semibold;
+  color: $picker-muted;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-height: 14px;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.columnLabelSpacer {
+  visibility: hidden;
+  user-select: none;
+}
+
+.stepBtn {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  font-size: 10px;
+  color: $picker-accent;
+  background: $picker-surface;
+  border: 1px solid $picker-border;
+  border-radius: $radius-xs;
+  cursor: pointer;
+
+  &:hover {
+    background: $picker-accent-soft;
+  }
+}
+
+.wheelSlot {
+  box-sizing: border-box;
+  min-width: 48px;
+  min-height: 44px;
+  padding: 8px 6px;
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  text-align: center;
+  color: $picker-text;
+  background: rgba(90, 79, 207, 0.08);
+  border: 1px solid rgba(90, 79, 207, 0.35);
+  border-radius: $radius-sm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wheelGhost {
+  font-size: $font-size-xs;
+  color: $picker-muted;
+  line-height: 1.2;
+  min-height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.primaryBtn {
+  flex-shrink: 0;
+  align-self: stretch;
+  width: 100%;
+  margin-top: auto;
+  padding-top: $space-3;
+  padding-left: 0;
+  padding-right: 0;
+  padding-bottom: 0;
+  min-height: 44px;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: #fff;
+  background: $picker-accent;
+  border: none;
+  border-radius: $radius-md;
+  cursor: pointer;
+
+  &:hover {
+    filter: brightness(1.05);
+  }
+}
+
+.calIcon {
+  flex-shrink: 0;
+  color: $picker-accent;
+}
+
+@media (max-width: 560px) {
+  .popover {
+    flex-direction: column;
+  }
+
+  .timeSection {
+    border-left: none;
+    border-top: 1px solid $picker-border;
+  }
+}
