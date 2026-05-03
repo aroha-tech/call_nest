@@ -25,6 +25,20 @@
   border-radius: $radius-full;
 }
 
+/* For dark panels (e.g. dialer cockpit) */
+.skeletonInverse {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.skeletonInverse::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.14) 45%,
+    transparent 100%
+  );
+}
+
 @keyframes skeletonShimmer {
   100% {
     transform: translateX(100%);

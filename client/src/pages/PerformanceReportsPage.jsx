@@ -14,6 +14,8 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } fro
 import { PerformanceReportsCharts } from './PerformanceReportsCharts';
 import { PerformanceReportsGuide } from './PerformanceReportsGuide';
 import { taskManagerAPI } from '../services/taskManagerAPI';
+import { reportsHubAPI } from '../services/reportsHubAPI';
+import { ReportsHubOverview } from '../components/reports/ReportsHubOverview';
 import { tenantUsersAPI } from '../services/tenantUsersAPI';
 import { usePermissions } from '../hooks/usePermission';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
@@ -77,6 +79,7 @@ export function PerformanceReportsPage() {
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
+  const [reportSurface, setReportSurface] = useState('hub');
   const [draftFrom, setDraftFrom] = useState(from);
   const [draftTo, setDraftTo] = useState(to);
   const [draftMonth, setDraftMonth] = useState(month);
@@ -141,6 +144,18 @@ export function PerformanceReportsPage() {
     setMonth(draftMonth);
     setUserId(draftUserId);
     setFilterOpen(false);
+  }
+
+  async function applyHubPreset(presetId) {
+    setError('');
+    try {
+      const res = await reportsHubAPI.getContext({ preset: presetId, compare: '0' });
+      const p = res?.data?.data?.period;
+      if (p?.from) setFrom(p.from);
+      if (p?.to) setTo(p.to);
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || 'Failed to apply range');
+    }
   }
 
   const filterSummaryLine = useMemo(() => {
@@ -341,51 +356,34 @@ export function PerformanceReportsPage() {
       {error ? <Alert variant="error">{error}</Alert> : null}
       {ok ? <Alert variant="success">{ok}</Alert> : null}
 
-      <div className={styles.scopeCard}>
-        <div>
-          <p className={styles.scopeLabel}>Report Perspective</p>
-          <h3 className={styles.scopeTitle}>
-            <span>{reportPerspective}</span>
-            <InfoHelpIcon
-              title="Report perspective info"
-              modalTitle={reportPerspective}
-              message={reportSubtitle}
-            />
-          </h3>
-        </div>
-        {!isAgent ? (
-          <div className={styles.viewToggleGroup}>
-            <Button
-              variant={viewMode === 'team' ? 'primary' : 'secondary'}
-              size="sm"
-              onClick={() => setViewMode('team')}
-              disabled={loading}
-            >
-              Team
-            </Button>
-            <Button
-              variant={viewMode === 'individual' ? 'primary' : 'secondary'}
-              size="sm"
-              onClick={() => setViewMode('individual')}
-              disabled={loading}
-            >
-              Individual
-            </Button>
-          </div>
-        ) : null}
+      <div className={styles.viewToggleGroup} style={{ marginBottom: '1rem' }}>
+        <Button
+          variant={reportSurface === 'hub' ? 'primary' : 'secondary'}
+          size="sm"
+          type="button"
+          onClick={() => setReportSurface('hub')}
+        >
+          Operations hub
+        </Button>
+        <Button
+          variant={reportSurface === 'detail' ? 'primary' : 'secondary'}
+          size="sm"
+          type="button"
+          onClick={() => setReportSurface('detail')}
+        >
+          Performance detail
+        </Button>
       </div>
 
-      <div className={styles.filterToolbar}>
-        <div className={styles.filterToolbarMeta}>
-          <p className={styles.filterToolbarLabel}>Active filters</p>
-          <p className={styles.filterToolbarRange}>{filterSummaryLine}</p>
-        </div>
-        <div className={styles.filterToolbarActions}>
-          <Button type="button" variant="primary" size="sm" onClick={openFilterModal} disabled={loading}>
-            Filters
-          </Button>
-        </div>
-      </div>
+      {reportSurface === 'hub' ? (
+        <ReportsHubOverview
+          canViewTeam={canViewTeam}
+          from={from}
+          to={to}
+          onApplyPresetDates={applyHubPreset}
+          onOpenFilters={() => setFilterOpen(true)}
+        />
+      ) : null}
 
       <Modal
         isOpen={filterOpen}
@@ -431,6 +429,54 @@ export function PerformanceReportsPage() {
           Task scores use daily task logs. CRM metrics (dials, scheduled follow-ups by type, meetings, new opportunities) use the same From/To range. The calendar month controls the status mix chart and calendar table.
         </p>
       </Modal>
+
+      {reportSurface === 'detail' ? (
+        <>
+      <div className={styles.scopeCard}>
+        <div>
+          <p className={styles.scopeLabel}>Report Perspective</p>
+          <h3 className={styles.scopeTitle}>
+            <span>{reportPerspective}</span>
+            <InfoHelpIcon
+              title="Report perspective info"
+              modalTitle={reportPerspective}
+              message={reportSubtitle}
+            />
+          </h3>
+        </div>
+        {!isAgent ? (
+          <div className={styles.viewToggleGroup}>
+            <Button
+              variant={viewMode === 'team' ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => setViewMode('team')}
+              disabled={loading}
+            >
+              Team
+            </Button>
+            <Button
+              variant={viewMode === 'individual' ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => setViewMode('individual')}
+              disabled={loading}
+            >
+              Individual
+            </Button>
+          </div>
+        ) : null}
+      </div>
+
+      <div className={styles.filterToolbar}>
+        <div className={styles.filterToolbarMeta}>
+          <p className={styles.filterToolbarLabel}>Active filters</p>
+          <p className={styles.filterToolbarRange}>{filterSummaryLine}</p>
+        </div>
+        <div className={styles.filterToolbarActions}>
+          <Button type="button" variant="primary" size="sm" onClick={openFilterModal} disabled={loading}>
+            Filters
+          </Button>
+        </div>
+      </div>
 
       <PerformanceReportsGuide isAgent={isAgent} canViewTeam={canViewTeam} viewMode={viewMode} />
 
@@ -854,6 +900,8 @@ export function PerformanceReportsPage() {
           ) : null}
         </Tabs>
       </div>
+        </>
+      ) : null}
     </div>
   );
 }

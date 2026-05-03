@@ -8,6 +8,7 @@ import { IconButton } from '../components/ui/IconButton';
 import { EditIcon, TrashIcon, RowActionGroup } from '../components/ui/ActionIcons';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
+import { Checkbox } from '../components/ui/Checkbox';
 import { Alert } from '../components/ui/Alert';
 import { Skeleton } from '../components/ui/Skeleton';
 import { Modal, ModalFooter, ConfirmModal } from '../components/ui/Modal';
@@ -488,10 +489,41 @@ export function DealsPage() {
     return (
       <div className={styles.page}>
         <PageHeader title="Deals" description="Pipelines and board by stage." />
-        <div style={{ width: 'min(980px, 100%)', display: 'grid', gap: 12 }}>
-          <Skeleton width="30%" height={14} />
-          <Skeleton width="100%" height={46} />
-          <Skeleton width="100%" height={320} />
+        <div className={styles.tabsWrap} aria-hidden>
+          <div className={styles.tabs}>
+            <Skeleton width={168} height={36} style={{ borderRadius: 9 }} />
+            <Skeleton width={112} height={36} style={{ borderRadius: 9 }} />
+          </div>
+        </div>
+        <div className={styles.dealCard}>
+          <div className={styles.dealHeader}>
+            <Skeleton width="36%" height={22} />
+            <div className={styles.dealActions}>
+              <Skeleton width={88} height={32} style={{ borderRadius: 8 }} />
+              <Skeleton width={88} height={32} style={{ borderRadius: 8 }} />
+            </div>
+          </div>
+          <div className={styles.stageTableWrap}>
+            <div style={{ padding: 14, display: 'grid', gap: 10 }}>
+              <Skeleton height={40} width="100%" />
+              <Skeleton height={40} width="100%" />
+              <Skeleton height={40} width="100%" />
+            </div>
+          </div>
+        </div>
+        <div className={styles.dealCard}>
+          <div className={styles.dealHeader}>
+            <Skeleton width="32%" height={22} />
+            <div className={styles.dealActions}>
+              <Skeleton width={88} height={32} style={{ borderRadius: 8 }} />
+            </div>
+          </div>
+          <div className={styles.stageTableWrap}>
+            <div style={{ padding: 14, display: 'grid', gap: 10 }}>
+              <Skeleton height={40} width="100%" />
+              <Skeleton height={40} width="100%" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -696,9 +728,36 @@ export function DealsPage() {
             </div>
           </div>
           {boardLoading ? (
-            <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
-              <Skeleton width="100%" height={48} />
-              <Skeleton width="100%" height={240} />
+            <div className={styles.boardSkelRoot} aria-busy="true" aria-label="Loading board">
+              <div className={styles.boardToolbar}>
+                <div className={styles.boardToolbarFields}>
+                  <Skeleton height={48} width="100%" style={{ maxWidth: 360 }} />
+                </div>
+                <div className={styles.boardToolbarActions}>
+                  <Skeleton width={96} height={32} style={{ borderRadius: 8 }} />
+                  <Skeleton width={88} height={32} style={{ borderRadius: 8 }} />
+                </div>
+              </div>
+              <div className={styles.boardScroll}>
+                {Array.from({ length: 4 }, (_, col) => (
+                  <div key={`board-skel-col-${col}`} className={styles.boardCol}>
+                    <div className={styles.boardColHead}>
+                      <div className={styles.boardColTitleRow}>
+                        <Skeleton width="72%" height={18} />
+                        <Skeleton width={44} height={20} style={{ borderRadius: 6 }} />
+                      </div>
+                      <div className={styles.boardColMeta}>
+                        <Skeleton width={52} height={22} style={{ borderRadius: 999 }} />
+                        <Skeleton width={68} height={14} />
+                      </div>
+                    </div>
+                    <div className={styles.boardColBody}>
+                      <Skeleton height={72} width="100%" style={{ borderRadius: 12, marginBottom: 10 }} />
+                      <Skeleton height={72} width="100%" style={{ borderRadius: 12 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
           {!boardLoading && boardData && (
@@ -796,17 +855,20 @@ export function DealsPage() {
                   placeholder="Optional — who this pipeline is for, or how it differs from others."
                 />
               </div>
-              <label className={styles.checkboxRow}>
-                <input
-                  type="checkbox"
-                  checked={!!dealModal.is_active}
-                  onChange={(e) => setDealModal((p) => ({ ...p, is_active: e.target.checked }))}
-                />
-                <span>
-                  <strong>Active</strong>
-                  <span className={styles.checkboxSub}>Inactive pipelines stay hidden when adding deals on records.</span>
-                </span>
-              </label>
+              <Checkbox
+                className={styles.pipelineActiveCheckbox}
+                labelClassName={styles.pipelineActiveCheckboxLabelWrap}
+                checked={!!dealModal.is_active}
+                onChange={(e) => setDealModal((p) => ({ ...p, is_active: e.target.checked }))}
+                label={
+                  <span className={styles.pipelineActiveCheckboxLabel}>
+                    <strong>Active</strong>
+                    <span className={styles.checkboxSub}>
+                      Inactive pipelines stay hidden when adding deals on records.
+                    </span>
+                  </span>
+                }
+              />
             </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => setDealModal(null)} disabled={saving}>
@@ -828,11 +890,6 @@ export function DealsPage() {
           onClose={() => !saving && setStageModal(null)}
         >
           <form onSubmit={saveStage} className={styles.modalForm}>
-            <InfoHelpIcon
-              title="Stage progress info"
-              modalTitle="Stage setup"
-              message="Choose 10–90% for open pipeline stages. At 100% you can keep the stage open or mark it closed as Won or Lost."
-            />
             <div className={styles.modalFields}>
               <Input
                 label="Stage name"
@@ -847,6 +904,7 @@ export function DealsPage() {
                 value={stageModal.progressOutcome}
                 onChange={(e) => setStageModal((p) => ({ ...p, progressOutcome: e.target.value }))}
                 placeholder="Select…"
+                hint="Choose 10–90% for open pipeline stages. At 100% you can keep the stage open or mark it closed as Won or Lost."
               />
             </div>
             <ModalFooter>

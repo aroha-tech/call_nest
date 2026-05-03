@@ -31,8 +31,8 @@
 
 // Color variants - matching screenshot design
 .iconWrap_blue {
-  background: color-mix(in srgb, #6366f1 18%, transparent);
-  color: #818cf8;
+  background: color-mix(in srgb, #2563eb 18%, transparent);
+  color: #3b82f6;
 }
 
 .iconWrap_green {
@@ -41,8 +41,8 @@
 }
 
 .iconWrap_purple {
-  background: color-mix(in srgb, #a855f7 18%, transparent);
-  color: #c084fc;
+  background: color-mix(in srgb, #2563eb 18%, transparent);
+  color: #3b82f6;
 }
 
 .iconWrap_orange {
@@ -81,8 +81,8 @@
 }
 
 .iconWrap_indigo {
-  background: color-mix(in srgb, #6366f1 18%, transparent);
-  color: #818cf8;
+  background: color-mix(in srgb, #2563eb 18%, transparent);
+  color: #3b82f6;
 }
 
 .iconWrap_teal {
@@ -134,8 +134,8 @@
 // Light theme adjustments
 :root[data-color-scheme='light'] {
   .iconWrap_blue {
-    background: color-mix(in srgb, #6366f1 12%, transparent);
-    color: #4f46e5;
+    background: color-mix(in srgb, #2563eb 12%, transparent);
+    color: #1d4ed8;
   }
 
   .iconWrap_green {
@@ -144,8 +144,8 @@
   }
 
   .iconWrap_purple {
-    background: color-mix(in srgb, #a855f7 12%, transparent);
-    color: #9333ea;
+    background: color-mix(in srgb, #2563eb 12%, transparent);
+    color: #1d4ed8;
   }
 
   .iconWrap_orange {
@@ -184,8 +184,8 @@
   }
 
   .iconWrap_indigo {
-    background: color-mix(in srgb, #6366f1 12%, transparent);
-    color: #4f46e5;
+    background: color-mix(in srgb, #2563eb 12%, transparent);
+    color: #1d4ed8;
   }
 
   .iconWrap_teal {

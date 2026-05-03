@@ -346,7 +346,11 @@ export function DispositionsPage({ readOnly = false }) {
             className={listStyles.searchInToolbar}
           />
         </div>
-        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        <TableDataRegion
+          loading={loading}
+          hasCompletedInitialFetch={hasCompletedInitialFetch}
+          skeletonColumns={7}
+        >
           {dispositions.length === 0 ? (
             <div className={listStyles.tableCardEmpty}>
               <EmptyState

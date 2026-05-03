@@ -9,6 +9,7 @@ import { IconButton } from '../../components/ui/IconButton';
 import { ViewIcon } from '../../components/ui/ActionIcons';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { TableSkeletonTable } from '../../components/admin/TableSkeletonTable';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { SearchInput } from '../../components/ui/SearchInput';
@@ -81,12 +82,13 @@ export function WhatsAppLogsPage() {
     return (
       <div className={styles.page}>
         <PageHeader title="WhatsApp API Logs" />
-        <div className={styles.loading}>
-          <div style={{ width: 'min(920px, 100%)', display: 'grid', gap: 10 }}>
-            <Skeleton width="26%" height={14} />
-            <Skeleton width="100%" height={40} />
-            <Skeleton width="100%" height={40} />
-            <Skeleton width="100%" height={40} />
+        <div className={listStyles.tableCard}>
+          <div className={listStyles.tableCardToolbarTop}>
+            <Skeleton height={36} width={120} />
+            <Skeleton height={40} width="min(320px, 100%)" />
+          </div>
+          <div style={{ padding: 16 }}>
+            <TableSkeletonTable columns={6} rows={8} />
           </div>
         </div>
       </div>
@@ -128,7 +130,11 @@ export function WhatsAppLogsPage() {
             className={listStyles.searchInToolbar}
           />
         </div>
-        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        <TableDataRegion
+          loading={loading}
+          hasCompletedInitialFetch={hasCompletedInitialFetch}
+          skeletonColumns={6}
+        >
           {!logs?.length ? (
             <div className={listStyles.tableCardEmpty}>
               <EmptyState

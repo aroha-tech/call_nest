@@ -194,7 +194,11 @@ export function IndustryFieldDefinitionsView({ industryId }) {
       {fieldsError ? <Alert variant="error">{String(fieldsError)}</Alert> : null}
 
       <div className={listStyles.tableCard}>
-        <TableDataRegion loading={loadingFields} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        <TableDataRegion
+          loading={loadingFields}
+          hasCompletedInitialFetch={hasCompletedInitialFetch}
+          skeletonColumns={8}
+        >
           {fields.length === 0 && !loadingFields ? (
             <p className={styles.empty}>
               No fields yet. Add fields that apply to this vertical (e.g. policy dates for insurance).

@@ -396,6 +396,14 @@
   text-transform: none;
 }
 
+.panelTitleWithHelp {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
 .panelTitleWithIcon {
   display: inline-flex;
   align-items: center;
@@ -888,7 +896,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
+  background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
   color: #ffffff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
 }
@@ -947,15 +955,15 @@
 }
 
 .activityTabActive {
-  border-color: #7c3aed;
+  border-color: #2563eb;
   color: #ffffff;
-  background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
+  background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
 
   &:hover {
-    border-color: #7c3aed;
+    border-color: #1d4ed8;
     color: #ffffff;
-    background: linear-gradient(135deg, #6d28d9 0%, #4f46e5 100%);
+    background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
   }
 }
 
@@ -1557,6 +1565,14 @@
   justify-content: space-between;
   gap: $space-3;
   margin-bottom: $space-4;
+}
+
+.insightPanelTitleRow {
+  margin: 0 0 $space-1;
+}
+
+.insightPanelTitleRow .insightPanelTitle {
+  margin: 0;
 }
 
 .insightPanelTitle {

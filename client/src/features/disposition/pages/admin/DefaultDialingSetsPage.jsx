@@ -217,7 +217,11 @@ export function DefaultDialingSetsPage() {
       {!selectedIndustry ? (
         <EmptyState icon="🏭" title="Select an Industry" description="Choose an industry to manage its dialing sets." />
       ) : (
-        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        <TableDataRegion
+          loading={loading}
+          hasCompletedInitialFetch={hasCompletedInitialFetch}
+          skeletonVariant="lines"
+        >
         <div className={styles.splitView}>
           <div className={styles.listPanel}>
             <h3 className={styles.panelTitle}>Dialing Sets</h3>

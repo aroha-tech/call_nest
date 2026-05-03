@@ -12,7 +12,7 @@ import { PERMISSIONS } from '../utils/permissionUtils';
 import { useToast } from '../context/ToastContext';
 import { DateRangePresetControl } from '../components/ui/DateRangePresetControl';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
-import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
+import { InfoHelpIcon, infoHelpHeadingRowClassName } from '../components/ui/InfoHelpIcon';
 import {
   TIME_RANGE_PRESET,
   TIME_RANGE_PRESET_OPTIONS,
@@ -308,13 +308,19 @@ export function TenantDashboardPage() {
   if (loading) {
     return (
       <div className={styles.page}>
-        <div className={styles.dashboardSkeletonWrap} aria-label="Loading dashboard">
-          <div className={styles.dashboardSkeletonHero}>
-            <Skeleton width="34%" height={14} />
-            <Skeleton width="48%" height={30} />
-            <Skeleton width="62%" height={14} />
+        <header className={styles.hero}>
+          <div className={styles.heroTitles}>
+            <Skeleton width="72%" height={11} />
+            <Skeleton width="min(420px, 58%)" height={32} />
+            <Skeleton width="min(520px, 88%)" height={11} />
           </div>
-          <div className={styles.dashboardSkeletonKpis}>
+          <div className={styles.heroActions}>
+            <Skeleton width={118} height={38} style={{ borderRadius: 10 }} />
+            <Skeleton width={88} height={38} style={{ borderRadius: 10 }} />
+          </div>
+        </header>
+        <div className={styles.dashboardSkeletonWrap} aria-label="Loading dashboard">
+          <section className={styles.dashboardSkeletonKpis}>
             {Array.from({ length: 6 }, (_, i) => (
               <div key={`kpi-skel-${i}`} className={styles.dashboardSkeletonCard}>
                 <Skeleton width={28} height={28} circle />
@@ -323,11 +329,55 @@ export function TenantDashboardPage() {
                 <Skeleton width="74%" height={11} />
               </div>
             ))}
-          </div>
-          <div className={styles.dashboardSkeletonGrid}>
-            <Skeleton width="100%" height={220} />
-            <Skeleton width="100%" height={220} />
-            <Skeleton width="100%" height={220} />
+          </section>
+          <div className={styles.mainGrid}>
+            <div>
+              <section className={styles.panel}>
+                <div className={styles.panelHead}>
+                  <Skeleton width="42%" height={16} />
+                  <Skeleton width={56} height={14} />
+                </div>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {Array.from({ length: 4 }, (_, j) => (
+                    <Skeleton key={`skel-up-${j}`} height={56} width="100%" />
+                  ))}
+                </div>
+              </section>
+              <section className={styles.panel} style={{ marginTop: 8 }}>
+                <div className={styles.panelHead}>
+                  <Skeleton width="48%" height={16} />
+                  <Skeleton width={120} height={24} />
+                </div>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {Array.from({ length: 3 }, (_, j) => (
+                    <Skeleton key={`skel-call-${j}`} height={52} width="100%" />
+                  ))}
+                </div>
+              </section>
+            </div>
+            <div className={styles.sideStack}>
+              <section className={styles.panel}>
+                <div className={styles.panelHead}>
+                  <Skeleton width="52%" height={16} />
+                  <Skeleton width={72} height={14} />
+                </div>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {Array.from({ length: 3 }, (_, j) => (
+                    <Skeleton key={`skel-cb-${j}`} height={52} width="100%" />
+                  ))}
+                </div>
+              </section>
+              <section className={styles.panel}>
+                <div className={styles.panelHead}>
+                  <Skeleton width="40%" height={16} />
+                </div>
+                <div className={styles.quickGrid}>
+                  {Array.from({ length: 4 }, (_, j) => (
+                    <Skeleton key={`skel-q-${j}`} height={44} width="100%" style={{ borderRadius: 12 }} />
+                  ))}
+                </div>
+              </section>
+            </div>
           </div>
         </div>
       </div>
@@ -998,7 +1048,7 @@ export function TenantDashboardPage() {
               aria-labelledby="dash-users-by-role-heading"
             >
               <div className={styles.insightPanelHead}>
-                <div>
+                <div className={`${infoHelpHeadingRowClassName} ${styles.insightPanelTitleRow}`.trim()}>
                   <h2 id="dash-users-by-role-heading" className={styles.insightPanelTitle}>
                     {scope === 'tenant' ? 'Users by role' : 'Your agents'}
                   </h2>
@@ -1047,7 +1097,7 @@ export function TenantDashboardPage() {
               aria-labelledby="dash-recent-users-heading"
             >
               <div className={styles.insightPanelHead}>
-                <div>
+                <div className={`${infoHelpHeadingRowClassName} ${styles.insightPanelTitleRow}`.trim()}>
                   <h2 id="dash-recent-users-heading" className={styles.insightPanelTitle}>
                     {scope === 'team' ? 'Recent agents' : 'Recent users'}
                   </h2>

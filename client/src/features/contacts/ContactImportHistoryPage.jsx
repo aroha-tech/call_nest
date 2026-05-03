@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Alert } from '../../components/ui/Alert';
-import { Skeleton } from '../../components/ui/Skeleton';
+import { TableSkeletonTable } from '../../components/admin/TableSkeletonTable';
 import { Pagination } from '../../components/ui/Pagination';
 import { contactsAPI } from '../../services/contactsAPI';
 import listStyles from '../../components/admin/adminDataList.module.scss';
@@ -79,14 +79,7 @@ export function ContactImportHistoryPage({ type }) {
 
       <div className={listStyles.tableCard}>
         <div className={styles.cardBody}>
-          {loading && (
-            <div style={{ width: '100%', display: 'grid', gap: 10 }}>
-              <Skeleton width="26%" height={14} />
-              <Skeleton width="100%" height={34} />
-              <Skeleton width="100%" height={34} />
-              <Skeleton width="100%" height={34} />
-            </div>
-          )}
+          {loading && <TableSkeletonTable columns={9} rows={7} />}
 
           {!loading && rows.length === 0 && (
             <div className={styles.footerNote}>No imports recorded yet. Run an import from the import page.</div>

@@ -3,7 +3,7 @@
 .checkbox {
   display: inline-flex;
   align-items: center;
-  gap: $space-2;
+  gap: 6px;
   cursor: pointer;
   user-select: none;
   flex-shrink: 0;
@@ -23,47 +23,69 @@
 
 .checkmark {
   position: relative;
-  width: 16px;
-  height: 16px;
-  border: 1px solid var(--color-border);
-  border-radius: $radius-sm;
-  background: var(--color-surface-secondary);
-  transition: all $transition-fast;
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  margin-top: 0;
+  border: 1px solid var(--color-input-border);
+  border-radius: 4px;
+  background: var(--color-input-bg);
+  transition:
+    background $transition-fast,
+    border-color $transition-fast,
+    box-shadow $transition-fast;
 
   &::after {
     content: '';
     position: absolute;
     display: none;
     left: 5px;
-    top: 2px;
-    width: 4px;
-    height: 8px;
-    border: solid white;
-    border-width: 0 2px 2px 0;
+    top: 1px;
+    width: 3px;
+    height: 7px;
+    border: solid #ffffff;
+    border-width: 0 1.5px 1.5px 0;
     transform: rotate(45deg);
   }
 
   .input:checked + & {
-    background: var(--color-text-primary);
-    border-color: var(--color-text-primary);
+    background: var(--color-primary-600);
+    border-color: var(--color-primary-500);
+    box-shadow: 0 1px 0 color-mix(in srgb, #ffffff 18%, transparent) inset;
 
     &::after {
       display: block;
     }
   }
 
-  .input:focus + & {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-text-primary) 30%, transparent);
+  .input:focus-visible + & {
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--color-primary-500) 45%, transparent),
+      0 1px 0 color-mix(in srgb, #ffffff 12%, transparent) inset;
+  }
+
+  .input:checked:focus-visible + & {
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--color-primary-500) 45%, transparent),
+      0 1px 0 color-mix(in srgb, #ffffff 18%, transparent) inset;
   }
 
   .input:disabled + & {
-    background: var(--color-surface-tertiary);
-    border-color: var(--color-border);
+    opacity: 0.55;
+    background: var(--color-bg-subtle);
+    border-color: var(--color-border-subtle);
+  }
+
+  .input:checked:disabled + & {
+    background: color-mix(in srgb, var(--color-primary-600) 55%, var(--color-bg-subtle));
+    border-color: color-mix(in srgb, var(--color-primary-500) 45%, var(--color-border-subtle));
   }
 }
 
 .label {
   font-size: $font-size-sm;
+  line-height: 1.35;
+  padding-top: 0.5px;
   color: var(--color-text-secondary);
 }
 

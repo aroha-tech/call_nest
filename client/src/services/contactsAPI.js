@@ -97,6 +97,7 @@ export const contactsAPI = {
     sort_dir,
     column_filters,
     exclude_blacklisted,
+    require_primary_phone,
   } = {}) =>
     axiosInstance.get(`${BASE}`, {
       params: {
@@ -132,6 +133,7 @@ export const contactsAPI = {
               : JSON.stringify(column_filters)
             : undefined,
         exclude_blacklisted: exclude_blacklisted ? '1' : undefined,
+        require_primary_phone: require_primary_phone ? '1' : undefined,
       },
     }),
 
@@ -155,6 +157,7 @@ export const contactsAPI = {
       filter_tag_ids,
       column_filters,
       exclude_blacklisted,
+      require_primary_phone,
     } = params;
     return axiosInstance.get(`${BASE}/list-ids`, {
       params: {
@@ -186,6 +189,7 @@ export const contactsAPI = {
               : JSON.stringify(column_filters)
             : undefined,
         exclude_blacklisted: exclude_blacklisted ? '1' : undefined,
+        require_primary_phone: require_primary_phone ? '1' : undefined,
       },
     });
   },

@@ -147,6 +147,10 @@ function listFilterOptionsFromObject(b) {
   const filterTagIds = parseFilterTagIdsParam(b.filter_tag_ids);
   const statusIdsFilter = parseStatusIdsFilterParam(b.status_ids);
   const columnFilters = contactsService.normalizeContactListColumnFilters(b.column_filters);
+  const requirePrimaryPhone =
+    b.require_primary_phone === true ||
+    b.require_primary_phone === 1 ||
+    ['1', 'true', 'yes'].includes(String(b.require_primary_phone ?? '').trim().toLowerCase());
 
   return {
     search,
@@ -166,6 +170,7 @@ function listFilterOptionsFromObject(b) {
     campaignIdsFilter,
     filterTagIds,
     columnFilters,
+    requirePrimaryPhone: requirePrimaryPhone || undefined,
   };
 }
 

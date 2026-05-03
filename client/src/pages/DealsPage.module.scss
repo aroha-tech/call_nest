@@ -239,6 +239,10 @@
   width: 100%;
 }
 
+.boardSkelRoot {
+  margin-top: 4px;
+}
+
 .boardRoot {
   display: flex;
   flex-direction: column;
@@ -492,6 +496,26 @@
     display: block;
     font-weight: 600;
     margin-bottom: 2px;
+  }
+}
+
+.pipelineActiveCheckbox {
+  align-items: flex-start;
+  font-size: 0.875rem;
+}
+
+.pipelineActiveCheckboxLabelWrap {
+  color: var(--color-text-primary, #0f172a);
+}
+
+.pipelineActiveCheckboxLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+
+  strong {
+    font-weight: 600;
   }
 }
 

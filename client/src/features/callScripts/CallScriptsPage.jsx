@@ -288,7 +288,7 @@ export function CallScriptsPage() {
         description={
           canManageAll
             ? 'Create scripts with variables like {{contact_first_name}} for use in the dialer.'
-            : 'View team scripts. You can add scripts and edit only scripts you created.'
+            : 'Scripts you create are visible to you, your manager, and admins. You can edit only scripts you created.'
         }
         actions={canAddScript ? <Button onClick={openCreate}>Add script</Button> : undefined}
       />
@@ -315,7 +315,11 @@ export function CallScriptsPage() {
             className={listStyles.searchInToolbar}
           />
         </div>
-        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        <TableDataRegion
+          loading={loading}
+          hasCompletedInitialFetch={hasCompletedInitialFetch}
+          skeletonColumns={canSetPersonalDefault ? 6 : 5}
+        >
           {scripts.length === 0 ? (
             <div className={listStyles.tableCardEmpty}>
               <EmptyState
@@ -332,6 +336,7 @@ export function CallScriptsPage() {
               <TableHead>
                 <TableRow>
                   <TableHeaderCell>Script Name</TableHeaderCell>
+                  <TableHeaderCell>Created by</TableHeaderCell>
                   <TableHeaderCell>Variables</TableHeaderCell>
                   {canSetPersonalDefault && (
                     <TableHeaderCell width="88px" align="center">My default</TableHeaderCell>
@@ -349,6 +354,11 @@ export function CallScriptsPage() {
                   return (
                   <TableRow key={script.id}>
                     <TableCell>{script.script_name}</TableCell>
+                    <TableCell>
+                      {script.created_by != null && Number(script.created_by) === Number(user?.id)
+                        ? 'Self'
+                        : script.created_by_name || '—'}
+                    </TableCell>
                     <TableCell>
                       {Array.isArray(script.variables_used) && script.variables_used.length > 0
                         ? script.variables_used.join(', ')

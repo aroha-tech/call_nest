@@ -105,7 +105,11 @@ export function CampaignOpenPage() {
           />
         </div>
 
-        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        <TableDataRegion
+          loading={loading}
+          hasCompletedInitialFetch={hasCompletedInitialFetch}
+          skeletonColumns={6}
+        >
           {rows.length === 0 ? (
             <div className={listStyles.tableCardEmpty}>
               <EmptyState

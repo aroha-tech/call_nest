@@ -370,7 +370,7 @@ export function LeadDataTable({
       case 'date_of_birth':
         return formatDate(c.date_of_birth);
       case 'created_at':
-        return formatDateTime(c.created_at);
+        return formatDate(c.created_at);
       case 'call_count_total':
         return c.call_count_total == null ? '0' : String(c.call_count_total);
       case 'last_called_at':

@@ -5,6 +5,7 @@ import { selectTenant, selectUser } from '../features/auth/authSelectors';
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
+import { Skeleton } from '../components/ui/Skeleton';
 import { Spinner } from '../components/ui/Spinner';
 import { dialerSessionsAPI } from '../services/dialerSessionsAPI';
 import { dialingSetsAPI, callScriptsAPI, dialingSetDispositionsAPI } from '../services/dispositionAPI';
@@ -231,8 +232,32 @@ export function DialerSessionSetupPage() {
       {error ? <Alert variant="error">{error}</Alert> : null}
 
       {loading ? (
-        <div className={styles.loadingCenter}>
-          <Spinner size="lg" />
+        <div className={styles.layout} aria-busy="true" aria-label="Loading session setup">
+          <section className={styles.leftCol}>
+            <Skeleton width={120} height={22} style={{ borderRadius: 999 }} />
+            <Skeleton width="72%" height={28} style={{ marginTop: 12 }} />
+            <Skeleton width="100%" height={14} style={{ marginTop: 8 }} />
+            <Skeleton height={72} width="100%" style={{ borderRadius: 12, marginTop: 18 }} />
+            <div style={{ marginTop: 18, display: 'grid', gap: 16 }}>
+              <div style={{ display: 'grid', gap: 8 }}>
+                <Skeleton width={96} height={12} />
+                <Skeleton height={44} width="100%" />
+              </div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                <Skeleton width={88} height={12} />
+                <Skeleton height={44} width="100%" />
+              </div>
+            </div>
+            <Skeleton width={112} height={40} style={{ borderRadius: 10, marginTop: 22 }} />
+          </section>
+          <aside className={styles.rightCol} aria-hidden>
+            <div className={styles.previewHeader}>
+              <Skeleton width={100} height={14} />
+              <Skeleton width={88} height={12} />
+            </div>
+            <Skeleton height={320} width="100%" style={{ borderRadius: 12, marginTop: 12 }} />
+            <Skeleton height={120} width="100%" style={{ borderRadius: 12, marginTop: 12 }} />
+          </aside>
         </div>
       ) : (
         <div className={styles.layout}>

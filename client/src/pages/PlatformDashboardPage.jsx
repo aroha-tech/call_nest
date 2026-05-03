@@ -207,13 +207,78 @@ export function PlatformDashboardPage() {
   if (loading) {
     return (
       <div className={dashStyles.page}>
-        <div className={styles.loading}>
-          <div style={{ width: 'min(1040px, 100%)', display: 'grid', gap: 12 }}>
-            <Skeleton width="32%" height={14} />
-            <Skeleton width="46%" height={28} />
-            <Skeleton width="62%" height={14} />
-            <Skeleton width="100%" height={132} />
-            <Skeleton width="100%" height={240} />
+        <header className={dashStyles.hero}>
+          <div className={dashStyles.heroTitles}>
+            <Skeleton width="78%" height={11} />
+            <Skeleton width="min(480px, 62%)" height={32} />
+            <Skeleton width="min(560px, 90%)" height={11} />
+          </div>
+          <div className={dashStyles.heroActions}>
+            <Skeleton width={118} height={38} style={{ borderRadius: 10 }} />
+            <Skeleton width={40} height={38} style={{ borderRadius: 10 }} />
+          </div>
+        </header>
+        <section className={dashStyles.dashboardSkeletonKpis}>
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={`plat-kpi-skel-${i}`} className={dashStyles.dashboardSkeletonCard}>
+              <Skeleton width={28} height={28} circle />
+              <Skeleton width="56%" height={22} />
+              <Skeleton width="68%" height={12} />
+              <Skeleton width="74%" height={11} />
+            </div>
+          ))}
+        </section>
+        <div className={dashStyles.mainGrid}>
+          <div>
+            <Skeleton height={268} width="100%" style={{ borderRadius: 12 }} />
+            <section className={dashStyles.panel} style={{ marginTop: 8 }}>
+              <div className={dashStyles.panelHead}>
+                <Skeleton width="44%" height={16} />
+                <Skeleton width={56} height={14} />
+              </div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {Array.from({ length: 3 }, (_, j) => (
+                  <Skeleton key={`skel-role-${j}`} height={36} width="100%" />
+                ))}
+              </div>
+            </section>
+            <section className={dashStyles.panel} style={{ marginTop: 8 }}>
+              <div className={dashStyles.panelHead}>
+                <Skeleton width="40%" height={16} />
+              </div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {Array.from({ length: 4 }, (_, j) => (
+                  <Skeleton key={`skel-act-${j}`} height={52} width="100%" />
+                ))}
+              </div>
+            </section>
+          </div>
+          <div className={dashStyles.sideStack}>
+            <section className={dashStyles.panel}>
+              <div className={dashStyles.panelHead}>
+                <Skeleton width="46%" height={16} />
+                <Skeleton width={88} height={22} />
+              </div>
+              {[1, 2, 3].map((i) => (
+                <div key={i} className={dashStyles.skeletonRow}>
+                  <div className={dashStyles.skeletonAvatar} />
+                  <div className={dashStyles.skeletonCol}>
+                    <div className={dashStyles.skeletonLine} style={{ width: '55%' }} />
+                    <div className={dashStyles.skeletonLine} style={{ width: '36%' }} />
+                  </div>
+                </div>
+              ))}
+            </section>
+            <section className={dashStyles.panel}>
+              <div className={dashStyles.panelHead}>
+                <Skeleton width="38%" height={16} />
+              </div>
+              <div className={dashStyles.quickGrid}>
+                {Array.from({ length: 4 }, (_, j) => (
+                  <Skeleton key={`skel-q-${j}`} height={44} width="100%" style={{ borderRadius: 12 }} />
+                ))}
+              </div>
+            </section>
           </div>
         </div>
       </div>
@@ -406,16 +471,18 @@ export function PlatformDashboardPage() {
 
             <section className={dashStyles.panel}>
               <div className={dashStyles.panelHead}>
-                <h2 className={dashStyles.panelTitleWithIcon}>
-                  <MaterialSymbol name="history" size="sm" className={dashStyles.panelTitleIcon} />
-                  Platform activity
-                </h2>
+                <div className={dashStyles.panelTitleWithHelp}>
+                  <h2 className={dashStyles.panelTitleWithIcon}>
+                    <MaterialSymbol name="history" size="sm" className={dashStyles.panelTitleIcon} />
+                    Platform activity
+                  </h2>
+                  <InfoHelpIcon
+                    title="Platform activity info"
+                    modalTitle="Platform activity"
+                    message="New organizations and workspace users (not scoped by the KPI date filter above)."
+                  />
+                </div>
               </div>
-              <InfoHelpIcon
-                title="Platform activity info"
-                modalTitle="Platform activity"
-                message="New organizations and workspace users (not scoped by the KPI date filter above)."
-              />
               <div className={styles.platformActivityCard}>
                 {(stats?.activityFeed ?? []).length === 0 ? (
                   <p className={styles.recentEmpty}>No recent platform events yet.</p>

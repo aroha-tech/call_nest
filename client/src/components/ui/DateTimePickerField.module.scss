@@ -7,7 +7,7 @@ $picker-surface: #ffffff;
 $picker-text: #1a1d26;
 $picker-muted: #8b92a8;
 $picker-border: rgba(26, 29, 38, 0.12);
-$picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
+$picker-shadow: 0 8px 28px rgba(15, 18, 40, 0.14);
 
 .field {
   display: flex;
@@ -20,6 +20,10 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
   display: flex;
   align-items: center;
   gap: $space-2;
+}
+
+.hintInfoBtn {
+  align-self: center;
 }
 
 .label {
@@ -99,7 +103,7 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
   -webkit-overflow-scrolling: touch;
   background: $picker-surface;
   border: 1px solid $picker-border;
-  border-radius: $radius-lg;
+  border-radius: $radius-md;
   box-shadow: $picker-shadow;
   font-family: var(--font-sans);
   color: $picker-text;
@@ -108,20 +112,23 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
 .dateSection {
   display: flex;
   flex-direction: column;
-  flex: 0 1 auto;
-  padding: $space-4;
-  min-width: 280px;
+  flex: 0 0 auto;
+  padding: $space-3;
+  min-width: 256px;
+  max-width: 256px;
   box-sizing: border-box;
 }
 
 .timeSection {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  min-width: 200px;
+  flex: 0 0 auto;
+  width: 168px;
+  min-width: 168px;
+  max-width: 168px;
   min-height: 0;
   border-left: 1px solid $picker-border;
-  padding: $space-4;
+  padding: $space-3;
   box-sizing: border-box;
   background: rgba(90, 79, 207, 0.03);
 }
@@ -130,16 +137,16 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: $space-3;
-  gap: $space-2;
+  margin-bottom: $space-2;
+  gap: $space-1;
 }
 
 .monthTitleBtn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  font-size: $font-size-sm;
+  gap: 2px;
+  padding: 2px 6px;
+  font-size: $font-size-xs;
   font-weight: $font-weight-semibold;
   color: $picker-text;
   background: transparent;
@@ -161,8 +168,8 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   color: $picker-accent;
   background: $picker-surface;
@@ -179,7 +186,7 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
   display: flex;
   flex-direction: column;
   gap: $space-2;
-  margin-bottom: $space-3;
+  margin-bottom: $space-2;
 }
 
 .monthSelectRow {
@@ -189,9 +196,9 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
 
 .monthSelect {
   flex: 1;
-  min-height: 36px;
+  min-height: 32px;
   padding: 0 $space-2;
-  font-size: $font-size-sm;
+  font-size: $font-size-xs;
   color: $picker-text;
   background: $picker-surface;
   border: 1px solid $picker-border;
@@ -201,8 +208,8 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
 .weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
-  margin-bottom: 4px;
+  gap: 1px;
+  margin-bottom: 2px;
 }
 
 .weekday {
@@ -216,7 +223,7 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
 .grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  gap: 2px;
 }
 
 .dayCell {
@@ -224,9 +231,9 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 36px;
+  height: 30px;
   padding: 0;
-  font-size: $font-size-sm;
+  font-size: $font-size-xs;
   font-weight: $font-weight-medium;
   color: $picker-text;
   background: transparent;
@@ -264,7 +271,7 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
   justify-content: space-between;
   gap: $space-2;
   margin-top: auto;
-  padding-top: $space-3;
+  padding-top: $space-2;
 }
 
 .dateFooterActions {
@@ -274,8 +281,8 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
 }
 
 .ghostBtn {
-  padding: 8px 14px;
-  font-size: $font-size-xs;
+  padding: 5px 10px;
+  font-size: $font-size-2xs;
   font-weight: $font-weight-semibold;
   color: $picker-accent;
   background: transparent;
@@ -289,9 +296,9 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
 }
 
 .timeHeader {
-  font-size: $font-size-sm;
+  font-size: $font-size-xs;
   font-weight: $font-weight-semibold;
-  margin-bottom: $space-3;
+  margin-bottom: $space-2;
   color: $picker-text;
 }
 
@@ -299,15 +306,15 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
   display: flex;
   background: $picker-surface;
   border: 1px solid $picker-border;
-  border-radius: $radius-md;
+  border-radius: $radius-sm;
   padding: 2px;
-  margin-bottom: $space-3;
+  margin-bottom: $space-2;
 }
 
 .segment {
   flex: 1;
-  padding: 8px 4px;
-  font-size: $font-size-xs;
+  padding: 5px 2px;
+  font-size: $font-size-2xs;
   font-weight: $font-weight-semibold;
   color: $picker-muted;
   background: transparent;
@@ -331,11 +338,11 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
 
 .columns {
   display: flex;
-  gap: $space-3;
+  gap: $space-2;
   justify-content: center;
   align-items: stretch;
-  flex: 1 1 auto;
-  min-height: 140px;
+  flex: 0 1 auto;
+  min-height: 0;
 }
 
 .column {
@@ -343,18 +350,18 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
   flex: 0 0 auto;
-  min-width: 52px;
+  min-width: 44px;
 }
 
 .columnLabel {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: $font-weight-semibold;
   color: $picker-muted;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  min-height: 14px;
+  min-height: 12px;
   line-height: 1.2;
   display: flex;
   align-items: center;
@@ -368,10 +375,10 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
 }
 
 .stepBtn {
-  width: 28px;
-  height: 24px;
+  width: 24px;
+  height: 20px;
   padding: 0;
-  font-size: 10px;
+  font-size: 8px;
   color: $picker-accent;
   background: $picker-surface;
   border: 1px solid $picker-border;
@@ -385,10 +392,10 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
 
 .wheelSlot {
   box-sizing: border-box;
-  min-width: 48px;
-  min-height: 44px;
-  padding: 8px 6px;
-  font-size: $font-size-md;
+  min-width: 40px;
+  min-height: 30px;
+  padding: 4px 4px;
+  font-size: $font-size-sm;
   font-weight: $font-weight-semibold;
   text-align: center;
   color: $picker-text;
@@ -401,10 +408,10 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
 }
 
 .wheelGhost {
-  font-size: $font-size-xs;
+  font-size: 10px;
   color: $picker-muted;
-  line-height: 1.2;
-  min-height: 14px;
+  line-height: 1.15;
+  min-height: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -414,27 +421,37 @@ $picker-shadow: 0 12px 40px rgba(15, 18, 40, 0.18);
   flex-shrink: 0;
   align-self: stretch;
   width: 100%;
-  margin-top: auto;
-  padding-top: $space-3;
-  padding-left: 0;
-  padding-right: 0;
-  padding-bottom: 0;
-  min-height: 44px;
-  font-size: $font-size-sm;
+  margin-top: $space-3;
+  padding: 7px $space-2;
+  min-height: 0;
+  font-size: $font-size-xs;
   font-weight: $font-weight-semibold;
   color: #fff;
   background: $picker-accent;
   border: none;
-  border-radius: $radius-md;
+  border-radius: $radius-sm;
   cursor: pointer;
+  line-height: $line-height-tight;
 
   &:hover {
     filter: brightness(1.05);
   }
 }
 
+.timeSection .primaryBtn {
+  margin-top: $space-2;
+}
+
+.dateFooterActions .primaryBtn {
+  width: auto;
+  margin-top: 0;
+  padding: 6px 12px;
+}
+
 .calIcon {
   flex-shrink: 0;
+  width: 16px;
+  height: 16px;
   color: $picker-accent;
 }
 

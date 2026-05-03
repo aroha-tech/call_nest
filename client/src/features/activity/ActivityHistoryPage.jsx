@@ -178,7 +178,11 @@ export function ActivityHistoryPage() {
           />
         </div>
 
-        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        <TableDataRegion
+          loading={loading}
+          hasCompletedInitialFetch={hasCompletedInitialFetch}
+          skeletonColumns={5}
+        >
           {rows.length === 0 ? (
             <div className={listStyles.tableCardEmpty}>
               <EmptyState

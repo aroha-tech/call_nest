@@ -51,6 +51,37 @@ const taskTypeOptions = [
   { value: 'deal', label: 'Deal' },
 ];
 
+/** How daily meeting targets are counted (must match server `meeting_progress_basis`). */
+const MEETING_PROGRESS_CARD_CHOICES = [
+  {
+    value: 'scheduled_date',
+    title: 'Meeting day',
+    badge: 'Held / attended',
+    description:
+      'Counts meetings whose scheduled start falls on the same calendar day as this task. Use this when the goal is for reps to actually run meetings on that day.',
+    example: 'Task = Mon → meeting Mon 3pm counts. Booking Mon for Fri counts toward Fri’s task, not Mon’s.',
+    icon: 'event',
+  },
+  {
+    value: 'created_date',
+    title: 'Booking day',
+    badge: 'Created / logged',
+    description:
+      'Counts meetings saved in the system on the same calendar day as this task, even if the appointment is on another day. Use this when the goal is daily booking activity.',
+    example: 'Task = Mon → create a meeting Mon for next week → it counts toward Mon’s task.',
+    icon: 'edit_calendar',
+  },
+];
+
+function meetingProgressBasisFromLog(log) {
+  const b = String(log?.meeting_progress_basis || 'scheduled_date').toLowerCase();
+  return b === 'created_date' ? 'created_date' : 'scheduled_date';
+}
+
+function meetingMetricMaterialName(basis) {
+  return basis === 'created_date' ? 'edit_calendar' : 'event';
+}
+
 const priorityOptions = [
   { value: 'low', label: 'Low' },
   { value: 'medium', label: 'Medium' },
@@ -78,6 +109,12 @@ function addDaysYmd(ymd, delta) {
   const d = new Date(`${ymd}T12:00:00`);
   d.setDate(d.getDate() + delta);
   return toYmd(d);
+}
+
+/** `to` covers the board day, today, and upcoming rows; `from` is `lookbackDays` before `to`. */
+function taskMetricsRecomputeRange(todayYmd, boardYmd, lookbackDays) {
+  const to = [boardYmd, todayYmd, addDaysYmd(todayYmd, 90)].reduce((mx, y) => (y > mx ? y : mx));
+  return { from: addDaysYmd(to, -lookbackDays), to };
 }
 
 function addDaysToToday(delta) {
@@ -271,6 +308,7 @@ export function TaskManagerPage() {
     end_date: '',
     schedule_window: 'current',
     task_type: 'todo',
+    meeting_progress_basis: 'scheduled_date',
     priority: 'medium',
     due_preset: '',
     reminder_preset: 'none',
@@ -519,7 +557,7 @@ export function TaskManagerPage() {
   /** Recompute when user or calendar day changes; refresh execution board when Current tab is active. */
   useEffect(() => {
     let cancelled = false;
-    const syncKey = `${userIdParam ?? ''}|${todayStr}`;
+    const syncKey = `${userIdParam ?? ''}|${todayStr}|${boardAnchorYmd}`;
     const shouldRecompute = executionSyncKeyRef.current !== syncKey;
 
     (async () => {
@@ -527,9 +565,10 @@ export function TaskManagerPage() {
         setError('');
         if (shouldRecompute) {
           setSyncing(true);
+          const { from: recomputeFrom, to: recomputeTo } = taskMetricsRecomputeRange(todayStr, boardAnchorYmd, 120);
           await taskManagerAPI.recomputeLogs({
-            from: addDaysYmd(todayStr, -400),
-            to: todayStr,
+            from: recomputeFrom,
+            to: recomputeTo,
             ...(userIdParam ? { userId: userIdParam } : {}),
           });
           if (cancelled) return;
@@ -742,9 +781,10 @@ export function TaskManagerPage() {
     setError('');
     setOk('');
     try {
+      const { from, to } = taskMetricsRecomputeRange(todayStr, boardAnchorYmd, 365);
       await taskManagerAPI.recomputeLogs({
-        from: addDaysYmd(todayStr, -400),
-        to: todayStr,
+        from,
+        to,
         ...(userIdParam ? { userId: userIdParam } : {}),
       });
       setOk('Live metrics refreshed.');
@@ -913,6 +953,7 @@ export function TaskManagerPage() {
         task_type: 'todo',
         priority: 'medium',
         due_preset: '',
+        meeting_progress_basis: 'scheduled_date',
         reminder_preset: 'none',
         reminder_custom_value: 15,
         reminder_custom_unit: 'minutes',
@@ -1095,6 +1136,12 @@ export function TaskManagerPage() {
     const callsP = formatAchievedTargetPair(log.achieved_calls, log.target_calls);
     const meetP = formatAchievedTargetPair(log.achieved_meetings, log.target_meetings);
     const dealsP = formatAchievedTargetPair(log.achieved_deals, log.target_deals);
+    const meetBasis = meetingProgressBasisFromLog(log);
+    const meetIcon = meetingMetricMaterialName(meetBasis);
+    const meetTitle =
+      meetBasis === 'created_date'
+        ? 'Meetings booked on this task date (by created date)'
+        : 'Meetings scheduled on this task date (start date)';
     return (
       <article key={`${log.id}-${log.task_date}`} className={styles.taskCard}>
         <div className={styles.taskCardTop}>
@@ -1134,9 +1181,13 @@ export function TaskManagerPage() {
           {meetP ? (
             <div
               className={`${styles.metricChip} ${styles.metricChipCompact} ${styles.metricChipMeetings}`}
-              title={meetP.overBy ? `Achieved ${log.achieved_meetings} (target ${log.target_meetings})` : undefined}
+              title={
+                meetP.overBy
+                  ? `${meetTitle} — achieved ${log.achieved_meetings} (target ${log.target_meetings})`
+                  : meetTitle
+              }
             >
-              <MaterialSymbol name="groups" className={`${styles.metricChipIcon} ${styles.taskCardMetricGlyph}`} />
+              <MaterialSymbol name={meetIcon} className={`${styles.metricChipIcon} ${styles.taskCardMetricGlyph}`} />
               <span className={styles.metricChipText}>
                 {meetP.text}
                 {meetP.overBy > 0 ? <span className={styles.metricChipExtra}>+{meetP.overBy}</span> : null}
@@ -1189,6 +1240,7 @@ export function TaskManagerPage() {
                     id: log.assignment_id,
                     title: log.assignment_title,
                     task_date: log.task_date,
+                    meeting_progress_basis: log.meeting_progress_basis,
                     status: log.status,
                     score: log.score,
                     achieved_calls: log.achieved_calls,
@@ -1732,6 +1784,7 @@ export function TaskManagerPage() {
                                       id: log.assignment_id,
                                       title: log.assignment_title,
                                       task_date: log.task_date,
+                                      meeting_progress_basis: log.meeting_progress_basis,
                                       status: log.status,
                                       score: log.score,
                                       achieved_calls: log.achieved_calls,
@@ -1835,7 +1888,14 @@ export function TaskManagerPage() {
             <Select
               label="Type"
               value={assignForm.task_type}
-              onChange={(e) => setAssignForm((s) => ({ ...s, task_type: e.target.value }))}
+              onChange={(e) =>
+                setAssignForm((s) => ({
+                  ...s,
+                  task_type: e.target.value,
+                  meeting_progress_basis:
+                    e.target.value === 'meeting' ? s.meeting_progress_basis : 'scheduled_date',
+                }))
+              }
               options={taskTypeOptions}
               required
             />
@@ -1938,9 +1998,9 @@ export function TaskManagerPage() {
                   modalTitle="Meeting and targets"
                   message={
                     assignForm.task_type === 'todo'
-                      ? 'To-do tracks calls, meetings, and deals. At least one target must be greater than zero (fields without a star are optional individually, but not all three may be zero).'
+                      ? 'To-do tracks calls, meetings, and deals. At least one target must be greater than zero (fields without a star are optional individually, but not all three may be zero). When meeting targets are used, choose whether progress counts meetings held on the task date or meetings booked (created) that day.'
                       : assignForm.task_type === 'meeting'
-                        ? 'Meeting tasks only track meetings; target meetings is required.'
+                        ? 'Meeting tasks only track meetings; target meetings is required. Choose meeting day vs booking day so progress matches how your team works.'
                         : assignForm.task_type === 'call'
                           ? 'Call tasks only track calls; target calls is required.'
                           : 'Deal tasks only track deals; target deals is required.'
@@ -2010,6 +2070,73 @@ export function TaskManagerPage() {
                 }
                 required={assignForm.task_type === 'meeting'}
               />
+            ) : null}
+            {assignForm.task_type === 'meeting' ||
+            (assignForm.task_type === 'todo' && Number(assignForm.target_meetings) > 0) ? (
+              <div className={styles.full}>
+                <div className={styles.meetingBasisField}>
+                  <div className={styles.meetingBasisFieldHead}>
+                    <span className={styles.meetingBasisFieldLabel}>Meeting targets</span>
+                    <InfoHelpIcon
+                      title="How meeting counting works"
+                      modalTitle="Meeting day vs booking day"
+                      message="Both options compare meetings to the task’s calendar date (the day shown on each task row). Meeting day looks at when the meeting is scheduled to start. Booking day looks at when the meeting record was created. Choose the one that matches how you measure rep performance."
+                    />
+                  </div>
+                  <p className={styles.meetingBasisIntro}>
+                    Choose what “hitting the meeting target” means for this assignment. The task date is always the row’s
+                    calendar day.
+                  </p>
+                  <div
+                    className={styles.meetingBasisChoices}
+                    role="radiogroup"
+                    aria-label="How meeting targets are counted"
+                  >
+                    {MEETING_PROGRESS_CARD_CHOICES.map((c) => {
+                      const selected = assignForm.meeting_progress_basis === c.value;
+                      return (
+                        <button
+                          key={c.value}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          className={`${styles.meetingBasisCard} ${selected ? styles.meetingBasisCardSelected : ''}`}
+                          onClick={() => setAssignForm((s) => ({ ...s, meeting_progress_basis: c.value }))}
+                        >
+                          <span className={styles.meetingBasisCardTop}>
+                            <span
+                              className={`${styles.meetingBasisIconWrap} ${
+                                c.value === 'created_date'
+                                  ? styles.meetingBasisIconWrapCreated
+                                  : styles.meetingBasisIconWrapScheduled
+                              }`}
+                            >
+                              <MaterialSymbol name={c.icon} className={styles.meetingBasisIcon} />
+                            </span>
+                            <span className={styles.meetingBasisCardTitles}>
+                              <span className={styles.meetingBasisCardTitleRow}>
+                                <span className={styles.meetingBasisCardTitle}>{c.title}</span>
+                                <span className={styles.meetingBasisCardBadge}>{c.badge}</span>
+                              </span>
+                              <span className={styles.meetingBasisCardTagline}>
+                                {c.value === 'scheduled_date'
+                                  ? 'By scheduled start time'
+                                  : 'By date the meeting was saved'}
+                              </span>
+                            </span>
+                            <span className={`${styles.meetingBasisRadio} ${selected ? styles.meetingBasisRadioOn : ''}`} aria-hidden />
+                          </span>
+                          <p className={styles.meetingBasisCardDesc}>{c.description}</p>
+                          <p className={styles.meetingBasisCardExample}>
+                            <MaterialSymbol name="lightbulb" className={styles.meetingBasisExampleIcon} />
+                            {c.example}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             ) : null}
             {assignForm.task_type === 'todo' || assignForm.task_type === 'deal' ? (
               <Input
@@ -2136,6 +2263,7 @@ export function TaskManagerPage() {
                         id: log.assignment_id,
                         title: log.assignment_title,
                         task_date: log.task_date,
+                        meeting_progress_basis: log.meeting_progress_basis,
                         status: log.status,
                         score: log.score,
                         achieved_calls: log.achieved_calls,
@@ -2199,12 +2327,23 @@ export function TaskManagerPage() {
                     : '—'}
               </p>
             ) : null}
+            {Number(taskDetailsLog.target_meetings) > 0 ? (
+              <p className={styles.formSectionHint}>
+                <MaterialSymbol name={meetingMetricMaterialName(meetingProgressBasisFromLog(taskDetailsLog))} size="sm" />{' '}
+                Meeting progress:{' '}
+                {meetingProgressBasisFromLog(taskDetailsLog) === 'created_date'
+                  ? 'counts meetings you booked on this task date (created that day), regardless of when the meeting starts.'
+                  : 'counts meetings scheduled to start on this task date.'}
+              </p>
+            ) : null}
             <div className={styles.taskMetricsIconsRow}>
               {(() => {
                 const log = taskDetailsLog;
                 const callsP = formatAchievedTargetPair(log.achieved_calls, log.target_calls);
                 const meetP = formatAchievedTargetPair(log.achieved_meetings, log.target_meetings);
                 const dealsP = formatAchievedTargetPair(log.achieved_deals, log.target_deals);
+                const mb = meetingProgressBasisFromLog(log);
+                const mi = meetingMetricMaterialName(mb);
                 return (
                   <>
                     {callsP ? (
@@ -2217,8 +2356,15 @@ export function TaskManagerPage() {
                       </div>
                     ) : null}
                     {meetP ? (
-                      <div className={`${styles.metricChip} ${styles.metricChipMeetings}`}>
-                        <MaterialSymbol name="groups" size="sm" className={styles.metricChipIcon} />
+                      <div
+                        className={`${styles.metricChip} ${styles.metricChipMeetings}`}
+                        title={
+                          mb === 'created_date'
+                            ? 'Meetings booked on this task date'
+                            : 'Meetings held on this task date (scheduled start)'
+                        }
+                      >
+                        <MaterialSymbol name={mi} size="sm" className={styles.metricChipIcon} />
                         <span className={styles.metricChipText}>
                           {meetP.text}
                           {meetP.overBy > 0 ? <span className={styles.metricChipExtra}>+{meetP.overBy}</span> : null}
@@ -2283,6 +2429,7 @@ export function TaskManagerPage() {
                 const c = formatAchievedTargetPair(log.achieved_calls, log.target_calls);
                 const m = formatAchievedTargetPair(log.achieved_meetings, log.target_meetings);
                 const d = formatAchievedTargetPair(log.achieved_deals, log.target_deals);
+                const hb = meetingProgressBasisFromLog(log);
                 return (
                   <>
                     {c ? (
@@ -2296,7 +2443,9 @@ export function TaskManagerPage() {
                     ) : null}
                     {m ? (
                       <div className={styles.taskMetric}>
-                        <span className={styles.taskMetricLabel}>Meetings</span>
+                        <span className={styles.taskMetricLabel}>
+                          Meetings ({hb === 'created_date' ? 'booking day' : 'meeting day'})
+                        </span>
                         <span className={styles.taskMetricVal}>
                           {m.text}
                           {m.overBy > 0 ? ` (+${m.overBy})` : ''}
@@ -2475,7 +2624,13 @@ export function TaskManagerPage() {
                     </span>
                   </div>
                   <div className={styles.commentMetricTile}>
-                    <span className={styles.commentMetricLabel}>Meetings</span>
+                    <span className={styles.commentMetricLabel}>
+                      Meetings (
+                      {meetingProgressBasisFromLog(commentsModalAssignment) === 'created_date'
+                        ? 'booking day'
+                        : 'meeting day'}
+                      )
+                    </span>
                     <span className={styles.commentMetricValue}>
                       {commentsModalAssignment.achieved_meetings ?? 0}/{commentsModalAssignment.target_meetings ?? 0}
                     </span>

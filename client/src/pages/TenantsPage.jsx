@@ -37,7 +37,7 @@ import { useMutation } from '../hooks/useAsyncData';
 import { useTableLoadingState } from '../hooks/useTableLoadingState';
 import { TableDataRegion } from '../components/admin/TableDataRegion';
 import { TenantWorkspaceUrlCopy } from '../components/admin/TenantWorkspaceUrlCopy';
-import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
+import { InfoHelpIcon, infoHelpHeadingRowClassName } from '../components/ui/InfoHelpIcon';
 import styles from './TenantsPage.module.scss';
 import { isNoListFilter } from '../utils/listFilterNarrowing';
 
@@ -620,7 +620,11 @@ export function TenantsPage() {
               className={listStyles.searchInToolbar}
             />
           </div>
-          <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+          <TableDataRegion
+            loading={loading}
+            hasCompletedInitialFetch={hasCompletedInitialFetch}
+            skeletonColumns={10}
+          >
             {tenants.length === 0 ? (
               <div className={listStyles.tableCardEmpty}>
                 <EmptyState
@@ -804,12 +808,14 @@ export function TenantsPage() {
 
           {editing && (
             <div className={styles.formSection}>
-              <h3 className={styles.formSectionTitle}>Workspace appearance</h3>
-              <InfoHelpIcon
-                title="Workspace appearance info"
-                modalTitle="Workspace appearance"
-                message="Logo and typography apply to this tenant app after sign-in. Users see updates on their next session refresh. Logo URL must use HTTPS."
-              />
+              <div className={`${infoHelpHeadingRowClassName} ${styles.formSectionTitleRow}`.trim()}>
+                <h3 className={styles.formSectionTitle}>Workspace appearance</h3>
+                <InfoHelpIcon
+                  title="Workspace appearance info"
+                  modalTitle="Workspace appearance"
+                  message="Logo and typography apply to this tenant app after sign-in. Users see updates on their next session refresh. Logo URL must use HTTPS."
+                />
+              </div>
               <Input
                 label="Logo URL (HTTPS)"
                 value={form.theme_logo_url}
@@ -857,12 +863,14 @@ export function TenantsPage() {
 
           {!editing && (
             <div className={styles.formSection}>
-              <h3 className={styles.formSectionTitle}>First admin user</h3>
-              <InfoHelpIcon
-                title="First admin user info"
-                modalTitle="First admin user"
-                message="Every tenant must have at least one admin. This user will have full access to the tenant."
-              />
+              <div className={`${infoHelpHeadingRowClassName} ${styles.formSectionTitleRow}`.trim()}>
+                <h3 className={styles.formSectionTitle}>First admin user</h3>
+                <InfoHelpIcon
+                  title="First admin user info"
+                  modalTitle="First admin user"
+                  message="Every tenant must have at least one admin. This user will have full access to the tenant."
+                />
+              </div>
               <Input
                 label="Admin email"
                 type="email"

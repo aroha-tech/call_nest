@@ -64,6 +64,7 @@ import tenantIndustryFieldsRoutes from './routes/tenant/industryFields.js';
 import backgroundJobsRoutes from './routes/tenant/backgroundJobs.js';
 import scheduleHubRoutes from './routes/tenant/scheduleHub.js';
 import taskManagerRoutes from './routes/tenant/taskManager.js';
+import reportsHubRoutes from './routes/tenant/reportsHub.js';
 import notificationsRoutes from './routes/tenant/notifications.js';
 import { initTenantRealtimeSocket } from './realtime/tenantRealtimeSocket.js';
 import { startTenantBackgroundJobWorker } from './workers/tenantBackgroundJobWorker.js';
@@ -190,6 +191,7 @@ app.use('/api/tenant/industry-fields', tenantIndustryFieldsRoutes);
 app.use('/api/tenant/background-jobs', backgroundJobsRoutes);
 app.use('/api/tenant/schedule-hub', scheduleHubRoutes);
 app.use('/api/tenant/task-manager', taskManagerRoutes);
+app.use('/api/tenant/reports', reportsHubRoutes);
 app.use('/api/tenant/notifications', notificationsRoutes);
 
 // Error handler (must be last)

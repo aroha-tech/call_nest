@@ -1,4 +1,5 @@
 import * as callScriptsService from '../../services/tenant/callScriptsService.js';
+import { isOutboundRecordVisibleByCreatedBy } from '../../services/tenant/userMessageScopeService.js';
 
 function hasPermission(req, code) {
   return Boolean(req.user?.isPlatformAdmin) || (req.user?.permissions || []).includes(code);
@@ -21,11 +22,14 @@ export async function getAll(req, res, next) {
     const search = req.query.search ?? '';
     const page = req.query.page ?? 1;
     const limit = req.query.limit ?? 10;
+    const manageAll = canManageAllScripts(req);
     const result = await callScriptsService.findAllPaginated(tenantId, {
       search,
       includeInactive,
       page,
       limit,
+      actingUser: req.user,
+      manageAllScripts: manageAll,
     });
     res.json({ data: result.data, pagination: result.pagination });
   } catch (err) {
@@ -39,6 +43,10 @@ export async function getById(req, res, next) {
     const script = await callScriptsService.findById(tenantId, req.params.id);
     if (!script) {
       return res.status(404).json({ error: 'Call script not found' });
+    }
+    if (!canManageAllScripts(req)) {
+      const ok = await isOutboundRecordVisibleByCreatedBy(tenantId, req.user, script.created_by);
+      if (!ok) return res.status(404).json({ error: 'Call script not found' });
     }
     res.json({ data: script });
   } catch (err) {
@@ -87,6 +95,8 @@ export async function update(req, res, next) {
 
     const manage = canManageAllScripts(req);
     if (!manage) {
+      const ok = await isOutboundRecordVisibleByCreatedBy(tenantId, req.user, existing.created_by);
+      if (!ok) return res.status(404).json({ error: 'Call script not found' });
       if (!canEditOwnScript(req, existing)) {
         return res.status(403).json({ error: 'You can only edit call scripts you created.' });
       }
@@ -119,8 +129,12 @@ export async function remove(req, res, next) {
       return res.status(404).json({ error: 'Call script not found' });
     }
     const manage = canManageAllScripts(req);
-    if (!manage && !canEditOwnScript(req, existing)) {
-      return res.status(403).json({ error: 'You can only delete call scripts you created.' });
+    if (!manage) {
+      const ok = await isOutboundRecordVisibleByCreatedBy(tenantId, req.user, existing.created_by);
+      if (!ok) return res.status(404).json({ error: 'Call script not found' });
+      if (!canEditOwnScript(req, existing)) {
+        return res.status(403).json({ error: 'You can only delete call scripts you created.' });
+      }
     }
     await callScriptsService.remove(tenantId, req.params.id, { userId: req.user.id });
     res.json({ message: 'Call script deleted successfully' });

@@ -224,7 +224,11 @@ export function DialingSetsPage({ readOnly = false }) {
         <SearchInput value={search} onSearch={(v) => setSearch(v)} placeholder="Search... (press Enter)" />
       </div>
 
-      <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+      <TableDataRegion
+        loading={loading}
+        hasCompletedInitialFetch={hasCompletedInitialFetch}
+        skeletonVariant="lines"
+      >
       <div className={styles.splitView}>
         <div className={styles.listPanel}>
           <h3 className={styles.panelTitle}>Dialing Sets</h3>

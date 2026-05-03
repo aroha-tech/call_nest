@@ -52,6 +52,10 @@ export function DialerSessionCallHistoryPanel({ dialerSessionId }) {
     loadCallHistoryVisibleColumnIds(getApplicableCallHistoryColumns())
   );
   const [callHistoryCustomizeOpen, setCallHistoryCustomizeOpen] = useState(false);
+  const callHistorySkeletonColumns = useMemo(
+    () => Math.min(14, Math.max(4, callHistoryVisibleColumnIds.length + 2)),
+    [callHistoryVisibleColumnIds]
+  );
   const tableScrollRef = useRef(null);
 
   const rows = payload?.data ?? [];
@@ -195,6 +199,7 @@ export function DialerSessionCallHistoryPanel({ dialerSessionId }) {
           loading={loading}
           hasCompletedInitialFetch={hasCompletedInitialFetch}
           className={listStyles.tableDataRegionLead}
+          skeletonColumns={callHistorySkeletonColumns}
         >
           {rows.length === 0 ? (
             <div className={listStyles.tableCardEmpty}>No call history rows match your filters.</div>

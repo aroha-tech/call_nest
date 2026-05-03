@@ -457,7 +457,11 @@ export function ScheduleHubPage() {
           </div>
         )}
       </div>
-      <TableDataRegion loading={loadingMeetings} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+      <TableDataRegion
+        loading={loadingMeetings}
+        hasCompletedInitialFetch={hasCompletedInitialFetch}
+        skeletonColumns={7}
+      >
         {meetingsRows.length === 0 ? (
           <div className={listStyles.tableCardEmpty}>No meetings in range.</div>
         ) : (
@@ -596,7 +600,11 @@ export function ScheduleHubPage() {
           </div>
         )}
       </div>
-      <TableDataRegion loading={loadingCallbacks} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+      <TableDataRegion
+        loading={loadingCallbacks}
+        hasCompletedInitialFetch={hasCompletedInitialFetch}
+        skeletonColumns={8}
+      >
         {callbacksRows.length === 0 ? (
           <div className={listStyles.tableCardEmpty}>No scheduled callbacks in range.</div>
         ) : (
@@ -717,7 +725,11 @@ export function ScheduleHubPage() {
           <div>
             <div className={styles.sectionTitle}>Summary by person</div>
             <div className={listStyles.tableCard}>
-              <TableDataRegion loading={loadingSummary} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+              <TableDataRegion
+                loading={loadingSummary}
+                hasCompletedInitialFetch={hasCompletedInitialFetch}
+                skeletonColumns={8}
+              >
                 {summaryRows.length === 0 ? (
                   <div className={listStyles.tableCardEmpty}>No summary rows in range.</div>
                 ) : (

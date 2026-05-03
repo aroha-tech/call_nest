@@ -317,7 +317,11 @@ export function EmailAccountsPage() {
         />
       </div>
 
-      <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+      <TableDataRegion
+        loading={loading}
+        hasCompletedInitialFetch={hasCompletedInitialFetch}
+        skeletonColumns={canManageAccounts ? 6 : 5}
+      >
         {!accounts?.length ? (
           <EmptyState
             icon="✉️"

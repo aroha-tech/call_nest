@@ -225,7 +225,11 @@ export function EmailTemplatesPage() {
         />
       </div>
 
-      <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+      <TableDataRegion
+        loading={loading}
+        hasCompletedInitialFetch={hasCompletedInitialFetch}
+        skeletonColumns={canManageTemplates ? 5 : 4}
+      >
         {!templates?.length ? (
           <EmptyState
             icon="📄"

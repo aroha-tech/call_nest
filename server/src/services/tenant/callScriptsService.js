@@ -4,6 +4,7 @@
 
 import { query } from '../../config/db.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
+import { getCreatedByUserIdsForScope } from './userMessageScopeService.js';
 
 function parseVariablesUsed(val) {
   if (val == null) return [];
@@ -19,6 +20,15 @@ function parseVariablesUsed(val) {
 }
 import { extractVariables } from '../templateEngine/variableDetector.js';
 import * as variableValidator from '../templateEngine/variableValidator.js';
+
+async function callScriptCreatedByScopeClause(tenantId, manageAllScripts, actingUser) {
+  if (manageAllScripts) return { clause: '', params: [] };
+  const scopedIds = await getCreatedByUserIdsForScope(tenantId, actingUser);
+  if (scopedIds === null) return { clause: '', params: [] };
+  if (!scopedIds.length) return { clause: ' AND 1=0 ', params: [] };
+  const ph = scopedIds.map(() => '?').join(',');
+  return { clause: ` AND cs.created_by IN (${ph}) `, params: scopedIds };
+}
 
 export async function findAll(tenantId, includeInactive = false) {
   let sql = `
@@ -42,35 +52,46 @@ export async function findAll(tenantId, includeInactive = false) {
 }
 
 /**
- * Paginated list with search (script_name) and includeInactive
+ * Paginated list with search (script_name) and includeInactive.
+ * When manageAllScripts is false, only scripts whose created_by is in the acting user's scope (self for agents; self+team for managers) are returned.
  */
-export async function findAllPaginated(tenantId, { search = '', includeInactive = false, page = 1, limit = 10 } = {}) {
+export async function findAllPaginated(
+  tenantId,
+  { search = '', includeInactive = false, page = 1, limit = 10, actingUser = null, manageAllScripts = false } = {}
+) {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
   const offset = (pageNum - 1) * limitNum;
 
-  const whereClauses = ['tenant_id = ?', 'is_deleted = 0'];
+  const scope = actingUser
+    ? await callScriptCreatedByScopeClause(tenantId, manageAllScripts, actingUser)
+    : { clause: '', params: [] };
+
+  const whereClauses = ['cs.tenant_id = ?', 'cs.is_deleted = 0'];
   const params = [tenantId];
 
   if (!includeInactive) {
-    whereClauses.push('status = 1');
+    whereClauses.push('cs.status = 1');
   }
 
   if (search && search.trim()) {
-    whereClauses.push('script_name LIKE ?');
+    whereClauses.push('cs.script_name LIKE ?');
     params.push(`%${search.trim()}%`);
   }
 
-  const whereSQL = whereClauses.join(' AND ');
+  const whereSQL = whereClauses.join(' AND ') + scope.clause;
+  params.push(...scope.params);
 
-  const [countRow] = await query(`SELECT COUNT(*) as total FROM call_scripts WHERE ${whereSQL}`, params);
+  const [countRow] = await query(`SELECT COUNT(*) as total FROM call_scripts cs WHERE ${whereSQL}`, params);
   const total = countRow.total;
 
   const rows = await query(
-    `SELECT id, tenant_id, script_name, script_body, variables_used, status, is_default, created_by, created_at, updated_by, updated_at
-     FROM call_scripts
+    `SELECT cs.id, cs.tenant_id, cs.script_name, cs.script_body, cs.variables_used, cs.status, cs.is_default, cs.created_by, cs.created_at, cs.updated_by, cs.updated_at,
+            creator.name AS created_by_name
+     FROM call_scripts cs
+     LEFT JOIN users creator ON creator.id = cs.created_by AND creator.tenant_id = cs.tenant_id AND creator.is_deleted = 0
      WHERE ${whereSQL}
-     ORDER BY script_name ASC
+     ORDER BY cs.script_name ASC
      LIMIT ${limitNum} OFFSET ${offset}`,
     params
   );
@@ -91,7 +112,10 @@ export async function findAllPaginated(tenantId, { search = '', includeInactive 
 
 export async function findById(tenantId, id) {
   const rows = await query(
-    'SELECT * FROM call_scripts WHERE id = ? AND tenant_id = ? AND is_deleted = 0',
+    `SELECT cs.*, creator.name AS created_by_name
+     FROM call_scripts cs
+     LEFT JOIN users creator ON creator.id = cs.created_by AND creator.tenant_id = cs.tenant_id AND creator.is_deleted = 0
+     WHERE cs.id = ? AND cs.tenant_id = ? AND cs.is_deleted = 0`,
     [id, tenantId]
   );
   const row = rows[0];

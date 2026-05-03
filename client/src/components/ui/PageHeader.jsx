@@ -42,16 +42,19 @@ export function PageHeader({
       >
         <div className={styles.info}>
           <h1 className={styles.title}>
-            {resolvedTitleIcon ? (
-              <span className={styles.titleIconWrap} aria-hidden>
-                <MaterialSymbol name={resolvedTitleIcon} size="sm" className={styles.titleIcon} />
-              </span>
-            ) : null}
-            <span>{title}</span>
+            <span className={styles.titleLeading}>
+              {resolvedTitleIcon ? (
+                <span className={styles.titleIconWrap} aria-hidden>
+                  <MaterialSymbol name={resolvedTitleIcon} size="sm" className={styles.titleIcon} />
+                </span>
+              ) : null}
+              <span>{title}</span>
+            </span>
             <InfoHelpIcon
               title={`About ${title}`}
               modalTitle={title}
               message={description}
+              variant="title"
               className={styles.titleInfoBtn}
             />
           </h1>

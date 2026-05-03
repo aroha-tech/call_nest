@@ -96,6 +96,19 @@
   background: var(--color-bg-elevated);
 }
 
+.mergeFieldsTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  margin: 0 0 6px;
+}
+
+.mergeFieldsTitleRow .mergeFieldsTitle {
+  margin: 0;
+  min-width: 0;
+}
+
 .mergeFieldsTitle {
   margin: 0 0 6px;
   font-size: 0.8125rem;
@@ -164,6 +177,13 @@
 
 .optionalPlainDetails {
   margin-top: 4px;
+}
+
+.optionalPlainSummaryInner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
 }
 
 .optionalPlainSummary {
@@ -650,32 +670,49 @@
   color: var(--color-primary-500, #6366f1);
 }
 
+/* ModalFooter content is flex + flex-end; one child would shrink to content width and wrap actions early. */
+.modalFooterFullWidth {
+  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .modalFooterRow {
   width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
+  flex-wrap: nowrap;
+  box-sizing: border-box;
 }
 
 .modalFooterLeft {
   display: flex;
   gap: 8px;
+  flex-shrink: 0;
+  align-items: center;
 }
 
 .modalFooterRight {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex-wrap: nowrap;
   justify-content: flex-end;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .footerBtn {
   min-width: 86px;
+  flex: 0 0 auto;
 }
 
 .footerBtnWide {
-  min-width: 195px;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
 .footerBtnPrimary {

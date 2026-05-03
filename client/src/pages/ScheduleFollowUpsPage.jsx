@@ -804,7 +804,11 @@ export function ScheduleFollowUpsPage() {
               className={listStyles.searchInToolbar}
             />
           </div>
-          <TableDataRegion loading={listLoading} hasCompletedInitialFetch={listHasCompletedInitialFetch}>
+          <TableDataRegion
+            loading={listLoading}
+            hasCompletedInitialFetch={listHasCompletedInitialFetch}
+            skeletonColumns={canDialExecute ? 9 : 7}
+          >
             {listRows.length === 0 && !listLoading ? (
               <div className={listStyles.tableCardEmpty}>No follow-ups match your filters.</div>
             ) : (
@@ -1210,7 +1214,7 @@ export function ScheduleFollowUpsPage() {
           />
         </div>
 
-        <TableDataRegion loading={pickerLoading} hasCompletedInitialFetch>
+        <TableDataRegion loading={pickerLoading} hasCompletedInitialFetch skeletonColumns={3}>
           {pickerRows.length === 0 && !pickerLoading ? (
             <div className={listStyles.tableCardEmpty}>No results.</div>
           ) : (

@@ -1266,12 +1266,50 @@ export function DialerSessionPage() {
       {showErrorOutside ? <Alert variant={errorAlertVariant}>{error}</Alert> : null}
 
       {loading && !session ? (
-        <div className={styles.loadingCenter}>
-          <div style={{ width: 'min(860px, 100%)', display: 'grid', gap: 12 }}>
-            <Skeleton width="38%" height={18} />
-            <Skeleton width="100%" height={56} />
-            <Skeleton width="100%" height={56} />
-            <Skeleton width="100%" height={220} />
+        <div className={styles.dialerShell} aria-busy="true" aria-label="Loading dialer workspace">
+          <header className={styles.dialerChromeBar}>
+            <div className={styles.dialerChromeLeft}>
+              <Skeleton inverse width={84} height={12} />
+              <Skeleton inverse width={160} height={18} />
+              <Skeleton inverse width={64} height={26} style={{ borderRadius: 999 }} />
+            </div>
+            <div className={styles.dialerChromeRight}>
+              <Skeleton inverse width={48} height={10} />
+              <Skeleton inverse width="min(200px, 42%)" height={14} />
+            </div>
+          </header>
+          <div className={styles.metricsStrip} aria-hidden>
+            {Array.from({ length: 7 }, (_, i) => (
+              <div key={`skel-met-${i}`} className={styles.metricCell}>
+                <Skeleton inverse width="70%" height={10} />
+                <Skeleton inverse width="52%" height={16} style={{ marginTop: 6 }} />
+              </div>
+            ))}
+          </div>
+          <div className={styles.shellProgress} aria-hidden>
+            <div className={styles.shellProgressText}>
+              <Skeleton inverse width={220} height={12} />
+              <Skeleton inverse width={72} height={12} />
+            </div>
+            <div className={styles.shellProgressBar}>
+              <Skeleton inverse width="38%" height="100%" style={{ borderRadius: 999 }} />
+            </div>
+          </div>
+          <div className={styles.dialerSkelWorkspace} aria-hidden>
+            <div className={styles.dialerSkelMain}>
+              <Skeleton inverse width={120} height={14} />
+              <Skeleton inverse width="85%" height={22} style={{ marginTop: 10 }} />
+              <Skeleton inverse width="100%" height={160} style={{ marginTop: 14, borderRadius: 12 }} />
+              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                <Skeleton inverse width={112} height={40} style={{ borderRadius: 10 }} />
+                <Skeleton inverse width={96} height={40} style={{ borderRadius: 10 }} />
+              </div>
+            </div>
+            <div className={styles.dialerSkelAside}>
+              <Skeleton inverse width="100%" height={14} />
+              <Skeleton inverse width="100%" height={220} style={{ marginTop: 12, borderRadius: 12 }} />
+              <Skeleton inverse width="100%" height={100} style={{ marginTop: 12, borderRadius: 12 }} />
+            </div>
           </div>
         </div>
       ) : null}

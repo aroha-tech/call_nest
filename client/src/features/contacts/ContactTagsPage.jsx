@@ -163,7 +163,11 @@ export function ContactTagsPage() {
       </div>
 
       <div className={listStyles.tableCard}>
-        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        <TableDataRegion
+          loading={loading}
+          hasCompletedInitialFetch={hasCompletedInitialFetch}
+          skeletonColumns={4}
+        >
           {!tags?.length ? (
             <div className={listStyles.tableCardEmpty}>
               <p style={{ padding: 24, opacity: 0.85 }}>No tags yet. Create tags here, then select them on lead/contact forms.</p>

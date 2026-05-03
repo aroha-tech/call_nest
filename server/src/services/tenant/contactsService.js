@@ -421,10 +421,18 @@ function resolveContactListOrderBy(sortBy, sortDir) {
   return `${col} ${dir}, c.id ASC`;
 }
 
-const CONTACT_LIST_JOIN_FROM = `
+/** @param {boolean} requirePrimaryPhone — when true (dialer list), only rows with a non-empty primary phone. Uses INNER JOIN for efficient filtering. */
+function contactListJoinFrom(requirePrimaryPhone = false) {
+  const phoneJoin = requirePrimaryPhone
+    ? `INNER JOIN contact_phones p
+       ON p.id = c.primary_phone_id
+      AND p.tenant_id = c.tenant_id
+      AND CHAR_LENGTH(TRIM(p.phone)) > 0`
+    : `LEFT JOIN contact_phones p
+       ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id`;
+  return `
      FROM contacts c
-     LEFT JOIN contact_phones p
-       ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id
+     ${phoneJoin}
      LEFT JOIN campaigns cam
        ON cam.id = c.campaign_id AND cam.tenant_id = c.tenant_id AND cam.deleted_at IS NULL
      LEFT JOIN users mgr
@@ -433,6 +441,7 @@ const CONTACT_LIST_JOIN_FROM = `
        ON ag.id = c.assigned_user_id AND ag.tenant_id = c.tenant_id AND ag.is_deleted = 0
      LEFT JOIN contact_status_master csm
        ON csm.id = c.status_id AND csm.is_deleted = 0`;
+}
 
 const COLUMN_FILTER_FIELDS = new Set([
   'display_name',
@@ -1150,6 +1159,7 @@ export async function listContacts(
     columnFilters,
     touchStatus,
     excludeBlacklisted = false,
+    requirePrimaryPhone = false,
   } = {}
 ) {
   const pageNum = parseInt(page, 10) || 1;
@@ -1157,6 +1167,7 @@ export async function listContacts(
   const offset = (pageNum - 1) * limitNum;
   const limitInt = Math.floor(Number(limitNum)) || 20;
   const offsetInt = Math.floor(Number(offset)) || 0;
+  const joinFrom = contactListJoinFrom(Boolean(requirePrimaryPhone));
   const orderBySQL = resolveContactListOrderBy(sortBy, sortDir);
   const blacklistContactSelectSQL = excludeBlacklisted
     ? '0 AS is_blacklisted_contact'
@@ -1209,7 +1220,7 @@ export async function listContacts(
 
   const [countRow] = await query(
     `SELECT COUNT(*) AS total
-     ${CONTACT_LIST_JOIN_FROM}
+     ${joinFrom}
      ${finalWhere}`,
     params
   );
@@ -1263,7 +1274,7 @@ export async function listContacts(
         ,
         ${blacklistContactSelectSQL},
         ${blacklistNumberSelectSQL}
-     ${CONTACT_LIST_JOIN_FROM}
+     ${joinFrom}
      ${finalWhere}
      ORDER BY ${orderBySQL}
      LIMIT ${limitInt} OFFSET ${offsetInt}`,
@@ -1314,9 +1325,10 @@ export async function listContacts(
 /** All matching contact ids for current list filters (same visibility as listContacts), capped for bulk selection. */
 export async function listContactIds(tenantId, user, options) {
   const { finalWhere, params } = await prepareContactListFinalWhere(tenantId, user, options);
+  const joinFrom = contactListJoinFrom(Boolean(options?.requirePrimaryPhone));
   const [countRow] = await query(
     `SELECT COUNT(*) AS total
-     ${CONTACT_LIST_JOIN_FROM}
+     ${joinFrom}
      ${finalWhere}`,
     params
   );
@@ -1324,7 +1336,7 @@ export async function listContactIds(tenantId, user, options) {
   const cap = CONTACT_LIST_IDS_CAP;
   const rows = await query(
     `SELECT c.id
-     ${CONTACT_LIST_JOIN_FROM}
+     ${joinFrom}
      ${finalWhere}
      ORDER BY c.id ASC
      LIMIT ${cap + 1}`,
@@ -1341,9 +1353,10 @@ export async function listContactIds(tenantId, user, options) {
  */
 export async function listAllContactIdsForBulkJob(tenantId, user, options) {
   const { finalWhere, params } = await prepareContactListFinalWhere(tenantId, user, options);
+  const joinFrom = contactListJoinFrom(Boolean(options?.requirePrimaryPhone));
   const [countRow] = await query(
     `SELECT COUNT(*) AS total
-     ${CONTACT_LIST_JOIN_FROM}
+     ${joinFrom}
      ${finalWhere}`,
     params
   );
@@ -1358,7 +1371,7 @@ export async function listAllContactIdsForBulkJob(tenantId, user, options) {
   }
   const rows = await query(
     `SELECT c.id
-     ${CONTACT_LIST_JOIN_FROM}
+     ${joinFrom}
      ${finalWhere}
      ORDER BY c.id ASC`,
     params
@@ -4342,6 +4355,7 @@ export function exportOptsToListFilterOptions(exportOpts = {}) {
     filterTagIds: exportOpts.filterTagIds,
     columnFilters: exportOpts.columnFilters,
     touchStatus: exportOpts.touchStatus,
+    requirePrimaryPhone: exportOpts.requirePrimaryPhone,
   };
 }
 

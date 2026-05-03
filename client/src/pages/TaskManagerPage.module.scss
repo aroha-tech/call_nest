@@ -1227,3 +1227,210 @@
     font-size: $font-size-xs;
     color: var(--color-text-tertiary);
   }
+
+  /* Meeting progress basis — assign task form */
+  .meetingBasisField {
+    padding: $space-3;
+    border-radius: $radius-lg;
+    border: 1px solid var(--color-border-subtle);
+    background: linear-gradient(
+      165deg,
+      rgba(99, 102, 241, 0.06) 0%,
+      var(--color-bg-subtle, #f8f9fc) 48%,
+      var(--color-bg-elevated, #fff) 100%
+    );
+  }
+
+  .meetingBasisFieldHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-2;
+    margin-bottom: $space-2;
+  }
+
+  .meetingBasisFieldLabel {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: var(--color-text-primary);
+  }
+
+  .meetingBasisIntro {
+    margin: 0 0 $space-3;
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+  }
+
+  .meetingBasisChoices {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: $space-3;
+
+    @media (max-width: 720px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .meetingBasisCard {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: $space-3;
+    text-align: left;
+    cursor: pointer;
+    border-radius: $radius-lg;
+    border: 2px solid var(--color-border-subtle);
+    background: var(--color-bg-elevated, #fff);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease,
+      background 0.15s ease;
+    font: inherit;
+    color: inherit;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary-500, #6366f1);
+      outline-offset: 2px;
+    }
+
+    &:hover {
+      border-color: rgba(99, 102, 241, 0.35);
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.08);
+    }
+  }
+
+  .meetingBasisCardSelected {
+    border-color: var(--color-primary-500, #6366f1);
+    background: linear-gradient(
+      180deg,
+      rgba(99, 102, 241, 0.1) 0%,
+      var(--color-bg-elevated, #fff) 64%
+    );
+    box-shadow:
+      0 0 0 1px rgba(99, 102, 241, 0.2),
+      0 6px 20px rgba(99, 102, 241, 0.12);
+  }
+
+  .meetingBasisCardTop {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-2;
+    margin-bottom: $space-2;
+  }
+
+  .meetingBasisIconWrap {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: $radius-md;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .meetingBasisIconWrapScheduled {
+    background: rgba(59, 130, 246, 0.16);
+    color: #2563eb;
+  }
+
+  .meetingBasisIconWrapCreated {
+    background: rgba(168, 85, 247, 0.18);
+    color: #7c3aed;
+  }
+
+  .meetingBasisIcon {
+    font-size: 26px !important;
+    line-height: 1 !important;
+  }
+
+  .meetingBasisCardTitles {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .meetingBasisCardTitleRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .meetingBasisCardTitle {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: var(--color-text-primary);
+  }
+
+  .meetingBasisCardBadge {
+    font-size: 10px;
+    font-weight: $font-weight-semibold;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    border-radius: $radius-full;
+    background: var(--color-bg-muted);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border-subtle);
+  }
+
+  .meetingBasisCardSelected .meetingBasisCardBadge {
+    background: rgba(99, 102, 241, 0.14);
+    border-color: rgba(99, 102, 241, 0.28);
+    color: var(--color-primary-700, #4338ca);
+  }
+
+  .meetingBasisCardTagline {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    color: var(--color-text-tertiary);
+  }
+
+  .meetingBasisRadio {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: $radius-full;
+    border: 2px solid var(--color-border-subtle);
+    margin-top: 2px;
+    position: relative;
+    transition: border-color 0.15s ease;
+  }
+
+  .meetingBasisRadioOn {
+    border-color: var(--color-primary-500, #6366f1);
+    background: radial-gradient(circle, var(--color-primary-500, #6366f1) 0%, var(--color-primary-500, #6366f1) 42%, transparent 44%);
+  }
+
+  .meetingBasisCardDesc {
+    margin: 0 0 $space-2;
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    line-height: 1.55;
+  }
+
+  .meetingBasisCardExample {
+    margin: 0;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--color-text-tertiary);
+    padding: $space-2;
+    border-radius: $radius-md;
+    background: rgba(15, 23, 42, 0.03);
+    border: 1px dashed var(--color-border-subtle);
+  }
+
+  .meetingBasisExampleIcon {
+    flex-shrink: 0;
+    font-size: 16px !important;
+    line-height: 1 !important;
+    margin-top: 1px;
+    opacity: 0.85;
+  }

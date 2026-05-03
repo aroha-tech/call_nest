@@ -333,7 +333,11 @@ export function EmailSentPage() {
             className={listStyles.searchInToolbar}
           />
         </div>
-        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        <TableDataRegion
+          loading={loading}
+          hasCompletedInitialFetch={hasCompletedInitialFetch}
+          skeletonColumns={showSentByColumn ? 7 : 6}
+        >
           {!filteredMessages?.length ? (
             <div className={listStyles.tableCardEmpty}>
               <EmptyState

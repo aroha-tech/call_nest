@@ -182,6 +182,10 @@ export function ActivitiesPage() {
   const callHistoryTableScrollRef = useRef(null);
   const [callHistoryColumnPanelCol, setCallHistoryColumnPanelCol] = useState(null);
   const [callHistoryColumnFilters, setCallHistoryColumnFilters] = useState([]);
+  const callHistorySkeletonColumns = useMemo(
+    () => Math.min(14, Math.max(4, callHistoryVisibleColumnIds.length + 2)),
+    [callHistoryVisibleColumnIds]
+  );
 
   const [sortBy, setSortBy] = useState('');
   const [sortDir, setSortDir] = useState('desc');
@@ -833,6 +837,7 @@ export function ActivitiesPage() {
           loading={loading}
           hasCompletedInitialFetch={hasCompletedInitialFetch}
           className={listStyles.tableDataRegionLead}
+          skeletonColumns={callHistorySkeletonColumns}
         >
           {rows.length === 0 ? (
             <div className={listStyles.tableCardEmpty}>No call history rows match your filters.</div>

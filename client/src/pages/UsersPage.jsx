@@ -345,7 +345,11 @@ export function UsersPage() {
               className={listStyles.searchInToolbar}
             />
           </div>
-          <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+          <TableDataRegion
+            loading={loading}
+            hasCompletedInitialFetch={hasCompletedInitialFetch}
+            skeletonColumns={8}
+          >
             {users.length === 0 ? (
               <div className={listStyles.tableCardEmpty}>
                 <EmptyState

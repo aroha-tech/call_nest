@@ -377,6 +377,32 @@ export function MeetingsPage() {
     return [{ value: '', label: 'Select owner' }, ...members];
   }, [teamMembers]);
 
+  /**
+   * Scoped team dropdowns omit users outside the viewer's hub scope; meeting rows still include
+   * assignee/owner IDs. Inject display labels from the loaded meeting so selects don't show raw IDs.
+   */
+  const agentOptionsResolved = useMemo(() => {
+    const base = agentOptions.slice();
+    const uid = form.assigned_user_id ? String(form.assigned_user_id) : '';
+    if (!uid || base.some((o) => o.value === uid)) return base;
+    const m = editing;
+    const label =
+      (m && String(m.assigned_user_id) === uid && (m.assigned_user_name || m.meeting_owner_name)) || `User ${uid}`;
+    return [...base, { value: uid, label: String(label).trim() || `User ${uid}` }];
+  }, [agentOptions, form.assigned_user_id, editing]);
+
+  const ownerOptionsResolved = useMemo(() => {
+    const base = ownerOptions.slice();
+    const uid = form.meeting_owner_user_id ? String(form.meeting_owner_user_id) : '';
+    if (!uid || base.some((o) => o.value === uid)) return base;
+    const m = editing;
+    const label =
+      (m && String(m.meeting_owner_user_id) === uid && (m.meeting_owner_name || m.assigned_user_name)) ||
+      (m && String(m.assigned_user_id) === uid && m.assigned_user_name) ||
+      `User ${uid}`;
+    return [...base, { value: uid, label: String(label).trim() || `User ${uid}` }];
+  }, [ownerOptions, form.meeting_owner_user_id, editing]);
+
   useEffect(() => {
     if (!pickerOpen) return;
     let cancelled = false;
@@ -1071,7 +1097,11 @@ export function MeetingsPage() {
               className={listStyles.searchInToolbar}
             />
           </div>
-          <TableDataRegion loading={listLoading} hasCompletedInitialFetch={listHasCompletedInitialFetch}>
+          <TableDataRegion
+            loading={listLoading}
+            hasCompletedInitialFetch={listHasCompletedInitialFetch}
+            skeletonColumns={6}
+          >
             {listRows.length === 0 && !listLoading ? (
               <div className={listStyles.tableCardEmpty}>
                 <p className={styles.listHint} style={{ margin: 0 }}>
@@ -1148,54 +1178,56 @@ export function MeetingsPage() {
         closeOnEscape={!saving}
         footer={
           <ModalFooter>
-            <div className={styles.modalFooterRow}>
-              <div className={styles.modalFooterLeft}>
-                {editing && canManage ? (
-                  <Button type="button" variant="danger" onClick={() => setDeleteTarget(editing)} disabled={saving} className={styles.footerBtn}>
-                    Delete
-                  </Button>
-                ) : null}
-              </div>
-              <div className={styles.modalFooterRight}>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => navigate('/settings/meeting-attendee-emails')}
-                  disabled={saving}
-                  className={styles.footerBtnWide}
-                >
-                  <UiIcon>
-                    <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
-                    <path d="m3.5 7 8.5 6 8.5-6" />
-                  </UiIcon>
-                  Attendee email settings
-                </Button>
-                <Button type="button" variant="ghost" onClick={() => setModalOpen(false)} disabled={saving} className={styles.footerBtn}>
-                  {canManage ? 'Cancel' : 'Close'}
-                </Button>
-                {canManage ? (
+            <div className={styles.modalFooterFullWidth}>
+              <div className={styles.modalFooterRow}>
+                <div className={styles.modalFooterLeft}>
+                  {editing && canManage ? (
+                    <Button type="button" variant="danger" onClick={() => setDeleteTarget(editing)} disabled={saving} className={styles.footerBtn}>
+                      Delete
+                    </Button>
+                  ) : null}
+                </div>
+                <div className={styles.modalFooterRight}>
                   <Button
                     type="button"
                     variant="secondary"
-                    onClick={openMeetingEmailPreview}
-                    disabled={!form.email_account_id || saving}
+                    onClick={() => navigate('/settings/meeting-attendee-emails')}
+                    disabled={saving}
                     className={styles.footerBtnWide}
                   >
                     <UiIcon>
-                      <path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z" />
-                      <circle cx="12" cy="12" r="2.75" />
+                      <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+                      <path d="m3.5 7 8.5 6 8.5-6" />
                     </UiIcon>
-                    Preview & edit email
+                    Attendee email settings
                   </Button>
-                ) : null}
-                {canManage ? (
-                  <Button type="submit" form="meeting-form" loading={saving} disabled={saving} className={styles.footerBtnPrimary}>
-                    <UiIcon>
-                      <path d="M20 7 9 18l-5-5" />
-                    </UiIcon>
-                    Save
+                  <Button type="button" variant="ghost" onClick={() => setModalOpen(false)} disabled={saving} className={styles.footerBtn}>
+                    {canManage ? 'Cancel' : 'Close'}
                   </Button>
-                ) : null}
+                  {canManage ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={openMeetingEmailPreview}
+                      disabled={!form.email_account_id || saving}
+                      className={styles.footerBtnWide}
+                    >
+                      <UiIcon>
+                        <path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z" />
+                        <circle cx="12" cy="12" r="2.75" />
+                      </UiIcon>
+                      Preview & edit email
+                    </Button>
+                  ) : null}
+                  {canManage ? (
+                    <Button type="submit" form="meeting-form" loading={saving} disabled={saving} className={styles.footerBtnPrimary}>
+                      <UiIcon>
+                        <path d="M20 7 9 18l-5-5" />
+                      </UiIcon>
+                      Save
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             </div>
           </ModalFooter>
@@ -1335,7 +1367,7 @@ export function MeetingsPage() {
                   }));
                   setMeetingFormErrors((e2) => ({ ...e2, assigned_user_id: undefined }));
                 }}
-                options={agentOptions}
+                options={agentOptionsResolved}
                 disabled={!canManage}
                 error={meetingFormErrors.assigned_user_id}
               />
@@ -1352,7 +1384,7 @@ export function MeetingsPage() {
                   setForm((f) => ({ ...f, meeting_owner_user_id: e.target.value }));
                   setMeetingFormErrors((e2) => ({ ...e2, meeting_owner_user_id: undefined }));
                 }}
-                options={ownerOptions}
+                options={ownerOptionsResolved}
                 disabled={!canManage}
                 error={meetingFormErrors.meeting_owner_user_id}
               />
@@ -1455,11 +1487,7 @@ export function MeetingsPage() {
                 inputClassName={styles.iconInput}
               />
             </div>
-            <div className={`${styles.iconField} ${styles.followUpIconBlue}`}>
-              <UiIcon>
-                <rect x="3" y="5" width="18" height="16" rx="2" />
-                <path d="M3 10h18M8 3v4M16 3v4" />
-              </UiIcon>
+            <div>
               <DateTimePickerField
                 label="Start *"
                 mode="datetime"
@@ -1480,14 +1508,9 @@ export function MeetingsPage() {
                 required
                 disabled={!canManage}
                 error={meetingFormErrors.start_at}
-                inputClassName={styles.iconInput}
               />
             </div>
-            <div className={`${styles.iconField} ${styles.followUpIconIndigo}`}>
-              <UiIcon>
-                <rect x="3" y="5" width="18" height="16" rx="2" />
-                <path d="M3 10h18M8 3v4M16 3v4" />
-              </UiIcon>
+            <div>
               <DateTimePickerField
                 label="End *"
                 mode="datetime"
@@ -1500,7 +1523,6 @@ export function MeetingsPage() {
                 required
                 disabled={!canManage}
                 error={meetingFormErrors.end_at}
-                inputClassName={styles.iconInput}
               />
             </div>
             <div className={styles.iconField}>
@@ -1584,7 +1606,11 @@ export function MeetingsPage() {
           />
         </div>
 
-        <TableDataRegion loading={pickerLoading} hasCompletedInitialFetch>
+        <TableDataRegion
+          loading={pickerLoading}
+          hasCompletedInitialFetch
+          skeletonColumns={3}
+        >
           {pickerRows.length === 0 && !pickerLoading ? (
             <div className={listStyles.tableCardEmpty}>No results.</div>
           ) : (
@@ -1688,12 +1714,14 @@ export function MeetingsPage() {
                 disabled={!canManage}
               />
               <div>
-                <div className={styles.fieldLabel}>Message (formatted)</div>
-                <InfoHelpIcon
-                  title="Formatted message info"
-                  modalTitle="Message (formatted)"
-                  message="Use the toolbar for formatting. Insert meeting fields with Variable in the toolbar (same as call scripts)."
-                />
+                <div className={styles.fieldLabelRow}>
+                  <div className={styles.fieldLabel}>Message (formatted)</div>
+                  <InfoHelpIcon
+                    title="Formatted message info"
+                    modalTitle="Message (formatted)"
+                    message="Use the toolbar for formatting. Insert meeting fields with Variable in the toolbar (same as call scripts)."
+                  />
+                </div>
                 <ScriptBodyEditor
                   key={meetingPreviewKind}
                   scrollableLayout
@@ -1810,12 +1838,14 @@ export function MeetingsPage() {
             </div>
             {placeholderHelp.length > 0 && (
               <div className={styles.mergeFieldsCard}>
-                <p className={styles.mergeFieldsTitle}>Insert meeting details</p>
-                <InfoHelpIcon
-                  title="Merge fields info"
-                  modalTitle="Insert meeting details"
-                  message='Focus Subject, the formatted message, or plain text, then click. Tooltip shows the code (e.g. {{title}}).'
-                />
+                <div className={styles.mergeFieldsTitleRow}>
+                  <p className={styles.mergeFieldsTitle}>Insert meeting details</p>
+                  <InfoHelpIcon
+                    title="Merge fields info"
+                    modalTitle="Insert meeting details"
+                    message='Focus Subject, the formatted message, or plain text, then click. Tooltip shows the code (e.g. {{title}}).'
+                  />
+                </div>
                 <div className={styles.mergeFieldsChips} role="group" aria-label="Insert merge field">
                   {placeholderHelp.map((name) => (
                     <button
@@ -1854,12 +1884,14 @@ export function MeetingsPage() {
                   disabled={!canManage}
                 />
                 <div>
-                  <div className={styles.fieldLabel}>Message (formatted)</div>
-                  <InfoHelpIcon
-                    title="Editor toolbar info"
-                    modalTitle="Message (formatted)"
-                    message="Use the toolbar for bold, lists, and links."
-                  />
+                  <div className={styles.fieldLabelRow}>
+                    <div className={styles.fieldLabel}>Message (formatted)</div>
+                    <InfoHelpIcon
+                      title="Editor toolbar info"
+                      modalTitle="Message (formatted)"
+                      message="Use the toolbar for bold, lists, and links."
+                    />
+                  </div>
                   <ScriptBodyEditor
                     ref={meetingTemplateHtmlRef}
                     key={templateTab}
@@ -1873,12 +1905,16 @@ export function MeetingsPage() {
                   />
                 </div>
                 <details className={styles.optionalPlainDetails}>
-                  <summary className={styles.optionalPlainSummary}>Plain text version (optional)</summary>
-                  <InfoHelpIcon
-                    title="Plain text info"
-                    modalTitle="Plain text version"
-                    message="Optional fallback for simple mail clients. Merge buttons work when this box is focused."
-                  />
+                  <summary className={styles.optionalPlainSummary}>
+                    <span className={styles.optionalPlainSummaryInner}>
+                      Plain text version (optional)
+                      <InfoHelpIcon
+                        title="Plain text info"
+                        modalTitle="Plain text version"
+                        message="Optional fallback for simple mail clients. Merge buttons work when this box is focused."
+                      />
+                    </span>
+                  </summary>
                   <textarea
                     id="meeting-template-plain"
                     className={styles.templateTextarea}

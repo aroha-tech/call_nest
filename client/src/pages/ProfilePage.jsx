@@ -215,14 +215,16 @@ export function ProfilePage() {
                 <p className={styles.roleBadge}>{roleLabel(user.role, user.isPlatformAdmin)}</p>
                 <div className={styles.emailBlock}>
                   <span className={styles.emailLabel}>Email</span>
-                  <p className={styles.emailValue} title={user.email}>
-                    {user.email}
-                  </p>
-                  <InfoHelpIcon
-                    title="Email change info"
-                    modalTitle="Email"
-                    message="Email cannot be changed here yet."
-                  />
+                  <div className={styles.emailValueRow}>
+                    <p className={styles.emailValue} title={user.email}>
+                      {user.email}
+                    </p>
+                    <InfoHelpIcon
+                      title="Email change info"
+                      modalTitle="Email"
+                      message="Email cannot be changed here yet."
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -293,6 +295,7 @@ export function ProfilePage() {
                 placeholder="Choose display"
                 value={datetimeDisplayMode}
                 onChange={(e) => setDatetimeDisplayMode(e.target.value)}
+                hint="Applies to lists and details across the app. In browser-local mode, timezone comes from your device while date/time format still follows these selections."
                 options={[
                   {
                     value: DATETIME_DISPLAY_IST,
@@ -325,11 +328,6 @@ export function ProfilePage() {
                 onChange={(e) => setDatetimeTimeFormat(e.target.value)}
                 options={TIME_FORMAT_OPTIONS}
               />
-              <InfoHelpIcon
-                title="Date/time settings info"
-                modalTitle="Dates and times"
-                message="Applies to lists and details across the app. In browser-local mode, timezone comes from your device while date/time format still follows these selections."
-              />
 
               {!passwordFlowOpen && (
                 <div className={styles.changePwdTrigger}>
@@ -345,6 +343,11 @@ export function ProfilePage() {
                     <div className={styles.passwordSectionTitle}>
                       <SectionIcon icon="lock" color="orange" size="sm" />
                       <h3 className={styles.sectionTitle}>Change password</h3>
+                      <InfoHelpIcon
+                        title="Password change info"
+                        modalTitle="Change password"
+                        message="Enter your current password and choose a new one (at least 8 characters)."
+                      />
                     </div>
                     <Button
                       type="button"
@@ -358,11 +361,6 @@ export function ProfilePage() {
                       Cancel
                     </Button>
                   </div>
-                  <InfoHelpIcon
-                    title="Password change info"
-                    modalTitle="Change password"
-                    message="Enter your current password and choose a new one (at least 8 characters)."
-                  />
                   <PasswordField
                     id="profile-current-password"
                     label="Current password"
@@ -426,14 +424,14 @@ export function ProfilePage() {
             <div className={styles.infoCardHeader}>
               <SectionIcon icon="credit_card" color="indigo" size="sm" />
               <h3 className={styles.managerCardTitle}>Billing &amp; plan</h3>
+              <InfoHelpIcon
+                title="Billing info"
+                modalTitle="Billing and plan"
+                message="Billing information and usage metrics will appear here."
+              />
             </div>
             <p className={styles.planTitle}>Current plan</p>
             <p className={styles.planValue}>Workspace Plan</p>
-            <InfoHelpIcon
-              title="Billing info"
-              modalTitle="Billing and plan"
-              message="Billing information and usage metrics will appear here."
-            />
             <Button type="button" variant="secondary" size="sm">
               Manage plan
             </Button>
@@ -443,12 +441,12 @@ export function ProfilePage() {
             <div className={styles.infoCardHeader}>
               <SectionIcon icon="extension" color="emerald" size="sm" />
               <h3 className={styles.managerCardTitle}>Add-ons</h3>
+              <InfoHelpIcon
+                title="Add-ons info"
+                modalTitle="Add-ons"
+                message={'Power Dialer\nWhatsApp Integration\nAdvanced Reports\nAPI Access'}
+              />
             </div>
-            <InfoHelpIcon
-              title="Add-ons info"
-              modalTitle="Add-ons"
-              message={'Power Dialer\nWhatsApp Integration\nAdvanced Reports\nAPI Access'}
-            />
             <Button type="button" variant="secondary" size="sm">
               Browse add-ons
             </Button>

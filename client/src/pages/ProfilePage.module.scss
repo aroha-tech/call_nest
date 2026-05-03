@@ -100,6 +100,20 @@
   letter-spacing: 0.04em;
 }
 
+.emailValueRow {
+  display: flex;
+  align-items: flex-start;
+  gap: $space-2;
+  flex-wrap: nowrap;
+  margin-top: $space-1;
+}
+
+.emailValueRow .emailValue {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
 .emailValue {
   margin: $space-1 0 0;
   font-size: $font-size-sm;

@@ -70,6 +70,22 @@
   margin: 0 0 $space-2;
 }
 
+.cardHeadingRow {
+  margin: 0 0 $space-2;
+
+  .sectionTitle {
+    margin: 0;
+  }
+}
+
+.fieldGroupHeadingRow {
+  margin: 0 0 $space-1;
+
+  .fieldGroupTitle {
+    margin: 0;
+  }
+}
+
 .optionalIndustryList {
   display: flex;
   flex-direction: column;
@@ -84,14 +100,19 @@
 }
 
 .optionalPacksHeading {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  flex-wrap: nowrap;
   margin-bottom: $space-3;
 }
 
 .optionalPacksTitle {
   font-size: $font-size-md;
   font-weight: $font-weight-semibold;
-  margin: 0 0 $space-1;
+  margin: 0;
   color: var(--color-text-primary, inherit);
+  min-width: 0;
 }
 
 .optionalPacksSubtitle {
@@ -140,6 +161,14 @@
   justify-content: space-between;
   gap: $space-2;
   margin-bottom: $space-1;
+}
+
+.optionalPackPaneTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .optionalPackPaneTitle {

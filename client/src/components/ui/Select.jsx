@@ -1,5 +1,6 @@
 import React, { useCallback, useId, useMemo } from 'react';
 import ReactSelect from 'react-select';
+import { InfoHelpIcon } from './InfoHelpIcon';
 import styles from './Select.module.scss';
 
 function parseLabel(label) {
@@ -129,6 +130,7 @@ export function Select({
   value,
   onChange,
   placeholder = 'Select...',
+  hint,
   error,
   disabled = false,
   className = '',
@@ -175,14 +177,33 @@ export function Select({
   return (
     <div className={`${styles.wrapper} ${className} ${wrapperClassName}`.trim()}>
       {label ? (
-        <label htmlFor={inputId} className={`${styles.label} ${labelClassName}`.trim()}>
-          {labelText}
-          {showRequiredMark ? (
-            <span className={styles.requiredMark} aria-hidden="true">
-              {' *'}
-            </span>
-          ) : null}
-        </label>
+        hint ? (
+          <div className={styles.labelRow}>
+            <label htmlFor={inputId} className={`${styles.label} ${labelClassName}`.trim()}>
+              {labelText}
+              {showRequiredMark ? (
+                <span className={styles.requiredMark} aria-hidden="true">
+                  {' *'}
+                </span>
+              ) : null}
+            </label>
+            <InfoHelpIcon
+              title={`${label} info`}
+              modalTitle={label}
+              message={hint}
+              className={styles.hintInfoBtn}
+            />
+          </div>
+        ) : (
+          <label htmlFor={inputId} className={`${styles.label} ${labelClassName}`.trim()}>
+            {labelText}
+            {showRequiredMark ? (
+              <span className={styles.requiredMark} aria-hidden="true">
+                {' *'}
+              </span>
+            ) : null}
+          </label>
+        )
       ) : null}
       <ReactSelect
         {...rest}

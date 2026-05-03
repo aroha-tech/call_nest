@@ -374,7 +374,11 @@ export function TenantUsersPage() {
               className={listStyles.searchInToolbar}
             />
           </div>
-          <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+          <TableDataRegion
+            loading={loading}
+            hasCompletedInitialFetch={hasCompletedInitialFetch}
+            skeletonColumns={7}
+          >
             {users.length === 0 ? (
               <div className={listStyles.tableCardEmpty}>
                 <EmptyState

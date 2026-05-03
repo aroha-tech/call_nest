@@ -7,7 +7,8 @@ import { Select } from '../components/ui/Select';
 import { Card } from '../components/ui/Card';
 import { Checkbox } from '../components/ui/Checkbox';
 import { Alert } from '../components/ui/Alert';
-import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
+import { Skeleton } from '../components/ui/Skeleton';
+import { InfoHelpIcon, infoHelpHeadingRowClassName } from '../components/ui/InfoHelpIcon';
 import { useMutation } from '../hooks/useAsyncData';
 import { tenantCompanyAPI } from '../services/tenantCompanyAPI';
 import { tenantIndustryFieldsAPI } from '../services/tenantIndustryFieldsAPI';
@@ -261,7 +262,32 @@ export function TenantCompanySettingsPage() {
     return (
       <div className={styles.page}>
         <PageHeader title="Company settings" description="Manage your organization profile." />
-        <p className={styles.muted}>Loading…</p>
+        <div className={`${styles.layout} ${styles.layoutSplit}`} aria-busy="true" aria-label="Loading settings">
+          <Card className={styles.card}>
+            <div className={styles.form}>
+              {Array.from({ length: 4 }, (_, i) => (
+                <div key={`skel-f-${i}`} style={{ display: 'grid', gap: 8 }}>
+                  <Skeleton width={120} height={12} />
+                  <Skeleton height={44} width="100%" />
+                </div>
+              ))}
+              <Skeleton height={120} width="100%" style={{ borderRadius: 10 }} />
+              <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                <Skeleton width={120} height={40} style={{ borderRadius: 8 }} />
+              </div>
+            </div>
+          </Card>
+          <Card className={`${styles.card} ${styles.cardAside}`}>
+            <div className={styles.cardHeadingRow}>
+              <Skeleton width="48%" height={18} />
+            </div>
+            <div style={{ display: 'grid', gap: 12 }}>
+              <Skeleton height={36} width="100%" />
+              <Skeleton height={36} width="100%" />
+              <Skeleton height={140} width="100%" style={{ borderRadius: 10 }} />
+            </div>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -360,12 +386,14 @@ export function TenantCompanySettingsPage() {
 
         {tenant?.industry_id ? (
           <Card className={`${styles.card} ${styles.cardAside}`}>
-            <h2 className={styles.sectionTitle}>Industry field packs</h2>
-            <InfoHelpIcon
-              title="Industry field packs info"
-              modalTitle="Industry field packs"
-              message="Always on your forms is fixed for your industry. Optional packs are in two columns: not using yet, then active for your workspace. Save when you are done."
-            />
+            <div className={`${infoHelpHeadingRowClassName} ${styles.cardHeadingRow}`.trim()}>
+              <h2 className={styles.sectionTitle}>Industry field packs</h2>
+              <InfoHelpIcon
+                title="Industry field packs info"
+                modalTitle="Industry field packs"
+                message="Always on your forms is fixed for your industry. Optional packs are in two columns: not using yet, then active for your workspace. Save when you are done."
+              />
+            </div>
             {optionalIndustryError ? (
               <Alert variant="error" className={styles.alert}>
                 {optionalIndustryError}
@@ -377,12 +405,14 @@ export function TenantCompanySettingsPage() {
               <>
                 {sortedCoreIndustryFields.length > 0 ? (
                   <div className={`${styles.fieldGroup} ${styles.fieldGroupTop}`}>
-                    <h3 className={styles.fieldGroupTitle}>Always on your forms</h3>
-                    <InfoHelpIcon
-                      title="Always on fields info"
-                      modalTitle="Always on your forms"
-                      message="Shown on every lead and contact and not controlled by the lists below."
-                    />
+                    <div className={`${infoHelpHeadingRowClassName} ${styles.fieldGroupHeadingRow}`.trim()}>
+                      <h3 className={styles.fieldGroupTitle}>Always on your forms</h3>
+                      <InfoHelpIcon
+                        title="Always on fields info"
+                        modalTitle="Always on your forms"
+                        message="Shown on every lead and contact and not controlled by the lists below."
+                      />
+                    </div>
                     <ul className={styles.fieldChipList}>
                       {sortedCoreIndustryFields.map((f) => (
                         <li key={f.id} className={styles.fieldChip}>
@@ -420,18 +450,20 @@ export function TenantCompanySettingsPage() {
                           aria-labelledby="optional-packs-available-heading"
                         >
                           <div className={styles.optionalPackPaneHeader}>
-                            <h4 className={styles.optionalPackPaneTitle} id="optional-packs-available-heading">
-                              Not using yet
-                            </h4>
+                            <div className={styles.optionalPackPaneTitleGroup}>
+                              <h4 className={styles.optionalPackPaneTitle} id="optional-packs-available-heading">
+                                Not using yet
+                              </h4>
+                              <InfoHelpIcon
+                                title="Not using yet info"
+                                modalTitle="Not using yet"
+                                message="Check a box to show this field on leads and contacts."
+                              />
+                            </div>
                             <span className={styles.optionalPackPaneBadge} aria-hidden>
                               {availableOptionalIndustryFields.length}
                             </span>
                           </div>
-                          <InfoHelpIcon
-                            title="Not using yet info"
-                            modalTitle="Not using yet"
-                            message="Check a box to show this field on leads and contacts."
-                          />
                           {availableOptionalIndustryFields.length === 0 ? (
                             <p className={styles.optionalPackPaneEmpty}>All optional packs are turned on.</p>
                           ) : (
@@ -457,18 +489,20 @@ export function TenantCompanySettingsPage() {
                           aria-labelledby="optional-packs-active-heading"
                         >
                           <div className={styles.optionalPackPaneHeader}>
-                            <h4 className={styles.optionalPackPaneTitle} id="optional-packs-active-heading">
-                              Active for your workspace
-                            </h4>
+                            <div className={styles.optionalPackPaneTitleGroup}>
+                              <h4 className={styles.optionalPackPaneTitle} id="optional-packs-active-heading">
+                                Active for your workspace
+                              </h4>
+                              <InfoHelpIcon
+                                title="Active packs info"
+                                modalTitle="Active for your workspace"
+                                message="Uncheck to hide from forms (after save)."
+                              />
+                            </div>
                             <span className={styles.optionalPackPaneBadge} aria-hidden>
                               {selectedOptionalIndustryFields.length}
                             </span>
                           </div>
-                          <InfoHelpIcon
-                            title="Active packs info"
-                            modalTitle="Active for your workspace"
-                            message="Uncheck to hide from forms (after save)."
-                          />
                           {selectedOptionalIndustryFields.length === 0 ? (
                             <p className={styles.optionalPackPaneEmpty}>
                               None yet — turn on packs from “Not using yet.”

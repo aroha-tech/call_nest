@@ -811,6 +811,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
     const aid = appliedAgentFilter;
     const dialerParams = {};
     if (isDialer && type === 'lead') {
+      dialerParams.require_primary_phone = true;
       if (touchStatusFilter && !isNoListFilter(touchStatusFilter)) {
         dialerParams.touch_status = touchStatusFilter;
       }
@@ -1239,6 +1240,13 @@ export function ContactsPage({ type, mode = 'crm' }) {
   const canBulkDelete = canDelete;
   const canBulkTag = canUpdate;
   const showRowCheckboxes = isDialer || canBulkAssign || canBulkDelete || canBulkTag;
+  const contactsTableSkeletonColumns = useMemo(() => {
+    const visibleCount = (type === 'lead' ? leadVisibleColumnIds : contactVisibleColumnIds).length;
+    let n = visibleCount + 1;
+    if (showRowCheckboxes) n += 1;
+    if (type === 'lead' && isDialer) n += 1;
+    return Math.min(14, Math.max(4, n));
+  }, [type, leadVisibleColumnIds, contactVisibleColumnIds, showRowCheckboxes, isDialer]);
   const bulkHint = useMemo(
     () => bulkToolbarHintText({ canBulkAssign, canBulkDelete, canBulkTag }),
     [canBulkAssign, canBulkDelete, canBulkTag]
@@ -1945,6 +1953,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
           loading={loadingContacts}
           hasCompletedInitialFetch={hasCompletedInitialFetch}
           className={type === 'lead' ? listStyles.tableDataRegionLead : undefined}
+          skeletonColumns={contactsTableSkeletonColumns}
         >
           {contacts.length === 0 ? (
             <div className={listStyles.tableCardEmpty}>

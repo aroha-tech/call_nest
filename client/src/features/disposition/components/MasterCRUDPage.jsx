@@ -196,7 +196,11 @@ export function MasterCRUDPage({
             className={listStyles.searchInToolbar}
           />
         </div>
-        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        <TableDataRegion
+          loading={loading}
+          hasCompletedInitialFetch={hasCompletedInitialFetch}
+          skeletonColumns={columnsForTable.length + 1}
+        >
           {data.length === 0 ? (
             <div className={listStyles.tableCardEmpty}>
               <EmptyState

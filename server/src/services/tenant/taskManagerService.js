@@ -1,32 +1,19 @@
 import { query } from '../../config/db.js';
 import { createAndDispatchNotification } from './notificationService.js';
+import {
+  dateOnly,
+  buildUserScope,
+  buildManagerTeamFilter,
+  PERF_REPORTS_AGENT_ROLE_SQL,
+} from '../../modules/reports/reportsScope.js';
 
 const TASK_TYPE_VALUES = new Set(['todo', 'meeting', 'call', 'deal']);
 const PRIORITY_VALUES = new Set(['low', 'medium', 'high']);
+const MEETING_PROGRESS_BASIS_VALUES = new Set(['scheduled_date', 'created_date']);
 
 function n(v, d = 0) {
   const x = Number(v);
   return Number.isFinite(x) ? x : d;
-}
-
-function dateOnly(v) {
-  if (!v) return null;
-  if (v instanceof Date) {
-    if (!Number.isFinite(v.getTime())) return null;
-    const y = v.getFullYear();
-    const m = String(v.getMonth() + 1).padStart(2, '0');
-    const d = String(v.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-  const raw = String(v).trim();
-  if (!raw) return null;
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
-  const parsed = new Date(raw.replace(' ', 'T'));
-  if (!Number.isFinite(parsed.getTime())) return null;
-  const y = parsed.getFullYear();
-  const m = String(parsed.getMonth() + 1).padStart(2, '0');
-  const d = String(parsed.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
 }
 
 function mysqlDateTime(v) {
@@ -47,6 +34,28 @@ function normalizeTaskType(v) {
 function normalizePriority(v) {
   const x = String(v || '').trim().toLowerCase();
   return PRIORITY_VALUES.has(x) ? x : 'medium';
+}
+
+function normalizeMeetingProgressBasis(v) {
+  const x = String(v || '').trim().toLowerCase();
+  return MEETING_PROGRESS_BASIS_VALUES.has(x) ? x : 'scheduled_date';
+}
+
+/** Human-readable due date for in-app notifications (avoids Date.toString() noise). */
+function formatTaskDueDateForNotification(row) {
+  const ymd = dateOnly(row?.end_date) || dateOnly(row?.end_at);
+  if (!ymd) return null;
+  const parts = ymd.split('-').map((x) => Number(x));
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return null;
+  const [y, mo, da] = parts;
+  const utc = new Date(Date.UTC(y, mo - 1, da));
+  return utc.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
 }
 
 function normalizeIdArray(v) {
@@ -79,16 +88,6 @@ function assertCanManageTasks(user) {
   err.status = 403;
   throw err;
 }
-
-function buildUserScope(actingUser) {
-  const role = String(actingUser?.role || '').toLowerCase();
-  if (role === 'admin') return { sql: '', params: [] };
-  if (role === 'manager') return { sql: ' AND (u.manager_id = ? OR u.id = ?) ', params: [actingUser.id, actingUser.id] };
-  return { sql: ' AND u.id = ? ', params: [actingUser.id] };
-}
-
-/** Performance reports (summary, trend, calendar, CRM rollups, dials-by-hour): agents only — not tenant admins/managers. */
-const PERF_REPORTS_AGENT_ROLE_SQL = ` AND LOWER(TRIM(COALESCE(u.role, ''))) = 'agent' `;
 
 async function getScoringConfig(tenantId) {
   const [row] = await query(
@@ -436,6 +435,7 @@ export async function createAssignment(tenantId, actingUser, payload) {
     throw err;
   }
   const taskType = normalizeTaskType(payload?.task_type);
+  const meetingProgressBasis = normalizeMeetingProgressBasis(payload?.meeting_progress_basis);
   const priority = normalizePriority(payload?.priority);
   const duePreset = payload?.due_preset ? String(payload.due_preset).trim().slice(0, 40) : null;
   const associatedMeetingId = Number(payload?.associated_meeting_id);
@@ -497,16 +497,17 @@ export async function createAssignment(tenantId, actingUser, payload) {
 
   const result = await query(
     `INSERT INTO task_assignments (
-      tenant_id, template_id, title, description, task_type, priority, due_preset, associated_meeting_id, reminder_at,
+      tenant_id, template_id, title, description, task_type, meeting_progress_basis, priority, due_preset, associated_meeting_id, reminder_at,
       suggestion_campaign_ids, suggestion_tag_ids, suggestion_email_account_ids, repeat_enabled, repeat_interval_days, assigned_to_user_id, assigned_by_user_id, schedule_type, recurring_pattern,
       start_date, end_date, start_at, end_at, target_calls, target_meetings, target_deals, status, created_by, updated_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON), CAST(? AS JSON), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON), CAST(? AS JSON), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
       template?.id || null,
       title,
       payload?.description ? String(payload.description).trim() : template?.description || null,
       taskType,
+      meetingProgressBasis,
       priority,
       duePreset,
       meetingId,
@@ -539,12 +540,13 @@ export async function createAssignment(tenantId, actingUser, payload) {
     [tenantId, result.insertId]
   );
   await createDailyLogsForAssignment(tenantId, row, actingUser.id);
+  const dueLabel = formatTaskDueDateForNotification(row);
   await createAndDispatchNotification(tenantId, actingUser.id, {
     moduleKey: 'tasks',
     eventType: 'task_assigned',
     severity: 'high',
-    title: `New task assigned: ${row?.title || 'Task'}`,
-    body: row?.start_date ? `From ${row.start_date} to ${row.end_date}` : '',
+    title: String(row?.title || 'Task').slice(0, 255),
+    body: dueLabel ? `Due ${dueLabel}` : null,
     assignedUserId: row?.assigned_to_user_id,
     recipientUserIds: row?.assigned_to_user_id ? [Number(row.assigned_to_user_id)] : [],
     entityType: 'task_assignment',
@@ -658,26 +660,105 @@ export async function listAssignments(tenantId, actingUser, { from, to, userId, 
   return rows;
 }
 
-async function computeAchievementForDay(tenantId, userId, ymd) {
-  const [calls] = await query(
-    `SELECT COUNT(*) AS c FROM contact_call_attempts
-     WHERE tenant_id = ? AND agent_user_id = ? AND DATE(COALESCE(started_at, created_at)) = ?`,
-    [tenantId, userId, ymd]
-  );
-  const [meetings] = await query(
-    `SELECT COUNT(*) AS c FROM tenant_meetings
-     WHERE tenant_id = ? AND assigned_user_id = ? AND deleted_at IS NULL AND DATE(start_at) = ?`,
-    [tenantId, userId, ymd]
-  );
-  const [deals] = await query(
-    `SELECT COUNT(*) AS c FROM opportunities
-     WHERE tenant_id = ? AND owner_id = ? AND deleted_at IS NULL AND DATE(updated_at) = ?`,
-    [tenantId, userId, ymd]
-  );
+function achievementRollupKey(userId, ymd) {
+  const u = Number(userId);
+  const d = dateOnly(ymd);
+  if (!Number.isFinite(u) || u <= 0 || !d) return null;
+  return `${u}|${d}`;
+}
+
+function rollupCountRowsToMap(rows) {
+  const m = new Map();
+  for (const r of rows || []) {
+    const k = achievementRollupKey(r.user_id, r.ymd);
+    if (!k) continue;
+    m.set(k, Number(r.c || 0));
+  }
+  return m;
+}
+
+/** Few grouped queries for [minYmd, maxYmd] instead of 4 COUNTs per daily_task_log row. */
+async function loadAchievementRollupMaps(tenantId, actingUser, minYmd, maxYmd, userId) {
+  const us = buildUserScope(actingUser);
+  const uid = userId != null && String(userId) !== '' ? Number(userId) : null;
+  const uidOk = Number.isFinite(uid) && uid > 0;
+  const callsUid = uidOk ? ' AND cca.agent_user_id = ? ' : '';
+  const meetUid = uidOk ? ' AND tm.assigned_user_id = ? ' : '';
+  const dealUid = uidOk ? ' AND o.owner_id = ? ' : '';
+
+  const callsParams = [tenantId, minYmd, maxYmd];
+  if (uidOk) callsParams.push(uid);
+  callsParams.push(...us.params);
+
+  const meetSchedParams = [tenantId, minYmd, maxYmd];
+  if (uidOk) meetSchedParams.push(uid);
+  meetSchedParams.push(...us.params);
+
+  const meetCreatedParams = [tenantId, minYmd, maxYmd];
+  if (uidOk) meetCreatedParams.push(uid);
+  meetCreatedParams.push(...us.params);
+
+  const dealParams = [tenantId, minYmd, maxYmd];
+  if (uidOk) dealParams.push(uid);
+  dealParams.push(...us.params);
+
+  const [callsRows, meetSchedRows, meetCreatedRows, dealRows] = await Promise.all([
+    query(
+      `SELECT cca.agent_user_id AS user_id,
+              DATE(COALESCE(cca.started_at, cca.created_at)) AS ymd,
+              COUNT(*) AS c
+       FROM contact_call_attempts cca
+       INNER JOIN users u ON u.id = cca.agent_user_id AND u.tenant_id = cca.tenant_id AND u.is_deleted = 0
+       WHERE cca.tenant_id = ?
+         AND DATE(COALESCE(cca.started_at, cca.created_at)) BETWEEN ? AND ?
+         ${callsUid}
+         ${us.sql}
+       GROUP BY cca.agent_user_id, DATE(COALESCE(cca.started_at, cca.created_at))`,
+      callsParams
+    ),
+    query(
+      `SELECT tm.assigned_user_id AS user_id, DATE(tm.start_at) AS ymd, COUNT(*) AS c
+       FROM tenant_meetings tm
+       INNER JOIN users u ON u.id = tm.assigned_user_id AND u.tenant_id = tm.tenant_id AND u.is_deleted = 0
+       WHERE tm.tenant_id = ?
+         AND tm.deleted_at IS NULL
+         AND DATE(tm.start_at) BETWEEN ? AND ?
+         ${meetUid}
+         ${us.sql}
+       GROUP BY tm.assigned_user_id, DATE(tm.start_at)`,
+      meetSchedParams
+    ),
+    query(
+      `SELECT tm.assigned_user_id AS user_id, DATE(tm.created_at) AS ymd, COUNT(*) AS c
+       FROM tenant_meetings tm
+       INNER JOIN users u ON u.id = tm.assigned_user_id AND u.tenant_id = tm.tenant_id AND u.is_deleted = 0
+       WHERE tm.tenant_id = ?
+         AND tm.deleted_at IS NULL
+         AND DATE(tm.created_at) BETWEEN ? AND ?
+         ${meetUid}
+         ${us.sql}
+       GROUP BY tm.assigned_user_id, DATE(tm.created_at)`,
+      meetCreatedParams
+    ),
+    query(
+      `SELECT o.owner_id AS user_id, DATE(o.updated_at) AS ymd, COUNT(*) AS c
+       FROM opportunities o
+       INNER JOIN users u ON u.id = o.owner_id AND u.tenant_id = o.tenant_id AND u.is_deleted = 0
+       WHERE o.tenant_id = ?
+         AND o.deleted_at IS NULL
+         AND DATE(o.updated_at) BETWEEN ? AND ?
+         ${dealUid}
+         ${us.sql}
+       GROUP BY o.owner_id, DATE(o.updated_at)`,
+      dealParams
+    ),
+  ]);
+
   return {
-    calls: Number(calls?.c || 0),
-    meetings: Number(meetings?.c || 0),
-    deals: Number(deals?.c || 0),
+    calls: rollupCountRowsToMap(callsRows),
+    meetingsScheduled: rollupCountRowsToMap(meetSchedRows),
+    meetingsCreated: rollupCountRowsToMap(meetCreatedRows),
+    deals: rollupCountRowsToMap(dealRows),
   };
 }
 
@@ -723,16 +804,46 @@ export async function recomputeLogs(tenantId, actingUser, { from, to, userId, lo
     }
   }
   const logs = await query(
-    `SELECT l.id, l.assignment_id, l.user_id, l.task_date, l.target_calls, l.target_meetings, l.target_deals, l.is_locked, l.status
+    `SELECT l.id, l.assignment_id, l.user_id, l.task_date, l.target_calls, l.target_meetings, l.target_deals, l.is_locked, l.status,
+            COALESCE(a.meeting_progress_basis, 'scheduled_date') AS meeting_progress_basis
      FROM daily_task_logs l
      INNER JOIN users u ON u.id = l.user_id AND u.tenant_id = l.tenant_id AND u.is_deleted = 0
+     LEFT JOIN task_assignments a ON a.id = l.assignment_id AND a.tenant_id = l.tenant_id AND a.deleted_at IS NULL
      WHERE ${where.join(' AND ')} ${us.sql}`,
     [...params, ...us.params]
   );
   const nowYmd = dateOnly(new Date());
+
+  let minYmd;
+  let maxYmd;
   for (const log of logs) {
     if (Number(log.is_locked) === 1) continue;
-    const achieved = await computeAchievementForDay(tenantId, log.user_id, dateOnly(log.task_date));
+    const td = dateOnly(log.task_date);
+    if (!td) continue;
+    if (minYmd == null || td < minYmd) minYmd = td;
+    if (maxYmd == null || td > maxYmd) maxYmd = td;
+  }
+
+  let rollupMaps = null;
+  if (minYmd && maxYmd && minYmd <= maxYmd) {
+    rollupMaps = await loadAchievementRollupMaps(tenantId, actingUser, minYmd, maxYmd, userId);
+  }
+
+  for (const log of logs) {
+    if (Number(log.is_locked) === 1) continue;
+    const rKey = achievementRollupKey(log.user_id, log.task_date);
+    const basis = normalizeMeetingProgressBasis(log.meeting_progress_basis);
+    const achieved =
+      rollupMaps && rKey
+        ? {
+            calls: rollupMaps.calls.get(rKey) || 0,
+            meetings:
+              basis === 'created_date'
+                ? rollupMaps.meetingsCreated.get(rKey) || 0
+                : rollupMaps.meetingsScheduled.get(rKey) || 0,
+            deals: rollupMaps.deals.get(rKey) || 0,
+          }
+        : { calls: 0, meetings: 0, deals: 0 };
     const targets = {
       calls: Number(log.target_calls || 0),
       meetings: Number(log.target_meetings || 0),
@@ -810,7 +921,7 @@ export async function recomputeLogs(tenantId, actingUser, { from, to, userId, lo
   const actorRole = String(actingUser?.role || '').toLowerCase();
   if (!['admin', 'manager'].includes(actorRole)) return { updated: logs.length };
   const repeatCandidates = await query(
-    `SELECT id, title, description, task_type, priority, due_preset, associated_meeting_id, assigned_to_user_id,
+    `SELECT id, title, description, task_type, meeting_progress_basis, priority, due_preset, associated_meeting_id, assigned_to_user_id,
             assigned_by_user_id, schedule_type, recurring_pattern, end_date, target_calls, target_meetings, target_deals,
             repeat_interval_days
      FROM task_assignments
@@ -844,6 +955,7 @@ export async function recomputeLogs(tenantId, actingUser, { from, to, userId, lo
       title: src.title,
       description: src.description,
       task_type: src.task_type,
+      meeting_progress_basis: src.meeting_progress_basis,
       priority: src.priority,
       due_preset: src.due_preset,
       associated_meeting_id: src.associated_meeting_id,
@@ -918,6 +1030,7 @@ export async function listDailyLogs(
   const rows = await query(
     `SELECT l.*, u.name AS user_name, u.role AS user_role, a.title AS assignment_title,
             a.priority AS assignment_priority,
+            COALESCE(a.meeting_progress_basis, 'scheduled_date') AS meeting_progress_basis,
             a.start_date AS assignment_start_date, a.end_date AS assignment_end_date,
             a.start_at AS assignment_start_at, a.end_at AS assignment_end_at,
             CASE
@@ -1086,15 +1199,15 @@ export async function listAssignmentComments(tenantId, actingUser, assignmentId)
   );
 }
 
-async function getAgentCrmRollups(tenantId, actingUser, from, to) {
+async function getAgentCrmRollups(tenantId, actingUser, from, to, managerId) {
   const us = buildUserScope(actingUser);
+  const mgr = buildManagerTeamFilter(actingUser, managerId);
   const fromD = dateOnly(from);
   const toD = dateOnly(to);
   if (!fromD || !toD) {
     return new Map();
   }
-  const scopeParams = [...us.params];
-  const p = [tenantId, fromD, toD, ...scopeParams];
+  const p = [tenantId, fromD, toD, ...us.params, ...mgr.params];
 
   const [callsRows, followUpRows, meetingRows, oppRows] = await Promise.all([
     query(
@@ -1104,7 +1217,7 @@ async function getAgentCrmRollups(tenantId, actingUser, from, to) {
        WHERE cca.tenant_id = ?
          AND cca.agent_user_id IS NOT NULL
          AND DATE(cca.created_at) >= ? AND DATE(cca.created_at) <= ?
-         ${us.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
+         ${us.sql}${mgr.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
        GROUP BY u.id`,
       p
     ),
@@ -1121,7 +1234,7 @@ async function getAgentCrmRollups(tenantId, actingUser, from, to) {
          AND sc.deleted_at IS NULL
          AND sc.status IN ('pending', 'completed')
          AND DATE(sc.scheduled_at) >= ? AND DATE(sc.scheduled_at) <= ?
-         ${us.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
+         ${us.sql}${mgr.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
        GROUP BY u.id`,
       p
     ),
@@ -1134,7 +1247,7 @@ async function getAgentCrmRollups(tenantId, actingUser, from, to) {
          AND tm.deleted_at IS NULL
          AND COALESCE(tm.assigned_user_id, tm.meeting_owner_user_id) IS NOT NULL
          AND DATE(tm.start_at) >= ? AND DATE(tm.start_at) <= ?
-         ${us.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
+         ${us.sql}${mgr.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
        GROUP BY u.id`,
       p
     ),
@@ -1148,7 +1261,7 @@ async function getAgentCrmRollups(tenantId, actingUser, from, to) {
        WHERE o.tenant_id = ?
          AND o.deleted_at IS NULL
          AND DATE(o.created_at) >= ? AND DATE(o.created_at) <= ?
-         ${us.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
+         ${us.sql}${mgr.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
        GROUP BY u.id`,
       p
     ),
@@ -1214,8 +1327,9 @@ export async function getDialsByHour(tenantId, actingUser, { from, to, userId } 
   }));
 }
 
-export async function getRolewiseSummary(tenantId, actingUser, { from, to, userId } = {}) {
+export async function getRolewiseSummary(tenantId, actingUser, { from, to, userId, managerId } = {}) {
   const us = buildUserScope(actingUser);
+  const mgr = buildManagerTeamFilter(actingUser, managerId);
   const where = ['l.tenant_id = ?', 'l.deleted_at IS NULL'];
   const params = [tenantId];
   if (from) {
@@ -1251,12 +1365,12 @@ export async function getRolewiseSummary(tenantId, actingUser, { from, to, userI
      FROM daily_task_logs l
      INNER JOIN users u ON u.id = l.user_id AND u.tenant_id = l.tenant_id AND u.is_deleted = 0
      LEFT JOIN users mgr ON mgr.id = u.manager_id AND mgr.tenant_id = u.tenant_id AND mgr.is_deleted = 0
-     WHERE ${where.join(' AND ')} ${us.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
+     WHERE ${where.join(' AND ')} ${us.sql}${mgr.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
      GROUP BY u.id, u.name, u.role, u.manager_id, mgr.name
      ORDER BY avg_score DESC, u.name ASC`,
-    [...params, ...us.params]
+    [...params, ...us.params, ...mgr.params]
   );
-  const crmByUser = await getAgentCrmRollups(tenantId, actingUser, from, to);
+  const crmByUser = await getAgentCrmRollups(tenantId, actingUser, from, to, managerId);
   return rows.map((r) => {
     const assignedDays = Number(r.assigned_days || 0);
     const achievedDays = Number(r.achieved_days || 0);

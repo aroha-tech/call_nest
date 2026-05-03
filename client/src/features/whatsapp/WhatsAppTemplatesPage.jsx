@@ -417,7 +417,11 @@ export function WhatsAppTemplatesPage() {
         />
       </div>
 
-      <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+      <TableDataRegion
+        loading={loading}
+        hasCompletedInitialFetch={hasCompletedInitialFetch}
+        skeletonColumns={canManageTemplates ? 7 : 6}
+      >
         {!templates?.length ? (
           <EmptyState
             icon="📄"

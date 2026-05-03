@@ -1,4 +1,5 @@
 import { query } from '../../config/db.js';
+import { getCreatedByUserIdsForScope } from './userMessageScopeService.js';
 import { trySendMeetingAttendeeEmail } from './meetingNotifyService.js';
 import {
   createNativeMeetingRoom,
@@ -130,10 +131,41 @@ async function assertMeetingOwnerOptional(tenantId, userId) {
 }
 
 /**
- * @param {number} tenantId
- * @param {{ email_account_id?: number|string|null, from?: string, to?: string }} filters
+ * Same assignee scope as schedule hub: admin sees all; agent sees own meetings; manager sees self + team.
+ * @returns {Promise<{ clause: string, params: any[] }>}
  */
-export async function listInRange(tenantId, { email_account_id = null, from = null, to = null } = {}) {
+export async function meetingAssigneeScopeSql(tenantId, actingUser) {
+  const scopedIds = await getCreatedByUserIdsForScope(tenantId, actingUser);
+  if (scopedIds === null) return { clause: '', params: [] };
+  if (!scopedIds.length) return { clause: ' AND 1=0 ', params: [] };
+  const ph = scopedIds.map(() => '?').join(',');
+  return { clause: ` AND m.assigned_user_id IN (${ph}) `, params: scopedIds };
+}
+
+/**
+ * Enforce list/detail access: non-admins only see meetings assigned to users in their scope.
+ * @param {object|null|undefined} row — meeting row with assigned_user_id
+ */
+export async function assertMeetingRowVisibleToUser(tenantId, actingUser, row) {
+  if (!row) {
+    const err = new Error('Meeting not found');
+    err.status = 404;
+    throw err;
+  }
+  const scopedIds = await getCreatedByUserIdsForScope(tenantId, actingUser);
+  if (scopedIds === null) return;
+  const aid = row.assigned_user_id != null ? Number(row.assigned_user_id) : null;
+  if (aid != null && Number.isFinite(aid) && scopedIds.includes(aid)) return;
+  const err = new Error('Meeting not found');
+  err.status = 404;
+  throw err;
+}
+
+/**
+ * @param {number} tenantId
+ * @param {{ actingUser?: object, email_account_id?: number|string|null, from?: string, to?: string }} filters
+ */
+export async function listInRange(tenantId, { actingUser = null, email_account_id = null, from = null, to = null } = {}) {
   const rangeFrom = from && String(from).trim() ? String(from).trim() : null;
   const rangeTo = to && String(to).trim() ? String(to).trim() : null;
 
@@ -162,15 +194,23 @@ export async function listInRange(tenantId, { email_account_id = null, from = nu
       m.updated_at,
       ea.email_address AS account_email,
       COALESCE(ea.account_name, ea.email_address) AS account_label,
+      assign_u.name AS assigned_user_name,
       owner_u.name AS meeting_owner_name
     FROM tenant_meetings m
     INNER JOIN email_accounts ea
       ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id AND ea.is_deleted = 0
+    LEFT JOIN users assign_u
+      ON assign_u.id = m.assigned_user_id AND assign_u.tenant_id = m.tenant_id AND assign_u.is_deleted = 0
     LEFT JOIN users owner_u
       ON owner_u.id = m.meeting_owner_user_id AND owner_u.tenant_id = m.tenant_id
     WHERE m.tenant_id = ? AND m.deleted_at IS NULL
   `;
   const p2 = [tenantId];
+  if (actingUser) {
+    const scope = await meetingAssigneeScopeSql(tenantId, actingUser);
+    sql2 += scope.clause;
+    p2.push(...scope.params);
+  }
   if (email_account_id != null && email_account_id !== '') {
     const eid = Number(email_account_id);
     if (Number.isFinite(eid)) {
@@ -218,10 +258,13 @@ const LIST_SELECT = `
       m.updated_at,
       ea.email_address AS account_email,
       COALESCE(ea.account_name, ea.email_address) AS account_label,
+      assign_u.name AS assigned_user_name,
       owner_u.name AS meeting_owner_name
     FROM tenant_meetings m
     INNER JOIN email_accounts ea
       ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id AND ea.is_deleted = 0
+    LEFT JOIN users assign_u
+      ON assign_u.id = m.assigned_user_id AND assign_u.tenant_id = m.tenant_id AND assign_u.is_deleted = 0
     LEFT JOIN users owner_u
       ON owner_u.id = m.meeting_owner_user_id AND owner_u.tenant_id = m.tenant_id
 `;
@@ -229,15 +272,20 @@ const LIST_SELECT = `
 /**
  * Paginated list with optional search (title, attendee, location, description).
  * @param {number} tenantId
- * @param {{ email_account_id?: number|string|null, search?: string|null, page?: number, limit?: number }} opts
+ * @param {{ actingUser?: object, email_account_id?: number|string|null, search?: string|null, page?: number, limit?: number }} opts
  */
-export async function listPaged(tenantId, { email_account_id = null, search = null, page = 1, limit = 20 } = {}) {
+export async function listPaged(tenantId, { actingUser = null, email_account_id = null, search = null, page = 1, limit = 20 } = {}) {
   const lim = Math.min(100, Math.max(1, Number(limit) || 20));
   const pg = Math.max(1, Number(page) || 1);
   const offset = (pg - 1) * lim;
 
   let where = 'WHERE m.tenant_id = ? AND m.deleted_at IS NULL';
   const params = [tenantId];
+  if (actingUser) {
+    const scope = await meetingAssigneeScopeSql(tenantId, actingUser);
+    where += scope.clause;
+    params.push(...scope.params);
+  }
   if (email_account_id != null && email_account_id !== '') {
     const eid = Number(email_account_id);
     if (Number.isFinite(eid)) {
@@ -280,9 +328,9 @@ export async function listPaged(tenantId, { email_account_id = null, search = nu
 /**
  * Dashboard metrics (7 buckets).
  * @param {number} tenantId
- * @param {{ email_account_id?: number|string|null }} [filters]
+ * @param {{ actingUser?: object, email_account_id?: number|string|null }} [filters]
  */
-export async function getMetrics(tenantId, { email_account_id = null } = {}) {
+export async function getMetrics(tenantId, { actingUser = null, email_account_id = null } = {}) {
   const params = [tenantId];
   let accountClause = '';
   if (email_account_id != null && email_account_id !== '') {
@@ -291,6 +339,12 @@ export async function getMetrics(tenantId, { email_account_id = null } = {}) {
       accountClause = ' AND m.email_account_id = ?';
       params.push(eid);
     }
+  }
+  let scopeClause = '';
+  if (actingUser) {
+    const scope = await meetingAssigneeScopeSql(tenantId, actingUser);
+    scopeClause = scope.clause;
+    params.push(...scope.params);
   }
 
   const [row] = await query(
@@ -310,7 +364,7 @@ export async function getMetrics(tenantId, { email_account_id = null } = {}) {
         SUM(CASE WHEN m.meeting_status = 'rescheduled' THEN 1 ELSE 0 END) AS rescheduled,
         SUM(CASE WHEN DATE(m.start_at) = CURDATE() THEN 1 ELSE 0 END) AS today
      FROM tenant_meetings m
-     WHERE m.tenant_id = ? AND m.deleted_at IS NULL${accountClause}`,
+     WHERE m.tenant_id = ? AND m.deleted_at IS NULL${accountClause}${scopeClause}`,
     params
   );
 
@@ -335,10 +389,13 @@ export async function findById(tenantId, id) {
         m.*,
         ea.email_address AS account_email,
         COALESCE(ea.account_name, ea.email_address) AS account_label,
+        assign_u.name AS assigned_user_name,
         owner_u.name AS meeting_owner_name
      FROM tenant_meetings m
      INNER JOIN email_accounts ea
        ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id AND ea.is_deleted = 0
+     LEFT JOIN users assign_u
+       ON assign_u.id = m.assigned_user_id AND assign_u.tenant_id = m.tenant_id AND assign_u.is_deleted = 0
      LEFT JOIN users owner_u
        ON owner_u.id = m.meeting_owner_user_id AND owner_u.tenant_id = m.tenant_id
      WHERE m.tenant_id = ? AND m.id = ? AND m.deleted_at IS NULL`,

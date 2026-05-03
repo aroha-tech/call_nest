@@ -597,7 +597,11 @@ export function CampaignsPage() {
             placeholder="Search... (press Enter)"
           />
         </div>
-        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        <TableDataRegion
+          loading={loading}
+          hasCompletedInitialFetch={hasCompletedInitialFetch}
+          skeletonColumns={8}
+        >
           {!campaigns?.length ? (
             <div className={listStyles.tableCardEmpty}>
               <EmptyState
@@ -914,7 +918,11 @@ export function CampaignsPage() {
             placeholder="Search preview… (press Enter)"
           />
         </div>
-        <TableDataRegion loading={previewLoading} hasCompletedInitialFetch={!previewLoading}>
+        <TableDataRegion
+          loading={previewLoading}
+          hasCompletedInitialFetch={!previewLoading}
+          skeletonColumns={5}
+        >
           <Table variant="adminList">
             <TableHead>
               <TableRow>

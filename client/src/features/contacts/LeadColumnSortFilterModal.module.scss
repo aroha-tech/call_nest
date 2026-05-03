@@ -137,6 +137,11 @@
   display: inline-flex;
   align-items: center;
   gap: $space-2;
+  flex-wrap: nowrap;
+
+  .panelTitle {
+    margin-bottom: 0;
+  }
 }
 
 .panelHint {

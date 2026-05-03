@@ -117,7 +117,11 @@ export function EmailInboxPage() {
             className={listStyles.searchInToolbar}
           />
         </div>
-        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        <TableDataRegion
+          loading={loading}
+          hasCompletedInitialFetch={hasCompletedInitialFetch}
+          skeletonColumns={5}
+        >
           {!messages?.length ? (
             <div className={listStyles.tableCardEmpty}>
               <EmptyState

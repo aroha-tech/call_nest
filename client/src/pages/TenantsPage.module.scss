@@ -191,6 +191,20 @@
   }
 }
 
+.formSectionTitleRow {
+  margin: 0 0 $space-3;
+  padding-bottom: $space-2;
+  border-bottom: 1px solid var(--color-border-subtle);
+
+  .formSectionTitle {
+    margin: 0;
+    padding: 0;
+    border: none;
+    flex: 1;
+    min-width: 0;
+  }
+}
+
 .formSectionTitle {
   font-size: $font-size-sm;
   font-weight: $font-weight-semibold;

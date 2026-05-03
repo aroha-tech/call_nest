@@ -20,7 +20,7 @@ const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 function CalendarGlyph({ className }) {
   return (
-    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
       <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.6" />
       <path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
@@ -67,6 +67,7 @@ function clampMinMax(day, minS, maxS, mode) {
 
 /**
  * Custom date or date+time field (popover picker). `value` / `onChange` use the same strings as native date inputs.
+ * The trigger already includes a calendar icon — do not wrap with another leading calendar glyph or extra left padding (e.g. iconField + UiIcon + `inputClassName` meant for that pattern).
  * @param {'date'|'datetime'} mode
  */
 export function DateTimePickerField({
@@ -143,7 +144,7 @@ export function DateTimePickerField({
     const el = wrapRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const pw = mode === 'datetime' ? 520 : 312;
+    const pw = mode === 'datetime' ? 436 : 276;
     const gap = 6;
     const pad = 12;
     const vh = window.innerHeight;
@@ -334,7 +335,7 @@ export function DateTimePickerField({
                 onClick={() => setShowMonthPick((s) => !s)}
               >
                 {new Date(viewYear, viewMonth0, 1).toLocaleString(undefined, { month: 'long', year: 'numeric' })}
-                <ChevronDown />
+                <ChevronDown size={12} />
               </button>
               <div className={styles.monthNav}>
                 <button
@@ -523,7 +524,12 @@ export function DateTimePickerField({
             {labelParsed.text}
             {showReq ? <span className={styles.requiredMark}> *</span> : null}
           </label>
-          <InfoHelpIcon title={`${label} info`} modalTitle={label} message={hint} />
+          <InfoHelpIcon
+            title={`${label} info`}
+            modalTitle={label}
+            message={hint}
+            className={styles.hintInfoBtn}
+          />
         </div>
       ) : null}
       <button

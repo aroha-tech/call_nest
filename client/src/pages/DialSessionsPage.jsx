@@ -127,6 +127,10 @@ export function DialSessionsPage() {
     loadDialSessionsVisibleColumnIds(getApplicableDialSessionsColumns())
   );
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  const dialSessionsSkeletonColumns = useMemo(
+    () => Math.min(14, Math.max(4, visibleColumnIds.length + 2)),
+    [visibleColumnIds]
+  );
 
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [selectAllMatchingLoading, setSelectAllMatchingLoading] = useState(false);
@@ -544,6 +548,7 @@ export function DialSessionsPage() {
           loading={loading}
           hasCompletedInitialFetch={hasCompletedInitialFetch}
           className={listStyles.tableDataRegionLead}
+          skeletonColumns={dialSessionsSkeletonColumns}
         >
           {rows.length === 0 ? (
             <div className={listStyles.tableCardEmpty}>No dial sessions match your filters.</div>

@@ -19,6 +19,7 @@ export function Checkbox({
   onChange,
   disabled = false,
   className = '',
+  labelClassName = '',
   required = false,
 }) {
   const { text: labelText, hasInlineRequiredMark } = parseLabel(label);
@@ -36,7 +37,7 @@ export function Checkbox({
       />
       <span className={styles.checkmark} />
       {label && (
-        <span className={styles.label}>
+        <span className={`${styles.label} ${labelClassName}`.trim()}>
           {labelText}
           {showRequiredMark ? (
             <span className={styles.requiredMark} aria-hidden="true">

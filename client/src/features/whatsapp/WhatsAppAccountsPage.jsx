@@ -294,7 +294,11 @@ export function WhatsAppAccountsPage() {
         />
       </div>
 
-      <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+      <TableDataRegion
+        loading={loading}
+        hasCompletedInitialFetch={hasCompletedInitialFetch}
+        skeletonColumns={canManageAccounts ? 5 : 4}
+      >
         {!accounts?.length ? (
           <EmptyState
             icon="📱"

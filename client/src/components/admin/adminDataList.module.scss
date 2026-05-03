@@ -115,6 +115,8 @@
 .tableCard {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border-subtle);
   border-radius: $radius-lg;
@@ -239,8 +241,29 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--color-bg-surface, #fff) 78%, transparent);
+  /* Let previous rows remain visible; avoid a second “fake table” that misaligns with real columns */
+  background: color-mix(in srgb, var(--color-bg-muted, #f1f5f9) 55%, transparent);
   pointer-events: auto;
+}
+
+.tableRefreshingOverlayContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $space-3;
+  padding: $space-4 $space-5;
+  border-radius: $radius-md;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+  pointer-events: none;
+}
+
+.tableRefreshingOverlayLabel {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: var(--color-text-secondary);
+  margin: 0;
 }
 
 .firstLoadSpinnerWrap {
@@ -263,11 +286,42 @@
   gap: $space-3;
 }
 
-.tableSkeletonOverlay {
-  width: min(760px, calc(100% - 24px));
+.tableSkeletonAsTable {
+  width: 100%;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: $radius-md;
+  overflow: hidden;
+  background: var(--color-bg-surface, #fff);
+}
+
+.tableSkeletonHead {
   display: grid;
+  grid-template-columns: repeat(var(--skel-cols, 6), minmax(0, 1fr));
+  gap: $space-3;
+  padding: $space-3 $space-4;
+  background: var(--color-surface-secondary, var(--color-bg-subtle));
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.tableSkeletonBody {
+  padding: $space-2 $space-4 $space-4;
+  display: flex;
+  flex-direction: column;
   gap: $space-2;
-  padding: $space-3;
+}
+
+.tableSkeletonRow {
+  display: grid;
+  grid-template-columns: repeat(var(--skel-cols, 6), minmax(0, 1fr));
+  gap: $space-3;
+  align-items: center;
+  padding: $space-2 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+
+  &:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
 }
 
 /** Search + rows per page — above table */

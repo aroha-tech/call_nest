@@ -237,7 +237,11 @@ export function EmailCampaignsPage() {
           />
         </div>
 
-        <TableDataRegion loading={loading} hasCompletedInitialFetch={hasCompletedInitialFetch}>
+        <TableDataRegion
+          loading={loading}
+          hasCompletedInitialFetch={hasCompletedInitialFetch}
+          skeletonColumns={8}
+        >
           {!campaigns.length ? (
             <div className={listStyles.tableCardEmpty}>
               <EmptyState

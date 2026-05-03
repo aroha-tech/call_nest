@@ -43,6 +43,17 @@
   background: transparent;
 }
 
+.labelRow {
+  display: flex;
+  align-items: center;
+  gap: $space-1;
+}
+
+.hintInfoBtn {
+  margin-top: -1px;
+  align-self: center;
+}
+
 .label {
   font-size: $font-size-xs;
   font-weight: $font-weight-medium;
