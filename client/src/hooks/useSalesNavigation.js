@@ -14,6 +14,7 @@ const PLATFORM_NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', path: '/', section: 'Main' },
   { key: 'tenants', label: 'Tenants', path: '/admin/tenants' },
   { key: 'users', label: 'Users', path: '/admin/users' },
+  { key: 'billing', label: 'Billing', path: '/admin/billing' },
   { key: 'workflow-map', label: 'Workflow', path: '/admin/workflow/map' },
   {
     key: 'masters',
@@ -217,6 +218,7 @@ const TENANT_ADMIN_NAV_ITEMS = [
         path: '/settings/background-jobs',
         permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
       },
+      { key: 'billing', label: 'Billing & plans', path: '/settings/billing', permission: PERMISSIONS.SETTINGS_MANAGE },
     ],
   },
 ];

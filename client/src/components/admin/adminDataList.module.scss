@@ -383,3 +383,61 @@
   justify-content: center;
   padding: $space-12;
 }
+
+/* Billing page helpers */
+.mb {
+  margin-bottom: $space-4;
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.mutedSmall {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.mono {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+}
+
+.empty {
+  padding: $space-6;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.planGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: $space-5;
+  padding: $space-5;
+}
+
+.planCard {
+  padding: $space-5;
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+
+  h3 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+}
+
+.planPrice {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.planDesc {
+  flex: 1;
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}

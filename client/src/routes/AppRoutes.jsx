@@ -69,6 +69,8 @@ import { TaskManagerPage } from '../pages/TaskManagerPage';
 import { PerformanceReportsPage } from '../pages/PerformanceReportsPage';
 import { NotificationsPage } from '../features/notifications/NotificationsPage';
 import { MeetingAttendeeEmailSettingsPage } from '../pages/MeetingAttendeeEmailSettingsPage';
+import { BillingPage } from '../pages/BillingPage';
+import { PlatformBillingPage } from '../pages/PlatformBillingPage';
 import { TenantDomainHostGate } from './TenantDomainHostGate';
 
 /**
@@ -767,6 +769,16 @@ function TenantRoutes() {
         }
       />
       <Route
+        path="/settings/billing"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+            <AppShellLayout>
+              <BillingPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/users"
         element={
           <ProtectedRoute permissions={[PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM]}>
@@ -856,6 +868,16 @@ function PlatformRoutes() {
           <ProtectedRoute>
             <AppShellLayout>
               <UsersPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/billing"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <PlatformBillingPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

@@ -7,6 +7,7 @@ import { env } from './config/env.js';
 import { initRedis } from './config/redis.js';
 import { tenantResolver } from './middleware/tenantResolver.js';
 import publicRoutes from './routes/publicRoutes.js';
+import razorpayWebhookRoutes from './routes/public/razorpayWebhook.js';
 
 // Super Admin routes
 import industriesRoutes from './routes/superAdmin/industries.js';
@@ -25,6 +26,7 @@ import dashboardAdminRoutes from './routes/superAdmin/dashboard.js';
 import campaignTypesMasterRoutes from './routes/superAdmin/campaignTypesMaster.js';
 import campaignStatusesMasterRoutes from './routes/superAdmin/campaignStatusesMaster.js';
 import industryFieldDefinitionsRoutes from './routes/superAdmin/industryFieldDefinitions.js';
+import platformBillingRoutes from './routes/superAdmin/billing.js';
 
 // Tenant routes
 import dialingSetsRoutes from './routes/tenant/dialingSets.js';
@@ -66,6 +68,7 @@ import scheduleHubRoutes from './routes/tenant/scheduleHub.js';
 import taskManagerRoutes from './routes/tenant/taskManager.js';
 import reportsHubRoutes from './routes/tenant/reportsHub.js';
 import notificationsRoutes from './routes/tenant/notifications.js';
+import billingRoutes from './routes/tenant/billing.js';
 import { initTenantRealtimeSocket } from './realtime/tenantRealtimeSocket.js';
 import { startTenantBackgroundJobWorker } from './workers/tenantBackgroundJobWorker.js';
 
@@ -108,6 +111,14 @@ app.use(
       : true,
   })
 );
+
+// Razorpay webhooks require raw body for signature verification (must run before express.json)
+app.use(
+  '/api/public/billing/razorpay-webhook',
+  express.raw({ type: 'application/json' }),
+  razorpayWebhookRoutes
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Twilio status callbacks use form-encoded body
 
@@ -159,6 +170,7 @@ app.use('/api/admin/users', platformUsersAdminRoutes);
 app.use('/api/admin/dashboard', dashboardAdminRoutes);
 app.use('/api/admin/campaign-types', campaignTypesMasterRoutes);
 app.use('/api/admin/campaign-statuses', campaignStatusesMasterRoutes);
+app.use('/api/admin/billing', platformBillingRoutes);
 
 // Tenant routes (tenant users only)
 app.use('/api/tenant/dialing-sets', dialingSetsRoutes);
@@ -193,6 +205,7 @@ app.use('/api/tenant/schedule-hub', scheduleHubRoutes);
 app.use('/api/tenant/task-manager', taskManagerRoutes);
 app.use('/api/tenant/reports', reportsHubRoutes);
 app.use('/api/tenant/notifications', notificationsRoutes);
+app.use('/api/tenant/billing', billingRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);

@@ -193,6 +193,13 @@ export const env = {
     ozonetelCallerId: process.env.OZONETEL_CALLER_ID || '',
     ozonetelWebhookToken: process.env.OZONETEL_WEBHOOK_TOKEN || '',
   },
+
+  /** Razorpay (subscriptions / checkout). Key secret must never be exposed to the client. */
+  razorpay: {
+    keyId: (process.env.RAZORPAY_KEY_ID || '').trim(),
+    keySecret: (process.env.RAZORPAY_KEY_SECRET || '').trim(),
+    webhookSecret: (process.env.RAZORPAY_WEBHOOK_SECRET || '').trim(),
+  },
 };
 
 /**
