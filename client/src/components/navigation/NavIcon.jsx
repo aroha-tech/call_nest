@@ -212,14 +212,6 @@ function IconBarChart() {
   );
 }
 
-function IconPhone() {
-  return (
-    <Icon>
-      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-    </Icon>
-  );
-}
-
 /** Dialer — handset + signal arcs (outbound / active call; same stroke language as other icons) */
 function IconDialer() {
   return (
@@ -355,6 +347,81 @@ function IconPlug() {
   );
 }
 
+/** Billing & plans — card / subscription */
+function IconCreditCard() {
+  return (
+    <Icon>
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+      <path d="M6 15h4M14 15h4" />
+    </Icon>
+  );
+}
+
+/** Sent mail — outbound paper plane */
+function IconSend() {
+  return (
+    <Icon>
+      <path d="M22 2 11 13" />
+      <path d="M22 2 15 22 11 13 2 9 22 2" />
+    </Icon>
+  );
+}
+
+/** Dial workspace — split layout / dual pane */
+function IconLayoutColumns() {
+  return (
+    <Icon>
+      <rect x="3" y="4" width="7" height="16" rx="1.5" />
+      <rect x="14" y="4" width="7" height="16" rx="1.5" />
+      <path d="M10.5 9h3M10.5 12h3M10.5 15h3" />
+    </Icon>
+  );
+}
+
+/** WhatsApp / mobile channel account */
+function IconSmartphone() {
+  return (
+    <Icon>
+      <rect x="6" y="2" width="12" height="20" rx="2" />
+      <circle cx="12" cy="18" r="1.25" />
+    </Icon>
+  );
+}
+
+/** Dialer workflow — horizontal sliders (tuning dispositions / lists) */
+function IconSlidersHorizontal() {
+  return (
+    <Icon>
+      <path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M14 20H3" />
+      <circle cx="14" cy="4" r="2" />
+      <circle cx="9" cy="12" r="2" />
+      <circle cx="17" cy="20" r="2" />
+    </Icon>
+  );
+}
+
+/** Dialer resources folder */
+function IconFolder() {
+  return (
+    <Icon>
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h11a2 2 0 0 1 2 2z" />
+    </Icon>
+  );
+}
+
+/** Message template gallery (WhatsApp) */
+function IconTemplateGrid() {
+  return (
+    <Icon>
+      <rect x="3" y="3" width="7" height="7" rx="1.25" />
+      <rect x="14" y="3" width="7" height="7" rx="1.25" />
+      <rect x="3" y="14" width="7" height="7" rx="1.25" />
+      <rect x="14" y="14" width="7" height="7" rx="1.25" />
+    </Icon>
+  );
+}
+
 /** Queued background work (imports, exports, bulk actions). */
 function IconBackgroundTasks() {
   return (
@@ -379,12 +446,14 @@ function IconWorkflowMap() {
   );
 }
 
-/** Workspace activity log (sidebar “Activities”). */
-function IconActivityFeed() {
+/** Workspace activity log — timeline bullets (distinct from call history clock). */
+function IconActivityStream() {
   return (
     <Icon>
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
+      <circle cx="5" cy="7" r="1.65" />
+      <circle cx="5" cy="12" r="1.65" />
+      <circle cx="5" cy="17" r="1.65" />
+      <path d="M10 7h11M10 12h8M10 17h10" />
     </Icon>
   );
 }
@@ -438,6 +507,19 @@ function IconCallbacks() {
       <path d="M6 10a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6" />
       <path d="M10.5 19a1.5 1.5 0 0 0 3 0" />
       <circle cx="18.5" cy="6.5" r="1.5" />
+    </Icon>
+  );
+}
+
+/** Scheduled follow-ups — checklist + calendar cue */
+function IconFollowUpList() {
+  return (
+    <Icon>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M8 3v4M16 3v4" />
+      <path d="m9 14 2 2 4-4" />
+      <path d="M9 19h6" />
     </Icon>
   );
 }
@@ -501,10 +583,13 @@ export const SHELL_NAV_ICON_ACCENTS = {
   integrations: '#6366f1',
   'background-jobs': '#eab308',
   'meeting-attendee-emails': '#06b6d4',
+  billing: '#22c55e',
+  'dialer-workspace': '#38bdf8',
 };
 
 const NAV_ICON_MAP = {
   dashboard: IconDashboard,
+  billing: IconCreditCard,
   tenants: IconBuilding,
   users: IconUsers,
   masters: IconLayers,
@@ -518,11 +603,11 @@ const NAV_ICON_MAP = {
   'campaign-types': IconMegaphone,
   'campaign-statuses': IconPulse,
   'workflow-map': IconWorkflowMap,
-  activity: IconActivityFeed,
+  activity: IconActivityStream,
   dialer: IconDialer,
   'call-history': IconCallHistory,
   'schedule-hub': IconCalendar,
-  'dialer-workflow': IconPhone,
+  'dialer-workflow': IconSlidersHorizontal,
   'default-dispositions': IconListTree,
   'default-dialing-sets': IconGitBranch,
   leads: IconTarget,
@@ -531,24 +616,26 @@ const NAV_ICON_MAP = {
   deals: IconDeals,
   activities: IconPulse,
   reports: IconBarChart,
+  'my-reports': IconBarChart,
   'task-manager': IconClipboardCheck,
   dispositions: IconListTree,
   'dialing-sets': IconGitBranch,
-  'dialer-resources': IconFileText,
-  'dialer-scripts': IconFileText,
+  'dialer-resources': IconFolder,
+  'dialer-scripts': IconScrollText,
+  'dialer-workspace': IconLayoutColumns,
   whatsapp: IconMessageCircle,
-  'whatsapp-accounts': IconPhone,
-  'whatsapp-templates': IconScrollText,
+  'whatsapp-accounts': IconSmartphone,
+  'whatsapp-templates': IconTemplateGrid,
   'whatsapp-messages': IconInbox,
   'whatsapp-logs': IconTerminal,
   email: IconMail,
-  'email-sent': IconInbox,
+  'email-sent': IconSend,
   'email-templates': IconScrollText,
   'email-accounts': IconMail,
   meetings: IconMeetings,
   'schedule-meetings': IconMeetings,
   'schedule-callbacks': IconCallbacks,
-  'schedule-follow-ups': IconCallbacks,
+  'schedule-follow-ups': IconFollowUpList,
   settings: IconSettings,
   'settings-main': IconBuilding2,
   'contact-fields': IconBraces,
