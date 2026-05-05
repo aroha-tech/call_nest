@@ -207,6 +207,12 @@ const TENANT_ADMIN_NAV_ITEMS = [
       },
       { key: 'integrations', label: 'Integrations', path: '/settings/integrations', permission: PERMISSIONS.SETTINGS_MANAGE },
       {
+        key: 'dialer-workspace',
+        label: 'Dial workspace',
+        path: '/settings/dialer-workspace',
+        permission: PERMISSIONS.SETTINGS_MANAGE,
+      },
+      {
         key: 'meeting-attendee-emails',
         label: 'Meeting attendee emails',
         path: '/settings/meeting-attendee-emails',
@@ -401,7 +407,7 @@ const AGENT_NAV_ITEMS = [
     permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
     section: 'Compliance',
   },
-
+  { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
   {
     key: 'background-jobs',
     label: 'Background tasks',

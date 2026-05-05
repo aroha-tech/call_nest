@@ -352,6 +352,95 @@
   color: #f8fafc;
 }
 
+.activeCallPhoneRowWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.activeCallPhoneRowItemWrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.phoneInsightBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #c7d2fe;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: rgba(99, 102, 241, 0.25);
+    border-color: rgba(165, 180, 252, 0.4);
+    color: #eef2ff;
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.phoneDisplayValueRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.phoneDisplayValueRow .phoneDisplayValue {
+  flex: 1;
+  min-width: 0;
+}
+
+.phoneInsightModalHint {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.phoneInsightDl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 38%) minmax(0, 1fr);
+  gap: 8px 14px;
+  font-size: 13px;
+}
+
+.phoneInsightDt {
+  margin: 0;
+  font-weight: 700;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.phoneInsightDd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text-primary, #0f172a);
+  word-break: break-word;
+}
+
 .dialToolbar {
   display: flex;
   flex-wrap: wrap;
@@ -847,6 +936,58 @@
 
 .cardContact {
   border-color: rgba(129, 140, 248, 0.15);
+}
+
+.contactCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
+}
+
+.cardTitleInline {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.contactEditIconBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: rgba(99, 102, 241, 0.22);
+    border-color: rgba(165, 180, 252, 0.35);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.contactEditActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 16px 16px;
 }
 
 .cardScript {

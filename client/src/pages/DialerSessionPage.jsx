@@ -17,6 +17,10 @@ import { callsAPI } from '../services/callsAPI';
 import { dialerSessionsAPI } from '../services/dialerSessionsAPI';
 import { dealsAPI } from '../services/dealsAPI';
 import { contactsAPI } from '../services/contactsAPI';
+import { phoneInsightAPI } from '../services/phoneInsightAPI';
+import { dialerWorkspaceConfigAPI, mergeDialerWorkspaceConfig } from '../services/dialerWorkspaceConfigAPI';
+import { selectPermissions } from '../features/auth/authSelectors';
+import { hasPermission, PERMISSIONS } from '../utils/permissionUtils';
 import { templateVariablesAPI } from '../services/templateVariablesAPI';
 import { scheduleHubAPI } from '../services/scheduleHubAPI';
 import { meetingsAPI } from '../services/meetingsAPI';
@@ -55,6 +59,22 @@ function formatPhoneLabel(raw) {
 
 /** Matches `contact_phones.label` ENUM — one row per type per contact. */
 const CONTACT_PHONE_LABEL_ENUM = ['mobile', 'home', 'work', 'whatsapp', 'other'];
+
+/** When the dialer default country code is national-only input, map to ISO for phone-insight API. */
+function defaultCountryIsoForPhoneInsight() {
+  const cc = String(DEFAULT_PHONE_COUNTRY_CODE || '').replace(/^\++/, '');
+  if (cc === '91') return 'IN';
+  if (cc === '1') return 'US';
+  if (cc === '44') return 'GB';
+  if (cc === '61') return 'AU';
+  if (cc === '49') return 'DE';
+  return undefined;
+}
+
+function formatPhoneInsightType(t) {
+  if (!t) return '—';
+  return String(t).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 function formatDialerHistoryLine(row, formatDateTime) {
   const when = formatDateTime?.(row.started_at || row.created_at) ?? '—';
@@ -138,6 +158,24 @@ function Icon({ name }) {
       </svg>
     );
   }
+  if (name === 'pencil') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path
+          {...stroke}
+          d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+        />
+      </svg>
+    );
+  }
+  if (name === 'info') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <circle {...stroke} cx="12" cy="12" r="10" />
+        <path {...stroke} d="M12 16v-5M12 8h.01" />
+      </svg>
+    );
+  }
   return null;
 }
 
@@ -192,6 +230,7 @@ export function DialerSessionPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAppSelector(selectUser);
   const tenant = useAppSelector(selectTenant);
+  const permissions = useAppSelector(selectPermissions);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -224,6 +263,22 @@ export function DialerSessionPage() {
   const [callHistoryRows, setCallHistoryRows] = useState([]);
   const [savingDialCallNotes, setSavingDialCallNotes] = useState(false);
   const [savingDialContactNotes, setSavingDialContactNotes] = useState(false);
+  const [dialerWorkspaceConfigRaw, setDialerWorkspaceConfigRaw] = useState(null);
+  const [contactPanelEditing, setContactPanelEditing] = useState(false);
+  const [contactEditDraft, setContactEditDraft] = useState({
+    display_name: '',
+    email: '',
+    company: '',
+    job_title: '',
+    city: '',
+  });
+  const [savingContactEdit, setSavingContactEdit] = useState(false);
+  const [phoneInsightOpen, setPhoneInsightOpen] = useState(false);
+  const [phoneInsightKindLabel, setPhoneInsightKindLabel] = useState('');
+  const [phoneInsightQuery, setPhoneInsightQuery] = useState('');
+  const [phoneInsightLoading, setPhoneInsightLoading] = useState(false);
+  const [phoneInsightError, setPhoneInsightError] = useState('');
+  const [phoneInsightResult, setPhoneInsightResult] = useState(null);
   const [teamMembers, setTeamMembers] = useState([]);
   const [emailAccounts, setEmailAccounts] = useState([]);
   const [dispositionActionFlow, setDispositionActionFlow] = useState(null);
@@ -512,6 +567,76 @@ export function DialerSessionPage() {
     return parts.length ? parts.join(' · ') : '';
   }, [leadContact]);
 
+  const dialerWorkspaceFlags = useMemo(
+    () => mergeDialerWorkspaceConfig(dialerWorkspaceConfigRaw),
+    [dialerWorkspaceConfigRaw]
+  );
+
+  const canEditCurrentContactInDialer = useMemo(() => {
+    if (!dialerWorkspaceFlags.allow_edit_contact_in_session) return false;
+    if (!contact || contactDetailPending) return false;
+    const t = String(contact.type || '').toLowerCase();
+    if (t === 'lead') return hasPermission(user, PERMISSIONS.LEADS_UPDATE, permissions);
+    if (t === 'contact') return hasPermission(user, PERMISSIONS.CONTACTS_UPDATE, permissions);
+    return (
+      hasPermission(user, PERMISSIONS.LEADS_UPDATE, permissions) ||
+      hasPermission(user, PERMISSIONS.CONTACTS_UPDATE, permissions)
+    );
+  }, [
+    dialerWorkspaceFlags.allow_edit_contact_in_session,
+    contact,
+    contactDetailPending,
+    user,
+    permissions,
+  ]);
+
+  const openContactEdit = useCallback(() => {
+    setContactEditDraft({
+      display_name: leadContact?.display_name != null ? String(leadContact.display_name) : '',
+      email: leadContact?.email != null ? String(leadContact.email) : '',
+      company: leadContact?.company != null ? String(leadContact.company) : '',
+      job_title: leadContact?.job_title != null ? String(leadContact.job_title) : '',
+      city: leadContact?.city != null ? String(leadContact.city) : '',
+    });
+    setContactPanelEditing(true);
+  }, [leadContact]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await dialerWorkspaceConfigAPI.get();
+        if (!cancelled) setDialerWorkspaceConfigRaw(res?.data?.data ?? null);
+      } catch {
+        if (!cancelled) setDialerWorkspaceConfigRaw(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!dialerWorkspaceFlags.show_activity_tab && dialWorkspaceTab === 'activity') {
+      setDialWorkspaceTab('script');
+    }
+    if (!dialerWorkspaceFlags.show_email_tab && dialWorkspaceTab === 'email') {
+      setDialWorkspaceTab('script');
+    }
+    if (!dialerWorkspaceFlags.show_website_tab && dialWorkspaceTab === 'website') {
+      setDialWorkspaceTab('script');
+    }
+  }, [
+    dialerWorkspaceFlags.show_activity_tab,
+    dialerWorkspaceFlags.show_email_tab,
+    dialerWorkspaceFlags.show_website_tab,
+    dialWorkspaceTab,
+  ]);
+
+  useEffect(() => {
+    setContactPanelEditing(false);
+  }, [currentItem?.contact_id]);
+
   const sessionEnded = session?.status === 'completed' || session?.status === 'cancelled';
 
   useEffect(() => {
@@ -630,6 +755,76 @@ export function DialerSessionPage() {
       if (rid === loadEpochRef.current) setLoading(false);
     }
   }, [id]);
+
+  const closePhoneInsight = useCallback(() => {
+    setPhoneInsightOpen(false);
+    setPhoneInsightError('');
+    setPhoneInsightResult(null);
+    setPhoneInsightKindLabel('');
+    setPhoneInsightQuery('');
+    setPhoneInsightLoading(false);
+  }, []);
+
+  const openPhoneInsight = useCallback(async (phone, kindLabel) => {
+    const q = String(phone || '').trim();
+    if (!q) return;
+    setPhoneInsightOpen(true);
+    setPhoneInsightKindLabel(kindLabel || '');
+    setPhoneInsightQuery(q);
+    setPhoneInsightLoading(true);
+    setPhoneInsightError('');
+    setPhoneInsightResult(null);
+    try {
+      const looksIntl = q.startsWith('+') || q.startsWith('00');
+      const iso = looksIntl ? undefined : defaultCountryIsoForPhoneInsight();
+      const res = await phoneInsightAPI.get(q, iso);
+      setPhoneInsightResult(res?.data?.data ?? null);
+    } catch (e) {
+      setPhoneInsightError(e?.response?.data?.error || e?.message || 'Could not load number details');
+      setPhoneInsightResult(null);
+    } finally {
+      setPhoneInsightLoading(false);
+    }
+  }, []);
+
+  const saveContactEdits = useCallback(async () => {
+    const cid = contact?.id ?? currentItem?.contact_id;
+    if (!cid) return;
+    const name = String(contactEditDraft.display_name || '').trim();
+    if (!name) {
+      showToast('Display name is required', 'error');
+      return;
+    }
+    setSavingContactEdit(true);
+    try {
+      await contactsAPI.update(cid, {
+        display_name: name,
+        email: String(contactEditDraft.email || '').trim() || null,
+        company: String(contactEditDraft.company || '').trim() || null,
+        job_title: String(contactEditDraft.job_title || '').trim() || null,
+        city: String(contactEditDraft.city || '').trim() || null,
+      });
+      const res = await contactsAPI.getById(cid);
+      setContact(res?.data?.data ?? null);
+      setContactPanelEditing(false);
+      showToast('Contact saved', 'success');
+      await load();
+    } catch (e) {
+      showToast(e?.response?.data?.error || e?.message || 'Save failed', 'error');
+    } finally {
+      setSavingContactEdit(false);
+    }
+  }, [
+    contact?.id,
+    currentItem?.contact_id,
+    contactEditDraft.display_name,
+    contactEditDraft.email,
+    contactEditDraft.company,
+    contactEditDraft.job_title,
+    contactEditDraft.city,
+    showToast,
+    load,
+  ]);
 
   useEffect(() => {
     load();
@@ -1518,11 +1713,31 @@ export function DialerSessionPage() {
                     <div className={styles.activeCallNumbersTitle}>Numbers</div>
                     {phonesList.length === 0 ? (
                       <div className={styles.activeCallNumbersRow}>
-                        <div className={styles.activeCallPhoneRow}>
-                          <Icon name="phone" />
-                          <span className={styles.activeCallPhone}>
-                            {activeDialPhone || leadContact?.primary_phone || '—'}
-                          </span>
+                        <div className={styles.activeCallPhoneRowWrap}>
+                          <div className={styles.activeCallPhoneRow}>
+                            <Icon name="phone" />
+                            <span className={styles.activeCallPhone}>
+                              {activeDialPhone || leadContact?.primary_phone || '—'}
+                            </span>
+                          </div>
+                          {activeDialPhone || leadContact?.primary_phone ? (
+                            <button
+                              type="button"
+                              className={styles.phoneInsightBtn}
+                              disabled={busy}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void openPhoneInsight(
+                                  activeDialPhone || leadContact?.primary_phone || '',
+                                  'Primary'
+                                );
+                              }}
+                              title="Number details (country, line type — offline)"
+                              aria-label="Number details"
+                            >
+                              <Icon name="info" />
+                            </button>
+                          ) : null}
                         </div>
                         {canAddPhoneNumber ? (
                           <div className={styles.activeCallAddPhoneWrap}>
@@ -1613,23 +1828,40 @@ export function DialerSessionPage() {
                             const pickQueued = currentItem?.state === 'queued';
                             return (
                               <li key={sid} className={styles.activeCallPhoneListHorizItem}>
-                                {pickQueued ? (
-                                  <button
-                                    type="button"
-                                    className={`${chipClass} ${styles.activeCallPhoneChipBtn}`}
-                                    disabled={busy}
-                                    title="Use this number on Call next"
-                                    onClick={() =>
-                                      applyTargetPhoneOnItem(
-                                        p.id === 'synthetic-primary' ? null : Number(p.id) || null
-                                      )
-                                    }
-                                  >
-                                    {chipBody}
-                                  </button>
-                                ) : (
-                                  <span className={chipClass}>{chipBody}</span>
-                                )}
+                                <div className={styles.activeCallPhoneRowItemWrap}>
+                                  {pickQueued ? (
+                                    <button
+                                      type="button"
+                                      className={`${chipClass} ${styles.activeCallPhoneChipBtn}`}
+                                      disabled={busy}
+                                      title="Use this number on Call next"
+                                      onClick={() =>
+                                        applyTargetPhoneOnItem(
+                                          p.id === 'synthetic-primary' ? null : Number(p.id) || null
+                                        )
+                                      }
+                                    >
+                                      {chipBody}
+                                    </button>
+                                  ) : (
+                                    <span className={chipClass}>{chipBody}</span>
+                                  )}
+                                  {p.phone ? (
+                                    <button
+                                      type="button"
+                                      className={styles.phoneInsightBtn}
+                                      disabled={busy}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        void openPhoneInsight(p.phone, formatPhoneLabel(p.label));
+                                      }}
+                                      title="Number details (country, line type — offline)"
+                                      aria-label={`Number details for ${formatPhoneLabel(p.label)}`}
+                                    >
+                                      <Icon name="info" />
+                                    </button>
+                                  ) : null}
+                                </div>
                               </li>
                             );
                           })}
@@ -1774,7 +2006,21 @@ export function DialerSessionPage() {
             <div className={styles.grid}>
             <aside className={styles.left}>
               <div className={`${styles.card} ${styles.cardContact}`}>
-                <div className={styles.cardTitle}>Current contact</div>
+                <div className={styles.contactCardHead}>
+                  <div className={styles.cardTitleInline}>Current contact</div>
+                  {canEditCurrentContactInDialer && !contactPanelEditing ? (
+                    <button
+                      type="button"
+                      className={styles.contactEditIconBtn}
+                      onClick={openContactEdit}
+                      disabled={busy || contactDetailPending}
+                      title="Edit contact details"
+                      aria-label="Edit contact details"
+                    >
+                      <Icon name="pencil" />
+                    </button>
+                  ) : null}
+                </div>
                 <div className={styles.contactHero}>
                   <div className={styles.contactAvatar} aria-hidden="true">
                     {contactInitial}
@@ -1796,6 +2042,21 @@ export function DialerSessionPage() {
                   </p>
                 ) : null}
                 <dl className={styles.contactMeta}>
+                  {contactPanelEditing ? (
+                    <div className={styles.contactRow}>
+                      <dt className={styles.metaLabel}>Display name</dt>
+                      <dd className={styles.metaValue}>
+                        <Input
+                          value={contactEditDraft.display_name}
+                          onChange={(e) =>
+                            setContactEditDraft((d) => ({ ...d, display_name: e.target.value }))
+                          }
+                          disabled={busy || savingContactEdit}
+                          autoComplete="name"
+                        />
+                      </dd>
+                    </div>
+                  ) : null}
                   <div className={styles.contactRow}>
                     <dt className={styles.metaLabel}>Phone numbers</dt>
                     <dd className={`${styles.metaValue} ${styles.phoneBlock}`}>
@@ -1808,7 +2069,21 @@ export function DialerSessionPage() {
                             return (
                               <div key={sid} className={styles.phoneDisplayItem}>
                                 <span className={styles.phoneDisplayType}>{formatPhoneLabel(p.label)}</span>
-                                <span className={styles.phoneDisplayValue}>{p.phone || '—'}</span>
+                                <span className={styles.phoneDisplayValueRow}>
+                                  <span className={styles.phoneDisplayValue}>{p.phone || '—'}</span>
+                                  {p.phone ? (
+                                    <button
+                                      type="button"
+                                      className={styles.phoneInsightBtn}
+                                      disabled={busy}
+                                      onClick={() => void openPhoneInsight(p.phone, formatPhoneLabel(p.label))}
+                                      title="Number details (country, line type — offline)"
+                                      aria-label={`Number details for ${formatPhoneLabel(p.label)}`}
+                                    >
+                                      <Icon name="info" />
+                                    </button>
+                                  ) : null}
+                                </span>
                               </div>
                             );
                           })}
@@ -1823,7 +2098,17 @@ export function DialerSessionPage() {
                         contactDetailPending && !leadContact?.email ? styles.metaPlaceholder : ''
                       }`}
                     >
-                      {leadContact?.email || '—'}
+                      {contactPanelEditing ? (
+                        <Input
+                          type="email"
+                          value={contactEditDraft.email}
+                          onChange={(e) => setContactEditDraft((d) => ({ ...d, email: e.target.value }))}
+                          disabled={busy || savingContactEdit}
+                          autoComplete="email"
+                        />
+                      ) : (
+                        leadContact?.email || '—'
+                      )}
                     </dd>
                   </div>
                   <div className={styles.contactRow}>
@@ -1833,7 +2118,16 @@ export function DialerSessionPage() {
                         contactDetailPending && !leadContact?.company ? styles.metaPlaceholder : ''
                       }`}
                     >
-                      {leadContact?.company || '—'}
+                      {contactPanelEditing ? (
+                        <Input
+                          value={contactEditDraft.company}
+                          onChange={(e) => setContactEditDraft((d) => ({ ...d, company: e.target.value }))}
+                          disabled={busy || savingContactEdit}
+                          autoComplete="organization"
+                        />
+                      ) : (
+                        leadContact?.company || '—'
+                      )}
                     </dd>
                   </div>
                   <div className={styles.contactRow}>
@@ -1843,7 +2137,16 @@ export function DialerSessionPage() {
                         contactDetailPending && !leadContact?.job_title ? styles.metaPlaceholder : ''
                       }`}
                     >
-                      {leadContact?.job_title || '—'}
+                      {contactPanelEditing ? (
+                        <Input
+                          value={contactEditDraft.job_title}
+                          onChange={(e) => setContactEditDraft((d) => ({ ...d, job_title: e.target.value }))}
+                          disabled={busy || savingContactEdit}
+                          autoComplete="organization-title"
+                        />
+                      ) : (
+                        leadContact?.job_title || '—'
+                      )}
                     </dd>
                   </div>
                   <div className={styles.contactRow}>
@@ -1853,10 +2156,41 @@ export function DialerSessionPage() {
                         contactDetailPending && !leadContact?.city ? styles.metaPlaceholder : ''
                       }`}
                     >
-                      {leadContact?.city || '—'}
+                      {contactPanelEditing ? (
+                        <Input
+                          value={contactEditDraft.city}
+                          onChange={(e) => setContactEditDraft((d) => ({ ...d, city: e.target.value }))}
+                          disabled={busy || savingContactEdit}
+                          autoComplete="address-level2"
+                        />
+                      ) : (
+                        leadContact?.city || '—'
+                      )}
                     </dd>
                   </div>
                 </dl>
+                {contactPanelEditing ? (
+                  <div className={styles.contactEditActions}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => void saveContactEdits()}
+                      disabled={busy || savingContactEdit}
+                      loading={savingContactEdit}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={savingContactEdit || busy}
+                      onClick={() => setContactPanelEditing(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             </aside>
 
@@ -1872,19 +2206,45 @@ export function DialerSessionPage() {
                   >
                     Script
                   </button>
+                  {dialerWorkspaceFlags.show_activity_tab ? (
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={dialWorkspaceTab === 'activity'}
+                      className={`${styles.workspaceTab} ${dialWorkspaceTab === 'activity' ? styles.workspaceTabActive : ''}`.trim()}
+                      onClick={() => setDialWorkspaceTab('activity')}
+                    >
+                      Activity
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     role="tab"
-                    aria-selected={dialWorkspaceTab === 'activity'}
-                    className={`${styles.workspaceTab} ${dialWorkspaceTab === 'activity' ? styles.workspaceTabActive : ''}`.trim()}
-                    onClick={() => setDialWorkspaceTab('activity')}
+                    aria-selected={dialWorkspaceTab === 'email'}
+                    className={`${styles.workspaceTab} ${dialWorkspaceTab === 'email' ? styles.workspaceTabActive : ''}`.trim()}
+                    disabled={!dialerWorkspaceFlags.show_email_tab}
+                    title={
+                      dialerWorkspaceFlags.show_email_tab
+                        ? undefined
+                        : 'The Email tab is turned off for your workspace. An administrator can enable it under Settings → Dial workspace.'
+                    }
+                    onClick={() => setDialWorkspaceTab('email')}
                   >
-                    Activity
-                  </button>
-                  <button type="button" className={styles.workspaceTab} disabled title="Not available">
                     Email
                   </button>
-                  <button type="button" className={styles.workspaceTab} disabled title="Not available">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={dialWorkspaceTab === 'website'}
+                    className={`${styles.workspaceTab} ${dialWorkspaceTab === 'website' ? styles.workspaceTabActive : ''}`.trim()}
+                    disabled={!dialerWorkspaceFlags.show_website_tab}
+                    title={
+                      dialerWorkspaceFlags.show_website_tab
+                        ? undefined
+                        : 'The Website tab is turned off for your workspace. An administrator can enable it under Settings → Dial workspace.'
+                    }
+                    onClick={() => setDialWorkspaceTab('website')}
+                  >
                     Website
                   </button>
                 </div>
@@ -2094,8 +2454,17 @@ export function DialerSessionPage() {
                       </div>
                     )}
                   </div>
+                ) : dialWorkspaceTab === 'email' ? (
+                  <div className={styles.dialTabPlaceholder}>
+                    Email tools for the dial workspace are not connected here yet. Use the Email section of the app for
+                    now.
+                  </div>
+                ) : dialWorkspaceTab === 'website' ? (
+                  <div className={styles.dialTabPlaceholder}>
+                    Website shortcuts for the dial workspace are not available yet.
+                  </div>
                 ) : (
-                  <div className={styles.dialTabPlaceholder}>This tab is not available in Call Nest yet.</div>
+                  <div className={styles.dialTabPlaceholder}>This tab is not available.</div>
                 )}
               </div>
 
@@ -2195,6 +2564,80 @@ export function DialerSessionPage() {
           </div>
           )}
 
+          <Modal
+            isOpen={phoneInsightOpen}
+            onClose={closePhoneInsight}
+            title={`Number details${phoneInsightKindLabel ? ` — ${phoneInsightKindLabel}` : ''}`}
+            size="sm"
+            closeOnOverlay
+            closeOnEscape
+            footer={
+              <ModalFooter>
+                <Button variant="primary" type="button" onClick={closePhoneInsight}>
+                  Close
+                </Button>
+              </ModalFooter>
+            }
+          >
+            <p className={styles.phoneInsightModalHint}>
+              <strong>{phoneInsightQuery || '—'}</strong>
+              <br />
+              From the public numbering plan only (offline). Not live carrier or location data.
+            </p>
+            {phoneInsightLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+                <Spinner />
+              </div>
+            ) : phoneInsightError ? (
+              <Alert variant="error">{phoneInsightError}</Alert>
+            ) : phoneInsightResult && !phoneInsightResult.parseable ? (
+              <Alert variant="warning">This does not look like a phone number.</Alert>
+            ) : phoneInsightResult && phoneInsightResult.parseable ? (
+              <dl className={styles.phoneInsightDl}>
+                <dt className={styles.phoneInsightDt}>E.164</dt>
+                <dd className={styles.phoneInsightDd}>{phoneInsightResult.e164 || '—'}</dd>
+                <dt className={styles.phoneInsightDt}>Country (ISO)</dt>
+                <dd className={styles.phoneInsightDd}>
+                  {phoneInsightResult.country ||
+                    (Array.isArray(phoneInsightResult.possible_countries) &&
+                    phoneInsightResult.possible_countries.length
+                      ? phoneInsightResult.possible_countries.join(', ')
+                      : '—')}
+                </dd>
+                <dt className={styles.phoneInsightDt}>Calling code</dt>
+                <dd className={styles.phoneInsightDd}>+{phoneInsightResult.country_calling_code || '—'}</dd>
+                <dt className={styles.phoneInsightDt}>National number</dt>
+                <dd className={styles.phoneInsightDd}>{phoneInsightResult.national_number || '—'}</dd>
+                <dt className={styles.phoneInsightDt}>Line type</dt>
+                <dd className={styles.phoneInsightDd}>{formatPhoneInsightType(phoneInsightResult.number_type)}</dd>
+                <dt className={styles.phoneInsightDt}>Non-geographic</dt>
+                <dd className={styles.phoneInsightDd}>{phoneInsightResult.is_non_geographic ? 'Yes' : 'No'}</dd>
+                <dt className={styles.phoneInsightDt}>Possible / valid</dt>
+                <dd className={styles.phoneInsightDd}>
+                  {phoneInsightResult.is_possible ? 'Possible' : 'Not possible'}
+                  {' · '}
+                  {phoneInsightResult.is_valid ? 'Valid' : 'Invalid'}
+                  {phoneInsightResult.length_issue ? ` (${phoneInsightResult.length_issue})` : ''}
+                </dd>
+                {phoneInsightResult.extension ? (
+                  <>
+                    <dt className={styles.phoneInsightDt}>Extension</dt>
+                    <dd className={styles.phoneInsightDd}>{phoneInsightResult.extension}</dd>
+                  </>
+                ) : null}
+                {phoneInsightResult.carrier_dial_code ? (
+                  <>
+                    <dt className={styles.phoneInsightDt}>Carrier dial code</dt>
+                    <dd className={styles.phoneInsightDd}>{phoneInsightResult.carrier_dial_code}</dd>
+                  </>
+                ) : null}
+                <dt className={styles.phoneInsightDt}>International format</dt>
+                <dd className={styles.phoneInsightDd}>{phoneInsightResult.formats?.international || '—'}</dd>
+                <dt className={styles.phoneInsightDt}>National format</dt>
+                <dd className={styles.phoneInsightDd}>{phoneInsightResult.formats?.national || '—'}</dd>
+              </dl>
+            ) : null}
+          </Modal>
           <Modal
             isOpen={!!dealPickDispo}
             onClose={() => {

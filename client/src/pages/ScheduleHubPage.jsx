@@ -89,6 +89,14 @@ function safeDate(v) {
   }
 }
 
+/** Created-by column: show Self when the logged-in user created the meeting. */
+function meetingCreatedByLabel(row, viewerUserId) {
+  const cid = row?.created_by != null ? Number(row.created_by) : null;
+  const me = viewerUserId != null ? Number(viewerUserId) : null;
+  if (Number.isFinite(me) && me > 0 && Number.isFinite(cid) && cid > 0 && cid === me) return 'Self';
+  return row?.created_by_name || '—';
+}
+
 function computeTimeFlag(d, { isOpen }) {
   if (!d) return { primary: { label: '—', variant: 'muted' }, today: false };
   const now = new Date();
@@ -460,7 +468,7 @@ export function ScheduleHubPage() {
       <TableDataRegion
         loading={loadingMeetings}
         hasCompletedInitialFetch={hasCompletedInitialFetch}
-        skeletonColumns={7}
+        skeletonColumns={8}
       >
         {meetingsRows.length === 0 ? (
           <div className={listStyles.tableCardEmpty}>No meetings in range.</div>
@@ -474,6 +482,7 @@ export function ScheduleHubPage() {
                   <TableHeaderCell>Title</TableHeaderCell>
                   <TableHeaderCell>Contact</TableHeaderCell>
                   <TableHeaderCell>Assignee</TableHeaderCell>
+                  <TableHeaderCell width="130px">Created by</TableHeaderCell>
                   <TableHeaderCell width="120px">Status</TableHeaderCell>
                   <TableHeaderCell width="130px">Attendance</TableHeaderCell>
                 </TableRow>
@@ -506,6 +515,7 @@ export function ScheduleHubPage() {
                     <TableCell noTruncate>{r.title || '—'}</TableCell>
                     <TableCell noTruncate>{r.contact_name || '—'}</TableCell>
                     <TableCell noTruncate>{r.assigned_name || r.assigned_email || '—'}</TableCell>
+                    <TableCell noTruncate>{meetingCreatedByLabel(r, user?.id)}</TableCell>
                     <TableCell>
                       <Badge size="sm" variant={meetingStatusBadgeVariant(r.meeting_status)}>
                         {r.meeting_status || '—'}

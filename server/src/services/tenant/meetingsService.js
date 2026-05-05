@@ -190,12 +190,14 @@ export async function listInRange(tenantId, { actingUser = null, email_account_i
       m.provider_event_id,
       m.provider_calendar_id,
       m.attendance_status,
+      m.created_by,
       m.created_at,
       m.updated_at,
       ea.email_address AS account_email,
       COALESCE(ea.account_name, ea.email_address) AS account_label,
       assign_u.name AS assigned_user_name,
-      owner_u.name AS meeting_owner_name
+      owner_u.name AS meeting_owner_name,
+      creator_u.name AS created_by_name
     FROM tenant_meetings m
     INNER JOIN email_accounts ea
       ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id AND ea.is_deleted = 0
@@ -203,6 +205,8 @@ export async function listInRange(tenantId, { actingUser = null, email_account_i
       ON assign_u.id = m.assigned_user_id AND assign_u.tenant_id = m.tenant_id AND assign_u.is_deleted = 0
     LEFT JOIN users owner_u
       ON owner_u.id = m.meeting_owner_user_id AND owner_u.tenant_id = m.tenant_id
+    LEFT JOIN users creator_u
+      ON creator_u.id = m.created_by AND creator_u.tenant_id = m.tenant_id
     WHERE m.tenant_id = ? AND m.deleted_at IS NULL
   `;
   const p2 = [tenantId];
@@ -254,12 +258,14 @@ const LIST_SELECT = `
       m.provider_event_id,
       m.provider_calendar_id,
       m.attendance_status,
+      m.created_by,
       m.created_at,
       m.updated_at,
       ea.email_address AS account_email,
       COALESCE(ea.account_name, ea.email_address) AS account_label,
       assign_u.name AS assigned_user_name,
-      owner_u.name AS meeting_owner_name
+      owner_u.name AS meeting_owner_name,
+      creator_u.name AS created_by_name
     FROM tenant_meetings m
     INNER JOIN email_accounts ea
       ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id AND ea.is_deleted = 0
@@ -267,6 +273,8 @@ const LIST_SELECT = `
       ON assign_u.id = m.assigned_user_id AND assign_u.tenant_id = m.tenant_id AND assign_u.is_deleted = 0
     LEFT JOIN users owner_u
       ON owner_u.id = m.meeting_owner_user_id AND owner_u.tenant_id = m.tenant_id
+    LEFT JOIN users creator_u
+      ON creator_u.id = m.created_by AND creator_u.tenant_id = m.tenant_id
 `;
 
 /**
@@ -390,7 +398,8 @@ export async function findById(tenantId, id) {
         ea.email_address AS account_email,
         COALESCE(ea.account_name, ea.email_address) AS account_label,
         assign_u.name AS assigned_user_name,
-        owner_u.name AS meeting_owner_name
+        owner_u.name AS meeting_owner_name,
+        creator_u.name AS created_by_name
      FROM tenant_meetings m
      INNER JOIN email_accounts ea
        ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id AND ea.is_deleted = 0
@@ -398,6 +407,8 @@ export async function findById(tenantId, id) {
        ON assign_u.id = m.assigned_user_id AND assign_u.tenant_id = m.tenant_id AND assign_u.is_deleted = 0
      LEFT JOIN users owner_u
        ON owner_u.id = m.meeting_owner_user_id AND owner_u.tenant_id = m.tenant_id
+     LEFT JOIN users creator_u
+       ON creator_u.id = m.created_by AND creator_u.tenant_id = m.tenant_id
      WHERE m.tenant_id = ? AND m.id = ? AND m.deleted_at IS NULL`,
     [tenantId, mid]
   );

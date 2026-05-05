@@ -32,6 +32,18 @@ import { dialerPreferencesAPI } from '../../services/dialerPreferencesAPI';
 
 const defaultPagination = { page: 1, limit: 10, total: 0, totalPages: 1 };
 
+function formatScriptCreatedByLabel(script, currentUserId) {
+  if (script?.created_by != null && Number(script.created_by) === Number(currentUserId)) {
+    return 'Self';
+  }
+  const name = script?.created_by_name || '—';
+  const r = String(script?.created_by_role || '').toLowerCase();
+  if (r === 'admin') return `${name} (Admin)`;
+  if (r === 'manager') return `${name} (Manager)`;
+  if (r === 'agent') return `${name} (Agent)`;
+  return name;
+}
+
 function UiIcon({ children, className = '' }) {
   return (
     <span className={`${styles.uiIcon} ${className}`.trim()} aria-hidden="true">
@@ -288,7 +300,9 @@ export function CallScriptsPage() {
         description={
           canManageAll
             ? 'Create scripts with variables like {{contact_first_name}} for use in the dialer.'
-            : 'Scripts you create are visible to you, your manager, and admins. You can edit only scripts you created.'
+            : String(user?.role || '').toLowerCase() === 'manager'
+              ? 'Scripts from tenant admins are visible to everyone. You also see scripts created by you and your agents. You can edit only scripts you created unless you have full settings access.'
+              : 'You see scripts from tenant admins and your manager (read-only), plus any you create. Use the star to set your personal default for the dialer.'
         }
         actions={canAddScript ? <Button onClick={openCreate}>Add script</Button> : undefined}
       />
@@ -354,11 +368,7 @@ export function CallScriptsPage() {
                   return (
                   <TableRow key={script.id}>
                     <TableCell>{script.script_name}</TableCell>
-                    <TableCell>
-                      {script.created_by != null && Number(script.created_by) === Number(user?.id)
-                        ? 'Self'
-                        : script.created_by_name || '—'}
-                    </TableCell>
+                    <TableCell>{formatScriptCreatedByLabel(script, user?.id)}</TableCell>
                     <TableCell>
                       {Array.isArray(script.variables_used) && script.variables_used.length > 0
                         ? script.variables_used.join(', ')
@@ -387,7 +397,11 @@ export function CallScriptsPage() {
                           <ViewIcon />
                         </IconButton>
                         <IconButton
-                          title={editable ? 'Edit' : 'You can only edit scripts you created'}
+                          title={
+                            editable
+                              ? 'Edit'
+                              : 'Read-only: only your own scripts can be edited (admin and manager scripts are for use only)'
+                          }
                           onClick={() => openEdit(script)}
                           disabled={!editable}
                         >
@@ -396,7 +410,7 @@ export function CallScriptsPage() {
                         <IconButton
                           title={
                             !editable
-                              ? 'You can only change status on scripts you created'
+                              ? 'Read-only: activate/deactivate is only for scripts you created'
                               : disableDeactivate
                                 ? 'Default script cannot be deactivated'
                               : script.status === 1
@@ -414,7 +428,7 @@ export function CallScriptsPage() {
                             isMyDefault
                               ? 'Choose another script as your default before deleting this one'
                               : !editable
-                                ? 'You can only delete scripts you created'
+                                ? 'Read-only: only scripts you created can be deleted'
                                 : 'Delete'
                           }
                           variant="danger"

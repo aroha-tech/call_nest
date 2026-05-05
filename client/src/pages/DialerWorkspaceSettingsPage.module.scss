@@ -1,0 +1,63 @@
+.wrap {
+  max-width: 720px;
+}
+
+.alert {
+  margin-bottom: 16px;
+}
+
+.card {
+  padding: 20px 22px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.lead {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  opacity: 0.88;
+
+  a {
+    color: var(--color-link, #6366f1);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
+.checkBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.checkHint {
+  margin: 0;
+  padding-left: 22px;
+  font-size: 0.88rem;
+  opacity: 0.75;
+  line-height: 1.45;
+}
+
+.skel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skelLine {
+  display: block;
+  max-width: 100%;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}

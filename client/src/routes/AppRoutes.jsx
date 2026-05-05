@@ -50,6 +50,7 @@ import { ContactBlacklistPage } from '../features/contacts/ContactBlacklistPage'
 import { BackgroundJobsPage } from '../pages/BackgroundJobsPage';
 import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
 import { TenantCompanySettingsPage } from '../pages/TenantCompanySettingsPage';
+import { DialerWorkspaceSettingsPage } from '../pages/DialerWorkspaceSettingsPage';
 import { CampaignsPage } from '../features/campaigns/CampaignsPage';
 import { CampaignOpenPage } from '../features/campaigns/CampaignOpenPage';
 import { DealsPage } from '../pages/DealsPage';
@@ -744,6 +745,16 @@ function TenantRoutes() {
           <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
             <AppShellLayout>
               <IntegrationsPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/dialer-workspace"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+            <AppShellLayout>
+              <DialerWorkspaceSettingsPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

@@ -26,13 +26,20 @@ async function fetchUserRowUnscoped(id, tenantId) {
 }
 
 /**
- * Manager may see: self and agents who report to them only (no unassigned pool).
+ * Row visible for GET-by-id: admin (and other elevated roles) = all; manager = self + team agents; agent = self only.
  */
-function managerCanSeeUserRow(actingUser, row) {
-  if (!row || actingUser?.role !== 'manager') return true;
-  if (Number(row.id) === Number(actingUser.id)) return true;
-  if (row.role !== 'agent') return false;
-  return Number(row.manager_id) === Number(actingUser.id);
+function actorCanSeeUserRow(actingUser, row) {
+  if (!row) return false;
+  const role = actingUser?.role;
+  if (role === 'manager') {
+    if (Number(row.id) === Number(actingUser.id)) return true;
+    if (row.role !== 'agent') return false;
+    return Number(row.manager_id) === Number(actingUser.id);
+  }
+  if (role === 'agent') {
+    return Number(row.id) === Number(actingUser.id);
+  }
+  return true;
 }
 
 /**
@@ -51,6 +58,11 @@ export async function findAll(
 
   const whereClauses = ['u.is_deleted = 0', 'u.tenant_id = ?', 'u.is_platform_admin = 0'];
   const params = [tenantId];
+
+  if (actingUser?.role === 'agent') {
+    whereClauses.push('u.id = ?');
+    params.push(actingUser.id);
+  }
 
   if (actingUser?.role === 'manager') {
     whereClauses.push('u.role = ? AND u.manager_id = ?');
@@ -132,7 +144,7 @@ export async function findAll(
 export async function findById(id, tenantId, actingUser) {
   const row = await fetchUserRowUnscoped(id, tenantId);
   if (!row) return null;
-  if (!managerCanSeeUserRow(actingUser, row)) return null;
+  if (!actorCanSeeUserRow(actingUser, row)) return null;
   return row;
 }
 

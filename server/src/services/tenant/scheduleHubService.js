@@ -304,12 +304,16 @@ export async function listMeetingsPaged(
       m.meeting_status,
       m.attendance_status,
       m.location,
-      m.attendee_email
+      m.attendee_email,
+      m.created_by,
+      creator_u.name AS created_by_name
     FROM tenant_meetings m
     LEFT JOIN contacts c
       ON c.id = m.contact_id AND c.tenant_id = m.tenant_id AND c.deleted_at IS NULL
     LEFT JOIN users u
       ON u.id = m.assigned_user_id AND u.tenant_id = m.tenant_id AND u.is_deleted = 0
+    LEFT JOIN users creator_u
+      ON creator_u.id = m.created_by AND creator_u.tenant_id = m.tenant_id
     WHERE m.tenant_id = ? AND m.deleted_at IS NULL
       ${dr.clause}
       ${scopeClause}

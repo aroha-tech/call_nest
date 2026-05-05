@@ -2397,7 +2397,7 @@ export function TaskManagerPage() {
               />
             </div>
             <p className={styles.taskDetailsDonePct}>
-              Done {Number(taskDetailsLog.completion_percent || 0).toFixed(1)}% · Daily log #{taskDetailsLog.id}
+              Done {Number(taskDetailsLog.completion_percent || 0).toFixed(1)}% · Daily log
             </p>
           </div>
         ) : null}

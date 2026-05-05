@@ -4,7 +4,7 @@
 
 import { query } from '../../config/db.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
-import { getCreatedByUserIdsForScope } from './userMessageScopeService.js';
+import { getCallScriptVisibleCreatedByUserIds } from './userMessageScopeService.js';
 
 function parseVariablesUsed(val) {
   if (val == null) return [];
@@ -22,8 +22,7 @@ import { extractVariables } from '../templateEngine/variableDetector.js';
 import * as variableValidator from '../templateEngine/variableValidator.js';
 
 async function callScriptCreatedByScopeClause(tenantId, manageAllScripts, actingUser) {
-  if (manageAllScripts) return { clause: '', params: [] };
-  const scopedIds = await getCreatedByUserIdsForScope(tenantId, actingUser);
+  const scopedIds = await getCallScriptVisibleCreatedByUserIds(tenantId, actingUser, manageAllScripts);
   if (scopedIds === null) return { clause: '', params: [] };
   if (!scopedIds.length) return { clause: ' AND 1=0 ', params: [] };
   const ph = scopedIds.map(() => '?').join(',');
@@ -53,7 +52,7 @@ export async function findAll(tenantId, includeInactive = false) {
 
 /**
  * Paginated list with search (script_name) and includeInactive.
- * When manageAllScripts is false, only scripts whose created_by is in the acting user's scope (self for agents; self+team for managers) are returned.
+ * When manageAllScripts is false, scripts whose created_by is in scope: agents see self, tenant admins, and their manager; managers see self, their agents, and tenant admins; tenant admins see all.
  */
 export async function findAllPaginated(
   tenantId,
@@ -87,7 +86,7 @@ export async function findAllPaginated(
 
   const rows = await query(
     `SELECT cs.id, cs.tenant_id, cs.script_name, cs.script_body, cs.variables_used, cs.status, cs.is_default, cs.created_by, cs.created_at, cs.updated_by, cs.updated_at,
-            creator.name AS created_by_name
+            creator.name AS created_by_name, creator.role AS created_by_role
      FROM call_scripts cs
      LEFT JOIN users creator ON creator.id = cs.created_by AND creator.tenant_id = cs.tenant_id AND creator.is_deleted = 0
      WHERE ${whereSQL}
@@ -112,7 +111,7 @@ export async function findAllPaginated(
 
 export async function findById(tenantId, id) {
   const rows = await query(
-    `SELECT cs.*, creator.name AS created_by_name
+    `SELECT cs.*, creator.name AS created_by_name, creator.role AS created_by_role
      FROM call_scripts cs
      LEFT JOIN users creator ON creator.id = cs.created_by AND creator.tenant_id = cs.tenant_id AND creator.is_deleted = 0
      WHERE cs.id = ? AND cs.tenant_id = ? AND cs.is_deleted = 0`,

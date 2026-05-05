@@ -67,6 +67,7 @@ WHERE r.name = 'manager'
     'dial.monitor',
     'reports.view',
     'users.team',
+    'pipelines.manage',
     'whatsapp.view',
     'whatsapp.send',
     'whatsapp.templates.manage',
@@ -107,6 +108,7 @@ WHERE r.name = 'agent'
     'meetings.view',
     'meetings.manage',
     'tasks.view',
+    'pipelines.manage',
     'reports.performance.view'
   );
 

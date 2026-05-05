@@ -26,6 +26,8 @@ import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
 import { DateTimePickerField } from '../components/ui/DateTimePickerField';
 import { formatDateTimeLocalInputValue } from '../components/ui/dateTimePickerUtils';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
+import { useAppSelector } from '../app/hooks';
+import { selectUser } from '../features/auth/authSelectors';
 import styles from './MeetingsPage.module.scss';
 
 function UiIcon({ children, className = '' }) {
@@ -187,9 +189,18 @@ function meetingChipStatusClass(meeting) {
   return 'meetingChip_upcoming';
 }
 
+/** Created-by column: show Self when the logged-in user created the meeting. */
+function meetingCreatedByLabel(row, viewerUserId) {
+  const cid = row?.created_by != null ? Number(row.created_by) : null;
+  const me = viewerUserId != null ? Number(viewerUserId) : null;
+  if (Number.isFinite(me) && me > 0 && Number.isFinite(cid) && cid > 0 && cid === me) return 'Self';
+  return row?.created_by_name || '—';
+}
+
 export function MeetingsPage() {
   const { formatDateTime, formatDate, formatTime, formatMonthYear } = useDateTimeDisplay();
   const navigate = useNavigate();
+  const user = useAppSelector(selectUser);
   const { canAny } = usePermissions();
   const canManage = canAny([PERMISSIONS.MEETINGS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]);
 
@@ -1100,7 +1111,7 @@ export function MeetingsPage() {
           <TableDataRegion
             loading={listLoading}
             hasCompletedInitialFetch={listHasCompletedInitialFetch}
-            skeletonColumns={6}
+            skeletonColumns={7}
           >
             {listRows.length === 0 && !listLoading ? (
               <div className={listStyles.tableCardEmpty}>
@@ -1114,6 +1125,7 @@ export function MeetingsPage() {
                   <TableHead>
                     <TableRow>
                       <TableHeaderCell>Title</TableHeaderCell>
+                      <TableHeaderCell width="140px">Created by</TableHeaderCell>
                       <TableHeaderCell width="120px">Status</TableHeaderCell>
                       <TableHeaderCell width="160px">Start</TableHeaderCell>
                       <TableHeaderCell width="160px">End</TableHeaderCell>
@@ -1125,6 +1137,7 @@ export function MeetingsPage() {
                     {listRows.map((row) => (
                       <TableRow key={row.id} onClick={() => openEdit(row)} className={styles.listRowClickable}>
                         <TableCell noTruncate>{row.title || '—'}</TableCell>
+                        <TableCell noTruncate>{meetingCreatedByLabel(row, user?.id)}</TableCell>
                         <TableCell>
                           <Badge variant={meetingStatusBadgeVariant(row.meeting_status)} size="sm">
                             {row.meeting_status || '—'}
