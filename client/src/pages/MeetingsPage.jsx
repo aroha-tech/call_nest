@@ -47,6 +47,14 @@ const MEETING_STATUS_OPTIONS = [
   { value: 'completed', label: 'Completed' },
   { value: 'cancelled', label: 'Cancelled' },
   { value: 'rescheduled', label: 'Rescheduled' },
+  { value: 'missed', label: 'Missed' },
+];
+
+const ATTENDANCE_OPTIONS = [
+  { value: 'unknown', label: 'Unknown' },
+  { value: 'attended', label: 'Attended' },
+  { value: 'no_show', label: 'No show' },
+  { value: 'cancelled', label: 'Cancelled (invitee)' },
 ];
 
 const MEETING_TEMPLATE_TABS = [
@@ -168,6 +176,8 @@ function meetingStatusBadgeVariant(status) {
       return 'danger';
     case 'rescheduled':
       return 'warning';
+    case 'missed':
+      return 'warning';
     case 'scheduled':
     default:
       return 'primary';
@@ -251,6 +261,7 @@ export function MeetingsPage() {
     meeting_owner_user_id: '',
     meeting_platform: 'google_meet',
     meeting_duration_min: '30',
+    attendance_status: 'unknown',
   });
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -633,6 +644,7 @@ export function MeetingsPage() {
       meeting_owner_user_id: '',
       meeting_platform: 'google_meet',
       meeting_duration_min: '30',
+      attendance_status: 'unknown',
     });
     setModalOpen(true);
   }
@@ -659,6 +671,7 @@ export function MeetingsPage() {
       meeting_owner_user_id: '',
       meeting_platform: 'google_meet',
       meeting_duration_min: '60',
+      attendance_status: 'unknown',
     });
     setModalOpen(true);
   }
@@ -681,8 +694,22 @@ export function MeetingsPage() {
       meeting_owner_user_id: m.meeting_owner_user_id != null ? String(m.meeting_owner_user_id) : '',
       meeting_platform: m.meeting_platform || 'google_meet',
       meeting_duration_min: m.meeting_duration_min != null ? String(m.meeting_duration_min) : '30',
+      attendance_status: m.attendance_status || 'unknown',
     });
     setModalOpen(true);
+  }
+
+  async function openMeetingJoin(e, row) {
+    e.stopPropagation();
+    const url = String(row?.meeting_link || '').trim();
+    if (!url) return;
+    try {
+      await meetingsAPI.recordJoinOpened(row.id);
+    } catch {
+      /* open link even if tracking fails */
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+    bumpMeetingsData();
   }
 
   async function handleSave(e) {
@@ -714,8 +741,9 @@ export function MeetingsPage() {
       setError('Invalid start/end datetime');
       return;
     }
-    if (startTs < Date.now()) {
-      setError('Only upcoming meetings are allowed.');
+    const st = String(form.meeting_status || '').toLowerCase();
+    if ((st === 'scheduled' || st === 'rescheduled') && startTs < Date.now()) {
+      setError('Start time must be in the future for scheduled or rescheduled meetings.');
       return;
     }
     if (endTs <= startTs) {
@@ -740,6 +768,7 @@ export function MeetingsPage() {
         meeting_owner_user_id: Number(form.meeting_owner_user_id),
         contact_id: Number(selectedEntityId),
         assigned_user_id: Number(form.assigned_user_id),
+        attendance_status: form.attendance_status || 'unknown',
       };
       if (editing) {
         await meetingsAPI.update(editing.id, payload);
@@ -1111,7 +1140,7 @@ export function MeetingsPage() {
           <TableDataRegion
             loading={listLoading}
             hasCompletedInitialFetch={listHasCompletedInitialFetch}
-            skeletonColumns={7}
+            skeletonColumns={8}
           >
             {listRows.length === 0 && !listLoading ? (
               <div className={listStyles.tableCardEmpty}>
@@ -1127,6 +1156,7 @@ export function MeetingsPage() {
                       <TableHeaderCell>Title</TableHeaderCell>
                       <TableHeaderCell width="140px">Created by</TableHeaderCell>
                       <TableHeaderCell width="120px">Status</TableHeaderCell>
+                      <TableHeaderCell width="100px">Join</TableHeaderCell>
                       <TableHeaderCell width="160px">Start</TableHeaderCell>
                       <TableHeaderCell width="160px">End</TableHeaderCell>
                       <TableHeaderCell>Attendee</TableHeaderCell>
@@ -1142,6 +1172,21 @@ export function MeetingsPage() {
                           <Badge variant={meetingStatusBadgeVariant(row.meeting_status)} size="sm">
                             {row.meeting_status || '—'}
                           </Badge>
+                        </TableCell>
+                        <TableCell noTruncate onClick={(e) => e.stopPropagation()}>
+                          {String(row.meeting_status || '').toLowerCase() !== 'cancelled' &&
+                          String(row.meeting_link || '').trim() ? (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={(e) => openMeetingJoin(e, row)}
+                            >
+                              Join
+                            </Button>
+                          ) : (
+                            <span className={styles.listHint}>—</span>
+                          )}
                         </TableCell>
                         <TableCell>{formatMeetingWhen(row.start_at, formatDateTime)}</TableCell>
                         <TableCell>{formatMeetingWhen(row.end_at, formatDateTime)}</TableCell>
@@ -1201,18 +1246,12 @@ export function MeetingsPage() {
                   ) : null}
                 </div>
                 <div className={styles.modalFooterRight}>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => navigate('/settings/meeting-attendee-emails')}
-                    disabled={saving}
-                    className={styles.footerBtnWide}
-                  >
+                  <Button type="button" variant="secondary" onClick={() => navigate('/settings/meeting-attendee-emails')} disabled={saving} className={styles.footerBtnWide}>
                     <UiIcon>
                       <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
                       <path d="m3.5 7 8.5 6 8.5-6" />
                     </UiIcon>
-                    Attendee email settings
+                    Default email settings
                   </Button>
                   <Button type="button" variant="ghost" onClick={() => setModalOpen(false)} disabled={saving} className={styles.footerBtn}>
                     {canManage ? 'Cancel' : 'Close'}
@@ -1500,6 +1539,52 @@ export function MeetingsPage() {
                 inputClassName={styles.iconInput}
               />
             </div>
+            {editing && (form.meeting_platform === 'google_meet' || form.meeting_platform === 'microsoft_teams') ? (
+              <div style={{ gridColumn: '1 / -1' }}>
+                {String(editing.meeting_link || '').trim() ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                    <span className={styles.listHint} style={{ wordBreak: 'break-all', flex: '1 1 240px', margin: 0 }}>
+                      {editing.meeting_link}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={!canManage}
+                      onClick={async () => {
+                        const url = String(editing.meeting_link || '').trim();
+                        if (!url) return;
+                        try {
+                          await meetingsAPI.recordJoinOpened(editing.id);
+                        } catch {
+                          /* ignore */
+                        }
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                        bumpMeetingsData();
+                      }}
+                    >
+                      Open meeting
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={!canManage}
+                      onClick={() => {
+                        void navigator.clipboard?.writeText(String(editing.meeting_link || ''));
+                      }}
+                    >
+                      Copy link
+                    </Button>
+                  </div>
+                ) : (
+                  <Alert variant="warning" style={{ marginBottom: 0 }}>
+                    No video link yet. Connect a Google or Microsoft email account with calendar permissions, then save the
+                    meeting again so a real Meet or Teams room can be created.
+                  </Alert>
+                )}
+              </div>
+            ) : null}
             <div>
               <DateTimePickerField
                 label="Start *"
@@ -1536,6 +1621,20 @@ export function MeetingsPage() {
                 required
                 disabled={!canManage}
                 error={meetingFormErrors.end_at}
+              />
+            </div>
+            <div className={styles.iconField}>
+              <UiIcon>
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+              </UiIcon>
+              <Select
+                label="Attendance"
+                value={form.attendance_status}
+                onChange={(e) => setForm((f) => ({ ...f, attendance_status: e.target.value }))}
+                options={ATTENDANCE_OPTIONS}
+                disabled={!canManage}
               />
             </div>
             <div className={styles.iconField}>

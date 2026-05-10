@@ -1,6 +1,7 @@
 import * as sendEmailService from '../email/sendEmailService.js';
-import * as meetingEmailTemplatesService from './meetingEmailTemplatesService.js';
+import * as meetingUserAttendeeEmailTemplatesService from './meetingUserAttendeeEmailTemplatesService.js';
 import * as meetingEmailContentResolve from './meetingEmailContentResolve.js';
+import { query } from '../../config/db.js';
 
 function pad2(n) {
   return String(n).padStart(2, '0');
@@ -94,6 +95,94 @@ function ensureJoinDetailsInBodyText(bodyText, meeting) {
   return `${text}\n\n${platform}\n${link}\n`;
 }
 
+function parseMeetingInstant(raw) {
+  if (raw == null || raw === '') return null;
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw;
+  const s = String(raw).trim();
+  const d = new Date(s.includes('T') ? s : s.replace(' ', 'T'));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatDateValue(raw) {
+  const d = parseMeetingInstant(raw);
+  if (!d) return String(raw || '').trim() || '—';
+  return d.toLocaleDateString(undefined, { dateStyle: 'medium' });
+}
+
+function formatTimeValue(raw) {
+  const d = parseMeetingInstant(raw);
+  if (!d) return '';
+  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function buildMeetingDetailsBoxHtml(meeting) {
+  const title = String(meeting?.title || '').trim() || 'Meeting';
+  const date = formatDateValue(meeting?.start_at);
+  const startTime = formatTimeValue(meeting?.start_at);
+  const endTime = formatTimeValue(meeting?.end_at);
+  const platform = String(meeting?.meeting_platform || '').trim() || 'Meeting';
+  const link = String(meeting?.meeting_link || '').trim();
+  const timeLine = startTime && endTime ? `${startTime} - ${endTime}` : startTime || endTime || '—';
+  const linkHtml = link
+    ? `<a href="${link}" target="_blank" rel="noopener noreferrer">${link}</a>`
+    : '—';
+  const joinCta = link
+    ? `<p style="margin:14px 0 0;"><a href="${link}" target="_blank" rel="noopener noreferrer" ` +
+      `style="display:inline-block;padding:10px 18px;border-radius:10px;background:#2563eb;color:#ffffff;` +
+      `font-weight:600;font-size:14px;text-decoration:none;">Join meeting</a></p>`
+    : '';
+  return (
+    `<div style="margin-top:16px;padding:14px 16px;border-radius:12px;` +
+    `background:#f5f7ff;border:1px solid #dbe3ff;font-size:13px;line-height:1.45;color:#1f2937;">` +
+    `<p style="margin:0 0 10px;font-weight:700;font-size:13px;color:#111827;">Meeting details</p>` +
+    `<table role="presentation" style="width:100%;border-collapse:collapse;">` +
+    `<tr><td style="padding:3px 0;width:92px;color:#64748b;font-weight:600;">Title</td><td style="padding:3px 0;">${title}</td></tr>` +
+    `<tr><td style="padding:3px 0;width:92px;color:#64748b;font-weight:600;">Date</td><td style="padding:3px 0;">${date || '—'}</td></tr>` +
+    `<tr><td style="padding:3px 0;width:92px;color:#64748b;font-weight:600;">Time</td><td style="padding:3px 0;">${timeLine}</td></tr>` +
+    `<tr><td style="padding:3px 0;width:92px;color:#64748b;font-weight:600;">Platform</td><td style="padding:3px 0;">${platform}</td></tr>` +
+    `<tr><td style="padding:3px 0;width:92px;color:#64748b;font-weight:600;">Link</td><td style="padding:3px 0;">${linkHtml}</td></tr>` +
+    `</table>${joinCta}</div>`
+  );
+}
+
+function buildMeetingDetailsBoxText(meeting) {
+  const title = String(meeting?.title || '').trim() || 'Meeting';
+  const date = formatDateValue(meeting?.start_at);
+  const startTime = formatTimeValue(meeting?.start_at);
+  const endTime = formatTimeValue(meeting?.end_at);
+  const platform = String(meeting?.meeting_platform || '').trim() || 'Meeting';
+  const link = String(meeting?.meeting_link || '').trim();
+  const timeLine = startTime && endTime ? `${startTime} - ${endTime}` : startTime || endTime || '—';
+  return (
+    `\n\nMeeting details\n` +
+    `Title: ${title}\n` +
+    `Date: ${date || '—'}\n` +
+    `Time: ${timeLine}\n` +
+    `Platform: ${platform}\n` +
+    `Link: ${link || '—'}\n`
+  );
+}
+
+async function includeMeetingDetailsEnabled(tenantId, meeting) {
+  const ownerUserId =
+    Number(meeting?.meeting_owner_user_id || meeting?.assigned_user_id || meeting?.created_by || 0) || null;
+  if (!ownerUserId) return true;
+  try {
+    const [row] = await query(
+      `SELECT include_meeting_details
+       FROM tenant_user_meeting_email_settings
+       WHERE tenant_id = ? AND user_id = ? AND deleted_at IS NULL
+       LIMIT 1`,
+      [Number(tenantId), ownerUserId]
+    );
+    if (!row) return true;
+    return Boolean(row.include_meeting_details);
+  } catch {
+    // Avoid blocking send if table/migration is not available yet.
+    return true;
+  }
+}
+
 /**
  * Send invite/update/cancel email to attendee using the meeting's email account
  * and tenant-editable templates.
@@ -117,7 +206,12 @@ export async function trySendMeetingAttendeeEmail(tenantId, userId, meeting, kin
   }
 
   try {
-    const template = await meetingEmailTemplatesService.findByKind(tenantId, userId, kind);
+    const ownerUserId = Number(meeting?.meeting_owner_user_id || meeting?.assigned_user_id || meeting?.created_by || 0) || null;
+    const template = await meetingUserAttendeeEmailTemplatesService.findTemplateForUserOrTenant(
+      tenantId,
+      ownerUserId,
+      kind
+    );
     if (!template) {
       console.error('[meetingNotify] template missing for kind:', kind);
       return { sent: false, reason: 'template_missing' };
@@ -132,8 +226,15 @@ export async function trySendMeetingAttendeeEmail(tenantId, userId, meeting, kin
       meeting
     );
     const subject = resolved.subject;
-    const body_text = ensureJoinDetailsInBodyText(resolved.body_text || null, meeting) || null;
-    const body_html = ensureJoinDetailsInBodyHtml(resolved.body_html || null, meeting) || null;
+    let body_text = ensureJoinDetailsInBodyText(resolved.body_text || null, meeting) || null;
+    let body_html = ensureJoinDetailsInBodyHtml(resolved.body_html || null, meeting) || null;
+    const includeDetails = await includeMeetingDetailsEnabled(tenantId, meeting);
+    if (includeDetails) {
+      const detailsHtml = buildMeetingDetailsBoxHtml(meeting);
+      const detailsText = buildMeetingDetailsBoxText(meeting);
+      body_html = `${body_html || ''}${detailsHtml}`;
+      body_text = `${body_text || ''}${detailsText}`;
+    }
 
     if (!body_html?.trim() && !body_text?.trim()) {
       return { sent: false, reason: 'empty_template' };
@@ -167,4 +268,68 @@ export async function trySendMeetingAttendeeEmail(tenantId, userId, meeting, kin
     console.error('[meetingNotify] send failed:', err?.message || err);
     return { sent: false, reason: err?.message || 'send_failed' };
   }
+}
+
+/**
+ * Used by test-send endpoints. Sends using the provided template override.
+ */
+export async function sendMeetingAttendeeEmailWithTemplate(tenantId, userId, meeting, kind, templateOverride) {
+  const to = meeting?.attendee_email?.trim();
+  if (!to) {
+    const err = new Error('attendee_email is required');
+    err.status = 400;
+    throw err;
+  }
+  const accountId = meeting.email_account_id;
+  if (!accountId) {
+    const err = new Error('email_account_id is required');
+    err.status = 400;
+    throw err;
+  }
+  const resolved = meetingEmailContentResolve.resolveTemplateStrings(
+    {
+      subject: templateOverride?.subject || '',
+      body_html: templateOverride?.body_html || null,
+      body_text: templateOverride?.body_text || null,
+    },
+    meeting
+  );
+  const subject = resolved.subject;
+  let body_text = ensureJoinDetailsInBodyText(resolved.body_text || null, meeting) || null;
+  let body_html = ensureJoinDetailsInBodyHtml(resolved.body_html || null, meeting) || null;
+  const includeDetails = await includeMeetingDetailsEnabled(tenantId, meeting);
+  if (includeDetails) {
+    const detailsHtml = buildMeetingDetailsBoxHtml(meeting);
+    const detailsText = buildMeetingDetailsBoxText(meeting);
+    body_html = `${body_html || ''}${detailsHtml}`;
+    body_text = `${body_text || ''}${detailsText}`;
+  }
+  if (!body_html?.trim() && !body_text?.trim()) {
+    const err = new Error('Template body is empty');
+    err.status = 400;
+    throw err;
+  }
+  const ics = buildMeetingIcs(meeting, kind, meeting?.account_email || null, to);
+  const attachments = ics
+    ? [
+        {
+          filename: `meeting-${meeting?.id || 'invite'}.ics`,
+          content: ics,
+          contentType: 'text/calendar; charset=utf-8; method=' + (kind === 'cancelled' ? 'CANCEL' : 'REQUEST'),
+        },
+      ]
+    : [];
+  await sendEmailService.sendEmail(
+    tenantId,
+    {
+      email_account_id: accountId,
+      to,
+      subject,
+      body_text: body_text || undefined,
+      body_html: body_html || undefined,
+      attachments,
+    },
+    userId ?? null
+  );
+  return { sent: true };
 }

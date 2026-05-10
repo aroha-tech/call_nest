@@ -81,6 +81,7 @@ export function userAndTenantFromToken(accessToken) {
           name: payload.tenant_name ?? null,
           slug: payload.tenant_slug ?? null,
           theme,
+          reportsAdvancedEnabled: Boolean(payload.reports_advanced_enabled),
         }
       : null;
   const permissions = Array.isArray(payload.permissions) ? payload.permissions : [];

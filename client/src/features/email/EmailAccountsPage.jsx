@@ -286,7 +286,7 @@ export function EmailAccountsPage() {
         title="Email Accounts"
         description={
           canManageAccounts
-            ? 'Connect Gmail, Outlook, or SMTP to send email from your accounts'
+            ? 'Connect Gmail or Outlook to send mail and use the same sign-in for calendar and video meetings (Google Meet / Microsoft Teams). Use Reconnect on an account if Meet or Teams links fail after a permission update.'
             : 'View connected email accounts. Only an admin can add or edit connections.'
         }
         actions={

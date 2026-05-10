@@ -83,9 +83,11 @@ async function assertPhoneOptional(tenantId, contactId, phoneId) {
   return id;
 }
 
-function normalizeStatus(raw) {
+function normalizeStatus(raw, { allowMissed = true } = {}) {
   const s = String(raw || '').trim().toLowerCase();
-  const allowed = new Set(['pending', 'completed', 'cancelled']);
+  const allowed = allowMissed
+    ? new Set(['pending', 'completed', 'cancelled', 'missed'])
+    : new Set(['pending', 'completed', 'cancelled']);
   if (!s) return 'pending';
   if (!allowed.has(s)) {
     const err = new Error('Invalid status');
@@ -180,7 +182,7 @@ export async function getFollowUpMetrics(tenantId, actingUser, { assigned_user_i
         COUNT(*) AS total,
         SUM(CASE WHEN sc.status = 'pending' AND sc.scheduled_at >= NOW() THEN 1 ELSE 0 END) AS pending,
         SUM(CASE WHEN sc.status = 'pending' AND sc.scheduled_at >= NOW() THEN 1 ELSE 0 END) AS upcoming,
-        SUM(CASE WHEN sc.status = 'pending' AND sc.scheduled_at < NOW() THEN 1 ELSE 0 END) AS missed,
+        SUM(CASE WHEN sc.status = 'missed' THEN 1 ELSE 0 END) AS missed,
         SUM(CASE WHEN sc.status = 'completed' THEN 1 ELSE 0 END) AS completed,
         SUM(CASE WHEN sc.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
         SUM(CASE WHEN DATE(sc.scheduled_at) = CURDATE() THEN 1 ELSE 0 END) AS today
@@ -236,7 +238,7 @@ export async function createFollowUp(tenantId, user, payload) {
     err.status = 400;
     throw err;
   }
-  const status = normalizeStatus(payload.status);
+  const status = normalizeStatus(payload.status, { allowMissed: false });
   const follow_up_type = normalizeFollowUpType(payload.follow_up_type);
 
   const notes = trimStr(payload.notes);
@@ -379,6 +381,22 @@ export async function updateFollowUp(tenantId, user, id, payload) {
     });
   }
   return row;
+}
+
+/**
+ * Background job: pending follow-ups whose scheduled time is more than 15 minutes past → missed.
+ * Mirrors meeting auto-missed grace after end time.
+ */
+export async function markStalePendingFollowUpsMissed() {
+  const result = await query(
+    `UPDATE scheduled_callbacks
+     SET status = 'missed', updated_at = CURRENT_TIMESTAMP
+     WHERE deleted_at IS NULL
+       AND status = 'pending'
+       AND scheduled_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE)`,
+    []
+  );
+  return { affected: Number(result?.affectedRows || 0) };
 }
 
 export async function removeFollowUp(tenantId, user, id) {

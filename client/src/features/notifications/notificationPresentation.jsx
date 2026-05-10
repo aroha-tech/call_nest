@@ -5,6 +5,7 @@ const MODULE_LABELS = {
   disposition: 'DISPOSITION',
   contacts: 'CONTACTS',
   meetings: 'MEETINGS',
+  schedule_hub: 'SCHEDULE',
   tasks: 'TASKS',
   email: 'EMAIL',
 };
@@ -33,6 +34,8 @@ export function getNotificationTone(moduleKey) {
   switch (k) {
     case 'meetings':
       return { tone: 'meetings', iconBg: '#ede9fe', iconColor: '#6366f1' };
+    case 'schedule_hub':
+      return { tone: 'schedule_hub', iconBg: '#e0f2fe', iconColor: '#0284c7' };
     case 'calling':
       return { tone: 'calling', iconBg: '#ccfbf1', iconColor: '#0d9488' };
     case 'tasks':
@@ -164,6 +167,7 @@ export function NotificationTypeIcon({ moduleKey, eventType, color }) {
     return <IconPencil color={color} />;
   }
   if (k === 'meetings') return <IconCalendar color={color} />;
+  if (k === 'schedule_hub') return <IconCalendar color={color} />;
   if (k === 'calling') return <IconPhone color={color} />;
   if (k === 'tasks') return <IconTask color={color} />;
   if (k === 'contacts' && (ev.includes('assign') || ev.includes('lead'))) {

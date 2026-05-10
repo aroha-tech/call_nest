@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { tenantAuthMiddleware } from '../../middleware/auth.js';
+import { requireTenantAdvancedReports } from '../../middleware/reportsAdvancedEnabled.js';
 import * as taskManagerController from '../../controllers/tenant/taskManagerController.js';
 
 const router = Router();
@@ -34,14 +35,14 @@ router.patch('/daily-logs/:id/agent-note', tasksView, taskManagerController.upda
 router.patch('/daily-logs/:id/manager-note', tasksManage, taskManagerController.updateManagerNote);
 router.get('/daily-logs/:id/note-history', tasksView, taskManagerController.listNoteHistory);
 
-router.get('/reports/summary', reportsView, taskManagerController.rolewiseSummary);
-router.get('/reports/calendar', reportsView, taskManagerController.calendar);
-router.get('/reports/trend', reportsView, taskManagerController.trend);
-router.get('/reports/dials-by-hour', reportsView, taskManagerController.dialsByHour);
-router.get('/reports/coaching-insights', reportsView, taskManagerController.coachingInsights);
-router.get('/reports/export.csv', reportsExport, taskManagerController.exportSummaryCsv);
+router.get('/reports/summary', reportsView, requireTenantAdvancedReports, taskManagerController.rolewiseSummary);
+router.get('/reports/calendar', reportsView, requireTenantAdvancedReports, taskManagerController.calendar);
+router.get('/reports/trend', reportsView, requireTenantAdvancedReports, taskManagerController.trend);
+router.get('/reports/dials-by-hour', reportsView, requireTenantAdvancedReports, taskManagerController.dialsByHour);
+router.get('/reports/coaching-insights', reportsView, requireTenantAdvancedReports, taskManagerController.coachingInsights);
+router.get('/reports/export.csv', reportsExport, requireTenantAdvancedReports, taskManagerController.exportSummaryCsv);
 
-router.get('/scoring-config', tasksView, taskManagerController.getScoring);
-router.put('/scoring-config', tasksManage, taskManagerController.updateScoring);
+router.get('/scoring-config', tasksView, requireTenantAdvancedReports, taskManagerController.getScoring);
+router.put('/scoring-config', tasksManage, requireTenantAdvancedReports, taskManagerController.updateScoring);
 
 export default router;

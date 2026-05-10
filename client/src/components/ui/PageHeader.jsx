@@ -27,6 +27,8 @@ function inferTitleIcon(title = '') {
 export function PageHeader({
   title,
   description,
+  /** Visible subtitle under the title (e.g. settings pages). Help modal still uses `description` when set. */
+  subtitle,
   actions,
   breadcrumbs,
   className = '',
@@ -53,11 +55,12 @@ export function PageHeader({
             <InfoHelpIcon
               title={`About ${title}`}
               modalTitle={title}
-              message={description}
+              message={description || subtitle || ''}
               variant="title"
               className={styles.titleInfoBtn}
             />
           </h1>
+          {subtitle ? <p className={styles.description}>{subtitle}</p> : null}
         </div>
         {actions && <div className={styles.actions}>{actions}</div>}
       </div>

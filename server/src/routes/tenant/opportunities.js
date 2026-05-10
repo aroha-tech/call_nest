@@ -12,6 +12,12 @@ router.get(
   opportunitiesController.list
 );
 
+router.get(
+  '/:id',
+  requirePermission(['contacts.read', 'leads.read', 'contacts.update', 'leads.update', 'pipelines.manage']),
+  opportunitiesController.getById
+);
+
 router.post(
   '/',
   requirePermission(['contacts.update', 'leads.update', 'pipelines.manage']),

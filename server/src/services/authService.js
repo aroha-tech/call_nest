@@ -108,12 +108,13 @@ async function tenantClaimsForJwt(tenantId, isPlatformAdmin) {
     return {};
   }
   const [row] = await query(
-    'SELECT name, slug, theme_json FROM tenants WHERE id = ? AND is_deleted = 0',
+    'SELECT name, slug, theme_json, reports_advanced_enabled FROM tenants WHERE id = ? AND is_deleted = 0',
     [tenantId]
   );
   const claims = {
     tenant_name: row?.name ?? null,
     tenant_slug: row?.slug ?? null,
+    reports_advanced_enabled: Boolean(Number(row?.reports_advanced_enabled)),
   };
   const jwtTheme = themeForJwt(row?.theme_json);
   if (jwtTheme) claims.tenant_theme = jwtTheme;

@@ -43,6 +43,62 @@
   gap: 8px;
 }
 
+.reportsNav {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.reportsNavPrimary {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.reportsNavNested {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-left: 2px;
+  padding: 10px 12px 10px 14px;
+  border-radius: $radius-lg;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-subtle);
+  box-shadow: inset 3px 0 0 var(--color-primary-400);
+}
+
+.reportsNavNestedLabel {
+  font-size: 11px;
+  font-weight: $font-weight-semibold;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary);
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.reportsNavNestedSeg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reportDateBar {
+  @include premium-panel;
+  border-radius: $radius-lg;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.reportDateSummary {
+  margin: 10px 0 0;
+  font-size: $font-size-sm;
+  color: var(--color-text-secondary);
+}
+
 .filterToolbar {
   @include premium-panel;
   border-radius: $radius-lg;

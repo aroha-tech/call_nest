@@ -60,6 +60,7 @@ import dialerPublicRoutes from './routes/public/dialerPublic.js';
 import exotelWebhookRoutes from './routes/public/exotelWebhook.js';
 import knowlarityWebhookRoutes from './routes/public/knowlarityWebhook.js';
 import ozonetelWebhookRoutes from './routes/public/ozonetelWebhook.js';
+import meetingFeedbackPublicRoutes from './routes/public/meetingFeedback.js';
 import callsRoutes from './routes/tenant/calls.js';
 import dialerSessionsRoutes from './routes/tenant/dialerSessions.js';
 import savedListFiltersRoutes from './routes/tenant/savedListFilters.js';
@@ -73,6 +74,7 @@ import notificationsRoutes from './routes/tenant/notifications.js';
 import billingRoutes from './routes/tenant/billing.js';
 import { initTenantRealtimeSocket } from './realtime/tenantRealtimeSocket.js';
 import { startTenantBackgroundJobWorker } from './workers/tenantBackgroundJobWorker.js';
+import { startMeetingReminderFeedbackWorker } from './workers/meetingReminderFeedbackWorker.js';
 
 const app = express();
 
@@ -145,6 +147,7 @@ app.use('/api/public/v1/dialer', dialerPublicRoutes);
 app.use('/api/public/telephony/exotel', exotelWebhookRoutes);
 app.use('/api/public/telephony/knowlarity', knowlarityWebhookRoutes);
 app.use('/api/public/telephony/ozonetel', ozonetelWebhookRoutes);
+app.use('/api/public/meetings/feedback', meetingFeedbackPublicRoutes);
 
 // Resolve tenant/platform context from subdomain for all API routes
 app.use(tenantResolver);
@@ -237,6 +240,7 @@ async function start() {
     console.log(`Call Nest API listening on port ${port}`);
     console.log(`Environment: ${env.appEnv}`);
     startTenantBackgroundJobWorker();
+    startMeetingReminderFeedbackWorker();
   });
 }
 

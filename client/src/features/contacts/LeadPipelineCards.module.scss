@@ -214,6 +214,52 @@
   color: #86efac;
 }
 
+/* ——— Campaigns list KPIs (same card shell as leads/contacts) ——— */
+.card_campaign_total {
+  @include card-accent(#6366f1, rgba(99, 102, 241, 0.5), #6366f1);
+}
+
+.card_campaign_dialer {
+  @include card-accent(#10b981, rgba(16, 185, 129, 0.5), #10b981);
+}
+
+.card_campaign_filter {
+  @include card-accent(#8b5cf6, rgba(139, 92, 246, 0.5), #8b5cf6);
+}
+
+.card_campaign_engagement {
+  @include card-accent(#f59e0b, rgba(245, 158, 11, 0.55), #f59e0b);
+}
+
+.card_campaign_click {
+  @include card-accent(#ec4899, rgba(236, 72, 153, 0.5), #ec4899);
+}
+
+.iconWrap_campaign_total {
+  background: color-mix(in srgb, #6366f1 24%, transparent);
+  color: #a5b4fc;
+}
+
+.iconWrap_campaign_dialer {
+  background: color-mix(in srgb, #10b981 24%, transparent);
+  color: #6ee7b7;
+}
+
+.iconWrap_campaign_filter {
+  background: color-mix(in srgb, #8b5cf6 24%, transparent);
+  color: #c4b5fd;
+}
+
+.iconWrap_campaign_engagement {
+  background: color-mix(in srgb, #f59e0b 26%, transparent);
+  color: #fcd34d;
+}
+
+.iconWrap_campaign_click {
+  background: color-mix(in srgb, #ec4899 24%, transparent);
+  color: #f9a8d4;
+}
+
 .value {
   font-size: $font-size-2xl;
   font-weight: $font-weight-bold;
@@ -230,6 +276,32 @@
   line-height: $line-height-snug;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.subtext {
+  font-size: 11px;
+  font-weight: $font-weight-medium;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  margin-top: 2px;
+}
+
+.skeletonSubtext {
+  height: 10px;
+  width: 85%;
+  max-width: 160px;
+  border-radius: $radius-sm;
+  margin-top: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
 }
 
 .skeletonIcon {
@@ -292,6 +364,7 @@
 
   .skeletonValue,
   .skeletonLabel,
+  .skeletonSubtext,
   .skeletonIcon {
     animation: none;
   }

@@ -6,6 +6,28 @@
   padding-bottom: 32px;
 }
 
+.pageBoardFull {
+  max-width: none;
+  width: 100%;
+  padding-left: clamp(12px, 2.5vw, 32px);
+  padding-right: clamp(12px, 2.5vw, 32px);
+}
+
+.breadcrumbLink {
+  color: var(--color-primary-600, #7c3aed);
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.breadcrumbSep {
+  color: var(--color-text-tertiary, #94a3b8);
+  margin: 0 0.35rem;
+}
+
 .pageDescWrap {
   display: flex;
   flex-direction: column;
@@ -60,6 +82,222 @@
   color: var(--color-primary-700, #1d4ed8);
   background: var(--color-bg-surface, #fff);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+/* —— Pipelines master list (setup tab) —— */
+.pipelineMasterCard {
+  border: 1px solid var(--color-border-subtle, #e5e7eb);
+  border-radius: 14px;
+  padding: 18px 20px 20px;
+  margin-bottom: 20px;
+  background: var(--color-bg-surface, #fff);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+}
+
+.pipelineMasterHint {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #64748b);
+  margin: 0 0 14px;
+  line-height: 1.45;
+}
+
+.pipelineMasterTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  background: var(--color-bg-surface, #fff);
+
+  th,
+  td {
+    text-align: left;
+    padding: 14px 16px;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--color-border-subtle, #f1f5f9);
+  }
+
+  th {
+    color: var(--color-text-secondary, #64748b);
+    font-weight: 600;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: var(--color-bg-muted, #f8fafc);
+  }
+
+  tbody tr.pipelineMasterRowOpen > td {
+    background: rgba(124, 58, 237, 0.06);
+  }
+
+  tbody tr:not(.pipelineStagesWrapRow):hover > td {
+    background: var(--color-bg-muted, #f8fafc);
+  }
+
+  tbody tr.pipelineMasterRowOpen:not(.pipelineStagesWrapRow):hover > td {
+    background: rgba(124, 58, 237, 0.09);
+  }
+}
+
+.pipelineExpandCol {
+  width: 48px;
+  text-align: center;
+}
+
+.pipelineExpandBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: var(--color-bg-muted, #f1f5f9);
+  cursor: pointer;
+  color: inherit;
+  transition: background 0.15s ease, transform 0.12s ease;
+
+  &:hover {
+    background: rgba(124, 58, 237, 0.18);
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
+}
+
+.pipelineExpandIcon {
+  color: #7c3aed;
+  font-size: 22px !important;
+}
+
+.pipelineNameCell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pipelineNameText {
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--color-text-primary, #0f172a);
+}
+
+.pipelineInactiveBadge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.2);
+  color: var(--color-text-secondary, #64748b);
+}
+
+.pipelineDescSnippet {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary, #94a3b8);
+  line-height: 1.35;
+  max-width: 640px;
+}
+
+.pipelineNumCol,
+.pipelineCurrencyCol {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.pipelineStatusCol {
+  white-space: nowrap;
+}
+
+.pipelineStatusOn {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #16a34a;
+}
+
+.pipelineStatusOff {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.pipelineActionsCol {
+  min-width: 220px;
+}
+
+.pipelineToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.pipelineAddStageBtn,
+.pipelineDeleteBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.msIconViolet {
+  color: #a78bfa;
+  font-size: 20px !important;
+}
+
+.msIconGreen {
+  color: #4ade80;
+  font-size: 20px !important;
+}
+
+.msIconRed {
+  color: #f87171;
+  font-size: 20px !important;
+}
+
+.msIconMuted {
+  color: var(--color-text-muted, #94a3b8);
+  font-size: 20px !important;
+}
+
+.pipelineStagesWrapRow > td {
+  padding: 0 !important;
+  border-bottom: 1px solid var(--color-border-subtle, #e2e8f0);
+  background: var(--color-bg-muted, #f8fafc);
+}
+
+.pipelineStagesCell {
+  vertical-align: top;
+}
+
+.pipelineNestedTableWrap {
+  padding: 12px 16px 18px;
+}
+
+.pipelineNestedTableWrap .stageTable {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle, #e2e8f0);
+}
+
+.pipelineStagesEmpty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 16px;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.stageTableSwatchUnset {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--color-bg-muted, #f1f5f9) 0%, #e2e8f0 100%);
+  border: 1px dashed #94a3b8;
+  vertical-align: middle;
 }
 
 .dealCard {
@@ -179,6 +417,30 @@
   color: #b91c1c;
 }
 
+.stageColorCol {
+  width: 72px;
+  vertical-align: middle;
+}
+
+.stageTableSwatch {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-subtle, #cbd5e1);
+  vertical-align: middle;
+}
+
+.stageColorInput {
+  width: 52px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--color-border-subtle, #e2e8f0);
+  border-radius: 10px;
+  background: var(--color-bg-surface, #fff);
+  cursor: pointer;
+}
+
 .stageOrderCol {
   width: 52px;
   vertical-align: middle;
@@ -235,6 +497,26 @@
   align-items: center;
 }
 
+.boardEdgeScrollHint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -8px 0 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--color-text-secondary, #64748b);
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+}
+
+.boardEdgeScrollIcon {
+  flex-shrink: 0;
+  color: #a78bfa;
+  font-size: 20px !important;
+}
+
 .boardPipelineSelect {
   width: 100%;
 }
@@ -254,6 +536,7 @@
   display: flex;
   flex: 1;
   gap: 16px;
+  width: 100%;
   overflow-x: auto;
   padding: 4px 4px 20px;
   min-height: calc(100dvh - 280px);
@@ -262,9 +545,9 @@
 }
 
 .boardCol {
-  flex: 1 0 268px;
-  min-width: 256px;
-  max-width: 320px;
+  flex: 1 1 0;
+  min-width: 280px;
+  max-width: none;
   display: flex;
   flex-direction: column;
   background: var(--color-bg-muted, #f8fafc);
@@ -294,7 +577,39 @@
   margin-bottom: 8px;
 }
 
+.boardStageDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12);
+}
+
+.boardColTotalBar {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #0f172a);
+  background: var(--color-bg-surface, #fff);
+  border-bottom: 1px solid var(--color-border-subtle, #e2e8f0);
+}
+
+.boardColTotalUnavailable {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.boardColEmptySkel {
+  padding: 4px 0;
+}
+
 .boardColTitle {
+  flex: 1;
+  min-width: 0;
   font-size: 1rem;
   font-weight: 700;
   margin: 0;
@@ -372,10 +687,105 @@
   opacity: 0.92;
 }
 
+.oppCardWrap {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.oppCardDelete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.12);
+}
+
+.oppCardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.oppDealTitle {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-text-primary, #0f172a);
+  letter-spacing: -0.02em;
+  flex: 1;
+  min-width: 0;
+}
+
+.oppPriority {
+  flex-shrink: 0;
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.oppPriLow {
+  background: rgba(34, 197, 94, 0.2);
+  color: #15803d;
+}
+
+.oppPriMed {
+  background: rgba(249, 115, 22, 0.2);
+  color: #c2410c;
+}
+
+.oppPriHigh {
+  background: rgba(239, 68, 68, 0.18);
+  color: #b91c1c;
+}
+
+.oppContactRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.oppContactLabel {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary, #94a3b8);
+}
+
+.oppContactName {
+  font-weight: 600;
+  color: var(--color-text-secondary, #475569);
+}
+
+.oppMetaKey {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-tertiary, #94a3b8);
+  margin-right: 4px;
+}
+
+.oppMetaStrong {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #0f172a);
+  margin-bottom: 6px;
+}
+
 .oppCard {
   display: block;
-  padding: 14px 14px;
-  margin-bottom: 10px;
+  padding: 14px 40px 14px 14px;
+  margin-bottom: 0;
   background: var(--color-bg-surface, #fff);
   border: 1px solid var(--color-border-subtle, #e5e7eb);
   border-radius: 12px;

@@ -2297,8 +2297,8 @@ export function ContactsPage({ type, mode = 'crm' }) {
           onSave={setLeadVisibleColumnIds}
           canAddCustomField={canUpdate}
           onCustomFieldCreated={handleLeadCustomFieldCreated}
-          title="Customize columns"
           persistVisibleIds={saveLeadVisibleColumnIds}
+          onOpenColumnSettings={(col) => setLeadColumnPanelCol(col)}
         />
       ) : null}
 
@@ -2311,9 +2311,9 @@ export function ContactsPage({ type, mode = 'crm' }) {
           onSave={setContactVisibleColumnIds}
           canAddCustomField={canUpdate}
           onCustomFieldCreated={handleContactCustomFieldCreated}
-          title="Customize columns"
           getDefaults={getDefaultVisibleContactColumnIds}
           persistVisibleIds={saveContactVisibleColumnIds}
+          onOpenColumnSettings={(col) => setContactColumnPanelCol(col)}
         />
       ) : null}
 

@@ -357,7 +357,7 @@ export async function listFollowUpsPaged(
     ? ' AND (c.display_name LIKE ? OR cp.phone LIKE ? OR sc.notes LIKE ? OR sc.outcome_notes LIKE ?) '
     : '';
   const qParams = qq ? Array(4).fill(`%${qq}%`) : [];
-  const openCallbackClause = "sc.status = 'pending'";
+  const openCallbackClause = "(sc.status = 'pending' OR sc.status = 'missed')";
   const tf = timeFlagSql(time_flag, { column: 'sc.scheduled_at', openClauseSql: openCallbackClause });
 
   const countSql = `

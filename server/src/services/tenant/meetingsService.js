@@ -45,22 +45,6 @@ function toMillis(value) {
   return dt ? dt.getTime() : null;
 }
 
-function encodeUrlSafe(v) {
-  return encodeURIComponent(String(v || '').trim());
-}
-
-function buildAutoMeetingLink(platform, { title, start_at, end_at }) {
-  if (platform === 'google_meet') return 'https://meet.google.com/new';
-  if (platform === 'microsoft_teams') {
-    const subject = encodeUrlSafe(title || 'Meeting');
-    const startIso = parseMysqlDateTime(start_at)?.toISOString() || '';
-    const endIso = parseMysqlDateTime(end_at)?.toISOString() || '';
-    const qs = `subject=${encodeUrlSafe(subject)}&startTime=${encodeUrlSafe(startIso)}&endTime=${encodeUrlSafe(endIso)}`;
-    return `https://teams.microsoft.com/l/meeting/new?${qs}`;
-  }
-  return null;
-}
-
 async function assertEmailAccount(tenantId, emailAccountId) {
   const id = Number(emailAccountId);
   if (!Number.isFinite(id) || id <= 0) {
@@ -190,6 +174,7 @@ export async function listInRange(tenantId, { actingUser = null, email_account_i
       m.provider_event_id,
       m.provider_calendar_id,
       m.attendance_status,
+      m.join_opened_at,
       m.created_by,
       m.created_at,
       m.updated_at,
@@ -258,6 +243,7 @@ const LIST_SELECT = `
       m.provider_event_id,
       m.provider_calendar_id,
       m.attendance_status,
+      m.join_opened_at,
       m.created_by,
       m.created_at,
       m.updated_at,
@@ -364,7 +350,8 @@ export async function getMetrics(tenantId, { actingUser = null, email_account_id
               THEN 1 ELSE 0
             END) AS upcoming,
         SUM(CASE
-              WHEN m.meeting_status IN ('scheduled', 'rescheduled') AND m.start_at < NOW()
+              WHEN m.meeting_status = 'missed'
+                OR (m.meeting_status IN ('scheduled', 'rescheduled') AND m.end_at < NOW())
               THEN 1 ELSE 0
             END) AS missed,
         SUM(CASE WHEN m.meeting_status = 'completed' THEN 1 ELSE 0 END) AS completed,
@@ -478,8 +465,6 @@ export async function create(tenantId, userId, payload) {
     throw err;
   }
   const explicitMeetingLink = trimStr(payload.meeting_link);
-  const fallback_meeting_link =
-    explicitMeetingLink || buildAutoMeetingLink(meeting_platform, { title, start_at, end_at });
   let nativeRoom = null;
   try {
     nativeRoom = await createNativeMeetingRoom(tenantId, userId, {
@@ -496,7 +481,7 @@ export async function create(tenantId, userId, payload) {
     // Keep CRM meeting flow alive even when provider calendar integration is misconfigured.
     console.error('createNativeMeetingRoom(create):', e?.message || e);
   }
-  const meeting_link = nativeRoom?.meeting_link || fallback_meeting_link;
+  const meeting_link = nativeRoom?.meeting_link || explicitMeetingLink || null;
   const attendanceRaw = trimStr(payload.attendance_status) || 'unknown';
   const attAllowed = ['unknown', 'attended', 'no_show', 'cancelled'];
   if (!attAllowed.includes(attendanceRaw)) {
@@ -647,7 +632,7 @@ export async function update(tenantId, userId, id, payload) {
   }
   if (payload.meeting_status !== undefined) {
     const s = trimStr(payload.meeting_status);
-    const allowed = ['scheduled', 'completed', 'cancelled', 'rescheduled'];
+    const allowed = ['scheduled', 'completed', 'cancelled', 'rescheduled', 'missed'];
     if (!s || !allowed.includes(s)) {
       const err = new Error('Invalid meeting_status');
       err.status = 400;
@@ -694,11 +679,6 @@ export async function update(tenantId, userId, id, payload) {
     err.status = 400;
     throw err;
   }
-  if (nextStartDt.getTime() < Date.now()) {
-    const err = new Error('Meeting start time must be in the future');
-    err.status = 400;
-    throw err;
-  }
   const nextPlatform =
     payload.meeting_platform !== undefined
       ? normalizeMeetingPlatform(payload.meeting_platform)
@@ -740,12 +720,7 @@ export async function update(tenantId, userId, id, payload) {
     }
     updates.push('meeting_link = ?');
     params.push(
-      nativeRoom?.meeting_link ||
-        buildAutoMeetingLink(nextPlatform, {
-          title: payload.title !== undefined ? trimStr(payload.title) || existing.title : existing.title,
-          start_at: sa,
-          end_at: ea,
-        })
+      nativeRoom?.meeting_link ?? existing.meeting_link ?? null
     );
     updates.push('provider_event_id = ?');
     params.push(nativeRoom?.provider_event_id || existing.provider_event_id || null);
@@ -803,6 +778,57 @@ export async function update(tenantId, userId, id, payload) {
     eventHash: `meeting:update:${tenantId}:${row?.id}:${row?.updated_at || ''}`,
   });
   return row;
+}
+
+/**
+ * Background job: past meetings still scheduled, not marked attended → missed + no_show.
+ */
+export async function markEndedMeetingsMissed() {
+  await query(
+    `UPDATE tenant_meetings
+     SET meeting_status = 'missed',
+         attendance_status = CASE
+           WHEN attendance_status = 'unknown' THEN 'no_show'
+           ELSE attendance_status
+         END,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE deleted_at IS NULL
+       AND meeting_status IN ('scheduled', 'rescheduled')
+       AND end_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+       AND COALESCE(attendance_status, 'unknown') <> 'attended'`,
+    []
+  );
+}
+
+/**
+ * Record that a user opened the join URL from the app (attendance still manual or cron).
+ */
+export async function recordJoinOpened(tenantId, actingUser, id) {
+  const existing = await findById(tenantId, id);
+  if (!existing) {
+    const err = new Error('Meeting not found');
+    err.status = 404;
+    throw err;
+  }
+  await assertMeetingRowVisibleToUser(tenantId, actingUser, existing);
+  const link = String(existing.meeting_link || '').trim();
+  if (!link) {
+    const err = new Error('No meeting link on this meeting yet. Save again after the calendar room is created, or reconnect the email account.');
+    err.status = 400;
+    throw err;
+  }
+  if (existing.meeting_status === 'cancelled') {
+    const err = new Error('Meeting is cancelled');
+    err.status = 400;
+    throw err;
+  }
+  await query(
+    `UPDATE tenant_meetings
+     SET join_opened_at = NOW(), updated_by = ?
+     WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL`,
+    [actingUser?.id ?? null, tenantId, Number(id)]
+  );
+  return findById(tenantId, id);
 }
 
 export async function remove(tenantId, userId, id) {

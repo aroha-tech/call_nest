@@ -21,29 +21,6 @@ function normalizeMeetingPlatform(v) {
   return 'google_meet';
 }
 
-function parseMysqlDateTime(raw) {
-  if (!raw) return null;
-  const d = new Date(String(raw).replace(' ', 'T'));
-  if (Number.isNaN(d.getTime())) return null;
-  return d;
-}
-
-function encodeUrlSafe(v) {
-  return encodeURIComponent(String(v || '').trim());
-}
-
-function buildAutoMeetingLink(platform, { title, start_at, end_at }) {
-  if (platform === 'google_meet') return 'https://meet.google.com/new';
-  if (platform === 'microsoft_teams') {
-    const subject = encodeUrlSafe(title || 'Meeting');
-    const startIso = parseMysqlDateTime(start_at)?.toISOString() || '';
-    const endIso = parseMysqlDateTime(end_at)?.toISOString() || '';
-    const qs = `subject=${encodeUrlSafe(subject)}&startTime=${encodeUrlSafe(startIso)}&endTime=${encodeUrlSafe(endIso)}`;
-    return `https://teams.microsoft.com/l/meeting/new?${qs}`;
-  }
-  return '';
-}
-
 export function applyTemplateVariables(text, variables = {}) {
   if (!text || typeof text !== 'string') return text;
   return text.replace(/\{\{(\w+)\}\}/g, (_, key) =>
@@ -64,13 +41,7 @@ function formatDt(mysqlDt) {
 
 export function buildPlainVars(meeting) {
   const platform = normalizeMeetingPlatform(meeting.meeting_platform);
-  const computedLink =
-    meeting.meeting_link ||
-    buildAutoMeetingLink(platform, {
-      title: meeting.title,
-      start_at: meeting.start_at,
-      end_at: meeting.end_at,
-    });
+  const computedLink = String(meeting.meeting_link || '').trim();
   return {
     title: meeting.title ?? '',
     start_at: formatDt(meeting.start_at),

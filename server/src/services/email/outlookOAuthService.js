@@ -1,19 +1,23 @@
 /**
  * Microsoft Outlook OAuth2: auth URL and code exchange.
- * Requires MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET. Redirect URI must be set in Azure App registration.
+ *
+ * Requires MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET. In Azure App registration (same app):
+ * - Add delegated Graph permissions matching SCOPES below and grant admin consent if your tenant requires it.
+ * - Redirect URI must match getRedirectUri().
+ *
+ * Scopes are requested for every connection so the account can send mail, read/write calendar events,
+ * and create Teams online meetings on events. Existing accounts must use **Reconnect** after permission changes.
  */
 import { env } from '../../config/env.js';
 import { encodeState } from './oauthState.js';
 
-// OAuth scopes for Outlook via Microsoft Graph + basic profile.
-// IMPORTANT: You cannot mix Graph scopes (Mail.Send) with legacy Outlook
-// resource scopes (IMAP/SMTP). To avoid AADSTS70011 \"scopes not compatible\",
-// we request only Graph + OpenID scopes here.
+// Microsoft Graph + OpenID only (do not mix with legacy Outlook resource scopes — AADSTS70011).
 const SCOPES = [
   'offline_access',
   'openid',
   'profile',
   'email',
+  'User.Read',
   'Mail.Send',
   'Calendars.ReadWrite',
   'OnlineMeetings.ReadWrite',
@@ -53,6 +57,7 @@ export function getAuthUrl(context) {
     scope: SCOPES.join(' '),
     state,
     response_mode: 'query',
+    prompt: 'consent',
   });
   return { url: `${AUTH_URL}?${params.toString()}` };
 }

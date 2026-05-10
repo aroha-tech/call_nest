@@ -653,12 +653,12 @@ export function DialSessionsPage() {
         applicableColumns={applicableColumns}
         visibleColumnIds={visibleColumnIds}
         onSave={setVisibleColumnIds}
-        title="Customize columns"
         getDefaults={getDefaultVisibleDialSessionsColumnIds}
         persistVisibleIds={saveDialSessionsVisibleColumnIds}
         pinnedColumnId="session_no"
         standardColumnTagLabel="Default"
         canAddCustomField={false}
+        onOpenColumnSettings={(col) => setColumnPanelCol(col)}
       />
 
       <LeadColumnSortFilterModal

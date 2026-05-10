@@ -5,7 +5,7 @@ import styles from './LeadPipelineCards.module.scss';
 /**
  * Single metric tile for lead/contact dashboard strips (icon + value + label).
  */
-export function PipelineMetricCard({ label, value, variant, loading }) {
+export function PipelineMetricCard({ label, value, variant, loading, subtext }) {
   const cardClass = `${styles.card} ${styles[`card_${variant}`] ?? ''}`.trim();
   return (
     <div className={cardClass}>
@@ -18,11 +18,13 @@ export function PipelineMetricCard({ label, value, variant, loading }) {
             <>
               <span className={styles.skeletonValue} />
               <span className={styles.skeletonLabel} />
+              {subtext ? <span className={styles.skeletonSubtext} /> : null}
             </>
           ) : (
             <>
               <span className={styles.value}>{value != null ? value : '—'}</span>
               <span className={styles.label}>{label}</span>
+              {subtext ? <span className={styles.subtext}>{subtext}</span> : null}
             </>
           )}
         </div>

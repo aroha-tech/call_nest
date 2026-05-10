@@ -77,6 +77,7 @@ function buildMonthCells(year, month0) {
 function followUpStatusBadgeVariant(status) {
   if (status === 'completed') return 'success';
   if (status === 'cancelled') return 'danger';
+  if (status === 'missed') return 'danger';
   return 'warning';
 }
 
@@ -84,6 +85,7 @@ function computeFollowUpTimeFlag(row) {
   const status = String(row?.status || 'pending').toLowerCase();
   if (status === 'completed') return 'completed';
   if (status === 'cancelled') return 'cancelled';
+  if (status === 'missed') return 'missed';
   const when = row?.scheduled_at ? new Date(String(row.scheduled_at).replace(' ', 'T')) : null;
   if (!when || Number.isNaN(when.getTime())) return 'upcoming';
   const now = new Date();
@@ -120,6 +122,8 @@ function isDialablePhoneFollowUpRow(row) {
 
 function canDialFollowUpRow(row) {
   if (!isDialablePhoneFollowUpRow(row)) return false;
+  const st = String(row?.status || '').toLowerCase();
+  if (st !== 'pending' && st !== 'missed') return false;
   const cid = Number(row?.contact_id);
   return Number.isFinite(cid) && cid > 0;
 }
@@ -416,6 +420,7 @@ export function ScheduleFollowUpsPage() {
     () => [
       { value: '', label: 'All statuses' },
       { value: 'pending', label: 'Pending' },
+      { value: 'missed', label: 'Missed' },
       { value: 'completed', label: 'Completed' },
       { value: 'cancelled', label: 'Cancelled' },
     ],
@@ -1144,6 +1149,7 @@ export function ScheduleFollowUpsPage() {
                   onChange={(e) => setFormStatus(e.target.value)}
                   options={[
                     { value: 'pending', label: 'Pending' },
+                    { value: 'missed', label: 'Missed' },
                     { value: 'completed', label: 'Completed' },
                     { value: 'cancelled', label: 'Cancelled' },
                   ]}

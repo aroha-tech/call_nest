@@ -108,10 +108,17 @@ function createSelectStyles({ compact = false } = {}) {
 }
 
 function normalizeOptions(options) {
-  return (options || []).map((o) => ({
-    value: String(o.value),
-    label: String(o.label ?? o.value),
-  }));
+  return (options || []).map((o) => {
+    if (o == null || typeof o !== 'object') {
+      return { value: String(o), label: String(o) };
+    }
+    const { value, label, ...rest } = o;
+    return {
+      value: String(value),
+      label: String(label ?? value),
+      ...rest,
+    };
+  });
 }
 
 function emitChange(onChange, value) {

@@ -55,6 +55,23 @@ For any list/table with server-side data (messages, logs, etc.) use the **same p
 
 See: `MasterCRUDPage.jsx`, `WhatsAppMessagesPage.jsx`, `WhatsAppLogsPage.jsx`.
 
+### Page size control (avoid duplicate row selectors)
+
+For list pages that show **both** a toolbar **PaginationPageSize** and a footer **Pagination** component, pass **`hidePageSize`** on the footer `Pagination` so users only change page size in one place (toolbar). Example: `WhatsAppMessagesPage.jsx`, `CampaignsPage.jsx`.
+
+## Dates in forms — use `DateTimePickerField`
+
+Do **not** use the browser’s native `<input type="date">` or free-text date fields for app screens. Use **`DateTimePickerField`** from `components/ui/DateTimePickerField` with **`mode="date"`** (or `mode="datetime"` when time is required) so date picking stays consistent with the rest of the product.
+
+### User-visible dates (labels, summaries, toolbars)
+
+For any **display** of a calendar date or month (table cells, “Active range”, filter summaries, chart axis labels if not library-driven), use **`useDateTimeDisplay`** from `hooks/useDateTimeDisplay` — **`formatDate`**, **`formatMonthYear`**, **`formatDateTime`** as appropriate — so **Profile → Date & time** (format, timezone mode) applies. Keep internal/API values as `YYYY-MM-DD` where the backend expects them; only the **rendered string** should go through the hook. Do not concatenate raw `YYYY-MM-DD` for user-facing copy.
+
+## Campaign create/edit wizard (`CampaignFormWizard.jsx`)
+
+- **Left stepper** — Each step is a single row with **`align-items: center`**: a **compact rounded gradient icon** (~30px, ~16px SVG, light shadow—avoid oversized “blocks”) plus **title + subtitle** in `.wizardStepCopy`. First column ~228–260px.
+- **Channel picker** — Gradient icon wells ~48px with ~22px SVGs (not emoji); selected state uses ring + modest shadow—not huge tiles.
+
 ## Migrations — MySQL command line
 
 When adding or referencing SQL migrations, **always provide both**:

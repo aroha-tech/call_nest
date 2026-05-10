@@ -12,6 +12,12 @@ router.get(
   campaignsController.list
 );
 
+router.get(
+  '/stats',
+  requirePermission(['contacts.read', 'leads.read']),
+  campaignsController.stats
+);
+
 router.post(
   '/preview',
   requirePermission(['contacts.read', 'leads.read']),
@@ -34,6 +40,12 @@ router.put(
   '/:id',
   requirePermission(['contacts.update', 'leads.update']),
   campaignsController.update
+);
+
+router.delete(
+  '/:id/permanent',
+  requirePermission(['contacts.delete', 'leads.delete']),
+  campaignsController.removePermanent
 );
 
 router.delete(

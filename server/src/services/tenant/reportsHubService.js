@@ -170,6 +170,7 @@ async function aggregateKpi(tenantId, actingUser, from, to, managerId) {
       query(
         `SELECT
            SUM(CASE WHEN sc.status = 'pending' THEN 1 ELSE 0 END) AS follow_ups_pending,
+           SUM(CASE WHEN sc.status = 'missed' THEN 1 ELSE 0 END) AS follow_ups_missed,
            SUM(CASE WHEN sc.status = 'completed' AND DATE(sc.completed_at) >= ? AND DATE(sc.completed_at) <= ? THEN 1 ELSE 0 END) AS follow_ups_completed_in_period,
            SUM(CASE WHEN sc.status = 'cancelled' THEN 1 ELSE 0 END) AS follow_ups_cancelled,
            COUNT(*) AS follow_ups_touched
@@ -177,7 +178,7 @@ async function aggregateKpi(tenantId, actingUser, from, to, managerId) {
          INNER JOIN users u ON u.id = sc.assigned_user_id AND u.tenant_id = sc.tenant_id AND u.is_deleted = 0
          WHERE sc.tenant_id = ?
            AND sc.deleted_at IS NULL
-           AND sc.status IN ('pending', 'completed', 'cancelled')
+           AND sc.status IN ('pending', 'completed', 'cancelled', 'missed')
            AND DATE(sc.scheduled_at) >= ? AND DATE(sc.scheduled_at) <= ?
            ${scopeSql}`,
         [tenantId, fromD, toD, fromD, toD, ...us.params, ...mgr.params]
@@ -240,6 +241,7 @@ async function aggregateKpi(tenantId, actingUser, from, to, managerId) {
     meetings_rescheduled: num(meetingsByStatus.rescheduled),
     attendance: attendanceByStatus,
     follow_ups_pending: num(fuRow?.follow_ups_pending),
+    follow_ups_missed: num(fuRow?.follow_ups_missed),
     follow_ups_completed_in_period: num(fuRow?.follow_ups_completed_in_period),
     follow_ups_cancelled: num(fuRow?.follow_ups_cancelled),
     follow_ups_touched: num(fuRow?.follow_ups_touched),

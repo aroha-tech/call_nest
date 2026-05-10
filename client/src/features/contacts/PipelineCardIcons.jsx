@@ -76,6 +76,62 @@ export function PipelineCardIcon({ variant, className = '' }) {
           <path d="M22 4L12 14.01l-3-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
+    case 'campaign_total':
+      return (
+        <svg {...common} className={c}>
+          <path
+            d="M3 11v3a1 1 0 001 1h2l4 4V7L6 11H4a1 1 0 00-1 1zM15.5 6.5a4.5 4.5 0 014.5 4.5 4.5 4.5 0 01-2.5 4.02V18l-4-2.5v-1.48A4.5 4.5 0 0115.5 6.5z"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
+    case 'campaign_dialer':
+      return (
+        <svg {...common} className={c}>
+          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+          <path d="M10 8.5v7l5.5-3.5L10 8.5z" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case 'campaign_filter':
+      return (
+        <svg {...common} className={c}>
+          <path
+            d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
+    case 'campaign_engagement':
+      return (
+        <svg {...common} className={c}>
+          <path
+            d="M4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path d="M22 7l-10 6L2 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'campaign_click':
+      return (
+        <svg {...common} className={c}>
+          <path
+            d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07L12 18.49"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
     default:
       return (
         <svg {...common} className={c}>

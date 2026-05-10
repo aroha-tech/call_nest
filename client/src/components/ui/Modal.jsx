@@ -7,6 +7,10 @@ export function Modal({
   isOpen,
   onClose,
   title,
+  /** Optional secondary line under the title (e.g. modal descriptions). */
+  subtitle,
+  /** Optional leading icon or graphic (placed before title + subtitle). */
+  headerIcon,
   children,
   footer,
   size = 'md',
@@ -49,7 +53,13 @@ export function Modal({
     >
       <div className={`${styles.modal} ${styles[size]}`}>
         <div className={styles.header}>
-          <h2 className={styles.title}>{title}</h2>
+          <div className={styles.headerLead}>
+            {headerIcon ? <div className={styles.headerIconSlot}>{headerIcon}</div> : null}
+            <div className={styles.headerTitles}>
+              <h2 className={styles.title}>{title}</h2>
+              {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
+            </div>
+          </div>
           <button
             type="button"
             className={styles.closeBtn}

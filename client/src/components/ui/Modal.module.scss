@@ -74,7 +74,7 @@
 
 .header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: $space-3;
   padding: $space-4 $space-5;
@@ -82,11 +82,41 @@
   flex-shrink: 0;
 }
 
+.headerLead {
+  display: flex;
+  align-items: flex-start;
+  gap: $space-3;
+  min-width: 0;
+  flex: 1;
+}
+
+.headerIconSlot {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.headerTitles {
+  min-width: 0;
+  flex: 1;
+}
+
 .title {
-  font-size: $font-size-md;
+  font-size: $font-size-lg;
   font-weight: $font-weight-semibold;
   color: var(--color-text-primary);
   margin: 0;
+  line-height: $line-height-tight;
+}
+
+.subtitle {
+  margin: $space-1 0 0;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-normal;
+  color: var(--color-text-muted);
+  line-height: $line-height-normal;
 }
 
 .closeBtn {

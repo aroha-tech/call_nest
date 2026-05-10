@@ -1,6 +1,12 @@
 /**
  * Gmail OAuth2: auth URL and code exchange.
- * Requires GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET. Redirect URI must be set in Google Cloud Console.
+ *
+ * Requires GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET. In Google Cloud Console for the same OAuth client:
+ * - Enable **Google Calendar API** (required for Meet links on calendar events).
+ * - Redirect URI must match getRedirectUri().
+ *
+ * Scopes below are requested for every new connection so the account can send mail and create/update
+ * calendar events (including Google Meet). Existing accounts must use **Reconnect** after scope changes.
  */
 import { OAuth2Client } from 'google-auth-library';
 import { env } from '../../config/env.js';
@@ -11,7 +17,9 @@ const SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
   'https://mail.google.com/',
+  /** Full calendar access (primary calendar, Meet conference creation via events API). */
   'https://www.googleapis.com/auth/calendar',
+  /** Explicit events scope (create/update/delete events; used with conferenceData for Meet). */
   'https://www.googleapis.com/auth/calendar.events',
 ];
 
@@ -44,6 +52,7 @@ export function getAuthUrl(context) {
   const url = client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
+    include_granted_scopes: true,
     scope: SCOPES,
     state,
   });

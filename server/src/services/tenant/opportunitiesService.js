@@ -20,10 +20,26 @@ function trimStr(v) {
   return t === '' ? null : t;
 }
 
-/** Full shape (migration 055_opportunities_crm_fields). */
-const OPP_SELECT_EXTENDED = `o.id, o.contact_id, o.deal_id, o.stage_id, o.title, o.amount, o.lead_id,
+/** Shape after migration 055 (no 096 wizard columns). */
+const OPP_SELECT_055 = `o.id, o.contact_id, o.deal_id, o.stage_id, o.title, o.amount, o.lead_id,
             o.owner_id, o.closing_date, o.probability_percent, o.expected_revenue,
             o.lead_source, o.deal_type, o.next_step, o.description, o.campaign_id,
+            NULL AS priority, NULL AS tags_json, NULL AS amount_currency, NULL AS value_type,
+            __DRAFT_COL__,
+            o.created_at, o.updated_at,
+            d.name AS deal_name,
+            s.name AS stage_name, s.sort_order AS stage_sort_order,
+            s.progression_percent, s.is_closed_won, s.is_closed_lost,
+            COALESCE(o.probability_percent, s.progression_percent) AS effective_probability,
+            ou.name AS owner_name,
+            camp.name AS campaign_name`;
+
+/** Full shape including migration 096 columns. */
+const OPP_SELECT_FULL = `o.id, o.contact_id, o.deal_id, o.stage_id, o.title, o.amount, o.lead_id,
+            o.owner_id, o.closing_date, o.probability_percent, o.expected_revenue,
+            o.lead_source, o.deal_type, o.next_step, o.description, o.campaign_id,
+            o.priority, o.tags_json, o.amount_currency, o.value_type,
+            __DRAFT_COL__,
             o.created_at, o.updated_at,
             d.name AS deal_name,
             s.name AS stage_name, s.sort_order AS stage_sort_order,
@@ -49,6 +65,7 @@ const OPP_SELECT_LEGACY = `o.id, o.contact_id, o.deal_id, o.stage_id, o.title, o
             NULL AS next_step,
             NULL AS description,
             NULL AS campaign_id,
+            NULL AS priority, NULL AS tags_json, NULL AS amount_currency, NULL AS value_type,
             o.created_at, o.updated_at,
             d.name AS deal_name,
             s.name AS stage_name, s.sort_order AS stage_sort_order,
@@ -62,6 +79,8 @@ const OPP_JOINS_LEGACY = `
      INNER JOIN deal_stages s ON s.id = o.stage_id AND s.tenant_id = o.tenant_id AND s.deleted_at IS NULL`;
 
 let opportunitySchemaExtendedCache = null;
+let opportunityPriorityColumnCache = null;
+let opportunityIsDraftColumnCache = null;
 
 /**
  * Migration 055 adds owner_id, probability_percent, etc. Older DBs only have 030 — avoid ER_BAD_FIELD_ERROR.
@@ -84,11 +103,54 @@ async function useExtendedOpportunitySchema() {
   return opportunitySchemaExtendedCache;
 }
 
+/** Migration 096 — priority, tags_json, amount_currency, value_type */
+async function useOpportunityPrioritySchema() {
+  if (opportunityPriorityColumnCache !== null) return opportunityPriorityColumnCache;
+  try {
+    const [row] = await query(
+      `SELECT 1 AS ok
+       FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'opportunities'
+         AND COLUMN_NAME = 'priority'
+       LIMIT 1`
+    );
+    opportunityPriorityColumnCache = !!row?.ok;
+  } catch {
+    opportunityPriorityColumnCache = false;
+  }
+  return opportunityPriorityColumnCache;
+}
+
+async function useOpportunityIsDraftSchema() {
+  if (opportunityIsDraftColumnCache !== null) return opportunityIsDraftColumnCache;
+  try {
+    const [row] = await query(
+      `SELECT 1 AS ok
+       FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'opportunities'
+         AND COLUMN_NAME = 'is_draft'
+       LIMIT 1`
+    );
+    opportunityIsDraftColumnCache = !!row?.ok;
+  } catch {
+    opportunityIsDraftColumnCache = false;
+  }
+  return opportunityIsDraftColumnCache;
+}
+
 async function getOpportunitySelectParts() {
-  const extended = await useExtendedOpportunitySchema();
-  return extended
-    ? { select: OPP_SELECT_EXTENDED, joins: OPP_JOINS_EXTENDED }
-    : { select: OPP_SELECT_LEGACY, joins: OPP_JOINS_LEGACY };
+  const draftSql = (await useOpportunityIsDraftSchema()) ? 'o.is_draft' : '0 AS is_draft';
+  const has096 = await useOpportunityPrioritySchema();
+  if (has096) {
+    return { select: OPP_SELECT_FULL.replace('__DRAFT_COL__', draftSql), joins: OPP_JOINS_EXTENDED };
+  }
+  const has055 = await useExtendedOpportunitySchema();
+  if (has055) {
+    return { select: OPP_SELECT_055.replace('__DRAFT_COL__', draftSql), joins: OPP_JOINS_EXTENDED };
+  }
+  return { select: OPP_SELECT_LEGACY.replace('__DRAFT_COL__', draftSql), joins: OPP_JOINS_LEGACY };
 }
 
 async function assertTenantUserId(tenantId, userId) {
@@ -165,6 +227,63 @@ function parseOptionalDateStr(v) {
   return t;
 }
 
+function parseOptionalPriorityField(v) {
+  if (v === undefined || v === null || v === '') return undefined;
+  const s = String(v).toLowerCase();
+  if (!['low', 'medium', 'high'].includes(s)) {
+    const err = new Error('priority must be low, medium, or high');
+    err.status = 400;
+    throw err;
+  }
+  return s;
+}
+
+function parseOptionalCurrencyCode(v) {
+  if (v === undefined || v === null || v === '') return undefined;
+  const u = String(v).trim().toUpperCase();
+  if (u.length > 8) {
+    const err = new Error('amount_currency is too long');
+    err.status = 400;
+    throw err;
+  }
+  return u;
+}
+
+function normalizeTagsJsonPayload(payload) {
+  if (payload?.tags_json !== undefined && payload.tags_json !== null) {
+    if (typeof payload.tags_json === 'string') {
+      try {
+        const j = JSON.parse(payload.tags_json);
+        if (!Array.isArray(j)) {
+          const err = new Error('tags_json must be a JSON array');
+          err.status = 400;
+          throw err;
+        }
+        const cleaned = j.map((x) => String(x).trim()).filter(Boolean);
+        return cleaned.length ? JSON.stringify(cleaned) : null;
+      } catch (e) {
+        if (e.status) throw e;
+        const err = new Error('tags_json must be valid JSON');
+        err.status = 400;
+        throw err;
+      }
+    }
+    if (Array.isArray(payload.tags_json)) {
+      const cleaned = payload.tags_json.map((x) => String(x).trim()).filter(Boolean);
+      return cleaned.length ? JSON.stringify(cleaned) : null;
+    }
+  }
+  if (Array.isArray(payload?.tags)) {
+    const cleaned = payload.tags.map((x) => String(x).trim()).filter(Boolean);
+    return cleaned.length ? JSON.stringify(cleaned) : null;
+  }
+  if (typeof payload?.tags === 'string' && payload.tags.trim()) {
+    const cleaned = payload.tags.split(/[,;]/).map((x) => x.trim()).filter(Boolean);
+    return cleaned.length ? JSON.stringify(cleaned) : null;
+  }
+  return undefined;
+}
+
 export async function listOpportunitiesForContact(tenantId, user, contactId) {
   const contact = await getContactById(contactId, tenantId, user);
   if (!contact) return null;
@@ -181,10 +300,38 @@ export async function listOpportunitiesForContact(tenantId, user, contactId) {
   return rows;
 }
 
-async function findDuplicateActive(tenantId, contactId, dealId) {
+/** Active (non-draft) opportunity on same contact + pipeline — drafts excluded when is_draft exists. */
+async function findDuplicateActiveNonDraft(tenantId, contactId, dealId, excludeOpportunityId = null) {
+  const has097 = await useOpportunityIsDraftSchema();
+  const ex = excludeOpportunityId != null ? Number(excludeOpportunityId) : null;
+  if (has097) {
+    let sql = `SELECT id FROM opportunities
+     WHERE tenant_id = ? AND contact_id = ? AND deal_id = ? AND deleted_at IS NULL
+       AND COALESCE(is_draft,0) = 0`;
+    const params = [tenantId, contactId, dealId];
+    if (ex && Number.isFinite(ex)) {
+      sql += ` AND id != ?`;
+      params.push(ex);
+    }
+    sql += ` LIMIT 1`;
+    const [row] = await query(sql, params);
+    return row?.id ?? null;
+  }
   const [row] = await query(
     `SELECT id FROM opportunities
      WHERE tenant_id = ? AND contact_id = ? AND deal_id = ? AND deleted_at IS NULL
+     LIMIT 1`,
+    [tenantId, contactId, dealId]
+  );
+  return row?.id ?? null;
+}
+
+async function findDraftOpportunityId(tenantId, contactId, dealId) {
+  if (!(await useOpportunityIsDraftSchema())) return null;
+  const [row] = await query(
+    `SELECT id FROM opportunities
+     WHERE tenant_id = ? AND contact_id = ? AND deal_id = ? AND deleted_at IS NULL
+       AND COALESCE(is_draft,0) = 1
      LIMIT 1`,
     [tenantId, contactId, dealId]
   );
@@ -215,8 +362,18 @@ export async function createOpportunity(tenantId, user, payload) {
     throw err;
   }
 
-  const dup = await findDuplicateActive(tenantId, contactId, dealId);
-  if (dup) {
+  const isDraft =
+    payload?.is_draft === true ||
+    payload?.is_draft === 1 ||
+    String(payload?.is_draft || '').toLowerCase() === 'true';
+
+  const activeDup = await findDuplicateActiveNonDraft(tenantId, contactId, dealId);
+  if (activeDup) {
+    if (isDraft) {
+      const err = new Error('This contact already has an active deal on this pipeline');
+      err.status = 400;
+      throw err;
+    }
     const err = new Error('This contact already has an opportunity on this pipeline');
     err.status = 400;
     throw err;
@@ -300,35 +457,214 @@ export async function createOpportunity(tenantId, user, payload) {
     campaignId = await assertTenantCampaignId(tenantId, payload.campaign_id);
   }
 
+  const has096 = await useOpportunityPrioritySchema();
+  const has055 = await useExtendedOpportunitySchema();
+  const has097 = await useOpportunityIsDraftSchema();
+
+  let priority = null;
+  let tagsJson = null;
+  let amountCurrency = null;
+  let valueType = null;
+  if (has096) {
+    if (payload?.priority !== undefined && payload?.priority !== null && payload?.priority !== '') {
+      priority = parseOptionalPriorityField(payload.priority);
+    }
+    const tagNorm = normalizeTagsJsonPayload(payload);
+    if (tagNorm !== undefined) tagsJson = tagNorm;
+    if (payload?.amount_currency !== undefined && payload?.amount_currency !== null && payload?.amount_currency !== '') {
+      amountCurrency = parseOptionalCurrencyCode(payload.amount_currency);
+    }
+    valueType = trimStr(payload?.value_type);
+  }
+
+  const draftInsertVal = isDraft ? 1 : 0;
+
+  if (isDraft && has097) {
+    const draftOid = await findDraftOpportunityId(tenantId, contactId, dealId);
+    if (draftOid) {
+      return updateOpportunity(
+        tenantId,
+        user,
+        draftOid,
+        {
+          stage_id: stageId,
+          title,
+          amount,
+          owner_id: ownerId,
+          closing_date: closingDate,
+          probability_percent: probabilityPercent,
+          expected_revenue: expectedRevenue,
+          lead_source: leadSource,
+          deal_type: dealType,
+          next_step: nextStep,
+          description,
+          campaign_id: campaignId,
+          priority,
+          tags: payload?.tags,
+          tags_json: payload?.tags_json,
+          amount_currency: amountCurrency,
+          value_type: valueType,
+          is_draft: true,
+        },
+        { skipTenantActivityLog: true }
+      );
+    }
+  }
+
   const uid = user?.id ?? null;
-  const result = await query(
-    `INSERT INTO opportunities (
-       tenant_id, contact_id, deal_id, stage_id, title, amount, lead_id,
-       owner_id, closing_date, probability_percent, expected_revenue,
-       lead_source, deal_type, next_step, description, campaign_id,
-       created_by, updated_by
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      tenantId,
-      contactId,
-      dealId,
-      stageId,
-      title,
-      amount,
-      leadId,
-      ownerId,
-      closingDate,
-      probabilityPercent,
-      expectedRevenue,
-      leadSource,
-      dealType,
-      nextStep,
-      description,
-      campaignId,
-      uid,
-      uid,
-    ]
-  );
+  let result;
+  if (has096) {
+    if (has097) {
+      result = await query(
+        `INSERT INTO opportunities (
+         tenant_id, contact_id, deal_id, stage_id, title, amount, lead_id,
+         owner_id, closing_date, probability_percent, expected_revenue,
+         lead_source, deal_type, next_step, description, campaign_id,
+         priority, tags_json, amount_currency, value_type,
+         is_draft,
+         created_by, updated_by
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          tenantId,
+          contactId,
+          dealId,
+          stageId,
+          title,
+          amount,
+          leadId,
+          ownerId,
+          closingDate,
+          probabilityPercent,
+          expectedRevenue,
+          leadSource,
+          dealType,
+          nextStep,
+          description,
+          campaignId,
+          priority,
+          tagsJson,
+          amountCurrency,
+          valueType,
+          draftInsertVal,
+          uid,
+          uid,
+        ]
+      );
+    } else {
+      result = await query(
+        `INSERT INTO opportunities (
+         tenant_id, contact_id, deal_id, stage_id, title, amount, lead_id,
+         owner_id, closing_date, probability_percent, expected_revenue,
+         lead_source, deal_type, next_step, description, campaign_id,
+         priority, tags_json, amount_currency, value_type,
+         created_by, updated_by
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          tenantId,
+          contactId,
+          dealId,
+          stageId,
+          title,
+          amount,
+          leadId,
+          ownerId,
+          closingDate,
+          probabilityPercent,
+          expectedRevenue,
+          leadSource,
+          dealType,
+          nextStep,
+          description,
+          campaignId,
+          priority,
+          tagsJson,
+          amountCurrency,
+          valueType,
+          uid,
+          uid,
+        ]
+      );
+    }
+  } else if (has055) {
+    if (has097) {
+      result = await query(
+        `INSERT INTO opportunities (
+         tenant_id, contact_id, deal_id, stage_id, title, amount, lead_id,
+         owner_id, closing_date, probability_percent, expected_revenue,
+         lead_source, deal_type, next_step, description, campaign_id,
+         is_draft,
+         created_by, updated_by
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          tenantId,
+          contactId,
+          dealId,
+          stageId,
+          title,
+          amount,
+          leadId,
+          ownerId,
+          closingDate,
+          probabilityPercent,
+          expectedRevenue,
+          leadSource,
+          dealType,
+          nextStep,
+          description,
+          campaignId,
+          draftInsertVal,
+          uid,
+          uid,
+        ]
+      );
+    } else {
+      result = await query(
+        `INSERT INTO opportunities (
+         tenant_id, contact_id, deal_id, stage_id, title, amount, lead_id,
+         owner_id, closing_date, probability_percent, expected_revenue,
+         lead_source, deal_type, next_step, description, campaign_id,
+         created_by, updated_by
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          tenantId,
+          contactId,
+          dealId,
+          stageId,
+          title,
+          amount,
+          leadId,
+          ownerId,
+          closingDate,
+          probabilityPercent,
+          expectedRevenue,
+          leadSource,
+          dealType,
+          nextStep,
+          description,
+          campaignId,
+          uid,
+          uid,
+        ]
+      );
+    }
+  } else if (has097) {
+    result = await query(
+      `INSERT INTO opportunities (
+         tenant_id, contact_id, deal_id, stage_id, title, amount, lead_id,
+         is_draft,
+         created_by, updated_by
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [tenantId, contactId, dealId, stageId, title, amount, leadId, draftInsertVal, uid, uid]
+    );
+  } else {
+    result = await query(
+      `INSERT INTO opportunities (
+         tenant_id, contact_id, deal_id, stage_id, title, amount, lead_id,
+         created_by, updated_by
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [tenantId, contactId, dealId, stageId, title, amount, leadId, uid, uid]
+    );
+  }
 
   const oppOut = await getOpportunityById(tenantId, user, result.insertId);
   await safeLogTenantActivity(tenantId, user?.id, {
@@ -349,7 +685,7 @@ export async function getOpportunityById(tenantId, user, opportunityId) {
   const ctWhere = whereSQL.replace(/\bc\./g, 'ct.');
   const { select, joins } = await getOpportunitySelectParts();
   const [row] = await query(
-    `SELECT ${select}
+    `SELECT ${select}, ct.type AS contact_source_type
      FROM opportunities o
      INNER JOIN contacts ct ON ct.id = o.contact_id AND ct.tenant_id = o.tenant_id AND ct.deleted_at IS NULL
      ${joins}
@@ -473,6 +809,64 @@ export async function updateOpportunity(tenantId, user, opportunityId, payload, 
     sqlParams.push(trimStr(payload.description));
   }
 
+  if (await useOpportunityIsDraftSchema()) {
+    if (payload.is_draft !== undefined) {
+      const nextIsDraft =
+        payload.is_draft === true ||
+        payload.is_draft === 1 ||
+        String(payload.is_draft).toLowerCase() === 'true';
+      const wasDraft = Number(existing.is_draft) === 1;
+      if (wasDraft && !nextIsDraft) {
+        const clash = await findDuplicateActiveNonDraft(
+          tenantId,
+          existing.contact_id,
+          existing.deal_id,
+          existing.id
+        );
+        if (clash) {
+          const err = new Error('This contact already has an active deal on this pipeline');
+          err.status = 400;
+          throw err;
+        }
+      }
+      updates.push('is_draft = ?');
+      sqlParams.push(nextIsDraft ? 1 : 0);
+    }
+  }
+
+  if (await useOpportunityPrioritySchema()) {
+    if (payload.priority !== undefined) {
+      if (payload.priority === null || payload.priority === '') {
+        updates.push('priority = ?');
+        sqlParams.push(null);
+      } else {
+        updates.push('priority = ?');
+        sqlParams.push(parseOptionalPriorityField(payload.priority));
+      }
+    }
+    if (payload.tags_json === null && payload.tags === undefined) {
+      updates.push('tags_json = ?');
+      sqlParams.push(null);
+    } else if (payload.tags !== undefined || payload.tags_json !== undefined) {
+      const tagNorm = normalizeTagsJsonPayload(payload);
+      updates.push('tags_json = ?');
+      sqlParams.push(tagNorm === undefined ? null : tagNorm);
+    }
+    if (payload.amount_currency !== undefined) {
+      if (payload.amount_currency === null || payload.amount_currency === '') {
+        updates.push('amount_currency = ?');
+        sqlParams.push(null);
+      } else {
+        updates.push('amount_currency = ?');
+        sqlParams.push(parseOptionalCurrencyCode(payload.amount_currency));
+      }
+    }
+    if (payload.value_type !== undefined) {
+      updates.push('value_type = ?');
+      sqlParams.push(trimStr(payload.value_type));
+    }
+  }
+
   if (payload.campaign_id !== undefined) {
     if (payload.campaign_id === null || payload.campaign_id === '') {
       updates.push('campaign_id = ?');
@@ -537,7 +931,7 @@ export async function applyOpportunityFromDisposition(tenantId, user, contactId,
   const match = deal.stages?.find((s) => Number(s.id) === sid);
   if (!match) return { applied: false, reason: 'bad_stage' };
 
-  const dupId = await findDuplicateActive(tenantId, cid, did);
+  const dupId = await findDuplicateActiveNonDraft(tenantId, cid, did);
   if (dupId) {
     await updateOpportunity(tenantId, user, dupId, { stage_id: sid }, { skipTenantActivityLog: true });
     return { applied: true, mode: 'updated', opportunity_id: dupId };

@@ -74,6 +74,12 @@
       max-width: min(900px, 100vw);
     }
   }
+
+  &.xlarge {
+    @include sm {
+      max-width: min(1080px, 100vw);
+    }
+  }
 }
 
 .header {
@@ -86,11 +92,23 @@
   flex-shrink: 0;
 }
 
+.titleBlock {
+  min-width: 0;
+  flex: 1;
+}
+
 .title {
   font-size: $font-size-md;
   font-weight: $font-weight-semibold;
   color: var(--color-text-primary);
   margin: 0;
+}
+
+.titleHint {
+  margin: $space-1 0 0;
+  font-size: $font-size-sm;
+  color: var(--color-text-muted);
+  line-height: 1.4;
 }
 
 .closeBtn {

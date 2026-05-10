@@ -13,6 +13,7 @@ import { ProfilePage } from '../pages/ProfilePage';
 import { PlatformDashboardPage } from '../pages/PlatformDashboardPage';
 import { WorkflowMapPage } from '../pages/WorkflowMapPage';
 import { TenantsPage } from '../pages/TenantsPage';
+import { TenantFormPage } from '../pages/TenantFormPage';
 import { UsersPage } from '../pages/UsersPage';
 import { TenantUsersPage } from '../pages/TenantUsersPage';
 import { UnauthorizedPage } from '../pages/UnauthorizedPage';
@@ -52,6 +53,7 @@ import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
 import { TenantCompanySettingsPage } from '../pages/TenantCompanySettingsPage';
 import { DialerWorkspaceSettingsPage } from '../pages/DialerWorkspaceSettingsPage';
 import { CampaignsPage } from '../features/campaigns/CampaignsPage';
+import { CampaignFormPage } from '../features/campaigns/CampaignFormPage';
 import { CampaignOpenPage } from '../features/campaigns/CampaignOpenPage';
 import { DealsPage } from '../pages/DealsPage';
 import { useEmailModuleEnabled } from '../hooks/useEmailModuleEnabled';
@@ -510,6 +512,26 @@ function TenantRoutes() {
         }
       />
       <Route
+        path="/campaigns/new"
+        element={
+          <ProtectedRoute permissions={[PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ]}>
+            <AppShellLayout>
+              <CampaignFormPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/campaigns/:id/edit"
+        element={
+          <ProtectedRoute permissions={[PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ]}>
+            <AppShellLayout>
+              <CampaignFormPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/campaigns/:id/open"
         element={
           <ProtectedRoute permissions={[PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ]}>
@@ -859,6 +881,26 @@ function PlatformRoutes() {
           <ProtectedRoute>
             <AppShellLayout>
               <WorkflowMapPage variant="platform" />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/tenants/new"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <TenantFormPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/tenants/:tenantId/edit"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <TenantFormPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

@@ -1,0 +1,241 @@
+@use '../styles/variables' as *;
+
+.page {
+  padding: $space-4;
+}
+
+.breadcrumbLink {
+  color: var(--color-primary-400);
+  text-decoration: none;
+  font-size: $font-size-sm;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.breadcrumbSep {
+  margin: 0 $space-2;
+  color: var(--color-text-muted);
+  font-size: $font-size-sm;
+}
+
+.breadcrumbCurrent {
+  font-size: $font-size-sm;
+  color: var(--color-text-secondary);
+}
+
+.shell {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.formError {
+  color: var(--color-text-danger, #dc2626);
+  font-size: $font-size-sm;
+  margin-top: $space-2;
+}
+
+.gridTop {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-5;
+  margin-bottom: $space-5;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gridTopSingle {
+  display: block;
+  margin-bottom: $space-5;
+}
+
+.gridModules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-5;
+  margin-bottom: $space-5;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sectionCard {
+  border-radius: $radius-lg;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+  padding: $space-4 $space-5;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: flex-start;
+  gap: $space-3;
+  margin-bottom: $space-4;
+  padding-bottom: $space-3;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.sectionIconWell {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.22) inset,
+    0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.sectionIconGlyph {
+  font-size: 22px !important;
+  line-height: 1 !important;
+}
+
+.sectionIcon_indigo {
+  background: linear-gradient(145deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+.sectionIcon_teal {
+  background: linear-gradient(145deg, #0d9488 0%, #14b8a6 100%);
+}
+
+.sectionIcon_violet {
+  background: linear-gradient(145deg, #7c3aed 0%, #a78bfa 100%);
+}
+
+.sectionIcon_emerald {
+  background: linear-gradient(145deg, #059669 0%, #34d399 100%);
+}
+
+.sectionIcon_blue {
+  background: linear-gradient(145deg, #2563eb 0%, #38bdf8 100%);
+}
+
+.sectionIcon_amber {
+  background: linear-gradient(145deg, #d97706 0%, #fbbf24 100%);
+}
+
+.sectionHeadText {
+  min-width: 0;
+  flex: 1;
+}
+
+.sectionTitleRow {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  flex-wrap: wrap;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  line-height: 1.25;
+}
+
+.sectionHint {
+  margin: $space-1 0 0;
+  font-size: $font-size-sm;
+  color: var(--color-text-muted);
+  line-height: $line-height-normal;
+}
+
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+}
+
+.footerBar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: $space-3;
+  margin-top: $space-6;
+  padding-top: $space-4;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.footerBarStart {
+  justify-content: flex-start;
+}
+
+.slugFieldWrap {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
+.slugSuggestions {
+  display: flex;
+  flex-direction: column;
+  gap: $space-1;
+}
+
+.slugSuggestionsLabel {
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+}
+
+.slugSuggestionChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2;
+}
+
+.slugSuggestionChip {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  padding: $space-1 $space-2;
+  border-radius: $radius-md;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+  color: var(--color-primary-400);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-primary-500);
+    color: var(--color-primary-300);
+  }
+}
+
+.themeSplitRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $space-3;
+
+  @media (max-width: 560px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.themeRadiusInput {
+  min-width: 0;
+}
+
+.themeFontSelect {
+  min-width: 0;
+}
+
+.formSectionTitleRow {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.loadingBox {
+  padding: $space-8;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: $font-size-sm;
+}

@@ -25,6 +25,18 @@ export async function list(req, res, next) {
   }
 }
 
+export async function stats(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
+
+    const data = await campaignsService.getCampaignDashboardStats(tenantId, req.user);
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function create(req, res, next) {
   try {
     const tenantId = req.tenant?.id;
@@ -64,6 +76,19 @@ export async function remove(req, res, next) {
     const campaign = await campaignsService.softDeleteCampaign(tenantId, req.user, req.params.id);
     if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
     res.json({ data: campaign, message: 'Campaign archived' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function removePermanent(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
+
+    const result = await campaignsService.permanentDeleteCampaign(tenantId, req.user, req.params.id);
+    if (!result) return res.status(404).json({ error: 'Archived campaign not found' });
+    res.json({ data: result, message: 'Campaign permanently deleted' });
   } catch (err) {
     next(err);
   }

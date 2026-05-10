@@ -276,12 +276,12 @@ export function DialerSessionCallHistoryPanel({ dialerSessionId }) {
         applicableColumns={callHistoryApplicableColumns}
         visibleColumnIds={callHistoryVisibleColumnIds}
         onSave={setCallHistoryVisibleColumnIds}
-        title="Customize columns"
         getDefaults={getDefaultVisibleCallHistoryColumnIds}
         persistVisibleIds={saveCallHistoryVisibleColumnIds}
         pinnedColumnId="call_notes"
         standardColumnTagLabel="Default"
         canAddCustomField={false}
+        onOpenColumnSettings={(col) => setCallHistoryColumnPanelCol(col)}
       />
     </section>
   );

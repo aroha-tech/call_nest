@@ -80,6 +80,17 @@ export async function create(req, res, next) {
   }
 }
 
+export async function recordJoinOpened(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
+    const row = await meetingsService.recordJoinOpened(tenantId, req.user, req.params.id);
+    res.json({ data: row });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function update(req, res, next) {
   try {
     const tenantId = req.tenant?.id;

@@ -9,6 +9,8 @@ export function SlidePanel({
   isOpen,
   onClose,
   title,
+  /** Optional one-line hint under the title (e.g. wizard subtitle). */
+  titleHint,
   children,
   footer,
   size = 'lg',
@@ -55,10 +57,15 @@ export function SlidePanel({
         onClick={(e) => e.stopPropagation()}
       >
         <div className={styles.header}>
-          {title ? (
-            <h2 id="slide-panel-title" className={styles.title}>
-              {title}
-            </h2>
+          {title || titleHint ? (
+            <div className={styles.titleBlock}>
+              {title ? (
+                <h2 id="slide-panel-title" className={styles.title}>
+                  {title}
+                </h2>
+              ) : null}
+              {titleHint ? <p className={styles.titleHint}>{titleHint}</p> : null}
+            </div>
           ) : (
             <span />
           )}

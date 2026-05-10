@@ -6,11 +6,9 @@ import { useAnyPermission } from '../../hooks/usePermission';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import { campaignsAPI } from '../../services/campaignsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
-import { contactStatusesAPI, campaignTypesAPI, campaignStatusesAPI } from '../../services/dispositionAPI';
-import { contactTagsAPI } from '../../services/contactTagsAPI';
+import { campaignTypesAPI, campaignStatusesAPI } from '../../services/dispositionAPI';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import {
   Table,
@@ -20,8 +18,7 @@ import {
   TableCell,
   TableHeaderCell,
 } from '../../components/ui/Table';
-import { Modal, ModalFooter, ConfirmModal } from '../../components/ui/Modal';
-import { SlidePanel } from '../../components/ui/SlidePanel';
+import { ConfirmModal } from '../../components/ui/Modal';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
@@ -32,89 +29,34 @@ import { SearchInput } from '../../components/ui/SearchInput';
 import { Pagination, PaginationPageSize } from '../../components/ui/Pagination';
 import { Checkbox } from '../../components/ui/Checkbox';
 import { IconButton } from '../../components/ui/IconButton';
-import { EditIcon, ViewIcon, ArchiveIcon, RowActionGroup } from '../../components/ui/ActionIcons';
-import { CampaignFilterBuilder } from './CampaignFilterBuilder';
-import { defaultRule, getPropertyMeta, ruleNeedsValue, validateRulesForSave } from './campaignFilterConfig';
+import { EditIcon, ViewIcon, ArchiveIcon, TrashIcon, RowActionGroup } from '../../components/ui/ActionIcons';
 import listStyles from '../../components/admin/adminDataList.module.scss';
+import { PipelineMetricCard } from '../contacts/PipelineMetricCard';
+import leadDashStyles from '../contacts/LeadPipelineCards.module.scss';
 import pageStyles from './CampaignsPage.module.scss';
 import { isNoListFilter } from '../../utils/listFilterNarrowing';
+import { dealsAPI } from '../../services/dealsAPI';
+import { channelIconFromCampaign, readCampaignSettings } from './campaignFormHelpers';
 
-function parseFilters(campaign) {
-  if (!campaign?.filters_json) return {};
-  const raw = campaign.filters_json;
-  if (typeof raw === 'object' && raw !== null) return raw;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return {};
+function campaignRowStatusBadge(c) {
+  if (c.deleted_at) {
+    return { className: pageStyles.statusArchived, label: 'Archived' };
   }
+  if (c.status === 'paused') {
+    return { className: pageStyles.statusPaused, label: 'Paused' };
+  }
+  const name = (c.campaign_status_name || '').toLowerCase();
+  if (name.includes('plan')) {
+    return { className: pageStyles.statusPlanning, label: c.campaign_status_name || 'Planning' };
+  }
+  if (name.includes('complete')) {
+    return { className: pageStyles.statusCompleted, label: c.campaign_status_name || 'Completed' };
+  }
+  if (name.includes('cancel')) {
+    return { className: pageStyles.statusCancelled, label: c.campaign_status_name || 'Cancelled' };
+  }
+  return { className: pageStyles.statusActive, label: c.campaign_status_name || 'Active' };
 }
-
-function rulesFromCampaign(campaign) {
-  const raw = parseFilters(campaign);
-  if (raw.rules && Array.isArray(raw.rules) && raw.rules.length > 0) {
-    const cleaned = raw.rules
-      .filter((r) => r && r.property !== 'tag')
-      .map((r) => {
-        let property = r.property || 'type';
-        let op = r.op || 'eq';
-        let value = r.value;
-        if (property === 'tag_id' && op === 'eq' && value != null && value !== '') {
-          op = 'in';
-          value = [value];
-        }
-        return { property, op, value };
-      });
-    if (cleaned.length) return cleaned;
-  }
-  const legacy = [];
-  if (raw.source) legacy.push({ property: 'source', op: 'eq', value: raw.source });
-  if (raw.status_id) legacy.push({ property: 'status_id', op: 'eq', value: raw.status_id });
-  if (raw.type) legacy.push({ property: 'type', op: 'eq', value: raw.type });
-  return legacy.length ? legacy : [defaultRule()];
-}
-
-function sanitizeRuleForApi(r) {
-  const meta = getPropertyMeta(r.property);
-  const out = { property: r.property, op: r.op };
-  if (!ruleNeedsValue(r.op)) return out;
-
-  if (r.op === 'in') {
-    const arr = Array.isArray(r.value) ? r.value : [];
-    if (['manager_id', 'assigned_user_id', 'campaign_id', 'tag_id'].includes(r.property)) {
-      out.value = arr.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0);
-    } else {
-      out.value = arr;
-    }
-    return out;
-  }
-
-  if (['manager_id', 'assigned_user_id', 'campaign_id', 'tag_id'].includes(r.property)) {
-    const v = r.value;
-    out.value = v == null || v === '' || v === 'none' ? null : Number(v);
-    return out;
-  }
-
-  if (meta.valueType === 'datetime' && typeof r.value === 'string' && r.value.includes('T')) {
-    const s = r.value.replace('T', ' ');
-    out.value = s.length === 16 ? `${s}:00` : s;
-    return out;
-  }
-
-  out.value = r.value;
-  return out;
-}
-
-const emptyForm = {
-  name: '',
-  description: '',
-  campaign_type_master_id: '',
-  campaign_status_master_id: '',
-  type: 'static',
-  manager_id: '',
-  status: 'active',
-  filterRules: [defaultRule()],
-};
 
 const TYPE_FILTER_OPTIONS = [
   { value: 'static', label: 'Static' },
@@ -132,15 +74,7 @@ export function CampaignsPage() {
   const canDelete = useAnyPermission(['contacts.delete', 'leads.delete']);
   const isAdmin = role === 'admin';
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(emptyForm);
-  const [formError, setFormError] = useState('');
   const [managerMap, setManagerMap] = useState({});
-  const [tenantUsers, setTenantUsers] = useState([]);
-  const [statusOptions, setStatusOptions] = useState([]);
-  const [tagList, setTagList] = useState([]);
-  const [allCampaigns, setAllCampaigns] = useState([]);
   const [campaignTypeRows, setCampaignTypeRows] = useState([]);
   const [campaignStatusRows, setCampaignStatusRows] = useState([]);
 
@@ -158,22 +92,19 @@ export function CampaignsPage() {
   const [showPaused, setShowPaused] = useState(false);
   const [includeArchived, setIncludeArchived] = useState(false);
 
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState('');
-  const [previewSearch, setPreviewSearch] = useState('');
-  const [previewPage, setPreviewPage] = useState(1);
-  const [previewLimit] = useState(10);
-  const [previewRows, setPreviewRows] = useState([]);
-  const [previewPagination, setPreviewPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 1,
-  });
-
   const [archiveCampaign, setArchiveCampaign] = useState(null);
   const [archiveError, setArchiveError] = useState('');
+  const [purgeCampaign, setPurgeCampaign] = useState(null);
+  const [purgeError, setPurgeError] = useState('');
+
+  const [pipelineOptions, setPipelineOptions] = useState([]);
+
+  const [draftDealPipelineFilter, setDraftDealPipelineFilter] = useState('');
+  const [draftMasterTypeId, setDraftMasterTypeId] = useState('');
+  const [draftCrmStatusId, setDraftCrmStatusId] = useState('');
+  const [appliedDealPipelineFilter, setAppliedDealPipelineFilter] = useState('');
+  const [appliedMasterTypeId, setAppliedMasterTypeId] = useState('');
+  const [appliedCrmStatusId, setAppliedCrmStatusId] = useState('');
 
   const listParams = useMemo(() => {
     const params = {
@@ -191,6 +122,15 @@ export function CampaignsPage() {
     } else if (!isNoListFilter(appliedManagerFilter)) {
       params.manager_id = appliedManagerFilter;
     }
+    if (!isNoListFilter(appliedMasterTypeId)) {
+      params.campaign_type_master_id = appliedMasterTypeId;
+    }
+    if (!isNoListFilter(appliedCrmStatusId)) {
+      params.campaign_status_master_id = appliedCrmStatusId;
+    }
+    if (!isNoListFilter(appliedDealPipelineFilter)) {
+      params.pipeline_id = appliedDealPipelineFilter;
+    }
     return params;
   }, [
     page,
@@ -200,6 +140,9 @@ export function CampaignsPage() {
     includeArchived,
     appliedTypeFilter,
     appliedManagerFilter,
+    appliedMasterTypeId,
+    appliedCrmStatusId,
+    appliedDealPipelineFilter,
     isAdmin,
   ]);
 
@@ -214,6 +157,11 @@ export function CampaignsPage() {
     transform: (res) => res?.data ?? { data: [], pagination: { total: 0, totalPages: 1, page: 1, limit: 20 } },
   });
 
+  const fetchStats = useCallback(() => campaignsAPI.stats(), []);
+  const { data: statsData, refetch: refetchStats, loading: statsLoading } = useAsyncData(fetchStats, [fetchStats], {
+    transform: (res) => res?.data?.data ?? null,
+  });
+
   const campaigns = Array.isArray(listResponse?.data) ? listResponse.data : [];
   const pagination = listResponse?.pagination ?? { total: 0, totalPages: 1, page, limit };
 
@@ -225,38 +173,25 @@ export function CampaignsPage() {
       try {
         // Agents cannot list tenant users (requires users.manage / users.team); skip to avoid breaking the whole page.
         const needsUserDirectory = role !== 'agent';
-        const [uRes, stRes, tagRes, cRes, ctRes, csRes] = await Promise.all([
+        const [uRes, ctRes, csRes] = await Promise.all([
           needsUserDirectory
             ? tenantUsersAPI.getAll({ page: 1, limit: 500, includeDisabled: false })
             : Promise.resolve({ data: { data: [] } }),
-          contactStatusesAPI.getOptions().catch(() => ({ data: { data: [] } })),
-          contactTagsAPI.list().catch(() => ({ data: { data: [] } })),
-          campaignsAPI.list({ page: 1, limit: 500, show_paused: true }).catch(() => ({ data: { data: [] } })),
           campaignTypesAPI.getOptions().catch(() => ({ data: { data: [] } })),
           campaignStatusesAPI.getOptions().catch(() => ({ data: { data: [] } })),
         ]);
         if (cancelled) return;
         const rows = uRes.data?.data ?? [];
-        setTenantUsers(rows);
         const map = {};
         for (const u of rows) {
           if (u.role === 'manager') map[u.id] = u.name || u.email;
         }
         setManagerMap(map);
-        const st = stRes.data?.data ?? [];
-        setStatusOptions(st.map((s) => ({ value: String(s.id), label: s.name || s.code || '—' })));
-        const tags = tagRes.data?.data ?? [];
-        setTagList(tags);
-        setAllCampaigns(cRes.data?.data ?? []);
         setCampaignTypeRows(ctRes.data?.data ?? []);
         setCampaignStatusRows(csRes.data?.data ?? []);
       } catch {
         if (!cancelled) {
-          setTenantUsers([]);
           setManagerMap({});
-          setStatusOptions([]);
-          setTagList([]);
-          setAllCampaigns([]);
           setCampaignTypeRows([]);
           setCampaignStatusRows([]);
         }
@@ -267,49 +202,32 @@ export function CampaignsPage() {
     };
   }, [role]);
 
-  const createMut = useMutation((body) => campaignsAPI.create(body));
-  const updateMut = useMutation((id, body) => campaignsAPI.update(id, body));
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await dealsAPI.list({ include_inactive: false });
+        const rows = res.data?.data ?? [];
+        if (!cancelled) {
+          setPipelineOptions(rows.map((p) => ({ value: String(p.id), label: p.name || '—' })));
+        }
+      } catch {
+        if (!cancelled) setPipelineOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const deleteMut = useMutation((id) => campaignsAPI.softDelete(id));
+  const purgeMut = useMutation((id) => campaignsAPI.permanentDelete(id));
 
   const managerOptions = useMemo(() => {
     return Object.entries(managerMap)
       .map(([id, label]) => ({ value: id, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [managerMap]);
-
-  const agentOptions = useMemo(() => {
-    return tenantUsers
-      .filter((u) => u.role === 'agent')
-      .map((u) => ({ value: String(u.id), label: u.name || u.email || '—' }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [tenantUsers]);
-
-  const staticCampaignOptions = useMemo(() => {
-    return (allCampaigns || [])
-      .filter((c) => c.type === 'static')
-      .map((c) => ({ value: String(c.id), label: c.name || '—' }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [allCampaigns]);
-
-  const tagOptions = useMemo(() => {
-    return (tagList || []).map((t) => ({ value: String(t.id), label: t.name || '—' }));
-  }, [tagList]);
-
-  const campaignTypeSelectOptions = useMemo(
-    () => [
-      { value: '', label: '— None —' },
-      ...campaignTypeRows.map((r) => ({ value: String(r.id), label: r.name || r.code || '—' })),
-    ],
-    [campaignTypeRows]
-  );
-
-  const campaignStatusSelectOptions = useMemo(
-    () => [
-      { value: '', label: '— None —' },
-      ...campaignStatusRows.map((r) => ({ value: String(r.id), label: r.name || r.code || '—' })),
-    ],
-    [campaignStatusRows]
-  );
 
   const campaignManagerFilterOptions = useMemo(() => {
     if (role === 'admin') {
@@ -329,14 +247,23 @@ export function CampaignsPage() {
   const applyFilters = useCallback(() => {
     setAppliedManagerFilter(draftManagerFilter);
     setAppliedTypeFilter(draftTypeFilter);
+    setAppliedDealPipelineFilter(draftDealPipelineFilter);
+    setAppliedMasterTypeId(draftMasterTypeId);
+    setAppliedCrmStatusId(draftCrmStatusId);
     setPage(1);
-  }, [draftManagerFilter, draftTypeFilter]);
+  }, [draftManagerFilter, draftTypeFilter, draftDealPipelineFilter, draftMasterTypeId, draftCrmStatusId]);
 
   const resetFilters = useCallback(() => {
     setDraftManagerFilter('');
     setDraftTypeFilter('');
+    setDraftDealPipelineFilter('');
+    setDraftMasterTypeId('');
+    setDraftCrmStatusId('');
     setAppliedManagerFilter('');
     setAppliedTypeFilter('');
+    setAppliedDealPipelineFilter('');
+    setAppliedMasterTypeId('');
+    setAppliedCrmStatusId('');
     setPage(1);
     setSearchQuery('');
   }, []);
@@ -348,77 +275,27 @@ export function CampaignsPage() {
 
   const totalPages = Math.max(1, pagination.totalPages || 1);
 
-  const hasActiveFilters = !isNoListFilter(appliedManagerFilter) || !isNoListFilter(appliedTypeFilter);
+  const hasActiveFilters =
+    !isNoListFilter(appliedManagerFilter) ||
+    !isNoListFilter(appliedTypeFilter) ||
+    !isNoListFilter(appliedDealPipelineFilter) ||
+    !isNoListFilter(appliedMasterTypeId) ||
+    !isNoListFilter(appliedCrmStatusId);
 
-  const openCreate = () => {
-    setEditing(null);
-    setForm({ ...emptyForm, manager_id: '', filterRules: [defaultRule()] });
-    setFormError('');
-    setModalOpen(true);
-  };
+  const pipelineNameById = useMemo(() => {
+    const m = {};
+    for (const o of pipelineOptions) {
+      m[o.value] = o.label;
+    }
+    return m;
+  }, [pipelineOptions]);
+
+  const openCreate = () => navigate('/campaigns/new');
 
   const openEdit = (row) => {
-    setEditing(row);
-    setForm({
-      name: row.name || '',
-      description: row.description || '',
-      campaign_type_master_id: row.campaign_type_master_id != null ? String(row.campaign_type_master_id) : '',
-      campaign_status_master_id: row.campaign_status_master_id != null ? String(row.campaign_status_master_id) : '',
-      type: row.type || 'static',
-      manager_id: row.manager_id != null ? String(row.manager_id) : '',
-      status: row.status || 'active',
-      filterRules: row.type === 'filter' ? rulesFromCampaign(row) : [defaultRule()],
-    });
-    setFormError('');
-    setModalOpen(true);
+    if (!row?.id || row.deleted_at) return;
+    navigate(`/campaigns/${row.id}/edit`);
   };
-
-  const buildFiltersPayload = () => {
-    const rules = (form.filterRules || []).map(sanitizeRuleForApi);
-    return { version: 2, rules };
-  };
-
-  const runPreview = () => {
-    setFormError('');
-    const err = validateRulesForSave(form.filterRules || []);
-    if (err) {
-      setFormError(err);
-      return;
-    }
-    setPreviewError('');
-    setPreviewPage(1);
-    setPreviewSearch('');
-    setPreviewOpen(true);
-  };
-
-  useEffect(() => {
-    if (!previewOpen) return;
-    let cancelled = false;
-    (async () => {
-      setPreviewLoading(true);
-      setPreviewError('');
-      try {
-        const res = await campaignsAPI.preview({
-          filters_json: { version: 2, rules: (form.filterRules || []).map(sanitizeRuleForApi) },
-          page: previewPage,
-          limit: previewLimit,
-          search: previewSearch || undefined,
-        });
-        if (cancelled) return;
-        setPreviewRows(res.data?.data ?? []);
-        setPreviewPagination(
-          res.data?.pagination ?? { page: 1, limit: previewLimit, total: 0, totalPages: 1 }
-        );
-      } catch (e) {
-        if (!cancelled) setPreviewError(e?.response?.data?.error || e?.message || 'Preview failed');
-      } finally {
-        if (!cancelled) setPreviewLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [previewOpen, previewPage, previewSearch, previewLimit, form.filterRules]);
 
   const openArchiveConfirm = (row) => {
     if (!row?.id) return;
@@ -440,59 +317,31 @@ export function CampaignsPage() {
       setArchiveCampaign(null);
       if (campaigns.length === 1 && page > 1) setPage((p) => p - 1);
       refetch();
+      refetchStats();
     } else {
       setArchiveError(result?.error || 'Could not archive campaign');
     }
   };
 
-  const handleSave = async () => {
-    setFormError('');
-    if (!form.name?.trim()) {
-      setFormError('Name is required');
-      return;
-    }
-    if (form.type === 'filter') {
-      const vErr = validateRulesForSave(form.filterRules || []);
-      if (vErr) {
-        setFormError(vErr);
-        return;
-      }
-    }
-
-    const body = {
-      name: form.name.trim(),
-      description: form.description?.trim() ? form.description.trim() : null,
-      campaign_type_master_id: form.campaign_type_master_id || null,
-      campaign_status_master_id: form.campaign_status_master_id || null,
-      manager_id: form.manager_id ? Number(form.manager_id) : null,
-      status: form.status,
-      filters_json: form.type === 'filter' ? buildFiltersPayload() : null,
-    };
-    if (!editing) {
-      body.type = form.type;
-    }
-
-    let result;
-    if (editing) {
-      result = await updateMut.mutate(editing.id, body);
-    } else {
-      result = await createMut.mutate(body);
-    }
-    if (result?.success) {
-      setModalOpen(false);
-      refetch();
-    } else {
-      setFormError(result?.error || 'Save failed');
-    }
+  const closePurgeConfirm = () => {
+    if (purgeMut.loading) return;
+    setPurgeCampaign(null);
+    setPurgeError('');
   };
 
-  function campaignRulesSummary(c) {
-    if (c.type !== 'filter') return 'Set campaign on each contact / import';
-    const f = parseFilters(c);
-    if (f.rules?.length) return `${f.rules.length} rule(s)`;
-    const bits = [f.source && 'source', f.status_id && 'status', f.type && 'type'].filter(Boolean);
-    return bits.length ? `Legacy: ${bits.join(' · ')}` : '—';
-  }
+  const confirmPurge = async () => {
+    if (!purgeCampaign?.id) return;
+    setPurgeError('');
+    const result = await purgeMut.mutate(purgeCampaign.id);
+    if (result?.success) {
+      setPurgeCampaign(null);
+      if (campaigns.length === 1 && page > 1) setPage((p) => p - 1);
+      refetch();
+      refetchStats();
+    } else {
+      setPurgeError(result?.error || 'Could not delete campaign');
+    }
+  };
 
   if (!canRead) {
     return (
@@ -505,6 +354,9 @@ export function CampaignsPage() {
     );
   }
 
+  const totalCampaignsKpi = statsData?.total ?? 0;
+  const activeDialerKpi = statsData?.activeDialer ?? 0;
+
   return (
     <div className={listStyles.page}>
       <PageHeader
@@ -513,52 +365,129 @@ export function CampaignsPage() {
         description={
           role === 'agent'
             ? 'Campaigns you can access—open one to work assigned records.'
-            : 'Static = membership; filter = rules. Owning manager limits visibility; agents see assignments inside a campaign.'
+            : 'Manage and track outbound programs: static membership, dynamic filters, and channel notes in one place.'
         }
         actions={
           isAdmin && canCreate ? (
-            <Button onClick={openCreate}>Add campaign</Button>
+            <Button variant="primary" onClick={openCreate}>
+              + New campaign
+            </Button>
           ) : null
         }
       />
 
       {error && <Alert variant="error">{error}</Alert>}
 
-      {showCampaignFilters ? (
-        <FilterBar onApply={applyFilters} onReset={resetFilters}>
-          {role === 'admin' || role === 'manager' ? (
-            role === 'admin' ? (
-              <Select
-                allowEmpty
-                label="Owning manager"
-                placeholder="All managers"
-                value={draftManagerFilter || ''}
-                onChange={(e) => setDraftManagerFilter(e.target.value)}
-                options={campaignManagerFilterOptions}
-                className={pageStyles.filterSelect}
-              />
-            ) : (
-              <Select
-                allowEmpty
-                label="Scope"
-                placeholder="All visible"
-                value={draftManagerFilter || ''}
-                onChange={(e) => setDraftManagerFilter(e.target.value)}
-                options={campaignManagerFilterOptions}
-                className={pageStyles.filterSelect}
-              />
-            )
-          ) : null}
-          <Select
-            allowEmpty
-            label="Audience"
-            placeholder="All types"
-            value={draftTypeFilter || ''}
-            onChange={(e) => setDraftTypeFilter(e.target.value)}
-            options={TYPE_FILTER_OPTIONS}
-            className={pageStyles.filterSelect}
+      <section className={leadDashStyles.section} aria-label="Campaign summary">
+        <div className={leadDashStyles.grid5}>
+          <PipelineMetricCard
+            variant="campaign_total"
+            label="Total campaigns"
+            value={totalCampaignsKpi.toLocaleString()}
+            subtext="All non-archived you can see"
+            loading={statsLoading}
           />
-        </FilterBar>
+          <PipelineMetricCard
+            variant="campaign_dialer"
+            label="Dialer active"
+            value={activeDialerKpi.toLocaleString()}
+            subtext="Ready for agents to open"
+            loading={statsLoading}
+          />
+          <PipelineMetricCard
+            variant="campaign_filter"
+            label="Filter audiences"
+            value={(statsData?.filterType ?? 0).toLocaleString()}
+            subtext="Dynamic rule campaigns"
+            loading={statsLoading}
+          />
+          <PipelineMetricCard
+            variant="campaign_engagement"
+            label="Engagement"
+            value={null}
+            subtext="Opens / clicks when email analytics is linked"
+            loading={statsLoading}
+          />
+          <PipelineMetricCard
+            variant="campaign_click"
+            label="Click rate"
+            value={null}
+            subtext="Reserved for future reporting"
+            loading={statsLoading}
+          />
+        </div>
+      </section>
+
+      {showCampaignFilters ? (
+        <div className={pageStyles.filterPanelWrap}>
+          <FilterBar onApply={applyFilters} onReset={resetFilters} fluid>
+            {role === 'admin' || role === 'manager' ? (
+              role === 'admin' ? (
+                <Select
+                  allowEmpty
+                  label="Owner"
+                  placeholder="All managers"
+                  value={draftManagerFilter || ''}
+                  onChange={(e) => setDraftManagerFilter(e.target.value)}
+                  options={campaignManagerFilterOptions}
+                  className={pageStyles.filterSelect}
+                />
+              ) : (
+                <Select
+                  allowEmpty
+                  label="Scope"
+                  placeholder="All visible"
+                  value={draftManagerFilter || ''}
+                  onChange={(e) => setDraftManagerFilter(e.target.value)}
+                  options={campaignManagerFilterOptions}
+                  className={pageStyles.filterSelect}
+                />
+              )
+            ) : null}
+            <Select
+              allowEmpty
+              label="Pipelines"
+              placeholder="All pipelines"
+              value={draftDealPipelineFilter || ''}
+              onChange={(e) => setDraftDealPipelineFilter(e.target.value)}
+              options={[{ value: '', label: 'All pipelines' }, ...pipelineOptions]}
+              className={pageStyles.filterSelect}
+            />
+            <Select
+              allowEmpty
+              label="CRM status"
+              placeholder="All statuses"
+              value={draftCrmStatusId || ''}
+              onChange={(e) => setDraftCrmStatusId(e.target.value)}
+              options={[
+                { value: '', label: 'All statuses' },
+                ...campaignStatusRows.map((r) => ({ value: String(r.id), label: r.name || r.code || '—' })),
+              ]}
+              className={pageStyles.filterSelect}
+            />
+            <Select
+              allowEmpty
+              label="Campaign type"
+              placeholder="All channel types"
+              value={draftMasterTypeId || ''}
+              onChange={(e) => setDraftMasterTypeId(e.target.value)}
+              options={[
+                { value: '', label: 'All types' },
+                ...campaignTypeRows.map((r) => ({ value: String(r.id), label: r.name || r.code || '—' })),
+              ]}
+              className={pageStyles.filterSelect}
+            />
+            <Select
+              allowEmpty
+              label="Audience"
+              placeholder="All audience modes"
+              value={draftTypeFilter || ''}
+              onChange={(e) => setDraftTypeFilter(e.target.value)}
+              options={TYPE_FILTER_OPTIONS}
+              className={pageStyles.filterSelect}
+            />
+          </FilterBar>
+        </div>
       ) : null}
 
       <div className={listStyles.tableCard}>
@@ -594,13 +523,13 @@ export function CampaignsPage() {
             value={searchQuery}
             onSearch={handleSearch}
             className={listStyles.searchInToolbar}
-            placeholder="Search... (press Enter)"
+            placeholder="Search campaigns… (press Enter)"
           />
         </div>
         <TableDataRegion
           loading={loading}
           hasCompletedInitialFetch={hasCompletedInitialFetch}
-          skeletonColumns={8}
+          skeletonColumns={11}
         >
           {!campaigns?.length ? (
             <div className={listStyles.tableCardEmpty}>
@@ -653,14 +582,17 @@ export function CampaignsPage() {
               <Table variant="adminList">
                 <TableHead>
                   <TableRow>
-                    <TableHeaderCell>Name</TableHeaderCell>
+                    <TableHeaderCell>Campaign</TableHeaderCell>
+                    <TableHeaderCell>Pipeline</TableHeaderCell>
+                    <TableHeaderCell>Type</TableHeaderCell>
+                    <TableHeaderCell>Status</TableHeaderCell>
                     <TableHeaderCell>Audience</TableHeaderCell>
-                    <TableHeaderCell>Campaign type</TableHeaderCell>
-                    <TableHeaderCell>CRM status</TableHeaderCell>
-                    <TableHeaderCell>Manager</TableHeaderCell>
-                    <TableHeaderCell>Dialer</TableHeaderCell>
-                    <TableHeaderCell>Rules / notes</TableHeaderCell>
-                    <TableHeaderCell width="220px" align="center">
+                    <TableHeaderCell>Est. size</TableHeaderCell>
+                    <TableHeaderCell>Sent</TableHeaderCell>
+                    <TableHeaderCell>Open rate</TableHeaderCell>
+                    <TableHeaderCell>Click rate</TableHeaderCell>
+                    <TableHeaderCell>Last activity</TableHeaderCell>
+                    <TableHeaderCell width="200px" align="center">
                       Actions
                     </TableHeaderCell>
                   </TableRow>
@@ -668,27 +600,61 @@ export function CampaignsPage() {
                 <TableBody>
                   {campaigns.map((c) => {
                     const isArchived = Boolean(c.deleted_at);
+                    const settings = readCampaignSettings(c);
+                    const pipelineId =
+                      settings.pipeline_id != null ? String(settings.pipeline_id) : '';
+                    const pipelineLabel = pipelineId ? pipelineNameById[pipelineId] || '—' : '—';
+                    const est =
+                      settings.audience_estimate_total != null
+                        ? Number(settings.audience_estimate_total)
+                        : null;
+                    const badge = campaignRowStatusBadge(c);
+                    const chIcon = channelIconFromCampaign(c);
                     return (
                       <TableRow key={c.id}>
-                        <TableCell>{c.name}</TableCell>
-                        <TableCell>{c.type}</TableCell>
+                        <TableCell>
+                          <div className={pageStyles.nameCell}>
+                            <span className={pageStyles.nameCellIcon}>{chIcon}</span>
+                            <div className={pageStyles.nameCellText}>
+                              <span className={pageStyles.nameCellTitle}>{c.name}</span>
+                              <div className={pageStyles.nameCellMeta}>ID: CMP-{c.id}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{pipelineLabel}</TableCell>
                         <TableCell>{c.campaign_type_name || '—'}</TableCell>
-                        <TableCell>{c.campaign_status_name || '—'}</TableCell>
                         <TableCell>
-                          {c.manager_id
-                            ? managerMap[c.manager_id] || '—'
-                            : role === 'agent'
-                              ? 'All managers'
-                              : 'All managers'}
+                          <span className={`${pageStyles.statusBadge} ${badge.className}`.trim()}>
+                            {badge.label}
+                          </span>
+                        </TableCell>
+                        <TableCell>{c.type === 'filter' ? 'Dynamic filter' : 'Static'}</TableCell>
+                        <TableCell>
+                          {c.type === 'filter' && est != null && Number.isFinite(est)
+                            ? est.toLocaleString()
+                            : '—'}
+                        </TableCell>
+                        <TableCell>—</TableCell>
+                        <TableCell>
+                          <span>—</span>
+                          <span
+                            className={pageStyles.miniBar}
+                            style={{ '--bar-pct': '0%', '--bar-color': '#22c55e' }}
+                          />
                         </TableCell>
                         <TableCell>
-                          {isArchived ? (
-                            <span title={c.deleted_at ? formatDateTime(c.deleted_at) : ''}>Archived</span>
-                          ) : (
-                            c.status
-                          )}
+                          <span>—</span>
+                          <span
+                            className={pageStyles.miniBar}
+                            style={{
+                              '--bar-pct': '0%',
+                              '--bar-color': 'var(--color-accent-brand)',
+                            }}
+                          />
                         </TableCell>
-                        <TableCell>{campaignRulesSummary(c)}</TableCell>
+                        <TableCell>
+                          {c.updated_at ? formatDateTime(c.updated_at) : formatDateTime(c.created_at)}
+                        </TableCell>
                         <TableCell align="center">
                           <RowActionGroup>
                             {role === 'agent' && c.status === 'active' && !isArchived ? (
@@ -722,6 +688,20 @@ export function CampaignsPage() {
                                     <ArchiveIcon />
                                   </IconButton>
                                 ) : null}
+                                {canDelete && isArchived && includeArchived ? (
+                                  <IconButton
+                                    size="sm"
+                                    variant="danger"
+                                    title="Permanently delete"
+                                    onClick={() => {
+                                      setPurgeError('');
+                                      setPurgeCampaign(c);
+                                    }}
+                                    disabled={purgeMut.loading}
+                                  >
+                                    <TrashIcon />
+                                  </IconButton>
+                                ) : null}
                               </>
                             ) : null}
                           </RowActionGroup>
@@ -745,223 +725,10 @@ export function CampaignsPage() {
               setLimit(nextLimit);
               setPage(1);
             }}
+            hidePageSize
           />
         </div>
       </div>
-
-      <SlidePanel
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={editing ? 'Edit campaign' : 'New campaign'}
-        size="wide"
-        closeOnOverlay
-        closeOnEscape
-        footer={
-          <ModalFooter>
-            <Button variant="secondary" onClick={() => setModalOpen(false)}>
-              Cancel
-            </Button>
-            {form.type === 'filter' ? (
-              <Button variant="secondary" onClick={runPreview} disabled={previewLoading || createMut.loading || updateMut.loading}>
-                {previewLoading ? 'Preview…' : 'Preview'}
-              </Button>
-            ) : null}
-            <Button onClick={handleSave} disabled={createMut.loading || updateMut.loading}>
-              {createMut.loading || updateMut.loading ? 'Saving…' : 'Save'}
-            </Button>
-          </ModalFooter>
-        }
-      >
-        {formError ? (
-          <Alert variant="error" style={{ marginBottom: 12 }}>
-            {formError}
-          </Alert>
-        ) : null}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Input
-            label="Name"
-            value={form.name}
-            onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
-            placeholder="Campaign name"
-          />
-          <Select
-            label="Audience"
-            value={form.type}
-            disabled={!!editing}
-            onChange={(e) => {
-              const t = e.target.value;
-              setForm((s) => ({
-                ...s,
-                type: t,
-                filterRules: t === 'filter' && (!s.filterRules || s.filterRules.length === 0) ? [defaultRule()] : s.filterRules,
-              }));
-            }}
-            options={[
-              { value: 'static', label: 'Static (campaign_id on contacts)' },
-              { value: 'filter', label: 'Filter (dynamic rules)' },
-            ]}
-          />
-          {editing ? (
-            <p style={{ margin: 0, fontSize: 12, opacity: 0.75 }}>
-              Audience is fixed after creation. Create a new campaign if you need the other type.
-            </p>
-          ) : null}
-          <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: 6,
-                fontSize: 13,
-                fontWeight: 500,
-                color: 'var(--color-text-secondary)',
-              }}
-            >
-              Description (optional)
-            </label>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
-              rows={4}
-              placeholder="Internal notes about this campaign…"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: 8,
-                border: '1px solid var(--color-border)',
-                fontFamily: 'inherit',
-                fontSize: 14,
-                background: 'var(--color-input-bg)',
-                color: 'var(--color-text-primary)',
-                resize: 'vertical',
-                boxSizing: 'border-box',
-              }}
-            />
-          </div>
-          <Select
-            label="Campaign type"
-            value={form.campaign_type_master_id}
-            onChange={(e) => setForm((s) => ({ ...s, campaign_type_master_id: e.target.value }))}
-            options={campaignTypeSelectOptions}
-          />
-          <Select
-            label="CRM status"
-            value={form.campaign_status_master_id}
-            onChange={(e) => setForm((s) => ({ ...s, campaign_status_master_id: e.target.value }))}
-            options={campaignStatusSelectOptions}
-          />
-          <Select
-            label="Owning manager (optional)"
-            value={form.manager_id}
-            onChange={(e) => setForm((s) => ({ ...s, manager_id: e.target.value }))}
-            placeholder="Visible to all managers"
-            options={[
-              { value: '', label: '— All managers —' },
-              ...managerOptions,
-            ]}
-          />
-          <p style={{ margin: 0, fontSize: 12, opacity: 0.75 }}>
-            If you pick a manager, only that manager sees and uses this campaign. Leave &quot;All managers&quot; for everyone.
-          </p>
-          <Select
-            label="Dialer availability"
-            value={form.status}
-            onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}
-            options={[
-              { value: 'active', label: 'Active' },
-              { value: 'paused', label: 'Paused' },
-            ]}
-          />
-
-          {form.type === 'filter' ? (
-            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
-              <CampaignFilterBuilder
-                rules={form.filterRules || []}
-                onChange={(next) => setForm((s) => ({ ...s, filterRules: next }))}
-                statusOptions={statusOptions}
-                tagOptions={tagOptions}
-                managerOptions={managerOptions}
-                agentOptions={agentOptions}
-                campaignOptions={staticCampaignOptions}
-              />
-            </div>
-          ) : null}
-          {editing ? (
-            <p style={{ margin: '12px 0 0', fontSize: 12, opacity: 0.7 }}>
-              Created {editing.created_at ? formatDateTime(editing.created_at) : '—'}
-              {editing.updated_at ? ` · Updated ${formatDateTime(editing.updated_at)}` : ''}
-            </p>
-          ) : null}
-        </div>
-      </SlidePanel>
-
-      <Modal
-        isOpen={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        title="Preview matching leads"
-        size="lg"
-        footer={
-          <ModalFooter>
-            <Button variant="secondary" onClick={() => setPreviewOpen(false)}>
-              Close
-            </Button>
-          </ModalFooter>
-        }
-      >
-        {previewError ? <Alert variant="error">{previewError}</Alert> : null}
-        <div style={{ marginBottom: 12 }}>
-          <SearchInput
-            value={previewSearch}
-            onSearch={(v) => {
-              setPreviewSearch(v || '');
-              setPreviewPage(1);
-            }}
-            placeholder="Search preview… (press Enter)"
-          />
-        </div>
-        <TableDataRegion
-          loading={previewLoading}
-          hasCompletedInitialFetch={!previewLoading}
-          skeletonColumns={5}
-        >
-          <Table variant="adminList">
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Name</TableHeaderCell>
-                <TableHeaderCell>Email</TableHeaderCell>
-                <TableHeaderCell>Tag</TableHeaderCell>
-                <TableHeaderCell>Phone</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {!previewRows?.length ? (
-                <TableRow>
-                  <TableCell colSpan={5}>
-                    {previewLoading ? 'Loading…' : 'No matching leads for these rules.'}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                previewRows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell>{r.display_name || '—'}</TableCell>
-                    <TableCell>{r.email || '—'}</TableCell>
-                    <TableCell>{r.tag_names || '—'}</TableCell>
-                    <TableCell>{r.primary_phone || '—'}</TableCell>
-                    <TableCell>{r.status_name || r.status_id || '—'}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableDataRegion>
-        <Pagination
-          page={previewPagination.page || 1}
-          totalPages={Math.max(1, previewPagination.totalPages || 1)}
-          total={previewPagination.total ?? 0}
-          limit={previewPagination.limit ?? previewLimit}
-          onPageChange={(p) => setPreviewPage(p)}
-        />
-      </Modal>
 
       <ConfirmModal
         isOpen={!!archiveCampaign}
@@ -976,6 +743,21 @@ export function CampaignsPage() {
         cancelText="Cancel"
         variant="primary"
         loading={deleteMut.loading}
+      />
+
+      <ConfirmModal
+        isOpen={!!purgeCampaign}
+        onClose={closePurgeConfirm}
+        onConfirm={confirmPurge}
+        title="Permanently delete campaign"
+        message={
+          purgeError ||
+          `Permanently delete “${purgeCampaign?.name || 'this campaign'}”? This cannot be undone. The row must already be archived.`
+        }
+        confirmText="Delete permanently"
+        cancelText="Cancel"
+        variant="danger"
+        loading={purgeMut.loading}
       />
     </div>
   );

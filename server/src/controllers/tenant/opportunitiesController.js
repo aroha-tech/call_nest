@@ -1,5 +1,18 @@
 import * as opportunitiesService from '../../services/tenant/opportunitiesService.js';
 
+export async function getById(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
+
+    const row = await opportunitiesService.getOpportunityById(tenantId, req.user, req.params.id);
+    if (!row) return res.status(404).json({ error: 'Opportunity not found' });
+    res.json({ data: row });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function list(req, res, next) {
   try {
     const tenantId = req.tenant?.id;

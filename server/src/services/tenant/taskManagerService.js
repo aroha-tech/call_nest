@@ -1232,7 +1232,7 @@ async function getAgentCrmRollups(tenantId, actingUser, from, to, managerId) {
        INNER JOIN users u ON u.id = sc.assigned_user_id AND u.tenant_id = sc.tenant_id AND u.is_deleted = 0
        WHERE sc.tenant_id = ?
          AND sc.deleted_at IS NULL
-         AND sc.status IN ('pending', 'completed')
+         AND sc.status IN ('pending', 'completed', 'missed')
          AND DATE(sc.scheduled_at) >= ? AND DATE(sc.scheduled_at) <= ?
          ${us.sql}${mgr.sql}${PERF_REPORTS_AGENT_ROLE_SQL}
        GROUP BY u.id`,

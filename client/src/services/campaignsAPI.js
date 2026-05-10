@@ -6,6 +6,9 @@ export const campaignsAPI = {
   /** @param {Record<string, unknown>} [params] — page, limit, search, type, manager_id, show_paused, include_archived */
   list: (params) => axiosInstance.get(BASE, { params }),
 
+  /** Dashboard KPI counts (visibility matches campaign list). */
+  stats: () => axiosInstance.get(`${BASE}/stats`),
+
   getById: (id) => axiosInstance.get(`${BASE}/${id}`),
 
   create: (data) => axiosInstance.post(BASE, data),
@@ -14,6 +17,9 @@ export const campaignsAPI = {
 
   /** Soft-delete (sets deleted_at / deleted_by on server). */
   softDelete: (id) => axiosInstance.delete(`${BASE}/${id}`),
+
+  /** Hard-delete — only allowed for already-archived campaigns (admin). */
+  permanentDelete: (id) => axiosInstance.delete(`${BASE}/${id}/permanent`),
 
   /** Agent workspace: contacts in this campaign assigned to current user (scenarios 4 & 9). */
   open: (id, { page = 1, limit = 20, search = '' } = {}) =>

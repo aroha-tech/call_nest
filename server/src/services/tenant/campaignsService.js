@@ -85,7 +85,110 @@ function parseCampaignListQuery(query = {}) {
     query.include_archived === true ||
     query.include_archived === 'true' ||
     query.include_archived === '1';
-  return { page, limit, offset, search, type, manager_id, show_paused, include_archived };
+  const campaign_type_master_id = String(query.campaign_type_master_id ?? '').trim();
+  const campaign_status_master_id = String(query.campaign_status_master_id ?? '').trim();
+  const pipeline_id = query.pipeline_id;
+  return {
+    page,
+    limit,
+    offset,
+    search,
+    type,
+    manager_id,
+    show_paused,
+    include_archived,
+    campaign_type_master_id,
+    campaign_status_master_id,
+    pipeline_id,
+  };
+}
+
+const MAX_CAMPAIGN_SETTINGS_JSON_CHARS = 120000;
+
+/**
+ * Whitelist wizard fields stored in campaigns.settings_json (JSON column).
+ */
+function normalizeSettingsJsonForDb(input) {
+  if (input === undefined) return undefined;
+  if (input === null || input === '') return null;
+  let obj = input;
+  if (typeof input === 'string') {
+    try {
+      obj = JSON.parse(input);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) return null;
+
+  const channelRaw = String(obj.channel || 'phone').toLowerCase();
+  const channel = ['phone', 'whatsapp', 'email', 'sms'].includes(channelRaw) ? channelRaw : 'phone';
+  const scheduleRaw = String(obj.schedule_mode || 'immediate').toLowerCase();
+  const schedule_mode = scheduleRaw === 'scheduled' ? 'scheduled' : 'immediate';
+
+  const out = {
+    channel,
+    schedule_mode,
+    timezone: obj.timezone != null && String(obj.timezone).trim() ? String(obj.timezone).trim() : null,
+    start_date: obj.start_date != null && String(obj.start_date).trim() ? String(obj.start_date).trim() : null,
+    end_date: obj.end_date != null && String(obj.end_date).trim() ? String(obj.end_date).trim() : null,
+    caller_id_label:
+      obj.caller_id_label != null && String(obj.caller_id_label).trim()
+        ? String(obj.caller_id_label).trim().slice(0, 255)
+        : null,
+    content_html: null,
+    audience_estimate_at:
+      obj.audience_estimate_at != null && String(obj.audience_estimate_at).trim()
+        ? String(obj.audience_estimate_at).trim()
+        : null,
+  };
+
+  const pid = Number(obj.pipeline_id);
+  out.pipeline_id = Number.isFinite(pid) && pid > 0 ? pid : null;
+
+  const scriptId = Number(obj.call_script_id);
+  out.call_script_id = Number.isFinite(scriptId) && scriptId > 0 ? scriptId : null;
+
+  const timeout = Number(obj.timeout_seconds);
+  out.timeout_seconds = Number.isFinite(timeout) && timeout > 0 ? Math.min(timeout, 600) : 30;
+
+  const est = Number(obj.audience_estimate_total);
+  out.audience_estimate_total =
+    Number.isFinite(est) && est >= 0 ? Math.min(Math.floor(est), 2147483647) : null;
+
+  if (obj.content_html != null && String(obj.content_html).trim()) {
+    const html = String(obj.content_html);
+    out.content_html = html.length > 100000 ? html.slice(0, 100000) : html;
+  }
+
+  const json = JSON.stringify(out);
+  if (json.length > MAX_CAMPAIGN_SETTINGS_JSON_CHARS) {
+    const err = new Error('Campaign settings are too large');
+    err.status = 400;
+    throw err;
+  }
+  return json;
+}
+
+/** Extra list filters (pipeline / CRM type / CRM status) — same semantics for admin, manager, agent lists. */
+function appendCampaignListAdvancedFilters(where, params, q) {
+  if (q.campaign_type_master_id) {
+    where.push('c.campaign_type_master_id = ?');
+    params.push(q.campaign_type_master_id);
+  }
+  if (q.campaign_status_master_id) {
+    where.push('c.campaign_status_master_id = ?');
+    params.push(q.campaign_status_master_id);
+  }
+  if (q.pipeline_id != null && q.pipeline_id !== '' && q.pipeline_id !== '__all__') {
+    const pid = Number(q.pipeline_id);
+    if (Number.isFinite(pid) && pid > 0) {
+      where.push(
+        '(c.settings_json IS NOT NULL AND JSON_EXTRACT(c.settings_json, \'$.pipeline_id\') = ?)'
+      );
+      params.push(pid);
+    }
+  }
 }
 
 function totalPages(total, limit) {
@@ -149,6 +252,8 @@ async function listCampaignsAdmin(tenantId, q, includeArchived) {
     }
   }
 
+  appendCampaignListAdvancedFilters(where, params, q);
+
   const whereSql = where.join(' AND ');
   const [countRow] = await query(`SELECT COUNT(*) AS c FROM campaigns c WHERE ${whereSql}`, params);
   const total = Number(countRow?.c ?? 0);
@@ -208,6 +313,8 @@ async function listCampaignsManager(tenantId, user, q) {
     }
   }
 
+  appendCampaignListAdvancedFilters(where, params, q);
+
   const whereSql = where.join(' AND ');
   const [countRow] = await query(`SELECT COUNT(*) AS c FROM campaigns c WHERE ${whereSql}`, params);
   const total = Number(countRow?.c ?? 0);
@@ -261,6 +368,8 @@ async function listCampaignsAgent(tenantId, user, q) {
     params.push(q.type);
   }
 
+  appendCampaignListAdvancedFilters(where, params, q);
+
   const whereSql = where.join(' AND ');
   const [countRow] = await query(
     `SELECT COUNT(*) AS c FROM campaigns c WHERE ${whereSql}`,
@@ -302,7 +411,11 @@ export async function createCampaign(tenantId, user, payload) {
     description,
     campaign_type_master_id,
     campaign_status_master_id,
+    settings_json,
+    draft: draftRaw,
+    save_as_draft: saveAsDraftRaw,
   } = payload || {};
+  const isDraft = draftRaw === true || saveAsDraftRaw === true;
 
   if (!name || !String(name).trim()) {
     const err = new Error('name is required');
@@ -342,11 +455,15 @@ export async function createCampaign(tenantId, user, payload) {
   if (type === 'filter') {
     const rules = normalizeFiltersToRules(filters_json);
     if (rules.length === 0) {
-      const err = new Error('Filter campaigns need at least one rule.');
-      err.status = 400;
-      throw err;
+      if (!isDraft) {
+        const err = new Error('Filter campaigns need at least one rule.');
+        err.status = 400;
+        throw err;
+      }
+      filtersStored = null;
+    } else {
+      filtersStored = JSON.stringify({ version: 2, rules });
     }
-    filtersStored = JSON.stringify({ version: 2, rules });
   }
 
   const desc =
@@ -356,12 +473,17 @@ export async function createCampaign(tenantId, user, payload) {
   const typeMasterId = await resolveCampaignTypeMasterId(campaign_type_master_id);
   const statusMasterId = await resolveCampaignStatusMasterId(campaign_status_master_id);
 
+  let settingsStored = null;
+  if (settings_json !== undefined && settings_json !== null) {
+    settingsStored = normalizeSettingsJsonForDb(settings_json);
+  }
+
   const result = await query(
     `INSERT INTO campaigns (
        tenant_id, name, description, campaign_type_master_id, campaign_status_master_id,
-       type, manager_id, created_by, updated_by, filters_json, status
+       type, manager_id, created_by, updated_by, filters_json, settings_json, status
      )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
       String(name).trim(),
@@ -373,6 +495,7 @@ export async function createCampaign(tenantId, user, payload) {
       user.id,
       user.id,
       filtersStored,
+      settingsStored,
       statusNorm,
     ]
   );
@@ -472,7 +595,11 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
     description,
     campaign_type_master_id,
     campaign_status_master_id,
+    settings_json,
+    draft: draftRaw,
+    save_as_draft: saveAsDraftRaw,
   } = payload || {};
+  const isDraft = draftRaw === true || saveAsDraftRaw === true;
 
   const updates = [];
   const params = [];
@@ -532,11 +659,15 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
     if (nextType === 'filter') {
       const rules = normalizeFiltersToRules(filters_json);
       if (rules.length === 0) {
-        const err = new Error('Filter campaigns need at least one rule.');
-        err.status = 400;
-        throw err;
+        if (!isDraft) {
+          const err = new Error('Filter campaigns need at least one rule.');
+          err.status = 400;
+          throw err;
+        }
+        toStore = null;
+      } else {
+        toStore = JSON.stringify({ version: 2, rules });
       }
-      toStore = JSON.stringify({ version: 2, rules });
     } else if (nextType === 'static') {
       toStore = null;
     }
@@ -552,6 +683,11 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
     }
     updates.push('status = ?');
     params.push(st);
+  }
+  if (settings_json !== undefined) {
+    const normalized = normalizeSettingsJsonForDb(settings_json);
+    updates.push('settings_json = ?');
+    params.push(normalized);
   }
 
   if (type === 'static' && filters_json === undefined) {
@@ -570,6 +706,7 @@ export async function updateCampaign(tenantId, user, campaignId, payload) {
   if (manager_id !== undefined) touchParts.push('manager');
   if (filters_json !== undefined) touchParts.push('filters');
   if (status !== undefined) touchParts.push('status');
+  if (settings_json !== undefined) touchParts.push('settings');
   if (type === 'static' && filters_json === undefined) touchParts.push('filters');
   else if (type === 'filter' && filters_json === undefined) touchParts.push('filters');
 
@@ -665,6 +802,38 @@ export async function softDeleteCampaign(tenantId, user, campaignId) {
     [id, tenantId]
   );
   return row || null;
+}
+
+/**
+ * Permanently remove an archived campaign (admin only). Row must already be soft-deleted.
+ */
+export async function permanentDeleteCampaign(tenantId, user, campaignId) {
+  if (user.role !== 'admin') {
+    const err = new Error('Only admin can permanently delete campaigns');
+    err.status = 403;
+    throw err;
+  }
+
+  const id = Number(campaignId);
+  if (!id) return null;
+
+  const [existing] = await query(
+    `SELECT id, name FROM campaigns WHERE id = ? AND tenant_id = ? AND deleted_at IS NOT NULL LIMIT 1`,
+    [id, tenantId]
+  );
+  if (!existing) return null;
+
+  await query(`DELETE FROM campaigns WHERE id = ? AND tenant_id = ? AND deleted_at IS NOT NULL`, [id, tenantId]);
+
+  await safeLogTenantActivity(tenantId, user?.id, {
+    event_category: 'campaign',
+    event_type: 'campaign.permanent_deleted',
+    summary: `Campaign permanently deleted: ${existing.name || '—'}`,
+    entity_type: 'campaign',
+    entity_id: id,
+  });
+
+  return { id, deleted: true };
 }
 
 export async function openCampaignForAgent(tenantId, user, campaignId, { page = 1, limit = 20, search = '' } = {}) {
@@ -777,16 +946,87 @@ export async function openCampaignForAgent(tenantId, user, campaignId, { page = 
 }
 
 /**
+ * Compact counts for campaign dashboard cards (same visibility rules as the list).
+ */
+export async function getCampaignDashboardStats(tenantId, user) {
+  if (user.role === 'admin') {
+    const whereSql = 'c.tenant_id = ? AND c.deleted_at IS NULL';
+    const params = [tenantId];
+    const [row] = await query(
+      `SELECT 
+        COUNT(*) AS total,
+        COALESCE(SUM(CASE WHEN c.status = 'active' THEN 1 ELSE 0 END), 0) AS active_dialer,
+        COALESCE(SUM(CASE WHEN c.status = 'paused' THEN 1 ELSE 0 END), 0) AS paused_dialer,
+        COALESCE(SUM(CASE WHEN c.type = 'filter' THEN 1 ELSE 0 END), 0) AS filter_type,
+        COALESCE(SUM(CASE WHEN c.type = 'static' THEN 1 ELSE 0 END), 0) AS static_type
+       FROM campaigns c WHERE ${whereSql}`,
+      params
+    );
+    return {
+      total: Number(row?.total ?? 0),
+      activeDialer: Number(row?.active_dialer ?? 0),
+      pausedDialer: Number(row?.paused_dialer ?? 0),
+      filterType: Number(row?.filter_type ?? 0),
+      staticType: Number(row?.static_type ?? 0),
+    };
+  }
+
+  if (user.role === 'manager') {
+    const whereSql =
+      'c.tenant_id = ? AND c.deleted_at IS NULL AND (c.manager_id IS NULL OR c.manager_id = ?)';
+    const params = [tenantId, user.id];
+    const [row] = await query(
+      `SELECT 
+        COUNT(*) AS total,
+        COALESCE(SUM(CASE WHEN c.status = 'active' THEN 1 ELSE 0 END), 0) AS active_dialer,
+        COALESCE(SUM(CASE WHEN c.status = 'paused' THEN 1 ELSE 0 END), 0) AS paused_dialer,
+        COALESCE(SUM(CASE WHEN c.type = 'filter' THEN 1 ELSE 0 END), 0) AS filter_type,
+        COALESCE(SUM(CASE WHEN c.type = 'static' THEN 1 ELSE 0 END), 0) AS static_type
+       FROM campaigns c WHERE ${whereSql}`,
+      params
+    );
+    return {
+      total: Number(row?.total ?? 0),
+      activeDialer: Number(row?.active_dialer ?? 0),
+      pausedDialer: Number(row?.paused_dialer ?? 0),
+      filterType: Number(row?.filter_type ?? 0),
+      staticType: Number(row?.static_type ?? 0),
+    };
+  }
+
+  const managerId = await getUserManagerId(tenantId, user.id);
+  const where = ['c.tenant_id = ?', 'c.deleted_at IS NULL'];
+  const params = [tenantId];
+  if (managerId != null) {
+    where.push('(c.manager_id IS NULL OR c.manager_id = ?)');
+    params.push(managerId);
+  } else {
+    where.push('c.manager_id IS NULL');
+  }
+  const whereSql = where.join(' AND ');
+  const [row] = await query(
+    `SELECT 
+      COUNT(*) AS total,
+      COALESCE(SUM(CASE WHEN c.status = 'active' THEN 1 ELSE 0 END), 0) AS active_dialer,
+      COALESCE(SUM(CASE WHEN c.status = 'paused' THEN 1 ELSE 0 END), 0) AS paused_dialer,
+      COALESCE(SUM(CASE WHEN c.type = 'filter' THEN 1 ELSE 0 END), 0) AS filter_type,
+      COALESCE(SUM(CASE WHEN c.type = 'static' THEN 1 ELSE 0 END), 0) AS static_type
+     FROM campaigns c WHERE ${whereSql}`,
+    params
+  );
+  return {
+    total: Number(row?.total ?? 0),
+    activeDialer: Number(row?.active_dialer ?? 0),
+    pausedDialer: Number(row?.paused_dialer ?? 0),
+    filterType: Number(row?.filter_type ?? 0),
+    staticType: Number(row?.static_type ?? 0),
+  };
+}
+
+/**
  * Preview contacts matching filter rules (respects list visibility like contacts list).
  */
 export async function previewFilterCampaignLeads(tenantId, user, { filters_json, page = 1, limit = 20, search = '' } = {}) {
-  const rules = normalizeFiltersToRules(filters_json);
-  if (rules.length === 0) {
-    const err = new Error('At least one filter rule is required for preview.');
-    err.status = 400;
-    throw err;
-  }
-
   const { whereSQL, params } = buildOwnershipWhere(user);
   const where = [whereSQL];
   appendCampaignFilterRules(where, params, filters_json);

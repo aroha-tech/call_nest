@@ -1,22 +1,87 @@
 @use '../../styles/variables' as *;
 
-.toolbarRow {
+.modalFooter {
+  justify-content: flex-end;
+}
+
+.footerBtnIcon {
+  flex-shrink: 0;
+  font-size: 18px !important;
+  line-height: 1;
+  margin-right: 2px;
+}
+
+.headerGlyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: $radius-md;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-primary-500) 22%, var(--color-bg-elevated)) 0%,
+    color-mix(in srgb, var(--color-primary-600) 14%, var(--color-bg-elevated)) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--color-primary-500) 35%, var(--color-border-subtle));
+  color: var(--color-primary-600);
+  box-shadow: $shadow-xs;
+}
+
+.toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: $space-3;
-  margin-bottom: $space-4;
+  margin-bottom: $space-5;
 }
 
 .searchGrow {
   flex: 1;
-  min-width: 160px;
+  min-width: 200px;
   margin-bottom: 0 !important;
 }
 
-.search {
-  width: 100%;
-  margin-bottom: $space-4;
+.toolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: $space-3;
+}
+
+.linkAction {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-accent-brand);
+  white-space: nowrap;
+  text-decoration: none;
+  transition: color $transition-fast;
+
+  &:hover {
+    color: var(--color-primary-600);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-primary-500) 45%, transparent);
+    outline-offset: 2px;
+    border-radius: $radius-xs;
+  }
+}
+
+.linkIcon {
+  font-size: 18px !important;
+  line-height: 1;
+  opacity: 0.9;
 }
 
 .addForm {
@@ -28,10 +93,10 @@
 .columnsGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: $space-5;
+  gap: $space-6;
   align-items: start;
 
-  @media (max-width: $bp-md) {
+  @media (max-width: $bp-lg) {
     grid-template-columns: 1fr;
   }
 }
@@ -40,17 +105,24 @@
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
   border-radius: $radius-lg;
-  padding: $space-4;
+  padding: $space-4 $space-5;
   min-width: 0;
 }
 
-.sectionHeading {
-  margin: 0 0 $space-1;
-  font-size: $font-size-xs;
+.sectionHeaderRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: $space-3;
+  margin-bottom: $space-1;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: $font-size-base;
   font-weight: $font-weight-semibold;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
+  line-height: $line-height-tight;
 }
 
 .sectionCount {
@@ -58,40 +130,18 @@
   color: var(--color-text-muted);
 }
 
-.sectionSub {
-  margin: 0 0 $space-2;
+.sectionHint {
+  margin: 0 0 $space-3;
   font-size: $font-size-xs;
   color: var(--color-text-muted);
   line-height: 1.45;
-}
-
-.tagLegend {
-  margin: 0 0 $space-2;
-  padding: 8px 10px;
-  font-size: 11px;
-  line-height: 1.45;
-  color: var(--color-text-muted);
-  background: var(--color-bg-elevated, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--color-border-subtle);
-  border-radius: $radius-md;
-}
-
-.tagLegendTitle {
-  font-weight: $font-weight-semibold;
-  color: var(--color-text-secondary);
-}
-
-.tagKey {
-  font-weight: $font-weight-bold;
-  color: var(--color-text-primary);
-  font-variant-numeric: tabular-nums;
 }
 
 .list {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: min(50vh, 360px);
+  max-height: min(52vh, 420px);
   overflow-x: hidden;
   overflow-y: auto;
   border: 1px solid var(--color-border-subtle);
@@ -99,13 +149,9 @@
   background: var(--color-bg-subtle);
 }
 
-/**
- * Grid: [drag28px] [label grows] [badges auto] — avoids flex shrinking the title to one character wide.
- */
 .rowVisible,
-.rowHidden {
+.rowAvailable {
   display: grid;
-  grid-template-columns: 28px minmax(8rem, 1fr) auto;
   align-items: center;
   column-gap: $space-2;
   padding: $space-2 $space-3;
@@ -116,6 +162,18 @@
   &:last-child {
     border-bottom: none;
   }
+}
+
+.rowVisible {
+  grid-template-columns: 28px 32px 26px minmax(0, 1fr) max-content 64px;
+}
+
+.rowVisibleCompact {
+  grid-template-columns: 28px 32px 26px minmax(0, 1fr) max-content;
+}
+
+.rowAvailable {
+  grid-template-columns: 32px 26px minmax(0, 1fr) max-content 36px;
 }
 
 .rowDragging {
@@ -151,74 +209,158 @@
   }
 }
 
-.dragGrip {
-  font-size: 14px;
+.dragGlyph {
+  font-size: 20px !important;
   line-height: 1;
-  letter-spacing: -2px;
-  user-select: none;
 }
 
-.checkLabel {
+.rowCheckbox {
+  margin: 0 !important;
+  flex-shrink: 0;
+}
+
+.typeIcon {
   display: flex;
   align-items: center;
-  gap: $space-2;
-  min-width: 0;
-  cursor: pointer;
+  justify-content: center;
+  width: 26px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+
+  span {
+    font-size: 18px !important;
+    line-height: 1;
+  }
 }
 
 .rowLabel {
-  flex: 1 1 auto;
   min-width: 0;
   line-height: 1.35;
-  /* Normal words stay on one line; long tokens wrap without breaking one letter per row */
   white-space: normal;
   overflow-wrap: break-word;
   word-break: normal;
 }
 
-/** Category + “Always” stay grouped; never overlap the column title */
-.rowBadges {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-  justify-self: end;
-  max-width: 100%;
-}
-
-.fieldTag {
+.typePill {
   flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  font-size: 11px;
-  font-weight: $font-weight-bold;
-  line-height: 1;
+  padding: 3px 8px;
+  font-size: $font-size-2xs;
+  font-weight: $font-weight-medium;
+  line-height: 1.2;
   color: var(--color-text-secondary);
-  border-radius: $radius-sm;
+  background: color-mix(in srgb, var(--color-bg-elevated) 88%, var(--color-border-subtle));
   border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-surface);
-  cursor: default;
+  border-radius: $radius-full;
+  white-space: nowrap;
 }
 
-.pill {
-  flex-shrink: 0;
+.rowTrailing {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  justify-self: end;
+}
+
+.rowSettingsBtn {
+  display: flex;
+  align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  font-size: 11px;
-  font-weight: $font-weight-bold;
-  line-height: 1;
-  color: var(--color-primary-400, #60a5fa);
-  border: 1px solid var(--color-border);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
   border-radius: $radius-sm;
-  background: rgba(59, 130, 246, 0.12);
-  cursor: default;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background $transition-fast,
+    color $transition-fast;
+
+  &:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-primary-500) 45%, transparent);
+    outline-offset: 1px;
+  }
+}
+
+.rowSettingsGlyph {
+  font-size: 18px !important;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.addIconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: $radius-sm;
+  background: color-mix(in srgb, var(--color-primary-500) 12%, transparent);
+  color: var(--color-primary-600);
+  cursor: pointer;
+  transition:
+    background $transition-fast,
+    color $transition-fast;
+
+  &:hover {
+    background: color-mix(in srgb, var(--color-primary-500) 20%, transparent);
+    color: var(--color-primary-700);
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-primary-500) 45%, transparent);
+    outline-offset: 1px;
+  }
+
+  span {
+    font-size: 18px !important;
+    line-height: 1;
+  }
+}
+
+.showMoreBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-1;
+  width: 100%;
+  margin-top: $space-2;
+  padding: $space-2 $space-3;
+  border: none;
+  border-radius: $radius-md;
+  background: transparent;
+  cursor: pointer;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-accent-brand);
+  text-decoration: none;
+  transition: background $transition-fast;
+
+  &:hover {
+    background: var(--color-accent-brand-subtle);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-primary-500) 45%, transparent);
+    outline-offset: 2px;
+  }
+}
+
+.showMoreChevron {
+  font-size: 18px !important;
+  line-height: 1;
 }
 
 .empty,

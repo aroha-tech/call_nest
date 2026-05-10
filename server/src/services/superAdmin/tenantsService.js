@@ -88,6 +88,7 @@ export async function findAll({
     `SELECT t.id, t.name, t.slug, t.industry_id, t.is_enabled, t.created_at, t.updated_at,
             t.whatsapp_send_mode, t.whatsapp_module_enabled, t.whatsapp_automation_enabled,
             t.email_communication_enabled, t.email_module_enabled, t.email_automation_enabled,
+            t.reports_advanced_enabled,
             t.theme_json,
             ${TENANT_USER_COUNT_SQL} AS user_count
      FROM tenants t
@@ -113,6 +114,7 @@ export async function findById(id) {
     `SELECT id, name, slug, industry_id, is_enabled, created_at, updated_at,
             whatsapp_send_mode, whatsapp_module_enabled, whatsapp_automation_enabled,
             email_communication_enabled, email_module_enabled, email_automation_enabled,
+            reports_advanced_enabled,
             theme_json
      FROM tenants WHERE id = ? AND is_deleted = 0`,
     [id]
@@ -139,6 +141,7 @@ export async function create(payload, createdBy) {
     email_communication_enabled,
     email_module_enabled,
     email_automation_enabled,
+    reports_advanced_enabled,
     theme,
   } = payload;
 
@@ -164,6 +167,7 @@ export async function create(payload, createdBy) {
     email_communication_enabled,
     email_module_enabled,
     email_automation_enabled,
+    reports_advanced_enabled,
   };
   const hasModuleFlags = Object.values(updatePayload).some((v) => v !== undefined);
   if (hasModuleFlags) {
@@ -227,6 +231,7 @@ export async function update(id, payload) {
     email_communication_enabled,
     email_module_enabled,
     email_automation_enabled,
+    reports_advanced_enabled,
     theme,
   } = payload;
 
@@ -286,6 +291,10 @@ export async function update(id, payload) {
   if (email_automation_enabled !== undefined) {
     updates.push('email_automation_enabled = ?');
     params.push(email_automation_enabled ? 1 : 0);
+  }
+  if (reports_advanced_enabled !== undefined) {
+    updates.push('reports_advanced_enabled = ?');
+    params.push(reports_advanced_enabled ? 1 : 0);
   }
 
   if (theme !== undefined) {

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAppSelector } from '../app/hooks';
-import { selectUser } from '../features/auth/authSelectors';
+import { selectUser, selectTenant } from '../features/auth/authSelectors';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -14,8 +14,13 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } fro
 import { PerformanceReportsCharts } from './PerformanceReportsCharts';
 import { PerformanceReportsGuide } from './PerformanceReportsGuide';
 import { taskManagerAPI } from '../services/taskManagerAPI';
-import { reportsHubAPI } from '../services/reportsHubAPI';
 import { ReportsHubOverview } from '../components/reports/ReportsHubOverview';
+import { DateRangePresetControl } from '../components/ui/DateRangePresetControl';
+import {
+  TIME_RANGE_PRESET,
+  computeDashboardInclusiveDates,
+  formatLocalYmd,
+} from '../utils/dateRangePresets';
 import { tenantUsersAPI } from '../services/tenantUsersAPI';
 import { usePermissions } from '../hooks/usePermission';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
@@ -56,15 +61,22 @@ function scoreTier(score) {
 }
 
 export function PerformanceReportsPage() {
-  const now = new Date();
   const user = useAppSelector(selectUser);
+  const tenant = useAppSelector(selectTenant);
   const currentRole = String(user?.role || 'agent').toLowerCase();
   const currentUserId = user?.id != null ? String(user.id) : '';
   const isAgent = currentRole === 'agent';
   const canViewTeam = !isAgent;
-  const [from, setFrom] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`);
-  const [to, setTo] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`);
-  const [month, setMonth] = useState(ym(now));
+  const initialRange = useMemo(
+    () => computeDashboardInclusiveDates(TIME_RANGE_PRESET.ONE_MONTH, '', '', new Date()) || { from: '', to: '' },
+    []
+  );
+  const [from, setFrom] = useState(initialRange.from);
+  const [to, setTo] = useState(initialRange.to);
+  const [month, setMonth] = useState(() => (initialRange.from ? initialRange.from.slice(0, 7) : ym(new Date())));
+  const [rangePreset, setRangePreset] = useState(TIME_RANGE_PRESET.ONE_MONTH);
+  const [rangeCustomFrom, setRangeCustomFrom] = useState('');
+  const [rangeCustomTo, setRangeCustomTo] = useState('');
   const [viewMode, setViewMode] = useState(isAgent ? 'self' : 'team');
   const [activeTab, setActiveTab] = useState('overview');
   const [userId, setUserId] = useState('');
@@ -80,14 +92,19 @@ export function PerformanceReportsPage() {
   const [ok, setOk] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
   const [reportSurface, setReportSurface] = useState('hub');
+  /** Only when tenant has advanced reports enabled: 'simple' = KPI hub only; 'advanced' = full hub + performance detail. */
+  const [reportsExperience, setReportsExperience] = useState('simple');
   const [draftFrom, setDraftFrom] = useState(from);
   const [draftTo, setDraftTo] = useState(to);
   const [draftMonth, setDraftMonth] = useState(month);
   const [draftUserId, setDraftUserId] = useState(userId);
   const { canAny } = usePermissions();
-  const { formatDate } = useDateTimeDisplay();
+  const { formatDate, formatMonthYear } = useDateTimeDisplay();
   const canExport = canAny([PERMISSIONS.REPORTS_PERFORMANCE_EXPORT, PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.REPORTS_VIEW]);
   const canManageScore = canAny([PERMISSIONS.TASKS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]);
+  const advancedReportsAllowed = Boolean(tenant?.reportsAdvancedEnabled);
+  const showAdvancedExperience = advancedReportsAllowed && reportsExperience === 'advanced';
+  const hubSimpleMode = !showAdvancedExperience;
 
   const userOptions = useMemo(
     () => [{ value: '', label: 'All agents' }, ...users.map((u) => ({ value: String(u.id), label: u.name || u.email }))],
@@ -143,30 +160,53 @@ export function PerformanceReportsPage() {
     setTo(draftTo);
     setMonth(draftMonth);
     setUserId(draftUserId);
+    setRangePreset(TIME_RANGE_PRESET.CUSTOM);
+    setRangeCustomFrom(draftFrom);
+    setRangeCustomTo(draftTo);
     setFilterOpen(false);
   }
 
-  async function applyHubPreset(presetId) {
-    setError('');
-    try {
-      const res = await reportsHubAPI.getContext({ preset: presetId, compare: '0' });
-      const p = res?.data?.data?.period;
-      if (p?.from) setFrom(p.from);
-      if (p?.to) setTo(p.to);
-    } catch (e) {
-      setError(e?.response?.data?.error || e?.message || 'Failed to apply range');
+  useEffect(() => {
+    if (rangePreset === TIME_RANGE_PRESET.ALL_TIME) {
+      const toY = formatLocalYmd(new Date());
+      setFrom('2000-01-01');
+      setTo(toY);
+      setMonth(toY.slice(0, 7));
+      return;
     }
-  }
+    if (rangePreset === TIME_RANGE_PRESET.CUSTOM) {
+      const r = computeDashboardInclusiveDates(
+        TIME_RANGE_PRESET.CUSTOM,
+        rangeCustomFrom,
+        rangeCustomTo,
+        new Date()
+      );
+      if (r) {
+        setFrom(r.from);
+        setTo(r.to);
+        setMonth(r.from.slice(0, 7));
+      }
+      return;
+    }
+    const r = computeDashboardInclusiveDates(rangePreset, '', '', new Date());
+    if (r) {
+      setFrom(r.from);
+      setTo(r.to);
+      setMonth(r.from.slice(0, 7));
+    }
+  }, [rangePreset, rangeCustomFrom, rangeCustomTo]);
 
   const filterSummaryLine = useMemo(() => {
-    const parts = [`${from} → ${to}`, `Calendar month ${month}`];
+    const rangeLabel = from && to ? `${formatDate(from)} → ${formatDate(to)}` : '';
+    const monthLabel = month ? `Calendar month ${formatMonthYear(`${month}-01`)}` : '';
+    const parts = [rangeLabel, monthLabel].filter(Boolean);
     if (canViewTeam && viewMode === 'individual' && userId) {
       parts.push(selectedUserLabel);
     } else if (canViewTeam && viewMode === 'team') {
       parts.push('All agents in scope');
     }
     return parts.join(' · ');
-  }, [from, to, month, canViewTeam, viewMode, userId, selectedUserLabel]);
+  }, [from, to, month, canViewTeam, viewMode, userId, selectedUserLabel, formatDate, formatMonthYear]);
 
   async function load() {
     setError('');
@@ -197,9 +237,17 @@ export function PerformanceReportsPage() {
   }
 
   useEffect(() => {
+    if (!showAdvancedExperience || reportSurface !== 'detail') return;
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from, to, month, effectiveUserId]);
+  }, [from, to, month, effectiveUserId, showAdvancedExperience, reportSurface]);
+
+  useEffect(() => {
+    if (!advancedReportsAllowed) {
+      setReportsExperience('simple');
+      setReportSurface('hub');
+    }
+  }, [advancedReportsAllowed]);
 
   async function exportCsv() {
     setError('');
@@ -340,13 +388,29 @@ export function PerformanceReportsPage() {
     [summary, trend, calendarHighlights, dialsByHour]
   );
 
+  const pageDescription = useMemo(() => {
+    if (!advancedReportsAllowed) {
+      return isAgent
+        ? 'Core operational KPIs for your workspace (dials, meetings, follow-ups, opportunities, task scores).'
+        : 'Core operational KPIs for your workspace. Ask your platform admin if you need advanced analytics.';
+    }
+    if (reportsExperience === 'simple') {
+      return isAgent
+        ? 'Simple view: key operational KPIs. Switch to Advanced for AI insights and full performance analytics.'
+        : 'Simple view: key operational KPIs. Switch to Advanced for AI insights, coaching views, and exports.';
+    }
+    return isAgent
+      ? 'Personal KPI tracking, trend, consistency, and coaching guidance.'
+      : 'Team and individual KPI tracking with trend, consistency, and coaching guidance.';
+  }, [advancedReportsAllowed, reportsExperience, isAgent]);
+
   return (
     <div className={styles.page}>
       <PageHeader
         title="Performance Reports"
-        description={isAgent ? 'Personal KPI tracking, trend, consistency, and coaching guidance.' : 'Team and individual KPI tracking with trend, consistency, and coaching guidance.'}
+        description={pageDescription}
         actions={
-          canExport ? (
+          canExport && showAdvancedExperience && reportSurface === 'detail' ? (
             <Button type="button" onClick={exportCsv} disabled={loading}>
               Export CSV
             </Button>
@@ -356,32 +420,85 @@ export function PerformanceReportsPage() {
       {error ? <Alert variant="error">{error}</Alert> : null}
       {ok ? <Alert variant="success">{ok}</Alert> : null}
 
-      <div className={styles.viewToggleGroup} style={{ marginBottom: '1rem' }}>
-        <Button
-          variant={reportSurface === 'hub' ? 'primary' : 'secondary'}
-          size="sm"
-          type="button"
-          onClick={() => setReportSurface('hub')}
-        >
-          Operations hub
-        </Button>
-        <Button
-          variant={reportSurface === 'detail' ? 'primary' : 'secondary'}
-          size="sm"
-          type="button"
-          onClick={() => setReportSurface('detail')}
-        >
-          Performance detail
-        </Button>
+      <div className={styles.reportsNav}>
+        {advancedReportsAllowed ? (
+          <div className={styles.reportsNavPrimary}>
+            <Button
+              variant={reportsExperience === 'simple' ? 'primary' : 'secondary'}
+              size="sm"
+              type="button"
+              onClick={() => {
+                setReportsExperience('simple');
+                setReportSurface('hub');
+              }}
+            >
+              Simple reports
+            </Button>
+            <Button
+              variant={reportsExperience === 'advanced' ? 'primary' : 'secondary'}
+              size="sm"
+              type="button"
+              onClick={() => {
+                setReportsExperience('advanced');
+                setReportSurface('hub');
+              }}
+            >
+              Advanced reports
+            </Button>
+          </div>
+        ) : null}
+
+        {showAdvancedExperience ? (
+          <div className={styles.reportsNavNested} role="group" aria-label="Advanced report views">
+            <span className={styles.reportsNavNestedLabel}>Within advanced</span>
+            <div className={styles.reportsNavNestedSeg}>
+              <Button
+                variant={reportSurface === 'hub' ? 'primary' : 'secondary'}
+                size="sm"
+                type="button"
+                onClick={() => setReportSurface('hub')}
+              >
+                Operations hub
+              </Button>
+              <Button
+                variant={reportSurface === 'detail' ? 'primary' : 'secondary'}
+                size="sm"
+                type="button"
+                onClick={() => setReportSurface('detail')}
+              >
+                Performance detail
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
-      {reportSurface === 'hub' ? (
+      <div className={styles.reportDateBar}>
+        <DateRangePresetControl
+          preset={rangePreset}
+          onPresetChange={(v) => setRangePreset(v)}
+          customStart={rangeCustomFrom}
+          customEnd={rangeCustomTo}
+          onCustomStartChange={setRangeCustomFrom}
+          onCustomEndChange={setRangeCustomTo}
+          variant="date"
+          selectLabel="Report range"
+          startLabel="From"
+          endLabel="To"
+          tone="panel"
+        />
+        <p className={styles.reportDateSummary}>
+          Active range: <strong>{formatDate(from)}</strong> → <strong>{formatDate(to)}</strong>
+        </p>
+      </div>
+
+      {(!showAdvancedExperience || reportSurface === 'hub') ? (
         <ReportsHubOverview
           canViewTeam={canViewTeam}
           from={from}
           to={to}
-          onApplyPresetDates={applyHubPreset}
-          onOpenFilters={() => setFilterOpen(true)}
+          simpleMode={hubSimpleMode}
+          advancedAvailableForTenant={advancedReportsAllowed && reportsExperience === 'simple'}
         />
       ) : null}
 

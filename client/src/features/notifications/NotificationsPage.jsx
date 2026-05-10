@@ -15,6 +15,7 @@ const moduleOptions = [
   { value: 'disposition', label: 'Disposition' },
   { value: 'contacts', label: 'Contacts' },
   { value: 'meetings', label: 'Meetings' },
+  { value: 'schedule_hub', label: 'Schedule hub' },
   { value: 'tasks', label: 'Tasks' },
   { value: 'email', label: 'Email' },
 ];
@@ -187,7 +188,7 @@ export function NotificationsPage() {
             <h1 className={styles.heroTitle}>Notifications</h1>
             <p className={styles.heroDesc}>Stay updated with important activities across your workspace.</p>
             <p className={styles.heroMeta}>
-              Alerts across calling, disposition, contacts, meetings, tasks and email. Items older than {RETENTION_DAYS}{' '}
+              Alerts across calling, disposition, contacts, meetings, schedule hub, tasks and email. Items older than {RETENTION_DAYS}{' '}
               days are hidden; dismiss removes an alert from your list.
             </p>
           </div>

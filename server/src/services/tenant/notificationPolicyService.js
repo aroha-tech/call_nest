@@ -17,6 +17,10 @@ const ROLE_BASED_NOTIFICATION_POLICY = {
     meeting_rescheduled: ['admin', 'manager', 'agent'],
     meeting_reminder: ['admin', 'manager', 'agent'],
   },
+  schedule_hub: {
+    follow_up_reminder: ['admin', 'manager', 'agent'],
+    follow_up_overdue: ['admin', 'manager', 'agent'],
+  },
   tasks: {
     task_assigned: ['admin', 'manager', 'agent'],
     task_due_soon: ['admin', 'manager', 'agent'],

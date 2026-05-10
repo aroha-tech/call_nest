@@ -58,6 +58,7 @@ function IconReset() {
 function callbackStatusBadgeVariant(status) {
   if (status === 'completed') return 'success';
   if (status === 'cancelled') return 'danger';
+  if (status === 'missed') return 'danger';
   return 'warning';
 }
 
@@ -319,6 +320,7 @@ export function ScheduleHubPage() {
     () => [
       { value: '', label: 'All callback statuses' },
       { value: 'pending', label: 'Pending' },
+      { value: 'missed', label: 'Missed' },
       { value: 'completed', label: 'Completed' },
       { value: 'cancelled', label: 'Cancelled' },
     ],
@@ -638,7 +640,7 @@ export function ScheduleHubPage() {
                     <TableCell>
                       {(() => {
                         const d = safeDate(r.scheduled_at);
-                        const isOpen = r.status === 'pending';
+                        const isOpen = r.status === 'pending' || r.status === 'missed';
                         const { primary, today: isToday } = computeTimeFlag(d, { isOpen });
                         return (
                           <>

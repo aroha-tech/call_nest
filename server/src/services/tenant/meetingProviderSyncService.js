@@ -65,6 +65,28 @@ function toIsoFromMysqlDatetime(v) {
   return d.toISOString();
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function extractGoogleMeetLink(event) {
+  if (!event) return null;
+  const video =
+    event.hangoutLink ||
+    event.conferenceData?.entryPoints?.find((e) => e.entryPointType === 'video')?.uri ||
+    null;
+  return video || event.htmlLink || null;
+}
+
+async function refreshGoogleEventConferenceLink(oauth2, calendarId, eventId) {
+  const calendar = google.calendar({ version: 'v3', auth: oauth2 });
+  const { data } = await calendar.events.get({
+    calendarId: calendarId || 'primary',
+    eventId,
+  });
+  return extractGoogleMeetLink(data);
+}
+
 function requireNativeProviderForPlatform(platform, provider) {
   const p = String(provider || '').toLowerCase();
   if (platform === 'google_meet' && p !== 'gmail') {
@@ -194,11 +216,17 @@ async function createGoogleEvent(account, meeting) {
     throw buildProviderReconnectError('Google', 'native meeting room creation');
   }
   const event = res?.data || {};
-  const link =
-    event.hangoutLink ||
-    event.conferenceData?.entryPoints?.find((e) => e.entryPointType === 'video')?.uri ||
-    event.htmlLink ||
-    null;
+  let link = extractGoogleMeetLink(event);
+  if (!link && event.id) {
+    for (let i = 0; i < 3 && !link; i += 1) {
+      if (i) await sleep(900);
+      try {
+        link = await refreshGoogleEventConferenceLink(oauth2, 'primary', event.id);
+      } catch {
+        break;
+      }
+    }
+  }
   return {
     provider_event_id: event.id || null,
     provider_calendar_id: 'primary',
@@ -219,28 +247,46 @@ async function updateGoogleEvent(account, meeting) {
     refresh_token: account.refresh_token,
   });
   const calendar = google.calendar({ version: 'v3', auth: oauth2 });
-  const requestId = `cn-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const calId = meeting.provider_calendar_id || 'primary';
+  let existingEvent;
+  try {
+    const got = await calendar.events.get({
+      calendarId: calId,
+      eventId: meeting.provider_event_id,
+    });
+    existingEvent = got.data;
+  } catch (e) {
+    throwGoogleCalendarError(e, 'native meeting room update');
+  }
+  const hasVideo =
+    Boolean(existingEvent?.hangoutLink) ||
+    Boolean(existingEvent?.conferenceData?.entryPoints?.some((e) => e.entryPointType === 'video'));
+
+  const requestBody = {
+    summary: meeting.title,
+    description: meeting.description || undefined,
+    location: meeting.location || undefined,
+    start: { dateTime: toIsoFromMysqlDatetime(meeting.start_at), timeZone: 'UTC' },
+    end: { dateTime: toIsoFromMysqlDatetime(meeting.end_at), timeZone: 'UTC' },
+    attendees: meeting.attendee_email ? [{ email: meeting.attendee_email }] : [],
+  };
+  if (!hasVideo) {
+    requestBody.conferenceData = {
+      createRequest: {
+        requestId: `cn-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        conferenceSolutionKey: { type: 'hangoutsMeet' },
+      },
+    };
+  }
+
   let res;
   try {
     res = await calendar.events.patch({
-      calendarId: meeting.provider_calendar_id || 'primary',
+      calendarId: calId,
       eventId: meeting.provider_event_id,
-      conferenceDataVersion: 1,
+      conferenceDataVersion: hasVideo ? 0 : 1,
       sendUpdates: 'all',
-      requestBody: {
-        summary: meeting.title,
-        description: meeting.description || undefined,
-        location: meeting.location || undefined,
-        start: { dateTime: toIsoFromMysqlDatetime(meeting.start_at), timeZone: 'UTC' },
-        end: { dateTime: toIsoFromMysqlDatetime(meeting.end_at), timeZone: 'UTC' },
-        attendees: meeting.attendee_email ? [{ email: meeting.attendee_email }] : [],
-        conferenceData: {
-          createRequest: {
-            requestId,
-            conferenceSolutionKey: { type: 'hangoutsMeet' },
-          },
-        },
-      },
+      requestBody,
     });
   } catch (e) {
     throwGoogleCalendarError(e, 'native meeting room update');
@@ -249,14 +295,17 @@ async function updateGoogleEvent(account, meeting) {
     throw buildProviderReconnectError('Google', 'native meeting room update');
   }
   const event = res?.data || {};
-  const link =
-    event.hangoutLink ||
-    event.conferenceData?.entryPoints?.find((e) => e.entryPointType === 'video')?.uri ||
-    event.htmlLink ||
-    null;
+  let link = extractGoogleMeetLink(event);
+  if (!link) {
+    try {
+      link = await refreshGoogleEventConferenceLink(oauth2, calId, meeting.provider_event_id);
+    } catch {
+      link = meeting.meeting_link || null;
+    }
+  }
   return {
     provider_event_id: event.id || meeting.provider_event_id,
-    provider_calendar_id: meeting.provider_calendar_id || 'primary',
+    provider_calendar_id: calId,
     meeting_link: link,
   };
 }
@@ -315,10 +364,20 @@ async function createOutlookEvent(account, meeting) {
     err.code = 'PROVIDER_SYNC_FAILED';
     throw err;
   }
+  let meeting_link = data?.onlineMeeting?.joinUrl || data?.webLink || null;
+  if (!meeting_link && data?.id) {
+    await sleep(600);
+    const getRes = await fetch(
+      `https://graph.microsoft.com/v1.0/me/events/${encodeURIComponent(data.id)}?$select=id,webLink,onlineMeeting`,
+      { headers: { Authorization: `Bearer ${account.access_token}` } }
+    );
+    const fresh = await getRes.json();
+    meeting_link = fresh?.onlineMeeting?.joinUrl || fresh?.webLink || null;
+  }
   return {
     provider_event_id: data.id || null,
     provider_calendar_id: 'primary',
-    meeting_link: data?.onlineMeeting?.joinUrl || data?.webLink || null,
+    meeting_link,
   };
 }
 

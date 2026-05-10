@@ -18,6 +18,9 @@ export const meetingsAPI = {
 
   update: (id, data) => axiosInstance.put(`${BASE}/${id}`, data),
 
+  /** Records join_opened_at when a user opens the meeting URL from the app. */
+  recordJoinOpened: (id) => axiosInstance.post(`${BASE}/${id}/join-opened`),
+
   delete: (id) => axiosInstance.delete(`${BASE}/${id}`),
 
   /** @returns {Promise<{ data: { data: object[], placeholder_help: string[] } }>} */
@@ -34,4 +37,14 @@ export const meetingsAPI = {
 
   /** @param {{ template_kind: 'created'|'updated'|'cancelled' }} body */
   resetEmailTemplate: (body) => axiosInstance.post(`${BASE}/email-templates/reset`, body),
+
+  getDefaultEmailSettings: () => axiosInstance.get(`${BASE}/default-email-settings`),
+  putDefaultEmailSettings: (body) => axiosInstance.put(`${BASE}/default-email-settings`, body),
+  sendDefaultSettingsTestEmail: (body) => axiosInstance.post(`${BASE}/default-email-settings/test-email`, body),
+
+  getUserAttendeeEmailTemplates: () => axiosInstance.get(`${BASE}/user-attendee-email-templates`),
+  putUserAttendeeEmailTemplates: (body) => axiosInstance.put(`${BASE}/user-attendee-email-templates`, body),
+  previewUserAttendeeEmailTemplate: (body) => axiosInstance.post(`${BASE}/user-attendee-email-templates/preview`, body),
+  sendUserAttendeeEmailTemplateTestEmail: (body) =>
+    axiosInstance.post(`${BASE}/user-attendee-email-templates/test-email`, body),
 };
