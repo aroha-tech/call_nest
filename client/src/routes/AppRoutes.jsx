@@ -52,6 +52,8 @@ import { BackgroundJobsPage } from '../pages/BackgroundJobsPage';
 import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
 import { TenantCompanySettingsPage } from '../pages/TenantCompanySettingsPage';
 import { DialerWorkspaceSettingsPage } from '../pages/DialerWorkspaceSettingsPage';
+import { DialerPhoneNumbersPage } from '../pages/DialerPhoneNumbersPage';
+import { PlatformDialerPhoneNumbersPage } from '../pages/PlatformDialerPhoneNumbersPage';
 import { CampaignsPage } from '../features/campaigns/CampaignsPage';
 import { CampaignFormPage } from '../features/campaigns/CampaignFormPage';
 import { CampaignOpenPage } from '../features/campaigns/CampaignOpenPage';
@@ -256,6 +258,16 @@ function TenantRoutes() {
           >
             <AppShellLayout>
               <DispositionSettingsPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/workflow/dialer-phones"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+            <AppShellLayout>
+              <DialerPhoneNumbersPage />
             </AppShellLayout>
           </ProtectedRoute>
         }
@@ -1063,6 +1075,16 @@ function PlatformRoutes() {
           <ProtectedRoute>
             <AppShellLayout>
               <DefaultDialingSetsPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/workflow/dialer-phone-inventory"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <PlatformDialerPhoneNumbersPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

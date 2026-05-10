@@ -21,7 +21,7 @@ export function parseDispositionActionsJson(actions) {
  */
 export async function loadDispositionCallApplyMeta(tenantId, dispositionId) {
   const [row] = await query(
-    `SELECT next_action, deal_id, stage_id, actions
+    `SELECT next_action, deal_id, stage_id, actions, is_connected
      FROM dispositions
      WHERE tenant_id = ? AND id = ? AND is_deleted = 0
      LIMIT 1`,
@@ -46,6 +46,7 @@ export async function loadDispositionCallApplyMeta(tenantId, dispositionId) {
 
   return {
     next_action: row.next_action,
+    is_connected: row.is_connected === 1 || row.is_connected === true ? 1 : 0,
     requires_deal_selection,
     legacy_deal_id:
       legacy_deal_id != null && Number.isFinite(legacy_deal_id) ? legacy_deal_id : null,

@@ -183,13 +183,23 @@ function PlatformFlow() {
         <ArrowDown />
       </div>
 
-      <div className={`${styles.row} ${styles.rowSpaced}`}>
-        <Node title="Platform users" hint="Roles across tenants" to="/admin/users" canAccess />
+      <div className={styles.branchRow}>
+        <div className={styles.branchCol}>
+          <Node
+            title="Phone inventory"
+            hint="Exotel lines → allocate to tenants"
+            to="/admin/workflow/dialer-phone-inventory"
+            canAccess
+          />
+        </div>
+        <div className={styles.branchCol}>
+          <Node title="Platform users" hint="Roles across tenants" to="/admin/users" canAccess />
+        </div>
       </div>
 
       <p className={styles.note}>
-        Configure master data and defaults before tenants go live; new workspaces inherit industry defaults
-        when a tenant is created with an industry.
+        Configure master data and defaults before tenants go live; register purchased lines under Phone inventory
+        and allocate them to workspaces. New tenants inherit industry defaults when created with an industry.
       </p>
     </div>
   );
@@ -219,7 +229,7 @@ export function DashboardFlowchart({ variant, compact = false }) {
         </h2>
         <p className={styles.subtitle}>
           {isPlatform
-            ? 'How super-admin areas connect: tenants, master data, and default dialer assets.'
+            ? 'How super-admin areas connect: tenants, master data, default dialer assets, and Exotel phone inventory.'
             : 'How the main areas of your workspace connect — use this map to navigate with context.'}
         </p>
       </header>

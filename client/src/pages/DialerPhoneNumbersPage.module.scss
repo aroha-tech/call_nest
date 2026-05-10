@@ -1,0 +1,72 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1100px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 20px;
+  align-items: flex-end;
+  margin: -4px 0 0;
+}
+
+.filterSelect {
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.meta {
+  margin: -8px 0 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+
+  a {
+    font-weight: 600;
+    color: var(--color-accent-primary, #2563eb);
+    text-decoration: none;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.alert {
+  margin: 0;
+}
+
+.card {
+  padding: 16px 20px;
+  overflow-x: auto;
+}
+
+.muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.mono {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.assignSelect {
+  min-width: 220px;
+  max-width: 280px;
+}
+
+.rowActions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.addForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}

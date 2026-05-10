@@ -53,6 +53,13 @@
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
+.formHint {
+  margin: calc(-1 * #{$space-2}) 0 $space-2;
+  font-size: $font-size-xs;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
 .formSection > * + * {
   margin-top: $space-3;
 }

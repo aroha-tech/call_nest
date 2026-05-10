@@ -3,12 +3,36 @@ import {
   getDefaultTelephonyProviderCode,
   getTelephonyProvider,
 } from './telephony/telephonyProviderRegistry.js';
+import { resolveExotelDisplayNumbers } from './telephonyNumberResolveService.js';
 import * as opportunitiesService from './opportunitiesService.js';
 import { loadDispositionCallApplyMeta } from './dispositionApplyDealHelper.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
 import { createAndDispatchNotification, listUserIdsByRoles } from './notificationService.js';
 
 const CALL_ATTEMPT_IDS_CAP = 5000;
+
+const DB_CALL_STATUS = new Set([
+  'queued',
+  'ringing',
+  'connected',
+  'completed',
+  'failed',
+  'cancelled',
+  'no_answer',
+  'busy',
+]);
+
+/** Normalize provider-reported status for `contact_call_attempts.status` ENUM (post-migration includes no_answer, busy). */
+export function normalizeAttemptStatusForDb(providerCode, rawStatus) {
+  const s = String(rawStatus || '')
+    .trim()
+    .toLowerCase();
+  if (DB_CALL_STATUS.has(s)) return s;
+  if (s === 'in-progress' || s === 'inprogress') return 'ringing';
+  if (s === 'no-answer' || s === 'noanswer') return 'no_answer';
+  if (providerCode === 'dummy') return 'completed';
+  return 'queued';
+}
 
 /** Joins required when WHERE references c, p, u, d (search + column filters). */
 const CALL_ATTEMPTS_STANDARD_JOINS = `
@@ -323,10 +347,22 @@ export async function startCallForContact(
   }
 
   const p = getTelephonyProvider(provider);
-  const providerRes = await p.startOutboundCall({ to, metadata: { tenantId, contactId: cid, userId: user.id } });
+  let callMeta = { tenantId, contactId: cid, userId: user.id };
+  if (p.code === 'exotel') {
+    const r = await resolveExotelDisplayNumbers(tenantId, user.id);
+    callMeta = {
+      ...callMeta,
+      exotelCallerId: r.callerId,
+      exotelAgentLeg: r.agentLeg,
+    };
+  }
+  const providerRes = await p.startOutboundCall({ to, metadata: callMeta });
 
   const startedAt = new Date();
-  const endedAt = new Date(); // dummy provider completes immediately; real providers will update later
+  const isDummy = p.code === 'dummy';
+  const endedAt = isDummy ? new Date() : null;
+  const durationSecIns = isDummy ? 0 : null;
+  const statusDb = normalizeAttemptStatusForDb(p.code, providerRes?.status);
 
   const result = await query(
     `INSERT INTO contact_call_attempts (
@@ -356,12 +392,12 @@ export async function startCallForContact(
       dialerSessionId,
       p.code,
       providerRes?.provider_call_id ?? null,
-      providerRes?.status || 'completed',
+      statusDb,
       0,
       notes ? String(notes).slice(0, 2000) : null,
       startedAt,
       endedAt,
-      0,
+      durationSecIns,
       user.id,
     ]
   );
@@ -375,9 +411,9 @@ export async function startCallForContact(
     contact_phone_id: chosenPhoneId,
     provider: p.code,
     provider_call_id: providerRes?.provider_call_id ?? null,
-    status: providerRes?.status || 'completed',
+    status: statusDb,
     started_at: startedAt.toISOString(),
-    ended_at: endedAt.toISOString(),
+    ended_at: endedAt ? endedAt.toISOString() : null,
   };
 }
 
@@ -504,6 +540,7 @@ export async function listCallAttempts(
         cca.started_at,
         cca.ended_at,
         cca.duration_sec,
+        cca.recording_url,
         cca.created_at,
         c.display_name,
         c.type AS contact_type,
@@ -821,6 +858,7 @@ const CALL_EXPORT_COL_SQL = {
   started_at: 'cca.started_at',
   ended_at: 'cca.ended_at',
   provider: 'cca.provider',
+  recording_url: 'cca.recording_url',
 };
 
 const CALL_EXPORT_HEADERS = {
@@ -839,6 +877,7 @@ const CALL_EXPORT_HEADERS = {
   started_at: 'Started',
   ended_at: 'Ended',
   provider: 'Provider',
+  recording_url: 'Recording URL',
 };
 
 function csvEscapeCallExport(v) {
@@ -1086,27 +1125,33 @@ export async function setAttemptDisposition(
     }
   }
 
+  const applyConnFromDispo = dispForDb && applyMeta ? 1 : 0;
+  const connValFromDispo = dispForDb && applyMeta ? (applyMeta.is_connected ? 1 : 0) : 0;
+
   const updateResult = updateNotesColumn
     ? await query(
         `UPDATE contact_call_attempts
-         SET disposition_id = ?, notes = ${
-           notesVal === null
-             ? '?'
-             : `CASE
-                  WHEN notes IS NULL OR TRIM(notes) = '' THEN ?
-                  ELSE CONCAT(notes, '\n\n', ?)
-                END`
-         }
+         SET disposition_id = ?,
+             is_connected = CASE WHEN ? = 1 THEN ? ELSE is_connected END,
+             notes = ${
+               notesVal === null
+                 ? '?'
+                 : `CASE
+                      WHEN notes IS NULL OR TRIM(notes) = '' THEN ?
+                      ELSE CONCAT(notes, '\n\n', ?)
+                    END`
+             }
          WHERE ${where.join(' AND ')}`,
         notesVal === null
-          ? [dispForDb, null, ...params]
-          : [dispForDb, notesVal, notesVal, ...params]
+          ? [dispForDb, applyConnFromDispo, connValFromDispo, null, ...params]
+          : [dispForDb, applyConnFromDispo, connValFromDispo, notesVal, notesVal, ...params]
       )
     : await query(
         `UPDATE contact_call_attempts
-         SET disposition_id = ?
+         SET disposition_id = ?,
+             is_connected = CASE WHEN ? = 1 THEN ? ELSE is_connected END
          WHERE ${where.join(' AND ')}`,
-        [dispForDb, ...params]
+        [dispForDb, applyConnFromDispo, connValFromDispo, ...params]
       );
 
   const affected = Number(updateResult?.affectedRows ?? 0);

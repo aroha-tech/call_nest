@@ -73,6 +73,8 @@ export function TenantUsersPage() {
     manager_id: '',
     agent_can_delete_leads: false,
     agent_can_delete_contacts: false,
+    telephony_caller_id_e164: '',
+    telephony_agent_leg_e164: '',
   });
   const [actionMessage, setActionMessage] = useState(null);
   const [formErrors, setFormErrors] = useState({});
@@ -193,6 +195,8 @@ export function TenantUsersPage() {
       manager_id: '',
       agent_can_delete_leads: false,
       agent_can_delete_contacts: false,
+      telephony_caller_id_e164: '',
+      telephony_agent_leg_e164: '',
     });
     setFormErrors({});
     setModalOpen(true);
@@ -210,6 +214,8 @@ export function TenantUsersPage() {
       manager_id: row.manager_id != null ? String(row.manager_id) : '',
       agent_can_delete_leads: !!row.agent_can_delete_leads,
       agent_can_delete_contacts: !!row.agent_can_delete_contacts,
+      telephony_caller_id_e164: row.telephony_caller_id_e164 || '',
+      telephony_agent_leg_e164: row.telephony_agent_leg_e164 || '',
     });
     setFormErrors({});
     setModalOpen(true);
@@ -247,6 +253,10 @@ export function TenantUsersPage() {
         payload.agent_can_delete_leads = !!form.agent_can_delete_leads;
         payload.agent_can_delete_contacts = !!form.agent_can_delete_contacts;
       }
+      if (isFullAccess || (isManagerTeamView && effectiveRole === 'agent')) {
+        payload.telephony_caller_id_e164 = form.telephony_caller_id_e164?.trim() || null;
+        payload.telephony_agent_leg_e164 = form.telephony_agent_leg_e164?.trim() || null;
+      }
       const result = await updateMutation.mutate(editing.id, payload);
       if (result.success) {
         setModalOpen(false);
@@ -262,6 +272,12 @@ export function TenantUsersPage() {
         role: isManagerTeamView ? 'agent' : form.role,
         ...(isFullAccess && form.role === 'agent' && form.manager_id
           ? { manager_id: Number(form.manager_id) }
+          : {}),
+        ...(isFullAccess
+          ? {
+              telephony_caller_id_e164: form.telephony_caller_id_e164?.trim() || null,
+              telephony_agent_leg_e164: form.telephony_agent_leg_e164?.trim() || null,
+            }
           : {}),
       });
       if (result.success) {
@@ -553,6 +569,51 @@ export function TenantUsersPage() {
               />
             )}
           </div>
+
+          {editing &&
+          (isFullAccess || (isManagerTeamView && (form.role === 'agent' || editing.role === 'agent'))) ? (
+            <div className={styles.formSection}>
+              <h3 className={styles.formSectionTitle}>Calling numbers (optional)</h3>
+              <p className={styles.formHint}>
+                Optional override ahead of the line assigned in Dialer Workflow → Phone numbers, the shared pool, and
+                server defaults.
+              </p>
+              <Input
+                label="Outbound caller ID override (E.164)"
+                value={form.telephony_caller_id_e164}
+                onChange={(e) => setForm((f) => ({ ...f, telephony_caller_id_e164: e.target.value }))}
+                placeholder="Leave blank to use assignment / pool / default"
+              />
+              <Input
+                label="Agent leg / first dial override (E.164)"
+                value={form.telephony_agent_leg_e164}
+                onChange={(e) => setForm((f) => ({ ...f, telephony_agent_leg_e164: e.target.value }))}
+                placeholder="Leave blank to use assignment / pool / default"
+              />
+            </div>
+          ) : null}
+
+          {!editing && isFullAccess ? (
+            <div className={styles.formSection}>
+              <h3 className={styles.formSectionTitle}>Calling numbers (optional)</h3>
+              <p className={styles.formHint}>
+                Per-user overrides; blank uses the line from Dialer Workflow → Phone numbers, then the pool, then server
+                defaults.
+              </p>
+              <Input
+                label="Outbound caller ID override (E.164)"
+                value={form.telephony_caller_id_e164}
+                onChange={(e) => setForm((f) => ({ ...f, telephony_caller_id_e164: e.target.value }))}
+                placeholder="Leave blank to use assignment / pool / default"
+              />
+              <Input
+                label="Agent leg / first dial override (E.164)"
+                value={form.telephony_agent_leg_e164}
+                onChange={(e) => setForm((f) => ({ ...f, telephony_agent_leg_e164: e.target.value }))}
+                placeholder="Leave blank to use assignment / pool / default"
+              />
+            </div>
+          ) : null}
 
           {editing && (
             <div className={styles.formSection}>

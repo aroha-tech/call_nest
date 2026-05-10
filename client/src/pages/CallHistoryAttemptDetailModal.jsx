@@ -109,6 +109,23 @@ export function CallHistoryAttemptDetailModal({
         <dt className={styles.label}>Duration</dt>
         <dd className={styles.value}>{formatDurationSec(row.duration_sec)}</dd>
 
+        <dt className={styles.label}>Recording</dt>
+        <dd className={styles.value}>
+          {String(row.recording_url || '').trim() ? (
+            <div className={styles.recordingBlock}>
+              <a href={row.recording_url} target="_blank" rel="noopener noreferrer" className={styles.recordingLink}>
+                Open recording (provider)
+              </a>
+              <audio controls className={styles.recordingAudio} preload="none" src={row.recording_url} />
+              <p className={styles.recordingHint}>
+                If playback fails, use the link — Exotel URLs may require cookies or expire.
+              </p>
+            </div>
+          ) : (
+            '—'
+          )}
+        </dd>
+
         <dt className={styles.label}>Started</dt>
         <dd className={styles.value}>{formatWhen?.(row.started_at) ?? '—'}</dd>
 

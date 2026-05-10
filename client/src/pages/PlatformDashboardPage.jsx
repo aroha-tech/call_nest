@@ -47,6 +47,12 @@ const QUICK_LINKS = [
   { to: '/admin/masters/dispo-types', label: 'Dispo types', mat: 'assignment', hint: 'Disposition types' },
   { to: '/admin/workflow/default-dispositions', label: 'Default dispos', mat: 'call', hint: 'Dialer workflow' },
   { to: '/admin/workflow/default-dialing-sets', label: 'Dialing sets', mat: 'tune', hint: 'Dialing config' },
+  {
+    to: '/admin/workflow/dialer-phone-inventory',
+    label: 'Phone inventory',
+    mat: 'call_end',
+    hint: 'Exotel lines → tenants',
+  },
 ];
 
 function ExecutiveKpiCard({ matIcon, matWrapClass, label, value, hint, to, badge, static: isStatic }) {

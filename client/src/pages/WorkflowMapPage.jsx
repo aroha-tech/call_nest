@@ -18,7 +18,7 @@ export function WorkflowMapPage({ variant }) {
           titleIcon="account_tree"
           description={
             isPlatform
-              ? 'How tenants, masters, dialer defaults, and platform users connect.'
+              ? 'How tenants, masters, dialer defaults, Exotel phone inventory, and platform users connect.'
               : 'How leads, contacts, campaigns, dialer, and channels connect in your workspace.'
           }
         />

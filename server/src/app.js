@@ -27,6 +27,7 @@ import campaignTypesMasterRoutes from './routes/superAdmin/campaignTypesMaster.j
 import campaignStatusesMasterRoutes from './routes/superAdmin/campaignStatusesMaster.js';
 import industryFieldDefinitionsRoutes from './routes/superAdmin/industryFieldDefinitions.js';
 import platformBillingRoutes from './routes/superAdmin/billing.js';
+import dialerPhoneNumbersAdminRoutes from './routes/superAdmin/dialerPhoneNumbers.js';
 
 // Tenant routes
 import dialingSetsRoutes from './routes/tenant/dialingSets.js';
@@ -46,6 +47,7 @@ import tenantCompanyRoutes from './routes/tenant/company.js';
 import contactDeletePolicyRoutes from './routes/tenant/contactDeletePolicy.js';
 import dialerPreferencesRoutes from './routes/tenant/dialerPreferences.js';
 import dialerWorkspaceConfigRoutes from './routes/tenant/dialerWorkspaceConfig.js';
+import dialerPhoneNumbersRoutes from './routes/tenant/dialerPhoneNumbers.js';
 import phoneInsightRoutes from './routes/tenant/phoneInsight.js';
 import tenantDashboardRoutes from './routes/tenant/dashboard.js';
 import campaignsRoutes from './routes/tenant/campaigns.js';
@@ -176,6 +178,7 @@ app.use('/api/admin/dashboard', dashboardAdminRoutes);
 app.use('/api/admin/campaign-types', campaignTypesMasterRoutes);
 app.use('/api/admin/campaign-statuses', campaignStatusesMasterRoutes);
 app.use('/api/admin/billing', platformBillingRoutes);
+app.use('/api/admin/dialer-phone-numbers', dialerPhoneNumbersAdminRoutes);
 
 // Tenant routes (tenant users only)
 app.use('/api/tenant/dialing-sets', dialingSetsRoutes);
@@ -190,6 +193,7 @@ app.use('/api/tenant/company', tenantCompanyRoutes);
 app.use('/api/tenant/contact-delete-policy', contactDeletePolicyRoutes);
 app.use('/api/tenant/dialer-preferences', dialerPreferencesRoutes);
 app.use('/api/tenant/dialer-workspace-config', dialerWorkspaceConfigRoutes);
+app.use('/api/tenant/dialer-phone-numbers', dialerPhoneNumbersRoutes);
 app.use('/api/tenant/phone-insight', phoneInsightRoutes);
 app.use('/api/tenant/dashboard', tenantDashboardRoutes);
 app.use('/api/tenant/campaigns', campaignsRoutes);

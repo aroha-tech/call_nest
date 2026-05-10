@@ -69,3 +69,33 @@
   gap: 10px;
   width: 100%;
 }
+
+.recordingBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.recordingLink {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent-primary, #2563eb);
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.recordingAudio {
+  width: 100%;
+  max-width: 420px;
+  height: 36px;
+}
+
+.recordingHint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}

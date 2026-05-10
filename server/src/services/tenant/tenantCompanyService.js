@@ -4,7 +4,8 @@ import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 async function findTenantRow(tenantId) {
   const [row] = await query(
-    `SELECT t.id, t.name, t.slug, t.industry_id, t.created_at, t.updated_at,
+    `SELECT t.id, t.name, t.slug, t.industry_id,
+            t.created_at, t.updated_at,
             i.name AS industry_name,
             i.code AS industry_code
      FROM tenants t
@@ -116,7 +117,6 @@ export async function updateForTenant(tenantId, payload, actingUserId = null) {
     updates.push('industry_id = ?');
     params.push(industry_id === null || industry_id === '' ? null : industry_id);
   }
-
   if (updates.length === 0) {
     return findTenantRow(tid);
   }

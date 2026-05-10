@@ -11,7 +11,7 @@ export const dummyProvider = {
    * @param {{ to: string, from?: string, metadata?: object }} params
    * @returns {Promise<{ provider_call_id: string, status: string }>}
    */
-  async startOutboundCall({ to }) {
+  async startOutboundCall({ to, metadata: _metadata = {} }) {
     if (!to) {
       const err = new Error('Missing destination number');
       err.status = 400;

@@ -1,4 +1,4 @@
-export const CALL_HISTORY_COLUMNS_STORAGE_KEY = 'callnest.callHistory.visibleColumns.v4';
+export const CALL_HISTORY_COLUMNS_STORAGE_KEY = 'callnest.callHistory.visibleColumns.v5';
 
 /**
  * @typedef {{
@@ -28,6 +28,7 @@ export const ALL_CALL_HISTORY_COLUMNS = [
   { id: 'is_connected', label: 'Connectivity', sortKey: 'is_connected', category: 'default' },
   { id: 'disposition', label: 'Disposition', sortKey: 'disposition', category: 'default' },
   { id: 'duration_sec', label: 'Duration', sortKey: 'duration_sec', category: 'extra' },
+  { id: 'recording_url', label: 'Recording', sortKey: null, category: 'extra' },
   { id: 'started_at', label: 'Started', sortKey: 'started_at', category: 'extra' },
   { id: 'ended_at', label: 'Ended', sortKey: 'ended_at', category: 'extra' },
   { id: 'provider', label: 'Provider', sortKey: 'provider', category: 'extra' },
@@ -56,6 +57,7 @@ export function getDefaultVisibleCallHistoryColumnIds(applicable) {
     'status',
     'is_connected',
     'disposition',
+    'recording_url',
     'created_at',
   ];
   return order.filter((id) => ids.has(id));

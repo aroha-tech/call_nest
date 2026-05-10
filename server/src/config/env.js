@@ -165,6 +165,17 @@ export const env = {
     exotelApiToken: process.env.EXOTEL_API_TOKEN || '',
     exotelSubdomain: process.env.EXOTEL_SUBDOMAIN || '',
     exotelCallerId: process.env.EXOTEL_CALLER_ID || '',
+    /**
+     * E.164 number Exotel dials first (agent softphone / SIP DID). Per Exotel Connect API: From is called first, To is the customer.
+     * When unset, legacy behavior is used (may not match Exotel docs — set this for production).
+     */
+    exotelAgentLeg: process.env.EXOTEL_AGENT_LEG || '',
+    /** Full URL for StatusCallback on outbound Connect (defaults to apiBaseUrl + /api/public/telephony/exotel/status). */
+    exotelStatusCallbackUrl: process.env.EXOTEL_STATUS_CALLBACK_URL || '',
+    /** When true (default), outbound Connect requests include Record=true. */
+    exotelRecordCalls: String(process.env.EXOTEL_RECORD_CALLS || 'true').toLowerCase() !== 'false',
+    /** Optional: single | dual (Exotel RecordingChannels). */
+    exotelRecordingChannels: process.env.EXOTEL_RECORDING_CHANNELS || '',
     /** Optional shared token for Exotel webhook verification (x-exotel-token). */
     exotelWebhookToken: process.env.EXOTEL_WEBHOOK_TOKEN || '',
     twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || '',

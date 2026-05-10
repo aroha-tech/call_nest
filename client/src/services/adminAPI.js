@@ -37,6 +37,20 @@ export const tenantsAPI = {
   update: (id, data) => axiosInstance.put(`/api/admin/tenants/${id}`, data),
 };
 
+const PLATFORM_DIALER_PHONES = '/api/admin/dialer-phone-numbers';
+
+export const platformDialerPhoneNumbersAPI = {
+  list: ({ tenant_id, unallocated_only } = {}) => {
+    const params = {};
+    if (tenant_id) params.tenant_id = tenant_id;
+    if (unallocated_only) params.unallocated_only = '1';
+    return axiosInstance.get(PLATFORM_DIALER_PHONES, { params });
+  },
+  create: (body) => axiosInstance.post(PLATFORM_DIALER_PHONES, body),
+  update: (id, body) => axiosInstance.put(`${PLATFORM_DIALER_PHONES}/${id}`, body),
+  remove: (id) => axiosInstance.delete(`${PLATFORM_DIALER_PHONES}/${id}`),
+};
+
 export const usersAPI = {
   getAll: ({
     tenantId,

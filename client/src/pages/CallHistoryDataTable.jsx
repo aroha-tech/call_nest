@@ -112,6 +112,15 @@ function renderCell(col, r, { formatWhen, expandedNoteIds, toggleNoteExpand }) {
     }
     case 'duration_sec':
       return formatDurationSec(r.duration_sec);
+    case 'recording_url': {
+      const u = String(r.recording_url || '').trim();
+      if (!u) return '—';
+      return (
+        <a href={u} target="_blank" rel="noopener noreferrer" className={styles.linkAnchor} onClick={(e) => e.stopPropagation()}>
+          Open recording
+        </a>
+      );
+    }
     case 'started_at':
       return formatWhen?.(r.started_at) ?? '—';
     case 'ended_at':

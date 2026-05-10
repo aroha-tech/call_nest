@@ -2,11 +2,13 @@ import bcrypt from 'bcryptjs';
 import { query } from '../../config/db.js';
 import { registerUser } from '../authService.js';
 import { getRoleByTenantAndName } from '../rbacService.js';
+import { normalizeTelephonyNullable } from '../../utils/telephonyNumberInput.js';
 import { syncContactsManagerForAgent } from './contactsService.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
 const USER_SELECT = `u.id, u.tenant_id, u.email, u.name, u.role, u.role_id, u.manager_id,
             u.agent_can_delete_leads, u.agent_can_delete_contacts,
+            u.telephony_caller_id_e164, u.telephony_agent_leg_e164,
             u.is_enabled, u.created_at, u.last_login_at,
             mgr.name AS manager_name, mgr.email AS manager_email`;
 
@@ -151,7 +153,31 @@ export async function findById(id, tenantId, actingUser) {
 /**
  * Create user in the current tenant.
  */
-export async function create(tenantId, actingUser, { email, password, name, role, manager_id = null }) {
+function assertTelephonyFieldLengths(payload) {
+  for (const key of ['telephony_caller_id_e164', 'telephony_agent_leg_e164']) {
+    if (payload[key] === undefined) continue;
+    const raw = payload[key] === null ? '' : String(payload[key]).trim();
+    if (raw.length > 32) {
+      const err = new Error(`${key.includes('caller') ? 'Caller ID' : 'Agent leg'} is too long (max 32 characters)`);
+      err.status = 400;
+      throw err;
+    }
+  }
+}
+
+export async function create(
+  tenantId,
+  actingUser,
+  {
+    email,
+    password,
+    name,
+    role,
+    manager_id = null,
+    telephony_caller_id_e164,
+    telephony_agent_leg_e164,
+  }
+) {
   if (actingUser?.role === 'manager') {
     const err = new Error('Only an administrator can create users');
     err.status = 403;
@@ -159,6 +185,8 @@ export async function create(tenantId, actingUser, { email, password, name, role
   }
 
   const effectiveManagerId = manager_id;
+
+  assertTelephonyFieldLengths({ telephony_caller_id_e164, telephony_agent_leg_e164 });
 
   const user = await registerUser(email, password, name, tenantId, role);
 
@@ -181,6 +209,21 @@ export async function create(tenantId, actingUser, { email, password, name, role
     }
   }
 
+  const telPatch = [];
+  const telParams = [];
+  if (telephony_caller_id_e164 !== undefined) {
+    telPatch.push('telephony_caller_id_e164 = ?');
+    telParams.push(normalizeTelephonyNullable(telephony_caller_id_e164) ?? null);
+  }
+  if (telephony_agent_leg_e164 !== undefined) {
+    telPatch.push('telephony_agent_leg_e164 = ?');
+    telParams.push(normalizeTelephonyNullable(telephony_agent_leg_e164) ?? null);
+  }
+  if (telPatch.length > 0) {
+    telParams.push(user.id, tenantId);
+    await query(`UPDATE users SET ${telPatch.join(', ')} WHERE id = ? AND tenant_id = ?`, telParams);
+  }
+
   await safeLogTenantActivity(tenantId, actingUser?.id, {
     event_category: 'user',
     event_type: 'user.created',
@@ -199,8 +242,29 @@ export async function update(id, tenantId, actingUser, payload) {
   const existing = await findById(id, tenantId, actingUser);
   if (!existing) return null;
 
-  const { name, role, is_enabled, password, manager_id, agent_can_delete_leads, agent_can_delete_contacts } =
-    payload;
+  const {
+    name,
+    role,
+    is_enabled,
+    password,
+    manager_id,
+    agent_can_delete_leads,
+    agent_can_delete_contacts,
+    telephony_caller_id_e164,
+    telephony_agent_leg_e164,
+  } = payload;
+
+  assertTelephonyFieldLengths({ telephony_caller_id_e164, telephony_agent_leg_e164 });
+
+  if (
+    (telephony_caller_id_e164 !== undefined || telephony_agent_leg_e164 !== undefined) &&
+    actingUser?.role === 'agent' &&
+    Number(id) !== Number(actingUser.id)
+  ) {
+    const err = new Error('You cannot change calling numbers for other users');
+    err.status = 403;
+    throw err;
+  }
 
   if (actingUser?.role === 'manager') {
     if (manager_id !== undefined) {
@@ -298,6 +362,15 @@ export async function update(id, tenantId, actingUser, payload) {
     }
   }
 
+  if (telephony_caller_id_e164 !== undefined) {
+    updates.push('telephony_caller_id_e164 = ?');
+    params.push(normalizeTelephonyNullable(telephony_caller_id_e164) ?? null);
+  }
+  if (telephony_agent_leg_e164 !== undefined) {
+    updates.push('telephony_agent_leg_e164 = ?');
+    params.push(normalizeTelephonyNullable(telephony_agent_leg_e164) ?? null);
+  }
+
   if (updates.length === 0) return existing;
   params.push(id);
   await query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
@@ -310,6 +383,8 @@ export async function update(id, tenantId, actingUser, payload) {
   if (password && String(password).trim()) touched.push('password');
   if (agent_can_delete_leads !== undefined) touched.push('lead delete policy');
   if (agent_can_delete_contacts !== undefined) touched.push('contact delete policy');
+  if (telephony_caller_id_e164 !== undefined) touched.push('caller ID');
+  if (telephony_agent_leg_e164 !== undefined) touched.push('agent leg');
   const summary = `User updated: ${existing.email}${touched.length ? ` (${touched.join(', ')})` : ''}`.slice(0, 500);
   await safeLogTenantActivity(tenantId, actingUser?.id, {
     event_category: 'user',

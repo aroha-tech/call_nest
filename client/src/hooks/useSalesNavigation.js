@@ -43,6 +43,11 @@ const PLATFORM_NAV_ITEMS = [
     children: [
       { key: 'default-dispositions', label: 'Default Dispositions', path: '/admin/workflow/default-dispositions' },
       { key: 'default-dialing-sets', label: 'Default Dialing Sets', path: '/admin/workflow/default-dialing-sets' },
+      {
+        key: 'platform-dialer-phones',
+        label: 'Phone inventory',
+        path: '/admin/workflow/dialer-phone-inventory',
+      },
     ],
   },
 ];
@@ -115,6 +120,12 @@ const TENANT_ADMIN_NAV_ITEMS = [
     children: [
       { key: 'dispositions', label: 'Dispositions', path: '/workflow/dispositions', permission: PERMISSIONS.DISPOSITIONS_MANAGE },
       { key: 'dialing-sets', label: 'Dialing Sets', path: '/workflow/dialing-sets', permission: PERMISSIONS.DISPOSITIONS_MANAGE },
+      {
+        key: 'dialer-phones',
+        label: 'Phone numbers',
+        path: '/workflow/dialer-phones',
+        permission: PERMISSIONS.SETTINGS_MANAGE,
+      },
     ],
   },
   {
@@ -309,6 +320,12 @@ const MANAGER_NAV_ITEMS = [
     children: [
       { key: 'dispositions', label: 'Dispositions', path: '/workflow/dispositions', permission: PERMISSIONS.DISPOSITIONS_MANAGE },
       { key: 'dialing-sets', label: 'Dialing Sets', path: '/workflow/dialing-sets', permission: PERMISSIONS.DISPOSITIONS_MANAGE },
+      {
+        key: 'dialer-phones',
+        label: 'Phone numbers',
+        path: '/workflow/dialer-phones',
+        permission: PERMISSIONS.SETTINGS_MANAGE,
+      },
     ],
   },
   {
