@@ -3,3 +3,6 @@ nginx_file_backup/.env
 .env
 .env.local
 .env.*.local
+
+# Local page content (not tracked)
+page_content/

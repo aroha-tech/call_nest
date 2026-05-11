@@ -1,0 +1,151 @@
+# =========================================================
+# CALLXTIME WEBSITE
+# callxtime.com
+# =========================================================
+
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name callxtime.com www.callxtime.com;
+
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    server_name callxtime.com www.callxtime.com;
+
+    # SSL
+    ssl_certificate /etc/nginx/ssl/cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/key.pem;
+
+    # Security
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+
+    # Website Build
+    root /home/yash/call-nest/website/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+
+# =========================================================
+# CALLXTIME APP
+# app.callxtime.com + tenants
+# =========================================================
+
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name app.callxtime.com *.callxtime.com;
+
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    server_name app.callxtime.com *.callxtime.com;
+
+    # SSL
+    ssl_certificate /etc/nginx/ssl/cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/key.pem;
+
+    # Security
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+
+    # SaaS Frontend Build
+    root /home/yash/call-nest/client/dist;
+    index index.html;
+
+    # API Proxy
+    location /api {
+        proxy_pass http://127.0.0.1:4000;
+
+        proxy_http_version 1.1;
+
+        # IMPORTANT FOR MULTI TENANT
+        proxy_set_header Host $host;
+
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+    # SOCKET.IO
+    location /socket.io/ {
+        proxy_pass http://127.0.0.1:4000;
+
+        proxy_http_version 1.1;
+
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        # IMPORTANT FOR MULTI TENANT
+        proxy_set_header Host $host;
+
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+
+        proxy_read_timeout 86400;
+    }
+
+    # HEALTH CHECK
+    location /health {
+        proxy_pass http://127.0.0.1:4000/health;
+    }
+
+    # REACT SPA
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+
+# =========================================================
+# AROHVA WEBSITE
+# arohva.com
+# =========================================================
+
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name arohva.com www.arohva.com;
+
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    server_name arohva.com www.arohva.com;
+
+    # SSL
+    ssl_certificate /etc/nginx/ssl/cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/key.pem;
+
+    # Security
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+
+    # AROHVA WEBSITE
+    root /home/yash/call-nest/website-arohva/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
