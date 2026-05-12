@@ -32,19 +32,29 @@ export const meetingsAPI = {
    */
   previewEmailTemplate: (body) => axiosInstance.post(`${BASE}/email-templates/preview`, body),
 
+  /**
+   * Meeting modal: owner template + mail settings + resolved preview (matches outbound attendee mail).
+   * @param {{ template_kind: 'created'|'updated'|'cancelled', meeting: object, template_override?: { subject?: string, body_html?: string|null, body_text?: string|null }, include_meeting_details?: boolean }} body
+   */
+  postAttendeeEmailWorkspace: (body) => axiosInstance.post(`${BASE}/attendee-email-workspace`, body),
+
   /** @param {{ templates: { template_kind: string, subject: string, body_html?: string|null, body_text?: string|null }[] }} body */
   putEmailTemplates: (body) => axiosInstance.put(`${BASE}/email-templates`, body),
 
   /** @param {{ template_kind: 'created'|'updated'|'cancelled' }} body */
   resetEmailTemplate: (body) => axiosInstance.post(`${BASE}/email-templates/reset`, body),
 
-  getDefaultEmailSettings: () => axiosInstance.get(`${BASE}/default-email-settings`),
+  /** @param {{ for_user_id?: number|string }} [params] */
+  getDefaultEmailSettings: (params) => axiosInstance.get(`${BASE}/default-email-settings`, { params }),
   putDefaultEmailSettings: (body) => axiosInstance.put(`${BASE}/default-email-settings`, body),
+  /** @param {{ type: 'reminder'|'feedback', to_email: string, email_account_id?: number }} body */
   sendDefaultSettingsTestEmail: (body) => axiosInstance.post(`${BASE}/default-email-settings/test-email`, body),
 
   getUserAttendeeEmailTemplates: () => axiosInstance.get(`${BASE}/user-attendee-email-templates`),
+  /** @param {{ templates: object[], for_user_id?: number|string }} body */
   putUserAttendeeEmailTemplates: (body) => axiosInstance.put(`${BASE}/user-attendee-email-templates`, body),
   previewUserAttendeeEmailTemplate: (body) => axiosInstance.post(`${BASE}/user-attendee-email-templates/preview`, body),
+  /** @param {{ template_kind: 'created'|'updated'|'cancelled', to_email: string, email_account_id?: number }} body */
   sendUserAttendeeEmailTemplateTestEmail: (body) =>
     axiosInstance.post(`${BASE}/user-attendee-email-templates/test-email`, body),
 };

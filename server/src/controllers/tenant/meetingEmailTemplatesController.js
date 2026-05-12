@@ -5,7 +5,7 @@ export async function preview(req, res, next) {
   try {
     const tenantId = req.tenant?.id;
     if (!tenantId) return res.status(400).json({ error: 'Tenant context required' });
-    const { template_kind, meeting, template_override } = req.body || {};
+    const { template_kind, meeting, template_override, include_meeting_details } = req.body || {};
     if (!['created', 'updated', 'cancelled'].includes(template_kind)) {
       return res.status(400).json({ error: 'Invalid or missing template_kind' });
     }
@@ -14,7 +14,8 @@ export async function preview(req, res, next) {
       req.user?.id,
       template_kind,
       meeting || {},
-      template_override || null
+      template_override || null,
+      { include_meeting_details: Boolean(include_meeting_details) }
     );
     res.json({ data });
   } catch (err) {

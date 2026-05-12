@@ -98,8 +98,14 @@ export async function update(req, res, next) {
     const existing = await meetingsService.findById(tenantId, req.params.id);
     if (!existing) return res.status(404).json({ error: 'Meeting not found' });
     await meetingsService.assertMeetingRowVisibleToUser(tenantId, req.user, existing);
-    const row = await meetingsService.update(tenantId, req.user?.id, req.params.id, req.body || {});
-    res.json({ data: row });
+    const result = await meetingsService.update(tenantId, req.user?.id, req.params.id, req.body || {});
+    res.json({
+      data: result.meeting,
+      meta: {
+        attendee_email_notice: result.attendeeEmailNotice,
+        attendee_email_sent: result.attendeeEmailSent,
+      },
+    });
   } catch (err) {
     next(err);
   }

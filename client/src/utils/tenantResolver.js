@@ -2,9 +2,13 @@
 // - Uses subdomains for tenant/platform separation
 // - Never used for security decisions (routing & UI only)
 
-const PLATFORM_ADMIN_HOST = 'admin.arohva.com';
-const MARKETING_HOST = 'www.arohva.com';
+import { getPlatformAdminHost, getTenantAppDomain } from '../config/tenantWorkspaceUrl';
+
 const DEV_TENANT_KEY = 'dev_tenant';
+
+function marketingHost() {
+  return `www.${getTenantAppDomain()}`;
+}
 
 /** Match server domainHelper — ngrok first label is not a tenant slug */
 const TUNNEL_HOST_SUFFIXES = [
@@ -49,9 +53,9 @@ function getDevTenantOverride(hostname) {
 /**
  * Resolve the current subdomain / tenant slug.
  * - localhost → optional dev override (localStorage["dev_tenant"])
- * - admin.arohva.com → "platform"
- * - www.arohva.com → null (marketing)
- * - {tenant}.arohva.com → "{tenant}"
+ * - admin.<apex> (see getPlatformAdminHost) → "platform"
+ * - www.<apex> → null (marketing)
+ * - {tenant}.<apex> → "{tenant}"
  */
 export function getSubdomain() {
   const hostname = getHostname();
@@ -66,11 +70,12 @@ export function getSubdomain() {
     return null;
   }
 
-  if (hostname === PLATFORM_ADMIN_HOST) {
+  const lower = hostname.toLowerCase();
+  if (lower === getPlatformAdminHost()) {
     return 'platform';
   }
 
-  if (hostname === MARKETING_HOST) {
+  if (lower === marketingHost()) {
     return null;
   }
 
@@ -95,7 +100,7 @@ export function isPlatformAdminDomain() {
     return false;
   }
 
-  return hostname === PLATFORM_ADMIN_HOST;
+  return hostname.toLowerCase() === getPlatformAdminHost();
 }
 
 export function isMarketingDomain() {
@@ -106,7 +111,7 @@ export function isMarketingDomain() {
     return false;
   }
 
-  return hostname === MARKETING_HOST;
+  return hostname.toLowerCase() === marketingHost();
 }
 
 export function isTenantDomain() {

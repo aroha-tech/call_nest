@@ -582,7 +582,7 @@ export const SHELL_NAV_ICON_ACCENTS = {
   'contact-tags': '#d946ef',
   integrations: '#6366f1',
   'background-jobs': '#eab308',
-  'meeting-attendee-emails': '#06b6d4',
+  'meetings-mail-settings': '#06b6d4',
   billing: '#22c55e',
   'telephony-billing': '#f59e0b',
   telephony: '#f59e0b',
@@ -647,7 +647,7 @@ const NAV_ICON_MAP = {
   integrations: IconPlug,
   'background-jobs': IconBackgroundTasks,
   blacklist: IconBlacklist,
-  'meeting-attendee-emails': IconMeetingAttendeeEmails,
+  'meetings-mail-settings': IconMeetingAttendeeEmails,
 };
 
 /**

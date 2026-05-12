@@ -36,7 +36,6 @@ import { WhatsAppAccountsPage } from '../features/whatsapp/WhatsAppAccountsPage'
 import { WhatsAppTemplatesPage } from '../features/whatsapp/WhatsAppTemplatesPage';
 import { WhatsAppMessagesPage } from '../features/whatsapp/WhatsAppMessagesPage';
 import { WhatsAppLogsPage } from '../features/whatsapp/WhatsAppLogsPage';
-import { EmailLayout } from '../features/email/EmailLayout';
 import { EmailSentPage } from '../features/email/EmailSentPage';
 import { EmailTemplatesPage } from '../features/email/EmailTemplatesPage';
 import { EmailAccountsPage } from '../features/email/EmailAccountsPage';
@@ -58,7 +57,6 @@ import { CampaignsPage } from '../features/campaigns/CampaignsPage';
 import { CampaignFormPage } from '../features/campaigns/CampaignFormPage';
 import { CampaignOpenPage } from '../features/campaigns/CampaignOpenPage';
 import { DealsPage } from '../pages/DealsPage';
-import { useEmailModuleEnabled } from '../hooks/useEmailModuleEnabled';
 import { ActivitiesPage } from '../pages/ActivitiesPage';
 import { ContactLeadActivityPage } from '../pages/ContactLeadActivityPage';
 import { DialSessionsPage } from '../pages/DialSessionsPage';
@@ -79,16 +77,7 @@ import { PlatformBillingPage } from '../pages/PlatformBillingPage';
 import { PlatformTenantTelephonyPage } from '../pages/PlatformTenantTelephonyPage';
 import { TenantTelephonyPage } from '../pages/TenantTelephonyPage';
 import { TenantDomainHostGate } from './TenantDomainHostGate';
-
-/**
- * Renders children only when email module is enabled for the tenant; otherwise redirects to dashboard.
- */
-function EmailModuleGate({ children }) {
-  const { emailModuleEnabled, loading } = useEmailModuleEnabled();
-  if (loading) return null;
-  if (!emailModuleEnabled) return <Navigate to="/" replace />;
-  return children;
-}
+import { EmailModuleGate } from '../features/email/EmailModuleGate';
 
 /**
  * ProtectedRoute with permission-based access control.
@@ -361,75 +350,67 @@ function TenantRoutes() {
       <Route
         path="/email/sent"
         element={
-          <EmailModuleGate>
-            <ProtectedRoute
-              permissions={[
-                PERMISSIONS.EMAIL_VIEW,
-                PERMISSIONS.SETTINGS_MANAGE,
-                PERMISSIONS.DIAL_EXECUTE,
-              ]}
-            >
-              <AppShellLayout>
-                <EmailLayout>
-                  <EmailSentPage />
-                </EmailLayout>
-              </AppShellLayout>
-            </ProtectedRoute>
-          </EmailModuleGate>
+          <ProtectedRoute
+            permissions={[
+              PERMISSIONS.EMAIL_VIEW,
+              PERMISSIONS.SETTINGS_MANAGE,
+              PERMISSIONS.DIAL_EXECUTE,
+            ]}
+          >
+            <AppShellLayout>
+              <EmailModuleGate>
+                <EmailSentPage />
+              </EmailModuleGate>
+            </AppShellLayout>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/email/meetings"
         element={
-          <EmailModuleGate>
-            <ProtectedRoute permissions={[PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE]}>
-              <AppShellLayout>
-                <EmailLayout>
-                  <Navigate to="/schedule/meetings" replace />
-                </EmailLayout>
-              </AppShellLayout>
-            </ProtectedRoute>
-          </EmailModuleGate>
+          <ProtectedRoute permissions={[PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE]}>
+            <AppShellLayout>
+              <EmailModuleGate>
+                <Navigate to="/schedule/meetings" replace />
+              </EmailModuleGate>
+            </AppShellLayout>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/email/templates"
         element={
-          <EmailModuleGate>
-            <ProtectedRoute
-              permissions={[
-                PERMISSIONS.EMAIL_VIEW,
-                PERMISSIONS.SETTINGS_MANAGE,
-                PERMISSIONS.DIAL_EXECUTE,
-              ]}
-            >
-              <AppShellLayout>
-                <EmailLayout>
-                  <EmailTemplatesPage />
-                </EmailLayout>
-              </AppShellLayout>
-            </ProtectedRoute>
-          </EmailModuleGate>
+          <ProtectedRoute
+            permissions={[
+              PERMISSIONS.EMAIL_VIEW,
+              PERMISSIONS.SETTINGS_MANAGE,
+              PERMISSIONS.DIAL_EXECUTE,
+            ]}
+          >
+            <AppShellLayout>
+              <EmailModuleGate>
+                <EmailTemplatesPage />
+              </EmailModuleGate>
+            </AppShellLayout>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/email/accounts"
         element={
-          <EmailModuleGate>
-            <ProtectedRoute
-              permissions={[
-                PERMISSIONS.EMAIL_TEMPLATES_MANAGE,
-                PERMISSIONS.EMAIL_ACCOUNTS_MANAGE,
-                PERMISSIONS.SETTINGS_MANAGE,
-              ]}
-            >
-              <AppShellLayout>
-                <EmailLayout>
-                  <EmailAccountsPage />
-                </EmailLayout>
-              </AppShellLayout>
-            </ProtectedRoute>
-          </EmailModuleGate>
+          <ProtectedRoute
+            permissions={[
+              PERMISSIONS.EMAIL_TEMPLATES_MANAGE,
+              PERMISSIONS.EMAIL_ACCOUNTS_MANAGE,
+              PERMISSIONS.SETTINGS_MANAGE,
+            ]}
+          >
+            <AppShellLayout>
+              <EmailModuleGate>
+                <EmailAccountsPage />
+              </EmailModuleGate>
+            </AppShellLayout>
+          </ProtectedRoute>
         }
       />
       {/* Legacy path for dispositions (redirect to workflow) */}
@@ -796,7 +777,7 @@ function TenantRoutes() {
         }
       />
       <Route
-        path="/settings/meeting-attendee-emails"
+        path="/settings/meetings-mail-settings"
         element={
           <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
             <AppShellLayout>
@@ -805,6 +786,7 @@ function TenantRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route path="/settings/meeting-attendee-emails" element={<Navigate to="/settings/meetings-mail-settings" replace />} />
       <Route
         path="/settings/background-jobs"
         element={

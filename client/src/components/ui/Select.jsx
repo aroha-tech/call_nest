@@ -14,7 +14,7 @@ function parseLabel(label) {
   return { text: trimmed.slice(0, -1).trimEnd(), hasInlineRequiredMark: true };
 }
 
-function createSelectStyles({ compact = false } = {}) {
+export function createSelectStyles({ compact = false } = {}) {
   const minHeight = compact ? 34 : 40;
   const fontSize = compact ? '12px' : undefined;
 
@@ -36,17 +36,33 @@ function createSelectStyles({ compact = false } = {}) {
           : 'var(--color-input-border-hover)',
       },
     }),
-    menuPortal: (base) => ({ ...base, zIndex: 20000 }),
+    /* Portal wrapper defaults to control width; widen so long option labels (emails) fit */
+    menuPortal: (base) => ({
+      ...base,
+      zIndex: 20000,
+      minWidth: base.width,
+      width: 'max-content',
+      maxWidth: 'calc(100vw - 24px)',
+    }),
     menu: (base) => ({
       ...base,
+      minWidth: '100%',
+      width: 'max-content',
+      maxWidth: '100%',
       backgroundColor: 'var(--color-bg-elevated, #252536)',
       border: '1px solid var(--color-input-border, rgba(255, 255, 255, 0.12))',
       zIndex: 20000,
+    }),
+    menuList: (base) => ({
+      ...base,
+      overflowX: 'hidden',
     }),
     option: (base, state) => ({
       ...base,
       cursor: 'pointer',
       fontSize,
+      whiteSpace: 'normal',
+      overflowWrap: 'anywhere',
       backgroundColor: state.isSelected
         ? 'color-mix(in srgb, var(--color-text-primary) 22%, var(--color-bg-elevated))'
         : state.isFocused

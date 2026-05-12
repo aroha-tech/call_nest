@@ -1,14 +1,7 @@
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.hint {
-  margin: 0;
-  font-size: 13px;
-  color: var(--color-text-muted, #888);
-  line-height: 1.4;
+  gap: 0;
 }
 
 .headerRow {
@@ -18,9 +11,10 @@
   align-items: center;
   font-size: 12px;
   font-weight: 600;
-  opacity: 0.85;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--border-subtle, #333);
+  color: var(--color-text-secondary, #475569);
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--color-border-subtle, rgba(15, 23, 42, 0.1));
 }
 
 .row {
@@ -28,6 +22,7 @@
   grid-template-columns: minmax(140px, 1fr) minmax(120px, 0.9fr) minmax(180px, 2fr) 40px;
   gap: 8px;
   align-items: start;
+  padding-top: 4px;
 }
 
 .colProp,
@@ -42,7 +37,49 @@
 .colAct {
   display: flex;
   justify-content: center;
-  padding-top: 4px;
+  padding-top: 2px;
+}
+
+.removeRuleBtn {
+  appearance: none;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-subtle, rgba(15, 23, 42, 0.12));
+  background: var(--color-input-bg, var(--color-bg-subtle, #fff));
+  color: var(--color-text-muted, #64748b);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+
+  &:hover:not(:disabled) {
+    border-color: var(--color-input-border-hover);
+    color: var(--color-primary-400, #818cf8);
+    background: var(--color-bg-hover);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+.ruleToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 10px;
+  margin-top: 2px;
 }
 
 .valueInput {
@@ -56,44 +93,16 @@
   font-size: 13px;
 }
 
-.multiWrap {
+.tagValueCol {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: var(--color-bg-subtle, #2a2a2a);
+  min-width: 0;
+}
+
+.tagEmptyHint {
+  margin: 0;
   font-size: 12px;
-  max-width: 100%;
-}
-
-.chipX {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  padding: 0 2px;
-  font-size: 14px;
-  line-height: 1;
-  opacity: 0.8;
-}
-
-.chipX:hover {
-  opacity: 1;
-}
-
-/* Layout only — SelectOncePick wraps react-select. */
-.addSelect {
-  width: 100%;
+  color: var(--color-text-muted, #888);
+  line-height: 1.35;
 }

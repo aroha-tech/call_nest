@@ -1,50 +1,47 @@
 import React from 'react';
-import { Select, SelectOncePick } from '../../components/ui/Select';
+import { Select } from '../../components/ui/Select';
+import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown';
 import { Input } from '../../components/ui/Input';
 import { DateTimePickerField } from '../../components/ui/DateTimePickerField';
 import { Button } from '../../components/ui/Button';
 import {
   CAMPAIGN_FILTER_PROPERTIES,
   OPERATOR_LABELS,
+  additionalRule,
   coerceRuleForProperty,
-  defaultRule,
   getEnumOptions,
   getPropertyMeta,
+  isValidEmailForFilter,
   ruleNeedsValue,
 } from './campaignFilterConfig';
 import styles from './CampaignFilterBuilder.module.scss';
 
-function MultiIdPicker({ options, value, onChange, placeholder }) {
-  const arr = Array.isArray(value) ? value : [];
-  const add = (v) => {
-    if (!v || arr.includes(v)) return;
-    onChange([...arr, v]);
-  };
-  const remove = (v) => onChange(arr.filter((x) => x !== v));
+/** Same storage shape as `MultiSelectDropdown` (JSON array string) ↔ rule `value` string[]. */
+function ruleMultiToJson(arr) {
+  const list = Array.isArray(arr) ? arr.map(String).filter((x) => x !== '') : [];
+  return list.length ? JSON.stringify(list) : '';
+}
 
+function jsonToRuleMulti(json) {
+  if (json == null || json === '') return [];
+  try {
+    const p = JSON.parse(json);
+    return Array.isArray(p) ? p.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Contact filter modal uses `MultiSelectDropdown`; reuse it here for identical UX. */
+function FilterRuleMultiSelect({ options, value, onChange, placeholder, disabled }) {
   return (
-    <div className={styles.multiWrap}>
-      <div className={styles.chips}>
-        {arr.map((id) => {
-          const label = options.find((o) => String(o.value) === String(id))?.label || '—';
-          return (
-            <span key={id} className={styles.chip}>
-              {label}
-              <button type="button" className={styles.chipX} onClick={() => remove(id)} aria-label="Remove">
-                ×
-              </button>
-            </span>
-          );
-        })}
-      </div>
-      <SelectOncePick
-        className={styles.addSelect}
-        options={options}
-        excludeValues={arr}
-        onPick={(e) => add(e.target.value)}
-        placeholder={placeholder || 'Add…'}
-      />
-    </div>
+    <MultiSelectDropdown
+      value={ruleMultiToJson(value)}
+      onChange={(json) => onChange(jsonToRuleMulti(json))}
+      options={options}
+      placeholder={placeholder}
+      disabled={disabled}
+    />
   );
 }
 
@@ -68,62 +65,74 @@ function RuleValue({
     if (meta.valueType === 'enum') {
       const opts = getEnumOptions(rule.property);
       return (
-        <MultiIdPicker
+        <FilterRuleMultiSelect
           options={opts}
           value={Array.isArray(rule.value) ? rule.value : []}
           onChange={(v) => onPatch({ value: v })}
-          placeholder="Add value…"
+          placeholder="All record types"
+          disabled={!(opts && opts.length)}
         />
       );
     }
     if (meta.valueType === 'status') {
       return (
-        <MultiIdPicker
+        <FilterRuleMultiSelect
           options={statusOptions}
           value={Array.isArray(rule.value) ? rule.value : []}
           onChange={(v) => onPatch({ value: v })}
-          placeholder="Add status…"
+          placeholder="All statuses"
+          disabled={!(statusOptions && statusOptions.length)}
         />
       );
     }
     if (meta.valueType === 'manager') {
       return (
-        <MultiIdPicker
+        <FilterRuleMultiSelect
           options={managerOptions}
           value={Array.isArray(rule.value) ? rule.value.map(String) : []}
           onChange={(v) => onPatch({ value: v.map((x) => String(x)) })}
-          placeholder="Add manager…"
+          placeholder="All managers"
+          disabled={!(managerOptions && managerOptions.length)}
         />
       );
     }
     if (meta.valueType === 'agent') {
       return (
-        <MultiIdPicker
+        <FilterRuleMultiSelect
           options={agentOptions}
           value={Array.isArray(rule.value) ? rule.value.map(String) : []}
           onChange={(v) => onPatch({ value: v.map((x) => String(x)) })}
-          placeholder="Add agent…"
+          placeholder="All agents"
+          disabled={!(agentOptions && agentOptions.length)}
         />
       );
     }
     if (meta.valueType === 'campaign') {
       return (
-        <MultiIdPicker
+        <FilterRuleMultiSelect
           options={campaignOptions}
           value={Array.isArray(rule.value) ? rule.value.map(String) : []}
           onChange={(v) => onPatch({ value: v.map((x) => String(x)) })}
-          placeholder="Add campaign…"
+          placeholder="All campaigns"
+          disabled={!(campaignOptions && campaignOptions.length)}
         />
       );
     }
     if (meta.valueType === 'contact_tag') {
+      const opts = tagOptions || [];
       return (
-        <MultiIdPicker
-          options={tagOptions || []}
-          value={Array.isArray(rule.value) ? rule.value.map(String) : []}
-          onChange={(v) => onPatch({ value: v.map((x) => String(x)) })}
-          placeholder="Add tag…"
-        />
+        <div className={styles.tagValueCol}>
+          <FilterRuleMultiSelect
+            options={opts}
+            value={Array.isArray(rule.value) ? rule.value.map(String) : []}
+            onChange={(v) => onPatch({ value: v.map((x) => String(x)) })}
+            placeholder={opts.length ? 'Any tags' : 'No tags available'}
+            disabled={!opts.length}
+          />
+          {!opts.length ? (
+            <p className={styles.tagEmptyHint}>Create contact tags first, then refresh this page.</p>
+          ) : null}
+        </div>
       );
     }
   }
@@ -201,12 +210,21 @@ function RuleValue({
     );
   }
 
+  const emailStrict = meta.id === 'email' && (op === 'eq' || op === 'ne');
+  const trimmedVal = String(rule.value || '').trim();
+  const emailError =
+    emailStrict && trimmedVal && !isValidEmailForFilter(trimmedVal)
+      ? 'Enter a valid email address (e.g. name@example.com).'
+      : undefined;
+
   return (
     <Input
       value={rule.value || ''}
       onChange={(e) => onPatch({ value: e.target.value })}
-      placeholder="Value"
+      placeholder={meta.id === 'email' ? 'name@example.com' : 'Value'}
       className={styles.valueInput}
+      type={emailStrict ? 'email' : 'text'}
+      error={emailError}
     />
   );
 }
@@ -233,9 +251,6 @@ export function CampaignFilterBuilder({
 
   return (
     <div className={styles.wrap}>
-      <p className={styles.hint}>
-        All rules apply together (AND). Tag uses &quot;Is any of&quot; to match contacts that have at least one of the selected tags.
-      </p>
       <div className={styles.headerRow}>
         <span className={styles.colProp}>Property</span>
         <span className={styles.colOp}>Operator</span>
@@ -248,28 +263,32 @@ export function CampaignFilterBuilder({
         return (
           <div key={index} className={styles.row}>
             <Select
-              value={rule.property}
-              onChange={(e) => {
-                const next = coerceRuleForProperty(e.target.value, rule);
-                setRow(index, next);
-              }}
-              options={CAMPAIGN_FILTER_PROPERTIES.map((p) => ({ value: p.id, label: p.label }))}
-              className={styles.colProp}
-            />
-            <Select
-              value={rule.op}
-              onChange={(e) => {
-                const op = e.target.value;
-                const base = { ...rule, op };
-                if (op === 'in') {
-                  setRow(index, coerceRuleForProperty(rule.property, base));
-                } else {
-                  setRow(index, coerceRuleForProperty(rule.property, { ...base, value: '' }));
-                }
-              }}
-              options={opOptions}
-              className={styles.colOp}
-            />
+                value={rule.property}
+                onChange={(e) => {
+                  const next = coerceRuleForProperty(e.target.value, rule);
+                  setRow(index, next);
+                }}
+                options={CAMPAIGN_FILTER_PROPERTIES.map((p) => ({
+                  value: p.id,
+                  label: p.label,
+                  isDisabled: p.id !== rule.property && rules.some((r, j) => j !== index && r.property === p.id),
+                }))}
+                className={styles.colProp}
+              />
+              <Select
+                value={rule.op}
+                onChange={(e) => {
+                  const op = e.target.value;
+                  const base = { ...rule, op };
+                  if (op === 'in') {
+                    setRow(index, coerceRuleForProperty(rule.property, base));
+                  } else {
+                    setRow(index, coerceRuleForProperty(rule.property, { ...base, value: '' }));
+                  }
+                }}
+                options={opOptions}
+                className={styles.colOp}
+              />
             <div className={styles.colVal}>
               <RuleValue
                 rule={rule}
@@ -282,27 +301,39 @@ export function CampaignFilterBuilder({
               />
             </div>
             <div className={styles.colAct}>
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="sm"
+                className={styles.removeRuleBtn}
                 title="Remove rule"
+                aria-label="Remove rule"
+                disabled={rules.length <= 1}
                 onClick={() => onChange(rules.filter((_, i) => i !== index))}
               >
-                🗑
-              </Button>
+                <span aria-hidden>×</span>
+              </button>
             </div>
           </div>
         );
       })}
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        onClick={() => onChange([...rules, defaultRule()])}
-      >
-        Add rule
-      </Button>
+      <div className={styles.ruleToolbar}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={!additionalRule(rules)}
+          title={
+            additionalRule(rules)
+              ? 'Add another filter property'
+              : 'Every available property is already used in a rule'
+          }
+          onClick={() => {
+            const next = additionalRule(rules);
+            if (next) onChange([...rules, next]);
+          }}
+        >
+          + Add rule
+        </Button>
+      </div>
     </div>
   );
 }

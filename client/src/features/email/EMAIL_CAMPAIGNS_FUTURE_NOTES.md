@@ -22,8 +22,7 @@ This module is intentionally hidden for now and will be enabled in a future rele
 
 ## To enable later
 
-1. In `client/src/features/email/EmailLayout.jsx`, add back:
-   - `{ to: '/email/campaigns', label: 'Campaigns', icon: '📣' }`
+1. In `client/src/hooks/useSalesNavigation.js`, add a child under the Email group (same pattern as Sent / Templates / Accounts), e.g. path `/email/campaigns` and label **Campaigns**.
 2. In `client/src/routes/AppRoutes.jsx`:
    - import `EmailCampaignsPage`
    - add `/email/campaigns` protected route under `EmailModuleGate`

@@ -1,5 +1,126 @@
 import React from 'react';
 
+/** Send / paper plane for wizard modal header (white on purple tile). */
+export function WizardPaperPlaneIcon({ className }) {
+  return (
+    <svg
+      className={className}
+      width={20}
+      height={20}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+    </svg>
+  );
+}
+
+/** Small rocket (stroke) for buttons and stepper — use currentColor. */
+export function WizardRocketMini({ className }) {
+  const s = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true, className };
+  return (
+    <svg {...s}>
+      <path
+        d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2l.5-.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Hero rocket for Review & Launch card (purple + accent stars). */
+export function WizardLaunchRocketHero({ className }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 64 64"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <circle cx="50" cy="14" r="2.2" fill="#818cf8" />
+      <circle cx="54" cy="22" r="1.6" fill="#c4b5fd" />
+      <circle cx="46" cy="20" r="1.2" fill="#fb923c" opacity="0.95" />
+      <path
+        d="M14 44c-4 1.2-6.5 4.2-8 8.5-.4 1.2.6 2.5 2 2.5 4.2 0 7.2-2.8 8.5-6.5l-2.5-4.5Z"
+        fill="currentColor"
+        opacity="0.35"
+      />
+      <path
+        d="M32 10c10 5 16 14 18 24-5-2.5-10.5-4-18-4s-13 1.5-18 4c2-10 8-19 18-24Z"
+        fill="currentColor"
+        opacity="0.95"
+      />
+      <path
+        d="M32 10v16M26 20l6 4 6-4"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+        opacity="0.35"
+      />
+    </svg>
+  );
+}
+
+/** Icons for audience source cards (stroke; color via CSS currentColor). */
+export function AudienceSourceIcon({ variant }) {
+  const s = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true };
+  const strokeIc = {
+    stroke: 'currentColor',
+    strokeWidth: 1.65,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+  };
+  if (variant === 'filter') {
+    return (
+      <svg {...s}>
+        <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" {...strokeIc} />
+      </svg>
+    );
+  }
+  if (variant === 'list') {
+    return (
+      <svg {...s}>
+        <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" {...strokeIc} />
+      </svg>
+    );
+  }
+  if (variant === 'import') {
+    return (
+      <svg {...s}>
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" {...strokeIc} />
+      </svg>
+    );
+  }
+  return null;
+}
+
 const ic = {
   stroke: 'currentColor',
   fill: 'none',
@@ -43,10 +164,26 @@ export function WizardStepperGlyph({ id }) {
       return (
         <svg {...s}>
           <path
-            d="M12 2.5c1.5 3 4.5 6.5 4.5 10a4.5 4.5 0 11-9 0c0-3.5 3-7 4.5-10zM12 12.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z"
-            {...ic}
+            d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2l.5-.5"
+            stroke="currentColor"
+            strokeWidth="1.65"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
-          <path d="M12 22v-4M9 20h6" {...ic} />
+          <path
+            d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"
+            stroke="currentColor"
+            strokeWidth="1.65"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"
+            stroke="currentColor"
+            strokeWidth="1.65"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       );
     default:

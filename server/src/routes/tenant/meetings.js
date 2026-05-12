@@ -3,6 +3,7 @@ import * as meetingsController from '../../controllers/tenant/meetingsController
 import * as meetingEmailTemplatesController from '../../controllers/tenant/meetingEmailTemplatesController.js';
 import * as meetingDefaultEmailSettingsController from '../../controllers/tenant/meetingDefaultEmailSettingsController.js';
 import * as meetingUserAttendeeEmailTemplatesController from '../../controllers/tenant/meetingUserAttendeeEmailTemplatesController.js';
+import * as meetingAttendeeEmailWorkspaceController from '../../controllers/tenant/meetingAttendeeEmailWorkspaceController.js';
 import { tenantAuthMiddleware, requirePermission } from '../../middleware/auth.js';
 import { requireEmailModuleEnabled } from '../../middleware/requireEmailModule.js';
 
@@ -26,6 +27,8 @@ router.get('/user-attendee-email-templates', meetingsView, meetingUserAttendeeEm
 router.put('/user-attendee-email-templates', meetingsManage, meetingUserAttendeeEmailTemplatesController.updateMine);
 router.post('/user-attendee-email-templates/preview', meetingsView, meetingUserAttendeeEmailTemplatesController.previewMine);
 router.post('/user-attendee-email-templates/test-email', meetingsManage, meetingUserAttendeeEmailTemplatesController.sendTestEmail);
+
+router.post('/attendee-email-workspace', meetingsView, meetingAttendeeEmailWorkspaceController.workspace);
 
 router.get('/metrics', meetingsView, meetingsController.metrics);
 router.get('/', meetingsView, meetingsController.list);

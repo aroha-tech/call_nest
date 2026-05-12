@@ -103,13 +103,15 @@ export const WizardDecorIcons = {
  * @param {Object} p
  * @param {string} p.title
  * @param {string} [p.hint]
- * @param {'indigo'|'teal'|'violet'|'orange'|'pink'|'emerald'|'blue'} p.tone
- * @param {React.ReactNode} p.icon — SVG from WizardDecorIcons
+ * @param {'indigo'|'teal'|'violet'|'orange'|'pink'|'emerald'|'blue'|'brand'} [p.tone]
+ * @param {React.ReactNode} [p.icon] — SVG from WizardDecorIcons; omit for title-only blocks
  */
-export function CampaignWizardSectionHeader({ title, hint, tone, icon }) {
+export function CampaignWizardSectionHeader({ title, hint, tone = 'brand', icon }) {
   return (
     <div className={styles.wizardBlockHeader}>
-      <div className={`${styles.wizardBadge} ${styles[`wizardBadge_${tone}`]}`.trim()}>{icon}</div>
+      {icon ? (
+        <div className={`${styles.wizardBadge} ${styles[`wizardBadge_${tone}`]}`.trim()}>{icon}</div>
+      ) : null}
       <div className={styles.wizardBlockHeaderText}>
         <h3 className={styles.wizardBlockTitle}>{title}</h3>
         {hint ? <p className={styles.wizardSectionHint}>{hint}</p> : null}

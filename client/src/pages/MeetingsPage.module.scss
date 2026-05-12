@@ -327,6 +327,67 @@
   color: var(--color-text-primary);
 }
 
+.composePreviewSubjectBlock {
+  margin-bottom: 6px;
+}
+
+.meetingPreviewIncludeCheckbox {
+  display: flex;
+  margin: 14px 0 20px;
+}
+
+.composeMessageBlock {
+  margin-top: 2px;
+}
+
+.composeMessageLabelRow {
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.composeMessageHeading {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.previewMeetingEmailModal {
+  min-width: 0;
+}
+
+.previewMeetingPanel {
+  max-height: min(72vh, 560px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.previewMeetingHeadText {
+  min-width: 0;
+  flex: 1;
+}
+
+.previewMeetingTitleRow {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.previewMeetingBodyRegion {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-top: 6px;
+}
+
+.previewMailHeaders {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
 .previewResolvedHtml {
   min-height: 120px;
   padding: 10px 12px;
@@ -337,7 +398,7 @@
   font-size: 13px;
   line-height: 1.45;
   overflow: auto;
-  max-height: 280px;
+  max-height: min(60vh, 480px);
 
   :global(p),
   :global(li),
@@ -637,6 +698,23 @@
 
 .iconField :global(.cn-select__value-container) {
   padding-left: 8px;
+}
+
+.statusWithReminderRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 20px;
+}
+
+.statusWithReminderSelect {
+  flex: 1;
+  min-width: min(100%, 200px);
+}
+
+.statusWithReminderCheck {
+  flex: 0 0 auto;
+  padding-bottom: 10px;
 }
 
 .panelSubtitle {

@@ -49,27 +49,41 @@ export function defaultRule() {
   return { property: 'type', op: 'eq', value: 'lead' };
 }
 
+/** Next rule when adding a row: first unused property, with a blank value (no cross-property carry-over). */
+export function additionalRule(existingRules) {
+  const used = new Set((existingRules || []).map((r) => r?.property).filter(Boolean));
+  const nextProp = CAMPAIGN_FILTER_PROPERTIES.find((p) => !used.has(p.id));
+  if (!nextProp) return null;
+  const [firstOp] = nextProp.operators;
+  return coerceRuleForProperty(nextProp.id, { property: '', op: firstOp, value: undefined });
+}
+
 export function coerceRuleForProperty(propertyId, prev) {
   const meta = getPropertyMeta(propertyId);
+  const switched = !prev?.property || prev.property !== meta.id;
+
   let op = prev?.op;
   if (!meta.operators.includes(op)) {
     [op] = meta.operators;
   }
-  let value = prev?.value;
+
+  const prevVal = switched ? undefined : prev?.value;
+
+  let value;
   if (op === 'in') {
     if (meta.valueType === 'enum') {
-      value = Array.isArray(value) ? value : value ? [value] : ['lead'];
+      value = Array.isArray(prevVal) ? prevVal : prevVal != null && prevVal !== '' ? [prevVal] : [];
     } else if (meta.valueType === 'contact_tag') {
-      value = Array.isArray(value) ? value : value ? [value] : [];
+      value = Array.isArray(prevVal) ? prevVal : prevVal != null && prevVal !== '' ? [prevVal] : [];
     } else {
-      value = Array.isArray(value) ? value : value ? [value] : [];
+      value = Array.isArray(prevVal) ? prevVal : prevVal != null && prevVal !== '' ? [prevVal] : [];
     }
   } else if (meta.valueType === 'datetime') {
-    value = typeof value === 'string' ? value : '';
+    value = typeof prevVal === 'string' ? prevVal : '';
   } else if (meta.valueType === 'contact_tag') {
     value = null;
   } else {
-    value = Array.isArray(value) ? (value[0] != null ? String(value[0]) : '') : value != null ? String(value) : '';
+    value = Array.isArray(prevVal) ? (prevVal[0] != null ? String(prevVal[0]) : '') : prevVal != null ? String(prevVal) : '';
   }
   return { property: meta.id, op, value };
 }
@@ -81,6 +95,13 @@ export function getEnumOptions(propertyId) {
 
 export function ruleNeedsValue(op) {
   return op !== 'is_blank' && op !== 'is_not_blank';
+}
+
+/** Strict enough for filter eq/ne; not full RFC parser. */
+export function isValidEmailForFilter(str) {
+  const s = String(str || '').trim();
+  if (!s) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 }
 
 export function validateRulesForSave(rules) {
@@ -98,6 +119,8 @@ export function validateRulesForSave(rules) {
       if (!String(r.value || '').trim()) return `Row ${i + 1}: date/time is required.`;
     } else if (r.value === undefined || r.value === null || String(r.value).trim() === '') {
       return `Row ${i + 1}: value is required for this operator.`;
+    } else if (r.property === 'email' && (r.op === 'eq' || r.op === 'ne') && !isValidEmailForFilter(r.value)) {
+      return `Row ${i + 1}: enter a valid email address (e.g. name@example.com).`;
     }
   }
   return null;

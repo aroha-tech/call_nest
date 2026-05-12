@@ -4,6 +4,12 @@ import * as meetingEmailContentResolve from '../../services/tenant/meetingEmailC
 import { sendMeetingAttendeeEmailWithTemplate } from '../../services/tenant/meetingNotifyService.js';
 import { query } from '../../config/db.js';
 
+function canManageOtherUsersMeetingEmail(req) {
+  if (req.user?.isPlatformAdmin) return true;
+  const p = req.user?.permissions || [];
+  return p.includes('meetings.manage') || p.includes('settings.manage');
+}
+
 export async function listMine(req, res, next) {
   try {
     const tenantId = req.tenant?.id;
@@ -19,10 +25,21 @@ export async function listMine(req, res, next) {
 export async function updateMine(req, res, next) {
   try {
     const tenantId = req.tenant?.id;
-    const userId = req.user?.id;
-    if (!tenantId || !userId) return res.status(400).json({ error: 'Tenant/user context required' });
-    const { templates } = req.body || {};
-    const data = await userTemplates.updateBatchForUser(tenantId, userId, req.user?.id ?? null, templates);
+    const actorId = req.user?.id;
+    if (!tenantId || !actorId) return res.status(400).json({ error: 'Tenant/user context required' });
+    const body = { ...(req.body || {}) };
+    const rawTarget = body.for_user_id;
+    delete body.for_user_id;
+    const { templates } = body;
+    let targetUserId = Number(actorId);
+    if (rawTarget != null && rawTarget !== '') {
+      const n = Number(rawTarget);
+      if (Number.isFinite(n) && n > 0) targetUserId = n;
+    }
+    if (targetUserId !== Number(actorId) && !canManageOtherUsersMeetingEmail(req)) {
+      return res.status(403).json({ error: 'Permission denied for this user’s templates' });
+    }
+    const data = await userTemplates.updateBatchForUser(tenantId, targetUserId, actorId ?? null, templates);
     return res.json({ data, placeholder_help: meetingEmailTemplatesService.MEETING_TEMPLATE_PLACEHOLDERS });
   } catch (e) {
     return next(e);
@@ -34,7 +51,7 @@ export async function previewMine(req, res, next) {
     const tenantId = req.tenant?.id;
     const userId = req.user?.id;
     if (!tenantId || !userId) return res.status(400).json({ error: 'Tenant/user context required' });
-    const { template_kind, meeting, template_override } = req.body || {};
+    const { template_kind, meeting, template_override, include_meeting_details } = req.body || {};
     if (!['created', 'updated', 'cancelled'].includes(template_kind)) {
       return res.status(400).json({ error: 'Invalid or missing template_kind' });
     }
@@ -47,7 +64,8 @@ export async function previewMine(req, res, next) {
       userId,
       template_kind,
       meeting || {},
-      override
+      override,
+      { include_meeting_details: Boolean(include_meeting_details) }
     );
     return res.json({ data });
   } catch (e) {
@@ -60,7 +78,7 @@ export async function sendTestEmail(req, res, next) {
     const tenantId = req.tenant?.id;
     const userId = req.user?.id;
     if (!tenantId || !userId) return res.status(400).json({ error: 'Tenant/user context required' });
-    const { template_kind, to_email } = req.body || {};
+    const { template_kind, to_email, email_account_id } = req.body || {};
     const kind = String(template_kind || '').trim();
     if (!['created', 'updated', 'cancelled'].includes(kind)) {
       return res.status(400).json({ error: 'Invalid template_kind' });
@@ -68,14 +86,33 @@ export async function sendTestEmail(req, res, next) {
     const to = String(to_email || '').trim();
     if (!to) return res.status(400).json({ error: 'to_email is required' });
 
-    const [account] = await query(
-      `SELECT id, email_address, COALESCE(account_name, email_address) AS account_label
-       FROM email_accounts
-       WHERE tenant_id = ? AND is_deleted = 0 AND (status = 'active' OR status IS NULL)
-       ORDER BY id ASC
-       LIMIT 1`,
-      [Number(tenantId)]
-    );
+    const tid = Number(tenantId);
+    const preferred =
+      email_account_id != null && email_account_id !== ''
+        ? Number(email_account_id)
+        : NaN;
+    let account = null;
+    if (Number.isFinite(preferred) && preferred > 0) {
+      const [row] = await query(
+        `SELECT id, email_address, COALESCE(account_name, email_address) AS account_label
+         FROM email_accounts
+         WHERE tenant_id = ? AND id = ? AND is_deleted = 0 AND (status = 'active' OR status IS NULL)
+         LIMIT 1`,
+        [tid, preferred]
+      );
+      account = row || null;
+    }
+    if (!account?.id) {
+      const [row] = await query(
+        `SELECT id, email_address, COALESCE(account_name, email_address) AS account_label
+         FROM email_accounts
+         WHERE tenant_id = ? AND is_deleted = 0 AND (status = 'active' OR status IS NULL)
+         ORDER BY id ASC
+         LIMIT 1`,
+        [tid]
+      );
+      account = row || null;
+    }
     if (!account?.id) return res.status(400).json({ error: 'No active email account found' });
 
     const meeting = {

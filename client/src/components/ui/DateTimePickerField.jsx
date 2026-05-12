@@ -147,21 +147,15 @@ export function DateTimePickerField({
     const pw = mode === 'datetime' ? 436 : 276;
     const gap = 6;
     const pad = 12;
-    const vh = window.innerHeight;
     const vw = window.innerWidth;
-    const maxPopH = Math.min(520, vh - 24);
 
     let left = r.left;
     if (left + pw > vw - pad) left = vw - pw - pad;
     if (left < pad) left = pad;
 
-    const spaceBelow = vh - r.bottom - gap;
-    const spaceAbove = r.top - gap;
-    let top = r.bottom + gap;
-    if (spaceBelow < Math.min(maxPopH, 260) && spaceAbove > spaceBelow) {
-      top = r.top - maxPopH - gap;
-      if (top < pad) top = pad;
-    }
+    // Always anchor below the trigger; avoid opening upward (overlaps labels/fields above, e.g. in modals).
+    // Vertical overflow is corrected in the layout effect after measure.
+    const top = r.bottom + gap;
 
     setPos({ top, left });
   }, [mode]);

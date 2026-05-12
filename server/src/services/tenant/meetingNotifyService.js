@@ -1,6 +1,8 @@
 import * as sendEmailService from '../email/sendEmailService.js';
 import * as meetingUserAttendeeEmailTemplatesService from './meetingUserAttendeeEmailTemplatesService.js';
+import * as meetingDefaultEmailSettingsService from './meetingDefaultEmailSettingsService.js';
 import * as meetingEmailContentResolve from './meetingEmailContentResolve.js';
+import { buildMeetingDetailsBoxHtml, buildMeetingDetailsBoxText } from './meetingEmailDetailsBox.js';
 import { query } from '../../config/db.js';
 
 function pad2(n) {
@@ -95,74 +97,6 @@ function ensureJoinDetailsInBodyText(bodyText, meeting) {
   return `${text}\n\n${platform}\n${link}\n`;
 }
 
-function parseMeetingInstant(raw) {
-  if (raw == null || raw === '') return null;
-  if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw;
-  const s = String(raw).trim();
-  const d = new Date(s.includes('T') ? s : s.replace(' ', 'T'));
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function formatDateValue(raw) {
-  const d = parseMeetingInstant(raw);
-  if (!d) return String(raw || '').trim() || '—';
-  return d.toLocaleDateString(undefined, { dateStyle: 'medium' });
-}
-
-function formatTimeValue(raw) {
-  const d = parseMeetingInstant(raw);
-  if (!d) return '';
-  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-}
-
-function buildMeetingDetailsBoxHtml(meeting) {
-  const title = String(meeting?.title || '').trim() || 'Meeting';
-  const date = formatDateValue(meeting?.start_at);
-  const startTime = formatTimeValue(meeting?.start_at);
-  const endTime = formatTimeValue(meeting?.end_at);
-  const platform = String(meeting?.meeting_platform || '').trim() || 'Meeting';
-  const link = String(meeting?.meeting_link || '').trim();
-  const timeLine = startTime && endTime ? `${startTime} - ${endTime}` : startTime || endTime || '—';
-  const linkHtml = link
-    ? `<a href="${link}" target="_blank" rel="noopener noreferrer">${link}</a>`
-    : '—';
-  const joinCta = link
-    ? `<p style="margin:14px 0 0;"><a href="${link}" target="_blank" rel="noopener noreferrer" ` +
-      `style="display:inline-block;padding:10px 18px;border-radius:10px;background:#2563eb;color:#ffffff;` +
-      `font-weight:600;font-size:14px;text-decoration:none;">Join meeting</a></p>`
-    : '';
-  return (
-    `<div style="margin-top:16px;padding:14px 16px;border-radius:12px;` +
-    `background:#f5f7ff;border:1px solid #dbe3ff;font-size:13px;line-height:1.45;color:#1f2937;">` +
-    `<p style="margin:0 0 10px;font-weight:700;font-size:13px;color:#111827;">Meeting details</p>` +
-    `<table role="presentation" style="width:100%;border-collapse:collapse;">` +
-    `<tr><td style="padding:3px 0;width:92px;color:#64748b;font-weight:600;">Title</td><td style="padding:3px 0;">${title}</td></tr>` +
-    `<tr><td style="padding:3px 0;width:92px;color:#64748b;font-weight:600;">Date</td><td style="padding:3px 0;">${date || '—'}</td></tr>` +
-    `<tr><td style="padding:3px 0;width:92px;color:#64748b;font-weight:600;">Time</td><td style="padding:3px 0;">${timeLine}</td></tr>` +
-    `<tr><td style="padding:3px 0;width:92px;color:#64748b;font-weight:600;">Platform</td><td style="padding:3px 0;">${platform}</td></tr>` +
-    `<tr><td style="padding:3px 0;width:92px;color:#64748b;font-weight:600;">Link</td><td style="padding:3px 0;">${linkHtml}</td></tr>` +
-    `</table>${joinCta}</div>`
-  );
-}
-
-function buildMeetingDetailsBoxText(meeting) {
-  const title = String(meeting?.title || '').trim() || 'Meeting';
-  const date = formatDateValue(meeting?.start_at);
-  const startTime = formatTimeValue(meeting?.start_at);
-  const endTime = formatTimeValue(meeting?.end_at);
-  const platform = String(meeting?.meeting_platform || '').trim() || 'Meeting';
-  const link = String(meeting?.meeting_link || '').trim();
-  const timeLine = startTime && endTime ? `${startTime} - ${endTime}` : startTime || endTime || '—';
-  return (
-    `\n\nMeeting details\n` +
-    `Title: ${title}\n` +
-    `Date: ${date || '—'}\n` +
-    `Time: ${timeLine}\n` +
-    `Platform: ${platform}\n` +
-    `Link: ${link || '—'}\n`
-  );
-}
-
 async function includeMeetingDetailsEnabled(tenantId, meeting) {
   const ownerUserId =
     Number(meeting?.meeting_owner_user_id || meeting?.assigned_user_id || meeting?.created_by || 0) || null;
@@ -184,8 +118,30 @@ async function includeMeetingDetailsEnabled(tenantId, meeting) {
 }
 
 /**
- * Send invite/update/cancel email to attendee using the meeting's email account
- * and tenant-editable templates.
+ * Build final subject/HTML/text like outbound attendee mail (merge fields, join link hint, optional details box).
+ * @param {{ include_meeting_details?: boolean }} [options] — when `include_meeting_details` is omitted, uses DB flag for meeting owner.
+ */
+export async function buildAttendeeEmailBodies(tenantId, meeting, templateFrom, options = {}) {
+  const resolved = meetingEmailContentResolve.resolveTemplateStrings(templateFrom, meeting);
+  const subject = resolved.subject;
+  let body_text = ensureJoinDetailsInBodyText(resolved.body_text || null, meeting) || null;
+  let body_html = ensureJoinDetailsInBodyHtml(resolved.body_html || null, meeting) || null;
+  let includeDetails;
+  if (Object.prototype.hasOwnProperty.call(options, 'include_meeting_details')) {
+    includeDetails = Boolean(options.include_meeting_details);
+  } else {
+    includeDetails = await includeMeetingDetailsEnabled(tenantId, meeting);
+  }
+  if (includeDetails) {
+    body_html = `${body_html || ''}${buildMeetingDetailsBoxHtml(meeting)}`;
+    body_text = `${body_text || ''}${buildMeetingDetailsBoxText(meeting)}`;
+  }
+  return { subject, body_html, body_text, include_meeting_details: includeDetails };
+}
+
+/**
+ * Send invite/update/cancel email to the meeting's **attendee_email** (To), from **email_account_id** (From),
+ * with optional CC/BCC from the meeting owner's default **Meetings mail settings**.
  * Never throws — logs failures so meeting save still succeeds.
  *
  * @param {number} tenantId
@@ -217,24 +173,14 @@ export async function trySendMeetingAttendeeEmail(tenantId, userId, meeting, kin
       return { sent: false, reason: 'template_missing' };
     }
 
-    const resolved = meetingEmailContentResolve.resolveTemplateStrings(
-      {
-        subject: template.subject,
-        body_html: template.body_html,
-        body_text: template.body_text,
-      },
-      meeting
-    );
-    const subject = resolved.subject;
-    let body_text = ensureJoinDetailsInBodyText(resolved.body_text || null, meeting) || null;
-    let body_html = ensureJoinDetailsInBodyHtml(resolved.body_html || null, meeting) || null;
-    const includeDetails = await includeMeetingDetailsEnabled(tenantId, meeting);
-    if (includeDetails) {
-      const detailsHtml = buildMeetingDetailsBoxHtml(meeting);
-      const detailsText = buildMeetingDetailsBoxText(meeting);
-      body_html = `${body_html || ''}${detailsHtml}`;
-      body_text = `${body_text || ''}${detailsText}`;
-    }
+    const built = await buildAttendeeEmailBodies(tenantId, meeting, {
+      subject: template.subject,
+      body_html: template.body_html,
+      body_text: template.body_text,
+    });
+    const subject = built.subject;
+    const body_text = built.body_text;
+    const body_html = built.body_html;
 
     if (!body_html?.trim() && !body_text?.trim()) {
       return { sent: false, reason: 'empty_template' };
@@ -251,11 +197,25 @@ export async function trySendMeetingAttendeeEmail(tenantId, userId, meeting, kin
         ]
       : [];
 
+    let cc;
+    let bcc;
+    if (ownerUserId) {
+      try {
+        const ownerSettings = await meetingDefaultEmailSettingsService.getOrCreateForUser(tenantId, ownerUserId);
+        cc = String(ownerSettings?.default_cc_email || '').trim() || undefined;
+        bcc = String(ownerSettings?.default_bcc_email || '').trim() || undefined;
+      } catch (_) {
+        /* non-fatal */
+      }
+    }
+
     await sendEmailService.sendEmail(
       tenantId,
       {
         email_account_id: accountId,
         to,
+        cc,
+        bcc,
         subject,
         body_text: body_text || undefined,
         body_html: body_html || undefined,
@@ -286,24 +246,14 @@ export async function sendMeetingAttendeeEmailWithTemplate(tenantId, userId, mee
     err.status = 400;
     throw err;
   }
-  const resolved = meetingEmailContentResolve.resolveTemplateStrings(
-    {
-      subject: templateOverride?.subject || '',
-      body_html: templateOverride?.body_html || null,
-      body_text: templateOverride?.body_text || null,
-    },
-    meeting
-  );
-  const subject = resolved.subject;
-  let body_text = ensureJoinDetailsInBodyText(resolved.body_text || null, meeting) || null;
-  let body_html = ensureJoinDetailsInBodyHtml(resolved.body_html || null, meeting) || null;
-  const includeDetails = await includeMeetingDetailsEnabled(tenantId, meeting);
-  if (includeDetails) {
-    const detailsHtml = buildMeetingDetailsBoxHtml(meeting);
-    const detailsText = buildMeetingDetailsBoxText(meeting);
-    body_html = `${body_html || ''}${detailsHtml}`;
-    body_text = `${body_text || ''}${detailsText}`;
-  }
+  const built = await buildAttendeeEmailBodies(tenantId, meeting, {
+    subject: templateOverride?.subject || '',
+    body_html: templateOverride?.body_html || null,
+    body_text: templateOverride?.body_text || null,
+  });
+  const subject = built.subject;
+  const body_text = built.body_text;
+  const body_html = built.body_html;
   if (!body_html?.trim() && !body_text?.trim()) {
     const err = new Error('Template body is empty');
     err.status = 400;
@@ -319,11 +269,27 @@ export async function sendMeetingAttendeeEmailWithTemplate(tenantId, userId, mee
         },
       ]
     : [];
+
+  const ownerUserId = Number(meeting?.meeting_owner_user_id || meeting?.assigned_user_id || meeting?.created_by || 0) || null;
+  let cc;
+  let bcc;
+  if (ownerUserId) {
+    try {
+      const ownerSettings = await meetingDefaultEmailSettingsService.getOrCreateForUser(tenantId, ownerUserId);
+      cc = String(ownerSettings?.default_cc_email || '').trim() || undefined;
+      bcc = String(ownerSettings?.default_bcc_email || '').trim() || undefined;
+    } catch (_) {
+      /* non-fatal */
+    }
+  }
+
   await sendEmailService.sendEmail(
     tenantId,
     {
       email_account_id: accountId,
       to,
+      cc,
+      bcc,
       subject,
       body_text: body_text || undefined,
       body_html: body_html || undefined,

@@ -1,5 +1,6 @@
 import { query } from '../../config/db.js';
 import * as meetingEmailTemplatesService from './meetingEmailTemplatesService.js';
+import { buildMeetingDetailsBoxHtml, buildMeetingDetailsBoxText } from './meetingEmailDetailsBox.js';
 
 function escapeHtml(s) {
   if (s == null || s === '') return '';
@@ -124,8 +125,16 @@ export function resolveTemplateStrings(template, meeting) {
  * @param {'created'|'updated'|'cancelled'} kind
  * @param {object} meetingPayload - partial meeting from client (datetime strings ok)
  * @param {{ subject?: string, body_html?: string|null, body_text?: string|null }|null} [templateOverride] - unsaved draft; if null, load from DB
+ * @param {{ include_meeting_details?: boolean }} [options] - when true, append the same meeting-details block as outbound mail
  */
-export async function resolveMeetingEmailContent(tenantId, userId, kind, meetingPayload, templateOverride = null) {
+export async function resolveMeetingEmailContent(
+  tenantId,
+  userId,
+  kind,
+  meetingPayload,
+  templateOverride = null,
+  options = {}
+) {
   const meeting = await enrichMeetingPayload(tenantId, meetingPayload || {});
 
   let template;
@@ -159,8 +168,17 @@ export async function resolveMeetingEmailContent(tenantId, userId, kind, meeting
   }
 
   const resolved = resolveTemplateStrings(template, meeting);
+  const includeDetails = Boolean(options?.include_meeting_details);
+  let body_html = resolved.body_html;
+  let body_text = resolved.body_text;
+  if (includeDetails) {
+    body_html = `${body_html || ''}${buildMeetingDetailsBoxHtml(meeting)}`;
+    body_text = `${body_text || ''}${buildMeetingDetailsBoxText(meeting)}`;
+  }
   return {
     template_kind: kind,
-    ...resolved,
+    subject: resolved.subject,
+    body_html,
+    body_text,
   };
 }

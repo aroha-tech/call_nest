@@ -57,12 +57,12 @@ function getReactSelectStyles({ searchable = true } = {}) {
           : 'var(--color-input-border-hover)',
       },
     }),
-    menuPortal: (base) => ({ ...base, zIndex: 11000 }),
+    menuPortal: (base) => ({ ...base, zIndex: 20000 }),
     menu: (base) => ({
       ...base,
       backgroundColor: 'var(--color-bg-elevated, #252536)',
       border: '1px solid var(--color-input-border, rgba(255, 255, 255, 0.12))',
-      zIndex: 11000,
+      zIndex: 20000,
     }),
     option: (base, state) => ({
       ...base,

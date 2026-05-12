@@ -25,6 +25,7 @@ import { TableDataRegion } from '../../components/admin/TableDataRegion';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { Pagination } from '../../components/ui/Pagination';
 import { CampaignFormWizard, STEPS } from './CampaignFormWizard';
+import { WizardPaperPlaneIcon, WizardRocketMini } from './campaignWizardVisuals';
 import {
   buildEmptyCampaignForm,
   buildSettingsPayload,
@@ -50,7 +51,7 @@ export function CampaignFormPage() {
   const navigate = useNavigate();
   const { id: editId } = useParams();
   const isNew = !editId;
-  const { formatDateTime } = useDateTimeDisplay();
+  const { formatDateTime, formatDate } = useDateTimeDisplay();
   const user = useAppSelector(selectUser);
   const role = user?.role ?? 'agent';
   const isAdmin = role === 'admin';
@@ -158,7 +159,13 @@ export function CampaignFormPage() {
       try {
         const res = await callScriptsAPI.getAll({ page: 1, limit: 200, includeInactive: false });
         const rows = res.data?.data ?? [];
-        if (!cancelled) setScriptSelectOptions(rows.map((s) => ({ value: String(s.id), label: s.name || '—' })));
+        if (!cancelled)
+          setScriptSelectOptions(
+            rows.map((s) => ({
+              value: String(s.id),
+              label: (s.script_name || s.name || '').trim() || '—',
+            }))
+          );
       } catch {
         if (!cancelled) setScriptSelectOptions([]);
       }
@@ -219,7 +226,15 @@ export function CampaignFormPage() {
 
   const managerOptions = useMemo(() => {
     return Object.entries(managerMap)
-      .map(([id, label]) => ({ value: id, label }))
+      .map(([id, name]) => {
+        const n = String(name || '').trim();
+        const parts = n.split(/\s+/).filter(Boolean);
+        const initials =
+          parts.length >= 2
+            ? `${(parts[0][0] || '').toUpperCase()}${(parts[1][0] || '').toUpperCase()}`
+            : (parts[0] || '?').slice(0, 2).toUpperCase();
+        return { value: id, label: n, ownerInitials: initials };
+      })
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [managerMap]);
 
@@ -274,7 +289,7 @@ export function CampaignFormPage() {
     if (stepIndex === 0) {
       if (!form.name?.trim()) return 'Campaign name is required';
       if (!form.campaign_type_master_id) return 'Campaign type is required';
-      if (!form.campaign_status_master_id) return 'Campaign status (CRM) is required';
+      if (!form.campaign_status_master_id) return 'Campaign status is required';
       if (form.schedule_mode === 'scheduled' && !String(form.start_date || '').trim()) {
         return 'Start date is required when using a scheduled start';
       }
@@ -440,96 +455,159 @@ export function CampaignFormPage() {
 
   return (
     <div className={`${listStyles.page} ${pageStyles.campaignFormPage}`.trim()}>
-      <PageHeader
-        title={isNew ? 'Create campaign' : 'Edit campaign'}
-        description="Set up your campaign and start reaching your audience."
-        actions={
-          <Button type="button" variant="secondary" onClick={() => navigate('/campaigns')}>
-            ← Back to list
-          </Button>
-        }
-      />
-
-      {loadingCampaign ? (
-        <p className={pageStyles.wizardMuted}>Loading…</p>
-      ) : (
-        <>
-          {formError ? (
-            <Alert variant="error" style={{ marginBottom: 12 }}>
-              {formError}
-            </Alert>
-          ) : null}
-          <CampaignFormWizard
-            step={wizardStep}
-            form={form}
-            setForm={setForm}
-            editing={isNew ? null : { id: editId }}
-            statusOptions={statusOptions}
-            tagOptions={tagOptions}
-            managerOptions={managerOptions}
-            agentOptions={agentOptions}
-            staticCampaignOptions={staticCampaignOptions}
-            campaignTypeSelectOptions={campaignTypeSelectOptions.filter((o) => o.value !== '')}
-            campaignStatusSelectOptions={campaignStatusSelectOptions.filter((o) => o.value !== '')}
-            pipelineOptions={pipelineOptions}
-            timezoneOptions={timezoneOptions}
-            scriptSelectOptions={scriptSelectOptions}
-            onRecalculateAudience={recalculateAudience}
-            audienceEstimateLoading={audienceEstimateLoading}
-            formatDateTime={formatDateTime}
-          />
-
-          <footer className={pageStyles.campaignFormFooter}>
-            <div className={pageStyles.campaignFormFooterInner}>
-              <Button
+      <div className={`${pageStyles.campaignWizardLightRoot} ${pageStyles.campaignWizardPageShell}`.trim()}>
+        <header className={pageStyles.campaignWizardPageHeader}>
+          <div className={pageStyles.campaignWizardPageInner}>
+            <div className={pageStyles.campaignWizardPageHeaderRow}>
+              <div className={pageStyles.campaignWizardCardHeaderIcon}>
+                <WizardPaperPlaneIcon />
+              </div>
+              <div className={pageStyles.campaignWizardCardHeaderText}>
+                <h1 className={pageStyles.campaignWizardCardTitle}>
+                  {isNew ? 'Create Campaign' : 'Edit Campaign'}
+                </h1>
+                <p className={pageStyles.campaignWizardCardSubtitle}>
+                  Setup your campaign and start reaching your audience.
+                </p>
+              </div>
+              <button
                 type="button"
-                variant="secondary"
-                onClick={handleSaveDraft}
-                disabled={createMut.loading || updateMut.loading}
+                className={pageStyles.campaignWizardClose}
+                onClick={() => navigate('/campaigns')}
+                aria-label="Close"
               >
-                Save as draft
-              </Button>
-              <div className={pageStyles.campaignFormFooterRight}>
-                <Button type="button" variant="secondary" onClick={() => navigate('/campaigns')}>
-                  Cancel
-                </Button>
-                {wizardStep === 1 && form.type === 'filter' ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={runPreview}
-                    disabled={previewLoading || createMut.loading || updateMut.loading}
-                  >
-                    {previewLoading ? 'Preview…' : 'Preview leads'}
-                  </Button>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path
+                    d="M18 6L6 18M6 6l12 12"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div className={pageStyles.campaignWizardPageBody}>
+          <div className={pageStyles.campaignWizardPageInner}>
+            {loadingCampaign ? (
+              <p className={pageStyles.wizardMuted}>Loading…</p>
+            ) : (
+              <>
+                {formError ? (
+                  <Alert variant="error" style={{ marginBottom: 12 }}>
+                    {formError}
+                  </Alert>
                 ) : null}
+                <CampaignFormWizard
+                  step={wizardStep}
+                  form={form}
+                  setForm={setForm}
+                  editing={isNew ? null : { id: editId }}
+                  statusOptions={statusOptions}
+                  tagOptions={tagOptions}
+                  managerOptions={managerOptions}
+                  agentOptions={agentOptions}
+                  staticCampaignOptions={staticCampaignOptions}
+                  campaignTypeSelectOptions={campaignTypeSelectOptions.filter((o) => o.value !== '')}
+                  campaignStatusSelectOptions={campaignStatusSelectOptions.filter((o) => o.value !== '')}
+                  pipelineOptions={pipelineOptions}
+                  timezoneOptions={timezoneOptions}
+                  scriptSelectOptions={scriptSelectOptions}
+                  onRecalculateAudience={recalculateAudience}
+                  audienceEstimateLoading={audienceEstimateLoading}
+                  formatDateTime={formatDateTime}
+                  formatDate={formatDate}
+                  launchBusy={createMut.loading || updateMut.loading}
+                  onReviewLaunch={handleLaunchOrSave}
+                />
+              </>
+            )}
+          </div>
+        </div>
+
+        {!loadingCampaign ? (
+          <footer className={pageStyles.campaignFormFooter}>
+            <div className={pageStyles.campaignWizardPageInner}>
+              <div className={pageStyles.campaignFormFooterInner}>
                 {wizardStep > 0 ? (
-                  <Button type="button" variant="secondary" onClick={goWizardBack}>
-                    Back
-                  </Button>
-                ) : null}
-                {wizardStep < STEPS.length - 1 ? (
-                  <Button type="button" onClick={goWizardNext}>
-                    Next: {STEPS[wizardStep + 1]?.label ?? 'Continue'}
-                  </Button>
+                  <div className={pageStyles.campaignFormFooterLeft}>
+                    <Button type="button" variant="secondary" onClick={goWizardBack}>
+                      Back
+                    </Button>
+                  </div>
                 ) : (
-                  <Button
-                    type="button"
-                    onClick={handleLaunchOrSave}
-                    disabled={createMut.loading || updateMut.loading}
-                  >
-                    {createMut.loading || updateMut.loading
-                      ? 'Saving…'
-                      : isNew
-                        ? 'Launch campaign'
-                        : 'Save changes'}
-                  </Button>
+                  <div className={pageStyles.campaignFormFooterLeft}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handleSaveDraft}
+                      disabled={createMut.loading || updateMut.loading}
+                    >
+                      Save as draft
+                    </Button>
+                  </div>
                 )}
+                <div className={pageStyles.campaignFormFooterRight}>
+                  {wizardStep > 0 ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handleSaveDraft}
+                      disabled={createMut.loading || updateMut.loading}
+                    >
+                      Save as draft
+                    </Button>
+                  ) : null}
+                  {wizardStep === 0 ? (
+                    <Button type="button" variant="secondary" onClick={() => navigate('/campaigns')}>
+                      Cancel
+                    </Button>
+                  ) : null}
+                  {wizardStep === 1 && form.type === 'filter' ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={runPreview}
+                      disabled={previewLoading || createMut.loading || updateMut.loading}
+                    >
+                      {previewLoading ? 'Preview…' : 'Preview leads'}
+                    </Button>
+                  ) : null}
+                  {wizardStep < STEPS.length - 1 ? (
+                    <Button type="button" onClick={goWizardNext}>
+                      <span className={pageStyles.footerBtnArrow}>
+                        Next: {STEPS[wizardStep + 1]?.label ?? 'Continue'}
+                        <span className={pageStyles.footerBtnArrowIcon} aria-hidden>
+                          →
+                        </span>
+                      </span>
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      onClick={handleLaunchOrSave}
+                      disabled={createMut.loading || updateMut.loading}
+                    >
+                      <span className={pageStyles.footerLaunchRow}>
+                        {createMut.loading || updateMut.loading ? (
+                          'Saving…'
+                        ) : (
+                          <>
+                            <WizardRocketMini className={pageStyles.footerLaunchRocket} aria-hidden />
+                            Launch Campaign
+                          </>
+                        )}
+                      </span>
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </footer>
-        </>
-      )}
+        ) : null}
+      </div>
 
       <Modal
         isOpen={previewOpen}

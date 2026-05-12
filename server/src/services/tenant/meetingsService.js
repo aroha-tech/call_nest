@@ -33,6 +33,16 @@ function parseDurationMinutes(v, fallback = 30) {
   return Math.floor(n);
 }
 
+/** @returns {0|1} — default on when unspecified (new meetings). */
+function parseSendReminderFlag(v) {
+  if (v === undefined || v === null) return 1;
+  if (v === false || v === 0) return 0;
+  if (v === true || v === 1) return 1;
+  const s = String(v).trim().toLowerCase();
+  if (s === 'false' || s === '0' || s === 'no') return 0;
+  return 1;
+}
+
 function parseMysqlDateTime(raw) {
   if (!raw) return null;
   const d = new Date(String(raw).replace(' ', 'T'));
@@ -174,6 +184,7 @@ export async function listInRange(tenantId, { actingUser = null, email_account_i
       m.provider_event_id,
       m.provider_calendar_id,
       m.attendance_status,
+      m.send_reminder,
       m.join_opened_at,
       m.created_by,
       m.created_at,
@@ -243,6 +254,7 @@ const LIST_SELECT = `
       m.provider_event_id,
       m.provider_calendar_id,
       m.attendance_status,
+      m.send_reminder,
       m.join_opened_at,
       m.created_by,
       m.created_at,
@@ -490,12 +502,14 @@ export async function create(tenantId, userId, payload) {
     throw err;
   }
 
+  const sendReminder = parseSendReminderFlag(payload.send_reminder);
+
   const result = await query(
     `INSERT INTO tenant_meetings
       (tenant_id, contact_id, assigned_user_id, email_account_id, title, description, location, attendee_email,
        start_at, end_at, meeting_status, meeting_platform, meeting_link, meeting_duration_min, meeting_owner_user_id,
-       provider_event_id, provider_calendar_id, attendance_status, created_by, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       provider_event_id, provider_calendar_id, attendance_status, send_reminder, created_by, updated_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
       contact_id,
@@ -515,6 +529,7 @@ export async function create(tenantId, userId, payload) {
       nativeRoom?.provider_event_id || null,
       nativeRoom?.provider_calendar_id || null,
       attendanceRaw,
+      sendReminder,
       userId ?? null,
       userId ?? null,
     ]
@@ -563,10 +578,8 @@ export async function update(tenantId, userId, id, payload) {
     throw err;
   }
 
-  let email_account_id = existing.email_account_id;
-  if (payload.email_account_id !== undefined) {
-    email_account_id = await assertEmailAccount(tenantId, payload.email_account_id);
-  }
+  /** Sender account and CRM link are fixed after creation (calendar + attendee thread consistency). */
+  const email_account_id = existing.email_account_id;
 
   const updates = [];
   const params = [];
@@ -641,11 +654,6 @@ export async function update(tenantId, userId, id, payload) {
     updates.push('meeting_status = ?');
     params.push(s);
   }
-  if (payload.contact_id !== undefined) {
-    const cid = await assertContactOptional(tenantId, payload.contact_id);
-    updates.push('contact_id = ?');
-    params.push(cid);
-  }
   if (payload.assigned_user_id !== undefined) {
     const aid = await assertUserOptional(tenantId, payload.assigned_user_id);
     updates.push('assigned_user_id = ?');
@@ -661,6 +669,10 @@ export async function update(tenantId, userId, id, payload) {
     }
     updates.push('attendance_status = ?');
     params.push(a);
+  }
+  if (payload.send_reminder !== undefined && payload.send_reminder !== null) {
+    updates.push('send_reminder = ?');
+    params.push(parseSendReminderFlag(payload.send_reminder));
   }
   updates.push('email_account_id = ?');
   params.push(email_account_id);
@@ -757,11 +769,21 @@ export async function update(tenantId, userId, id, payload) {
       console.error('deleteNativeMeetingRoom(cancelled):', e?.message || e);
     }
   }
+  const becameCancelled =
+    row?.meeting_status === 'cancelled' && String(existing.meeting_status || '').toLowerCase() !== 'cancelled';
   const meetingDateOrTimeChanged =
     toMillis(existing?.start_at) !== toMillis(row?.start_at) ||
     toMillis(existing?.end_at) !== toMillis(row?.end_at);
-  if (meetingDateOrTimeChanged) {
-    void trySendMeetingAttendeeEmail(tenantId, userId, row, 'updated');
+  let attendeeEmailNotice = null;
+  let attendeeEmailSent = false;
+  if (becameCancelled) {
+    const r = await trySendMeetingAttendeeEmail(tenantId, userId, row, 'cancelled');
+    attendeeEmailNotice = 'cancelled';
+    attendeeEmailSent = Boolean(r?.sent);
+  } else if (meetingDateOrTimeChanged && String(row?.meeting_status || '').toLowerCase() !== 'cancelled') {
+    const r = await trySendMeetingAttendeeEmail(tenantId, userId, row, 'updated');
+    attendeeEmailNotice = 'updated';
+    attendeeEmailSent = Boolean(r?.sent);
   }
   const escalationRecipients = await listUserIdsByRoles(tenantId, ['admin', 'manager']);
   await createAndDispatchNotification(tenantId, userId, {
@@ -777,7 +799,7 @@ export async function update(tenantId, userId, id, payload) {
     ctaPath: '/schedule/meetings',
     eventHash: `meeting:update:${tenantId}:${row?.id}:${row?.updated_at || ''}`,
   });
-  return row;
+  return { meeting: row, attendeeEmailNotice, attendeeEmailSent };
 }
 
 /**

@@ -225,9 +225,9 @@ const TENANT_ADMIN_NAV_ITEMS = [
         permission: PERMISSIONS.SETTINGS_MANAGE,
       },
       {
-        key: 'meeting-attendee-emails',
-        label: 'Meeting attendee emails',
-        path: '/settings/meeting-attendee-emails',
+        key: 'meetings-mail-settings',
+        label: 'Meetings mail settings',
+        path: '/settings/meetings-mail-settings',
         permission: PERMISSIONS.SETTINGS_MANAGE,
       },
       {

@@ -24,6 +24,8 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
     hideVariableMenu = false,
     /** Fixed frame with vertical scroll inside the editor (no drag resize). For dense modals. */
     scrollableLayout = false,
+    /** Shorter fixed frame with compact toolbar (campaign wizard channel step). */
+    denseScrollLayout = false,
   },
   ref
 ) {
@@ -225,10 +227,10 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
     <div
       className={`${styles.editorResizeWrap} ${compact ? styles.editorResizeWrapCompact : ''} ${
         scrollableLayout ? styles.editorResizeWrapScroll : ''
-      }`}
+      } ${scrollableLayout && denseScrollLayout ? styles.editorResizeWrapScrollDense : ''}`.trim()}
     >
       <div className={styles.editorWrap}>
-        <div id={toolbarId} className={`ql-toolbar ql-snow ${styles.toolbar}`}>
+        <div id={toolbarId} className={`ql-toolbar ql-snow ${styles.toolbar} ${scrollableLayout && denseScrollLayout ? styles.toolbarDense : ''}`.trim()}>
           <span className="ql-formats">
             <select className="ql-header" defaultValue="">
               <option value="">Normal</option>

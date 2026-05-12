@@ -30,6 +30,8 @@ const DEFAULTS = {
     'We hope your meeting went well. Please share your feedback:\n{{feedback_link}}\n\nThanks,\n{{company_name}}',
   thank_you_page_url: '',
   include_meeting_details: true,
+  default_cc_email: '',
+  default_bcc_email: '',
 };
 
 function asBool(v, fallback) {
@@ -189,6 +191,8 @@ export async function getOrCreateForUser(tenantId, userId) {
     feedback_body_text: row.feedback_body_text || '',
     thank_you_page_url: row.thank_you_page_url || '',
     include_meeting_details: Boolean(row.include_meeting_details),
+    default_cc_email: row.default_cc_email != null ? String(row.default_cc_email) : '',
+    default_bcc_email: row.default_bcc_email != null ? String(row.default_bcc_email) : '',
   };
 }
 
@@ -210,6 +214,8 @@ export async function updateForUser(tenantId, userId, actingUserId, payload) {
     feedback_body_text: asString(payload?.feedback_body_text, current.feedback_body_text),
     thank_you_page_url: asString(payload?.thank_you_page_url, current.thank_you_page_url).trim(),
     include_meeting_details: asBool(payload?.include_meeting_details, current.include_meeting_details),
+    default_cc_email: asString(payload?.default_cc_email, current.default_cc_email).trim().slice(0, 1000),
+    default_bcc_email: asString(payload?.default_bcc_email, current.default_bcc_email).trim().slice(0, 1000),
   };
   await query(
     `UPDATE tenant_user_meeting_email_settings
@@ -226,6 +232,8 @@ export async function updateForUser(tenantId, userId, actingUserId, payload) {
          feedback_body_text = ?,
          thank_you_page_url = ?,
          include_meeting_details = ?,
+         default_cc_email = ?,
+         default_bcc_email = ?,
          updated_by = ?,
          updated_at = CURRENT_TIMESTAMP
      WHERE tenant_id = ? AND user_id = ? AND deleted_at IS NULL`,
@@ -243,6 +251,8 @@ export async function updateForUser(tenantId, userId, actingUserId, payload) {
       next.feedback_body_text || null,
       next.thank_you_page_url || null,
       next.include_meeting_details ? 1 : 0,
+      next.default_cc_email || null,
+      next.default_bcc_email || null,
       actingUserId ?? null,
       Number(tenantId),
       Number(userId),
@@ -285,6 +295,7 @@ async function listSchedulableMeetings() {
     `SELECT
        m.id, m.tenant_id, m.email_account_id, m.title, m.description, m.location, m.attendee_email,
        m.start_at, m.end_at, m.meeting_status, m.meeting_platform, m.meeting_link,
+       m.send_reminder,
        m.assigned_user_id, m.meeting_owner_user_id, m.created_by,
        c.display_name AS contact_name,
        t.name AS tenant_company_name
@@ -410,7 +421,8 @@ export async function processMeetingReminderAndFeedbackTick() {
     const end = parseDt(m.end_at);
     if (!start || !end) continue;
 
-    if (setting.reminder_enabled && m.meeting_status !== 'cancelled') {
+    const meetingWantsReminder = Number(m.send_reminder) !== 0;
+    if (setting.reminder_enabled && meetingWantsReminder && m.meeting_status !== 'cancelled') {
       for (const offsetMinutes of setting.reminder_offsets_minutes || []) {
         const dueMs = start.getTime() - offsetMinutes * 60_000;
         if (nowMs < dueMs || nowMs - dueMs > 5 * 60_000) continue;
@@ -529,7 +541,7 @@ export async function submitFeedbackByToken(token, payload) {
   return { ok: true, meeting_title: row.title || 'Meeting' };
 }
 
-export async function sendTestEmailForUser(tenantId, userId, type, toEmail) {
+export async function sendTestEmailForUser(tenantId, userId, type, toEmail, emailAccountId = null) {
   const normalizedType = String(type || '').trim().toLowerCase();
   if (!['reminder', 'feedback'].includes(normalizedType)) {
     const err = new Error('Invalid test email type');
@@ -544,14 +556,33 @@ export async function sendTestEmailForUser(tenantId, userId, type, toEmail) {
   }
 
   const setting = await getOrCreateForUser(tenantId, userId);
-  const [account] = await query(
-    `SELECT id
-     FROM email_accounts
-     WHERE tenant_id = ? AND is_deleted = 0 AND (status = 'active' OR status IS NULL)
-     ORDER BY id ASC
-     LIMIT 1`,
-    [Number(tenantId)]
-  );
+  const tid = Number(tenantId);
+  const preferred =
+    emailAccountId != null && emailAccountId !== ''
+      ? Number(emailAccountId)
+      : NaN;
+  let account = null;
+  if (Number.isFinite(preferred) && preferred > 0) {
+    const [row] = await query(
+      `SELECT id
+       FROM email_accounts
+       WHERE tenant_id = ? AND id = ? AND is_deleted = 0 AND (status = 'active' OR status IS NULL)
+       LIMIT 1`,
+      [tid, preferred]
+    );
+    account = row || null;
+  }
+  if (!account?.id) {
+    const [row] = await query(
+      `SELECT id
+       FROM email_accounts
+       WHERE tenant_id = ? AND is_deleted = 0 AND (status = 'active' OR status IS NULL)
+       ORDER BY id ASC
+       LIMIT 1`,
+      [tid]
+    );
+    account = row || null;
+  }
   if (!account?.id) {
     const err = new Error('No active email account found for test email');
     err.status = 400;

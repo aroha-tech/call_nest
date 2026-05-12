@@ -22,13 +22,16 @@ import { Badge } from '../components/ui/Badge';
 import { TableDataRegion } from '../components/admin/TableDataRegion';
 import listStyles from '../components/admin/adminDataList.module.scss';
 import { ScriptBodyEditor } from '../features/callScripts/ScriptBodyEditor';
-import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
+import { InfoHelpIcon, infoHelpHeadingRowClassName } from '../components/ui/InfoHelpIcon';
+import { MaterialSymbol } from '../components/ui/MaterialSymbol';
+import { Checkbox } from '../components/ui/Checkbox';
 import { DateTimePickerField } from '../components/ui/DateTimePickerField';
 import { formatDateTimeLocalInputValue } from '../components/ui/dateTimePickerUtils';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import { useAppSelector } from '../app/hooks';
 import { selectUser } from '../features/auth/authSelectors';
 import styles from './MeetingsPage.module.scss';
+import attendeeMailStyles from './MeetingAttendeeEmailSettingsPage.module.scss';
 
 function UiIcon({ children, className = '' }) {
   return (
@@ -133,8 +136,12 @@ function templateKindForMeetingForm(isEditing, meetingStatus) {
   return isEditing ? 'updated' : 'created';
 }
 
-function meetingPayloadFromForm(form, accounts) {
+function meetingPayloadFromForm(form, accounts, editingMeeting = null) {
   const acc = accounts.find((a) => String(a.id) === String(form.email_account_id));
+  const meetingLink =
+    (editingMeeting && String(editingMeeting.meeting_link || '').trim()) ||
+    (form.meeting_link && String(form.meeting_link).trim()) ||
+    '';
   return {
     title: form.title?.trim() ?? '',
     start_at: localDatetimeToMysql(form.start_at) || '',
@@ -145,8 +152,10 @@ function meetingPayloadFromForm(form, accounts) {
     meeting_platform: form.meeting_platform || 'google_meet',
     meeting_duration_min: form.meeting_duration_min ? Number(form.meeting_duration_min) : null,
     meeting_owner_user_id: form.meeting_owner_user_id ? Number(form.meeting_owner_user_id) : null,
+    assigned_user_id: form.assigned_user_id ? Number(form.assigned_user_id) : null,
     attendee_email: form.attendee_email?.trim() ?? '',
     email_account_id: form.email_account_id ? Number(form.email_account_id) : null,
+    meeting_link: meetingLink || undefined,
     ...(acc
       ? { account_label: acc.account_name || acc.email_address, account_email: acc.email_address }
       : {}),
@@ -157,6 +166,107 @@ function meetingPreviewKindLabel(kind) {
   if (kind === 'created') return 'New meeting';
   if (kind === 'updated') return 'Update';
   return 'Cancelled';
+}
+
+/** Split rendered HTML so meeting details can sit before closing lines (same as Meetings mail settings). */
+function splitPreviewHtmlBeforeClosing(html) {
+  const h = String(html || '');
+  if (!h.trim()) return { before: '', after: '' };
+  const needles = [
+    'We apologize',
+    'Thanks,',
+    'Thank you,',
+    'Best regards',
+    'Kind regards',
+    'Warm regards',
+    'Regards,',
+    'Sincerely',
+    'We hope your meeting',
+    'Please share your feedback',
+  ];
+  let bestCut = -1;
+  for (const n of needles) {
+    let from = 0;
+    while (from < h.length) {
+      const idx = h.indexOf(n, from);
+      if (idx === -1) break;
+      const pOpen = h.lastIndexOf('<p', idx);
+      const cutCandidate = pOpen >= 0 ? pOpen : idx;
+      if (bestCut === -1 || cutCandidate < bestCut) bestCut = cutCandidate;
+      from = idx + n.length;
+    }
+  }
+  if (bestCut >= 0) return { before: h.slice(0, bestCut), after: h.slice(bestCut) };
+  return { before: h, after: '' };
+}
+
+function meetingPreviewEmailSubtitle(kind) {
+  if (kind === 'created') return 'This is how the invitation will look to the attendee.';
+  if (kind === 'updated') return 'This is how the update email will look to the attendee.';
+  return 'This is how the cancellation email will look to the attendee.';
+}
+
+function meetingPreviewHeroIconName(kind) {
+  if (kind === 'created') return 'calendar_add_on';
+  if (kind === 'updated') return 'sync';
+  return 'highlight_off';
+}
+
+function meetingPreviewDetailsToneClass(kind) {
+  if (kind === 'created') return attendeeMailStyles.meetingDetailsAlert_tone_created;
+  if (kind === 'updated') return attendeeMailStyles.meetingDetailsAlert_tone_updated;
+  if (kind === 'cancelled') return attendeeMailStyles.meetingDetailsAlert_tone_cancelled;
+  return attendeeMailStyles.meetingDetailsAlert_tone_created;
+}
+
+function previewMetaCcBccDisplay(raw) {
+  const t = String(raw || '').trim();
+  return t || '—';
+}
+
+function MeetingPreviewCalendarLinksRow() {
+  return (
+    <div className={attendeeMailStyles.calendarRow}>
+      <span className={attendeeMailStyles.calendarLink}>
+        <svg className={attendeeMailStyles.calBrandIcon} viewBox="0 0 24 24" aria-hidden>
+          <path
+            fill="#4285F4"
+            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+          />
+          <path
+            fill="#34A853"
+            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+          />
+          <path
+            fill="#FBBC05"
+            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+          />
+          <path
+            fill="#EA4335"
+            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+          />
+        </svg>
+        Add to Google Calendar
+      </span>
+      <span className={attendeeMailStyles.calendarLink}>
+        <svg className={attendeeMailStyles.calBrandIcon} viewBox="0 0 24 24" aria-hidden>
+          <path fill="#0078D4" d="M7 3h9a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z" />
+          <path fill="#fff" d="M7 7h12v2H7zm0 4h12v2H7zm0 4h8v2H7z" opacity="0.9" />
+        </svg>
+        Add to Outlook
+      </span>
+      <span className={attendeeMailStyles.calendarLink}>
+        <svg className={attendeeMailStyles.calBrandIcon} viewBox="0 0 24 24" aria-hidden>
+          <rect x="3" y="5" width="18" height="16" rx="2" fill="#E11D48" />
+          <path d="M3 10h18" stroke="#fff" strokeWidth="1.5" />
+          <text x="12" y="17.5" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700">
+            31
+          </text>
+        </svg>
+        Add to iCal
+      </span>
+    </div>
+  );
 }
 
 function isProviderReauthError(errorLike) {
@@ -233,6 +343,7 @@ export function MeetingsPage() {
   const [listHasCompletedInitialFetch, setListHasCompletedInitialFetch] = useState(false);
   const [dataVersion, setDataVersion] = useState(0);
   const [error, setError] = useState(null);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -262,6 +373,7 @@ export function MeetingsPage() {
     meeting_platform: 'google_meet',
     meeting_duration_min: '30',
     attendance_status: 'unknown',
+    send_reminder: true,
   });
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -289,6 +401,23 @@ export function MeetingsPage() {
   const [meetingPreviewSubModal, setMeetingPreviewSubModal] = useState(null);
   /** Which resolved modal we are fetching for (for button loading). */
   const [meetingPreviewResolveFor, setMeetingPreviewResolveFor] = useState(null);
+  const [meetingPreviewIncludeDetails, setMeetingPreviewIncludeDetails] = useState(true);
+  const [meetingPreviewOwnerUserId, setMeetingPreviewOwnerUserId] = useState(null);
+  const [meetingPreviewEnvelope, setMeetingPreviewEnvelope] = useState({
+    to: '',
+    fromLine: '',
+    cc: '',
+    bcc: '',
+  });
+  /** Resolved template + merge only (no appended details box) — used like Meetings mail settings stream. */
+  const [meetingPreviewStreamHtml, setMeetingPreviewStreamHtml] = useState('');
+  const [meetingPreviewDetailsCard, setMeetingPreviewDetailsCard] = useState({
+    title: '',
+    date: '',
+    timeLine: '',
+    platform: '',
+    link: '',
+  });
 
   const meetingTemplateHtmlRef = useRef(null);
 
@@ -305,6 +434,20 @@ export function MeetingsPage() {
       },
     ];
   }, [previewPlaceholderHelp]);
+
+  const meetingPreviewStreamParts = useMemo(() => {
+    const full = String(meetingPreviewStreamHtml || '');
+    if (!meetingPreviewIncludeDetails) {
+      return { mode: 'single', single: full, intro: '', closing: '' };
+    }
+    const { before, after } = splitPreviewHtmlBeforeClosing(full);
+    const closingTrim = (after || '').trim();
+    const beforeTrim = (before || '').trim();
+    if (!beforeTrim && closingTrim) {
+      return { mode: 'split', single: '', intro: full, closing: '' };
+    }
+    return { mode: 'split', single: '', intro: before || '', closing: after || '' };
+  }, [meetingPreviewStreamHtml, meetingPreviewIncludeDetails]);
 
   const insertTemplateMergeField = useCallback(
     (fieldKey) => {
@@ -627,6 +770,7 @@ export function MeetingsPage() {
   function openCreate() {
     if (!formAccountOptions.length) return navigate('/email/accounts');
     const first = formAccountOptions[0]?.value || '';
+    setSaveSuccessMessage(null);
     setEditing(null);
     setMeetingFormErrors({});
     setSelectedEntityId('');
@@ -645,6 +789,7 @@ export function MeetingsPage() {
       meeting_platform: 'google_meet',
       meeting_duration_min: '30',
       attendance_status: 'unknown',
+      send_reminder: true,
     });
     setModalOpen(true);
   }
@@ -654,6 +799,7 @@ export function MeetingsPage() {
     if (!formAccountOptions.length) return navigate('/email/accounts');
     const first = formAccountOptions[0]?.value || '';
     const { start_at, end_at } = dayDefaultsForCreate(dayDate);
+    setSaveSuccessMessage(null);
     setEditing(null);
     setMeetingFormErrors({});
     setSelectedEntityId('');
@@ -672,11 +818,13 @@ export function MeetingsPage() {
       meeting_platform: 'google_meet',
       meeting_duration_min: '60',
       attendance_status: 'unknown',
+      send_reminder: true,
     });
     setModalOpen(true);
   }
 
   function openEdit(m) {
+    setSaveSuccessMessage(null);
     setEditing(m);
     setMeetingFormErrors({});
     setSelectedEntityId(m.contact_id != null ? String(m.contact_id) : '');
@@ -695,6 +843,7 @@ export function MeetingsPage() {
       meeting_platform: m.meeting_platform || 'google_meet',
       meeting_duration_min: m.meeting_duration_min != null ? String(m.meeting_duration_min) : '30',
       attendance_status: m.attendance_status || 'unknown',
+      send_reminder: m.send_reminder == null ? true : Number(m.send_reminder) !== 0,
     });
     setModalOpen(true);
   }
@@ -752,6 +901,7 @@ export function MeetingsPage() {
     }
     setSaving(true);
     setError(null);
+    setSaveSuccessMessage(null);
     setProviderReconnectRequired(false);
     try {
       const payload = {
@@ -769,9 +919,31 @@ export function MeetingsPage() {
         contact_id: Number(selectedEntityId),
         assigned_user_id: Number(form.assigned_user_id),
         attendance_status: form.attendance_status || 'unknown',
+        send_reminder: Boolean(form.send_reminder),
       };
       if (editing) {
-        await meetingsAPI.update(editing.id, payload);
+        const res = await meetingsAPI.update(editing.id, payload);
+        const meta = res?.data?.meta;
+        const toEmail = String(form.attendee_email || '').trim() || 'the attendee';
+        if (meta?.attendee_email_notice === 'updated') {
+          if (meta.attendee_email_sent) {
+            setSaveSuccessMessage(
+              `Meeting saved. We sent a schedule update to ${toEmail} because the start or end time changed.`
+            );
+          } else {
+            setSaveSuccessMessage(
+              `Meeting saved. The start or end time changed, but the update email could not be sent to ${toEmail}. Check the address and your connected email account.`
+            );
+          }
+        } else if (meta?.attendee_email_notice === 'cancelled') {
+          if (meta.attendee_email_sent) {
+            setSaveSuccessMessage(`Meeting saved. We sent a cancellation notice to ${toEmail}.`);
+          } else {
+            setSaveSuccessMessage(
+              `Meeting saved. This meeting is cancelled, but the cancellation email could not be sent to ${toEmail}. Check the address and your connected email account.`
+            );
+          }
+        }
       } else {
         await meetingsAPI.create(payload);
       }
@@ -848,14 +1020,14 @@ export function MeetingsPage() {
 
   const activeTemplate = emailTemplates.find((t) => t.template_kind === templateTab);
 
-  async function refreshMeetingPreviewWithDraft(draft) {
+  async function refreshMeetingPreviewWithDraft(draft, includeMeetingDetails) {
     const kind = templateKindForMeetingForm(!!editing, form.meeting_status);
     setMeetingPreviewKind(kind);
     setMeetingPreviewResolving(true);
     setMeetingPreviewError(null);
     try {
-      const meeting = meetingPayloadFromForm(form, accounts);
-      const res = await meetingsAPI.previewEmailTemplate({
+      const meeting = meetingPayloadFromForm(form, accounts, editing);
+      const res = await meetingsAPI.postAttendeeEmailWorkspace({
         template_kind: kind,
         meeting,
         template_override: {
@@ -863,12 +1035,33 @@ export function MeetingsPage() {
           body_html: draft.body_html,
           body_text: draft.body_text,
         },
+        include_meeting_details: Boolean(includeMeetingDetails),
       });
       const d = res?.data?.data;
+      const env = d?.envelope || {};
+      const own = d?.owner_settings || {};
+      const accLabel = String(env.account_label || '').trim();
+      const accEmail = String(env.account_email || '').trim();
+      setMeetingPreviewOwnerUserId(d?.meeting_owner_user_id != null ? Number(d.meeting_owner_user_id) : null);
+      setMeetingPreviewEnvelope({
+        to: String(env.to_email || '').trim() || '—',
+        fromLine: accEmail ? `${accLabel || accEmail} <${accEmail}>` : '—',
+        cc: String(own.default_cc_email || '').trim(),
+        bcc: String(own.default_bcc_email || '').trim(),
+      });
+      const prev = d?.preview;
+      setMeetingPreviewStreamHtml(prev?.body_without_details_html ?? '');
+      setMeetingPreviewDetailsCard({
+        title: String(d?.details_card?.title ?? ''),
+        date: String(d?.details_card?.date ?? ''),
+        timeLine: String(d?.details_card?.timeLine ?? ''),
+        platform: String(d?.details_card?.platform ?? ''),
+        link: String(d?.details_card?.link ?? ''),
+      });
       setMeetingPreviewResolved({
-        subject: d?.subject ?? '',
-        body_html: d?.body_html ?? '',
-        body_text: d?.body_text ?? '',
+        subject: prev?.subject ?? '',
+        body_html: prev?.body_html ?? '',
+        body_text: prev?.body_text ?? '',
       });
       return true;
     } catch (e) {
@@ -882,7 +1075,7 @@ export function MeetingsPage() {
   async function openMeetingPreviewResolvedModal(mode) {
     setMeetingPreviewResolveFor(mode);
     try {
-      const ok = await refreshMeetingPreviewWithDraft(meetingPreviewDraft);
+      const ok = await refreshMeetingPreviewWithDraft(meetingPreviewDraft, meetingPreviewIncludeDetails);
       if (ok) setMeetingPreviewSubModal(mode);
     } finally {
       setMeetingPreviewResolveFor(null);
@@ -902,17 +1095,49 @@ export function MeetingsPage() {
     setMeetingPreviewOpen(true);
     setMeetingPreviewLoading(true);
     try {
-      const res = await meetingsAPI.getEmailTemplates();
-      const rows = res?.data?.data ?? [];
+      const meeting = meetingPayloadFromForm(form, accounts, editing);
+      const res = await meetingsAPI.postAttendeeEmailWorkspace({
+        template_kind: kind,
+        meeting,
+      });
+      const d = res?.data?.data;
       setPreviewPlaceholderHelp(res?.data?.placeholder_help ?? []);
-      const row = rows.find((t) => t.template_kind === kind);
+      const own = d?.owner_settings || {};
+      const includeBool = Object.prototype.hasOwnProperty.call(own, 'include_meeting_details')
+        ? Boolean(own.include_meeting_details)
+        : true;
+      setMeetingPreviewIncludeDetails(includeBool);
+      const tpl = d?.template;
       const draft = {
-        subject: row?.subject ?? '',
-        body_html: row?.body_html ?? '',
-        body_text: row?.body_text ?? '',
+        subject: tpl?.subject ?? '',
+        body_html: tpl?.body_html ?? '',
+        body_text: tpl?.body_text ?? '',
       };
       setMeetingPreviewDraft(draft);
-      await refreshMeetingPreviewWithDraft(draft);
+      const env = d?.envelope || {};
+      const accLabel = String(env.account_label || '').trim();
+      const accEmail = String(env.account_email || '').trim();
+      setMeetingPreviewOwnerUserId(d?.meeting_owner_user_id != null ? Number(d.meeting_owner_user_id) : null);
+      setMeetingPreviewEnvelope({
+        to: String(env.to_email || '').trim() || '—',
+        fromLine: accEmail ? `${accLabel || accEmail} <${accEmail}>` : '—',
+        cc: String(own.default_cc_email || '').trim(),
+        bcc: String(own.default_bcc_email || '').trim(),
+      });
+      const prev = d?.preview;
+      setMeetingPreviewStreamHtml(prev?.body_without_details_html ?? '');
+      setMeetingPreviewDetailsCard({
+        title: String(d?.details_card?.title ?? ''),
+        date: String(d?.details_card?.date ?? ''),
+        timeLine: String(d?.details_card?.timeLine ?? ''),
+        platform: String(d?.details_card?.platform ?? ''),
+        link: String(d?.details_card?.link ?? ''),
+      });
+      setMeetingPreviewResolved({
+        subject: prev?.subject ?? '',
+        body_html: prev?.body_html ?? '',
+        body_text: prev?.body_text ?? '',
+      });
     } catch (e) {
       setMeetingPreviewError(e?.response?.data?.error || e?.message || 'Failed to load template');
     } finally {
@@ -925,7 +1150,7 @@ export function MeetingsPage() {
     setMeetingPreviewSaving(true);
     setMeetingPreviewError(null);
     try {
-      await meetingsAPI.putEmailTemplates({
+      const body = {
         templates: [
           {
             template_kind: kind,
@@ -934,7 +1159,13 @@ export function MeetingsPage() {
             body_text: meetingPreviewDraft.body_text,
           },
         ],
-      });
+      };
+      const ownerId = meetingPreviewOwnerUserId != null ? Number(meetingPreviewOwnerUserId) : null;
+      const myId = user?.id != null ? Number(user.id) : null;
+      if (ownerId && myId && ownerId !== myId) {
+        body.for_user_id = ownerId;
+      }
+      await meetingsAPI.putUserAttendeeEmailTemplates(body);
       setMeetingPreviewSubModal(null);
       setMeetingPreviewResolveFor(null);
       setMeetingPreviewOpen(false);
@@ -1005,6 +1236,17 @@ export function MeetingsPage() {
           {error}
         </Alert>
       )}
+
+      {saveSuccessMessage ? (
+        <Alert variant="success" display="inline" style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+            <span>{saveSuccessMessage}</span>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setSaveSuccessMessage(null)}>
+              Dismiss
+            </Button>
+          </div>
+        </Alert>
+      ) : null}
 
       <MeetingMetricCards data={metrics} loading={metricsLoading} />
 
@@ -1246,12 +1488,12 @@ export function MeetingsPage() {
                   ) : null}
                 </div>
                 <div className={styles.modalFooterRight}>
-                  <Button type="button" variant="secondary" onClick={() => navigate('/settings/meeting-attendee-emails')} disabled={saving} className={styles.footerBtnWide}>
+                  <Button type="button" variant="secondary" onClick={() => navigate('/settings/meetings-mail-settings')} disabled={saving} className={styles.footerBtnWide}>
                     <UiIcon>
                       <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
                       <path d="m3.5 7 8.5 6 8.5-6" />
                     </UiIcon>
-                    Default email settings
+                    Meetings mail settings
                   </Button>
                   <Button type="button" variant="ghost" onClick={() => setModalOpen(false)} disabled={saving} className={styles.footerBtn}>
                     {canManage ? 'Cancel' : 'Close'}
@@ -1314,7 +1556,8 @@ export function MeetingsPage() {
                   type="button"
                   variant="secondary"
                   size="sm"
-                  disabled={!canManage}
+                  disabled={!canManage || !!editing}
+                  title={editing ? 'Contact or lead cannot be changed after this meeting is created.' : undefined}
                   onClick={() => {
                     setPickerType('contact');
                     setPickerSearch('');
@@ -1333,7 +1576,8 @@ export function MeetingsPage() {
                   type="button"
                   variant="secondary"
                   size="sm"
-                  disabled={!canManage}
+                  disabled={!canManage || !!editing}
+                  title={editing ? 'Contact or lead cannot be changed after this meeting is created.' : undefined}
                   onClick={() => {
                     setPickerType('lead');
                     setPickerSearch('');
@@ -1393,15 +1637,9 @@ export function MeetingsPage() {
                 }}
                 options={formAccountOptions}
                 required
-                disabled={!canManage}
+                disabled={!canManage || !!editing}
                 error={meetingFormErrors.email_account_id}
               />
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <p className={styles.listHint} style={{ margin: 0 }}>
-                Connected account permissions power native meeting links and future provider sync features. If any
-                provider action fails, reconnect the same account once to refresh scopes.
-              </p>
             </div>
             <div className={`${styles.iconField} ${styles.followUpIconIndigo}`}>
               <UiIcon>
@@ -1637,19 +1875,29 @@ export function MeetingsPage() {
                 disabled={!canManage}
               />
             </div>
-            <div className={styles.iconField}>
-              <UiIcon>
-                <path d="M4 12h16" />
-                <path d="M4 6h12" />
-                <path d="M4 18h10" />
-              </UiIcon>
-              <Select
-                label="Status"
-                value={form.meeting_status}
-                onChange={(e) => setForm((f) => ({ ...f, meeting_status: e.target.value }))}
-                options={MEETING_STATUS_OPTIONS}
-                disabled={!canManage}
-              />
+            <div className={styles.statusWithReminderRow} style={{ gridColumn: '1 / -1' }}>
+              <div className={`${styles.iconField} ${styles.statusWithReminderSelect}`}>
+                <UiIcon>
+                  <path d="M4 12h16" />
+                  <path d="M4 6h12" />
+                  <path d="M4 18h10" />
+                </UiIcon>
+                <Select
+                  label="Status"
+                  value={form.meeting_status}
+                  onChange={(e) => setForm((f) => ({ ...f, meeting_status: e.target.value }))}
+                  options={MEETING_STATUS_OPTIONS}
+                  disabled={!canManage}
+                />
+              </div>
+              <div className={styles.statusWithReminderCheck}>
+                <Checkbox
+                  label="Send reminder"
+                  checked={Boolean(form.send_reminder)}
+                  onChange={(e) => setForm((f) => ({ ...f, send_reminder: e.target.checked }))}
+                  disabled={!canManage}
+                />
+              </div>
             </div>
           </div>
           <div className={styles.helperNotice}>
@@ -1818,20 +2066,47 @@ export function MeetingsPage() {
           <div className={styles.meetingEmailModal}>
             <div className={`${styles.previewPanel} ${styles.previewPanelCompose} ${styles.composeOnlyPanel}`}>
               <h4 className={styles.previewPanelTitle}>Compose</h4>
-              <Input
-                id="meeting-preview-subject"
-                label="Subject"
-                value={meetingPreviewDraft.subject}
-                onChange={(e) => setMeetingPreviewDraft((d) => ({ ...d, subject: e.target.value }))}
-                disabled={!canManage}
+              <div className={styles.composePreviewSubjectBlock}>
+                <Input
+                  id="meeting-preview-subject"
+                  label="Subject"
+                  value={meetingPreviewDraft.subject}
+                  onChange={(e) => setMeetingPreviewDraft((d) => ({ ...d, subject: e.target.value }))}
+                  disabled={!canManage}
+                />
+              </div>
+              <Checkbox
+                className={styles.meetingPreviewIncludeCheckbox}
+                label="Include meeting details in email"
+                checked={meetingPreviewIncludeDetails}
+                onChange={async (e) => {
+                  const v = e.target.checked;
+                  setMeetingPreviewIncludeDetails(v);
+                  await refreshMeetingPreviewWithDraft(meetingPreviewDraft, v);
+                  if (canManage) {
+                    try {
+                      const payload = { include_meeting_details: v };
+                      if (meetingPreviewOwnerUserId != null && Number(meetingPreviewOwnerUserId) > 0) {
+                        payload.for_user_id = Number(meetingPreviewOwnerUserId);
+                      }
+                      await meetingsAPI.putDefaultEmailSettings(payload);
+                    } catch (err) {
+                      setMeetingPreviewError(
+                        err?.response?.data?.error || err?.message || 'Could not save default for meeting owner'
+                      );
+                    }
+                  }
+                }}
+                disabled={!canManage || meetingPreviewLoading || meetingPreviewResolving}
               />
-              <div>
-                <div className={styles.fieldLabelRow}>
-                  <div className={styles.fieldLabel}>Message (formatted)</div>
+              <div className={styles.composeMessageBlock}>
+                <div className={`${infoHelpHeadingRowClassName} ${styles.composeMessageLabelRow}`}>
+                  <h4 className={styles.composeMessageHeading}>Message (formatted)</h4>
                   <InfoHelpIcon
                     title="Formatted message info"
                     modalTitle="Message (formatted)"
                     message="Use the toolbar for formatting. Insert meeting fields with Variable in the toolbar (same as call scripts)."
+                    size="sm"
                   />
                 </div>
                 <ScriptBodyEditor
@@ -1874,27 +2149,143 @@ export function MeetingsPage() {
           </ModalFooter>
         }
       >
-        <InfoHelpIcon
-          title="Preview info"
-          modalTitle="Preview"
-          message="Filled with the meeting currently on the form (read-only)."
-        />
         {meetingPreviewResolving ? (
           <p className={styles.listHint}>Updating…</p>
         ) : (
-          <>
-            <Input label="Subject" value={meetingPreviewResolved.subject} readOnly />
-            <div>
-              <div className={styles.fieldLabel}>Formatted message</div>
-              <div
-                className={styles.previewResolvedHtml}
-                dangerouslySetInnerHTML={{ __html: meetingPreviewResolved.body_html || '<p>—</p>' }}
-              />
+          <div className={styles.previewMeetingEmailModal}>
+            <div className={`${attendeeMailStyles.previewPanel} ${styles.previewMeetingPanel}`}>
+              <div className={attendeeMailStyles.previewSectionHead}>
+                <span className={attendeeMailStyles.previewSectionIcon} aria-hidden>
+                  <MaterialSymbol name="visibility" size="md" />
+                </span>
+                <div className={styles.previewMeetingHeadText}>
+                  <div className={`${infoHelpHeadingRowClassName} ${styles.previewMeetingTitleRow}`}>
+                    <h2 className={attendeeMailStyles.previewSectionTitle}>Email Preview</h2>
+                    <InfoHelpIcon
+                      title="Preview info"
+                      modalTitle="Email preview"
+                      message={
+                        'Matches the sent attendee email: same email account, To, and optional CC/BCC from the meeting owner’s Meetings mail settings.\n\nWhen “Include meeting details in email” is on, the preview matches the mail settings page: your template first, then one styled Meeting details block (not a duplicate of the template’s own list).'
+                      }
+                      size="sm"
+                    />
+                  </div>
+                  <p className={attendeeMailStyles.previewSectionSubtitle}>
+                    {meetingPreviewEmailSubtitle(meetingPreviewKind)}
+                  </p>
+                </div>
+              </div>
+
+              <div className={attendeeMailStyles.previewMeta}>
+                <div className={attendeeMailStyles.previewMetaRow}>
+                  <span className={attendeeMailStyles.previewMetaLabel}>Subject</span>
+                  <span className={attendeeMailStyles.previewSubject}>{meetingPreviewResolved.subject || '—'}</span>
+                </div>
+                <div className={attendeeMailStyles.previewMetaRow}>
+                  <span className={attendeeMailStyles.previewMetaLabel}>To</span>
+                  <span>{meetingPreviewEnvelope.to}</span>
+                </div>
+                <div className={attendeeMailStyles.previewMetaRow}>
+                  <span className={attendeeMailStyles.previewMetaLabel}>CC</span>
+                  <span
+                    className={
+                      !String(meetingPreviewEnvelope.cc || '').trim() ? attendeeMailStyles.previewMetaFaint : ''
+                    }
+                  >
+                    {previewMetaCcBccDisplay(meetingPreviewEnvelope.cc)}
+                  </span>
+                </div>
+                <div className={attendeeMailStyles.previewMetaRow}>
+                  <span className={attendeeMailStyles.previewMetaLabel}>BCC</span>
+                  <span
+                    className={
+                      !String(meetingPreviewEnvelope.bcc || '').trim() ? attendeeMailStyles.previewMetaFaint : ''
+                    }
+                  >
+                    {previewMetaCcBccDisplay(meetingPreviewEnvelope.bcc)}
+                  </span>
+                </div>
+              </div>
+
+              <div className={`${attendeeMailStyles.previewBodyRegion} ${styles.previewMeetingBodyRegion}`}>
+                {meetingPreviewStreamParts.mode === 'single' ? (
+                  <div className={attendeeMailStyles.previewStream}>
+                    <div
+                      className={attendeeMailStyles.previewBody}
+                      dangerouslySetInnerHTML={{ __html: meetingPreviewStreamParts.single || '<p>—</p>' }}
+                    />
+                  </div>
+                ) : (
+                  <div className={attendeeMailStyles.previewStream}>
+                    {String(meetingPreviewStreamParts.intro || '').trim() ? (
+                      <div
+                        className={attendeeMailStyles.previewBody}
+                        dangerouslySetInnerHTML={{ __html: meetingPreviewStreamParts.intro }}
+                      />
+                    ) : null}
+                    <div
+                      className={`${attendeeMailStyles.meetingDetailsAlert} ${meetingPreviewDetailsToneClass(
+                        meetingPreviewKind
+                      )}`}
+                    >
+                      <div className={attendeeMailStyles.meetingDetailsHeroRow}>
+                        <span className={attendeeMailStyles.meetingDetailsHeroIcon} aria-hidden>
+                          <MaterialSymbol
+                            name={meetingPreviewHeroIconName(meetingPreviewKind)}
+                            size="md"
+                            className={attendeeMailStyles.meetingDetailsHeroGlyph}
+                          />
+                        </span>
+                        <div className={attendeeMailStyles.meetingDetailsHeroCopy}>
+                          <div className={attendeeMailStyles.meetingDetailsAlertTitle}>Meeting details</div>
+                          <div className={attendeeMailStyles.meetingDetailsGrid}>
+                            {[
+                              { label: 'Meeting Title', value: meetingPreviewDetailsCard.title || '—', isLink: false },
+                              { label: 'Date', value: meetingPreviewDetailsCard.date || '—', isLink: false },
+                              { label: 'Time', value: meetingPreviewDetailsCard.timeLine || '—', isLink: false },
+                              { label: 'Platform', value: meetingPreviewDetailsCard.platform || '—', isLink: false },
+                              {
+                                label: 'Meeting Link',
+                                value: meetingPreviewDetailsCard.link || '',
+                                isLink: true,
+                              },
+                            ].map((row) => (
+                              <div key={row.label} className={attendeeMailStyles.meetingDetailLine}>
+                                <span className={attendeeMailStyles.meetingDetailLabel}>{row.label}</span>
+                                <span className={attendeeMailStyles.meetingDetailValue}>
+                                  {row.isLink && row.value ? (
+                                    <a href={row.value} target="_blank" rel="noopener noreferrer">
+                                      {row.value}
+                                    </a>
+                                  ) : (
+                                    row.value || '—'
+                                  )}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {String(meetingPreviewStreamParts.closing || '').trim() ? (
+                      <div
+                        className={attendeeMailStyles.previewBody}
+                        dangerouslySetInnerHTML={{ __html: meetingPreviewStreamParts.closing }}
+                      />
+                    ) : null}
+                    <MeetingPreviewCalendarLinksRow />
+                  </div>
+                )}
+              </div>
+
+              <div className={attendeeMailStyles.previewInfoBanner}>
+                <MaterialSymbol name="info" size="sm" className={attendeeMailStyles.previewInfoIcon} aria-hidden />
+                <span>Preview uses this meeting’s data. Calendar links are included on the sent message.</span>
+              </div>
             </div>
-          </>
+          </div>
         )}
       </Modal>
-
       <ConfirmModal
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
