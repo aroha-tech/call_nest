@@ -2,7 +2,7 @@ import { env } from '../../config/env.js';
 
 /**
  * Allow browser origin for OAuth success/error redirects (open-redirect safe).
- * Matches FRONTEND_URL host, CORS suffix (e.g. *.arohva.com), bootstrap hosts, or localhost in dev.
+ * Matches FRONTEND_URL host, CORS suffix (e.g. *.yourdomain.com), bootstrap hosts, or localhost in dev.
  * Both http and https are allowed when the hostname matches (OAuth return must match the page the user started from).
  */
 export function isAllowedReturnOrigin(origin) {

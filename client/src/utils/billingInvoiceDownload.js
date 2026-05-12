@@ -3,6 +3,8 @@
  * Users can open the file and use Print → Save as PDF for a PDF copy.
  */
 
+import { PRODUCT_DISPLAY_NAME } from '../config/productBrand';
+
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s)
@@ -36,10 +38,10 @@ function formatDisplayDate(isoOrSql, fallback = '—') {
  * @param {object} opts.payment - Row from tenant payment list API
  * @param {string} [opts.customerEmail]
  * @param {string} [opts.workspaceLabel] - e.g. tenant subdomain
- * @param {string} [opts.productName='Call Nest']
+ * @param {string} [opts.productName]
  */
 export function downloadPaymentInvoiceHtml(opts) {
-  const { payment, customerEmail, workspaceLabel, productName = 'Call Nest' } = opts || {};
+  const { payment, customerEmail, workspaceLabel, productName = PRODUCT_DISPLAY_NAME } = opts || {};
   if (!payment) return;
 
   const invoiceNo = payment.razorpay_payment_id || `INV-${payment.id}`;

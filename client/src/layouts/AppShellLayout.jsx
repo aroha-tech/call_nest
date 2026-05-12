@@ -10,6 +10,7 @@ import { getBreadcrumbItems } from './breadcrumbUtils';
 import { NotificationBell } from '../features/notifications/NotificationBell';
 import { useSiteEntryPermissions } from '../hooks/useSiteEntryPermissions';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
+import { PRODUCT_DISPLAY_NAME } from '../config/productBrand';
 import styles from './AppShellLayout.module.scss';
 
 /** Survives route changes: each `<Route>` wraps its own `AppShellLayout`, so the component remounts on navigation. */
@@ -234,7 +235,7 @@ export function AppShellLayout({ children }) {
   const theme = tenant?.theme;
   const titleOverride = theme?.workspaceTitle?.trim();
   const workspaceTitle = isPlatform
-    ? 'Call Nest'
+    ? PRODUCT_DISPLAY_NAME
     : titleOverride || name || slug || 'Workspace';
   const workspaceSubtitle = roleLabelForSidebar(user, isPlatform);
   const logoUrl = !isPlatform && theme?.logoUrl ? String(theme.logoUrl).trim() : '';

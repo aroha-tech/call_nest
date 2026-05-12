@@ -14,6 +14,10 @@ import * as emailTemplateService from '../tenant/emailTemplateService.js';
 import { safeLogTenantActivity } from '../tenant/tenantActivityLogService.js';
 import * as outlookOAuth from './outlookOAuthService.js';
 import * as googleOAuth from './googleOAuthService.js';
+import {
+  isLikelyGoogleOAuthOrApiAuthFailure,
+  isLikelyMicrosoftGraphAuthHttpStatus,
+} from './emailOAuthAuthHeuristics.js';
 
 /** Prevent SMTP OAuth handshakes from hanging indefinitely (nodemailer default is no timeout). */
 const SMTP_TIMEOUT_MS = {
@@ -80,6 +84,22 @@ async function sendViaGmailRestApi(account, mailOptions) {
     });
     return res.data.id || res.data.threadId || null;
   } catch (err) {
+    if (isLikelyGoogleOAuthOrApiAuthFailure(err)) {
+      try {
+        await emailAccountService.recordOAuthConnectionFailureQuiet(
+          account.tenant_id,
+          account.id,
+          'OAUTH_GMAIL_API',
+          emailAccountService.sanitizeOAuthErrorDetail(
+            err?.response?.data?.error?.message ||
+              err?.errors?.[0]?.message ||
+              err?.message
+          )
+        );
+      } catch (_) {
+        /* non-fatal */
+      }
+    }
     const msg =
       err?.response?.data?.error?.message ||
       err?.errors?.[0]?.message ||
@@ -106,6 +126,16 @@ async function ensureFreshGmailAccessToken(account, tenantId, updatedBy) {
   if (!needsRefresh) return account;
 
   if (!account.refresh_token) {
+    try {
+      await emailAccountService.recordOAuthConnectionFailureQuiet(
+        tenantId,
+        account.id,
+        'OAUTH_GMAIL_NO_REFRESH',
+        'Gmail access expired and no refresh token is stored.'
+      );
+    } catch (_) {
+      /* non-fatal */
+    }
     const err = new Error(
       'Gmail access expired and no refresh token is stored. Reconnect the account under Email Accounts.'
     );
@@ -115,6 +145,16 @@ async function ensureFreshGmailAccessToken(account, tenantId, updatedBy) {
 
   const refreshed = await googleOAuth.refreshAccessToken(account.refresh_token);
   if (refreshed?.error) {
+    try {
+      await emailAccountService.recordOAuthConnectionFailureQuiet(
+        tenantId,
+        account.id,
+        'OAUTH_GMAIL_REFRESH_FAILED',
+        refreshed.error
+      );
+    } catch (_) {
+      /* non-fatal */
+    }
     const err = new Error(refreshed.error);
     err.status = 400;
     throw err;
@@ -129,6 +169,9 @@ async function ensureFreshGmailAccessToken(account, tenantId, updatedBy) {
       token_expires_at: refreshed.expires_at
         ? new Date(refreshed.expires_at * 1000)
         : null,
+      oauth_last_error_at: null,
+      oauth_last_error_code: null,
+      oauth_last_error_detail: null,
     },
     updatedBy
   );
@@ -171,6 +214,16 @@ async function sendViaMicrosoftGraph(account, mail) {
   if (expiresAtSec && expiresAtSec <= nowSec + 60 && account.refresh_token) {
     const refreshed = await outlookOAuth.refreshAccessToken(account.refresh_token);
     if (refreshed?.error) {
+      try {
+        await emailAccountService.recordOAuthConnectionFailureQuiet(
+          account.tenant_id,
+          account.id,
+          'OAUTH_OUTLOOK_REFRESH_FAILED',
+          refreshed.error
+        );
+      } catch (_) {
+        /* non-fatal */
+      }
       throw new Error(refreshed.error);
     }
     await emailAccountService.update(
@@ -182,6 +235,9 @@ async function sendViaMicrosoftGraph(account, mail) {
         token_expires_at: refreshed.expires_at
           ? new Date(refreshed.expires_at * 1000)
           : null,
+        oauth_last_error_at: null,
+        oauth_last_error_code: null,
+        oauth_last_error_detail: null,
       },
       // If you later want full audit attribution, pass the current userId down into sendEmail().
       undefined
@@ -242,6 +298,20 @@ async function sendViaMicrosoftGraph(account, mail) {
       const data = await res.json();
       details = data?.error?.message ? ` ${data.error.message}` : '';
     } catch (_) {}
+    if (isLikelyMicrosoftGraphAuthHttpStatus(res.status)) {
+      try {
+        await emailAccountService.recordOAuthConnectionFailureQuiet(
+          account.tenant_id,
+          account.id,
+          'OAUTH_OUTLOOK_GRAPH_AUTH',
+          emailAccountService.sanitizeOAuthErrorDetail(
+            `HTTP ${res.status}.${details}`.trim()
+          )
+        );
+      } catch (_) {
+        /* non-fatal */
+      }
+    }
     throw new Error(`Microsoft Graph sendMail failed (HTTP ${res.status}).${details}`.trim());
   }
 }
@@ -331,6 +401,14 @@ export async function sendEmail(tenantId, payload, createdBy) {
     const transporter = getTransporter(account);
     const info = await transporter.sendMail(mailOptions);
     messageId = info.messageId || null;
+  }
+
+  if (provider === 'gmail' || provider === 'outlook') {
+    try {
+      await emailAccountService.patchOauthHealthOnSendSuccess(tenantId, email_account_id);
+    } catch (_) {
+      /* non-fatal */
+    }
   }
 
   const threadId = `thread-${Date.now()}`;

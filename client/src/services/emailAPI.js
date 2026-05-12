@@ -15,6 +15,8 @@ export const emailAccountsAPI = {
   delete: (id) => axiosInstance.delete(`${BASE}/accounts/${id}`),
   activate: (id) => axiosInstance.post(`${BASE}/accounts/${id}/activate`),
   deactivate: (id) => axiosInstance.post(`${BASE}/accounts/${id}/deactivate`),
+  /** Proves OAuth still works; refreshes tokens when possible. Requires email.accounts.manage (or settings.manage). */
+  verifyOAuth: (id) => axiosInstance.post(`${BASE}/accounts/${id}/oauth-verify`),
   /** Returns { url } for redirect to Google OAuth. Sends current origin so post-OAuth redirect returns to the same host (tenant subdomain). */
   getOAuthGoogleUrl: () =>
     axiosInstance.get(`${BASE}/oauth/google/url`, {

@@ -67,14 +67,14 @@ export const env = {
   nodeEnv: process.env.NODE_ENV || appEnv,
   isProduction,
   /**
-   * Comma-separated allowed browser origins for CORS in production (e.g. https://admin.arohva.com,https://www.arohva.com).
+   * Comma-separated allowed browser origins for CORS in production (e.g. https://admin.example.com,https://www.example.com).
    * If empty in production, falls back to FRONTEND_URL only. Development uses permissive CORS.
    */
   corsOrigins: (process.env.CORS_ORIGINS || '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
-  /** If set (e.g. .arohva.com), any https?://*.suffix origin is allowed in production in addition to corsOrigins */
+  /** If set (e.g. .example.com), any https?://*.suffix origin is allowed in production in addition to corsOrigins */
   corsOriginSuffix: (process.env.CORS_ORIGIN_SUFFIX || '').trim().toLowerCase(),
   /** Hostnames (no port) allowed to use path-based API routing like dev — e.g. droplet IP before DNS */
   bootstrapHosts: parseBootstrapHosts(),

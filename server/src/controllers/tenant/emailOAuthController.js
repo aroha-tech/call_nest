@@ -85,6 +85,7 @@ export async function callbackGoogle(req, res) {
   const tokenExpiresAt = tokens.expires_at
     ? new Date(tokens.expires_at * 1000)
     : null;
+  const verifiedAt = new Date();
   try {
     const existing = await emailAccountService.findByEmail(tenantId, email);
     if (existing) {
@@ -93,6 +94,10 @@ export async function callbackGoogle(req, res) {
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         token_expires_at: tokenExpiresAt,
+        oauth_last_verified_at: verifiedAt,
+        oauth_last_error_at: null,
+        oauth_last_error_code: null,
+        oauth_last_error_detail: null,
       }, userId);
       return redirectSuccess(res, `${email} reconnected.`, ro);
     }
@@ -104,6 +109,7 @@ export async function callbackGoogle(req, res) {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       token_expires_at: tokenExpiresAt,
+      oauth_last_verified_at: verifiedAt,
       status: 'active',
     }, userId);
     return redirectSuccess(res, `${email} connected.`, ro);
@@ -164,6 +170,7 @@ export async function callbackOutlook(req, res) {
   const tokenExpiresAt = tokens.expires_at
     ? new Date(tokens.expires_at * 1000)
     : null;
+  const verifiedAt = new Date();
   try {
     const existing = await emailAccountService.findByEmail(tenantId, email);
     if (existing) {
@@ -172,6 +179,10 @@ export async function callbackOutlook(req, res) {
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         token_expires_at: tokenExpiresAt,
+        oauth_last_verified_at: verifiedAt,
+        oauth_last_error_at: null,
+        oauth_last_error_code: null,
+        oauth_last_error_detail: null,
       }, userId);
       return redirectSuccess(res, `${email} reconnected.`, ro);
     }
@@ -183,6 +194,7 @@ export async function callbackOutlook(req, res) {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       token_expires_at: tokenExpiresAt,
+      oauth_last_verified_at: verifiedAt,
       status: 'active',
     }, userId);
     return redirectSuccess(res, `${email} connected.`, ro);

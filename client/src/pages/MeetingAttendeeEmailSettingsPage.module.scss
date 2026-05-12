@@ -10,7 +10,7 @@
 
 .intro {
   margin: 0 0 4px;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--color-text-secondary);
   font-size: 14px;
   line-height: 1.45;
 }
@@ -47,15 +47,80 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--color-text-secondary);
   margin: 0 0 4px;
 }
 
+.automationToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg-muted);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: var(--color-bg-hover);
+    border-color: var(--color-border-strong);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.automationToggleText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.automationToggle .sectionTitle {
+  margin-bottom: 0;
+  color: var(--color-text-primary);
+}
+
+.automationToggleHint {
+  font-size: 13px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+}
+
+.automationChevron {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  transition: transform 0.15s ease;
+}
+
+.automationChevronOpen {
+  transform: rotate(180deg);
+}
+
+.automationPanel {
+  display: grid;
+  gap: 12px;
+  padding-top: 2px;
+}
+
 .reminderSchedule {
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
   padding: 14px;
-  background: var(--surface-2, rgba(0, 0, 0, 0.15));
+  background: var(--color-bg-muted);
 }
 
 .reminderRow {
@@ -75,7 +140,7 @@
   padding: 0;
   border: none;
   background: none;
-  color: var(--color-primary, #6366f1);
+  color: var(--color-primary-600);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -98,9 +163,9 @@
 }
 
 .tab {
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
-  background: var(--surface-2, #252536);
-  color: var(--text-primary, #e2e8f0);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-muted);
+  color: var(--color-text-primary);
   border-radius: 8px;
   padding: 8px 14px;
   cursor: pointer;
@@ -109,13 +174,13 @@
 }
 
 .tabActive {
-  border-color: var(--color-primary, #6366f1);
-  background: color-mix(in srgb, var(--color-primary, #6366f1) 20%, transparent);
+  border-color: var(--color-primary-500);
+  background: var(--color-accent-brand-subtle);
 }
 
 .muted {
   margin: 0;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--color-text-secondary);
 }
 
 .form {
@@ -126,12 +191,12 @@
 .label {
   font-weight: 600;
   margin-bottom: 4px;
-  color: var(--text-primary, #e2e8f0);
+  color: var(--color-text-primary);
 }
 
 .hint {
   margin: 0 0 8px;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--color-text-secondary);
   font-size: 13px;
 }
 
@@ -142,39 +207,40 @@
   margin-top: 8px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--text-secondary, #64748b) 12%, transparent);
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border-subtle);
   font-size: 13px;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--color-text-secondary);
   line-height: 1.4;
 }
 
-/* Preview column */
+/* Preview column — uses global theme tokens so light/dark match the app shell */
 .previewCard {
   position: sticky;
   top: 16px;
   display: grid;
   gap: 12px;
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   padding: 16px;
-  background: var(--surface-1, #1a1b26);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  background: var(--color-bg-elevated);
+  box-shadow: 0 4px 20px var(--premium-panel-shadow);
 }
 
 .previewTitle {
   margin: 0;
   font-size: 15px;
   font-weight: 700;
-  color: var(--text-primary, #e2e8f0);
+  color: var(--color-text-primary);
 }
 
 .previewMeta {
   display: grid;
   gap: 6px;
   font-size: 12px;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--color-text-secondary);
   padding-bottom: 10px;
-  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .previewMetaRow {
@@ -186,19 +252,19 @@
 
 .previewMetaLabel {
   font-weight: 600;
-  color: var(--text-muted, #64748b);
+  color: var(--color-text-muted);
 }
 
 .previewSubject {
   font-weight: 600;
-  color: var(--text-primary, #e2e8f0);
+  color: var(--color-text-primary);
   word-break: break-word;
 }
 
 .previewBody {
   font-size: 14px;
   line-height: 1.5;
-  color: var(--text-primary, #e2e8f0);
+  color: var(--color-text-primary);
 
   :global(p) {
     margin: 0 0 0.75em;
@@ -211,7 +277,7 @@
   }
 
   :global(a) {
-    color: var(--color-primary, #818cf8);
+    color: var(--color-primary-600);
   }
 }
 
@@ -219,8 +285,8 @@
   margin-top: 12px;
   padding: 12px 14px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--text-secondary, #64748b) 14%, transparent);
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border-subtle);
   font-size: 13px;
 }
 
@@ -228,7 +294,7 @@
   font-weight: 700;
   margin: 0 0 8px;
   font-size: 13px;
-  color: var(--text-primary, #e2e8f0);
+  color: var(--color-text-primary);
 }
 
 .meetingDetailsGrid {
@@ -247,8 +313,8 @@
   margin-top: 14px;
   padding: 10px 20px;
   border-radius: 8px;
-  background: var(--color-primary, #4f46e5);
-  color: #fff !important;
+  background: var(--color-primary-600);
+  color: var(--color-text-inverse) !important;
   font-weight: 600;
   text-decoration: none !important;
   font-size: 14px;
@@ -264,18 +330,18 @@
 .calendarBtn {
   padding: 6px 12px;
   border-radius: 6px;
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
-  background: var(--surface-2, #252536);
-  color: var(--text-primary, #e2e8f0);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-muted);
+  color: var(--color-text-primary);
   font-size: 12px;
   cursor: default;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 .previewDisclaimer {
   margin: 12px 0 0;
   font-size: 12px;
-  color: var(--text-muted, #64748b);
+  color: var(--color-text-muted);
   line-height: 1.4;
 }
 

@@ -1,4 +1,5 @@
 import * as emailAccountService from '../../services/tenant/emailAccountService.js';
+import * as emailAccountOAuthVerifyService from '../../services/email/emailAccountOAuthVerifyService.js';
 
 export async function getAll(req, res, next) {
   try {
@@ -75,6 +76,23 @@ export async function deactivate(req, res, next) {
     const tenantId = req.tenant.id;
     const account = await emailAccountService.deactivate(tenantId, req.params.id, req.user.id);
     res.json({ data: account });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** POST /accounts/:id/oauth-verify — refresh or probe tokens; updates oauth_last_verified_at on success. */
+export async function verifyOAuth(req, res, next) {
+  try {
+    const tenantId = req.tenant.id;
+    const userId = req.user.id;
+    const result = await emailAccountOAuthVerifyService.verifyOAuthConnection(
+      tenantId,
+      req.params.id,
+      userId
+    );
+    const account = await emailAccountService.findById(tenantId, req.params.id);
+    res.json({ ...result, data: account });
   } catch (err) {
     next(err);
   }

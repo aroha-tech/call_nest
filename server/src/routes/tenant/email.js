@@ -46,6 +46,11 @@ router.put('/accounts/:id', emailAccountsManage, emailAccountsController.update)
 router.delete('/accounts/:id', emailAccountsManage, emailAccountsController.remove);
 router.post('/accounts/:id/activate', emailAccountsManage, emailAccountsController.activate);
 router.post('/accounts/:id/deactivate', emailAccountsManage, emailAccountsController.deactivate);
+router.post(
+  '/accounts/:id/oauth-verify',
+  emailAccountsManage,
+  emailAccountsController.verifyOAuth
+);
 
 // Templates
 router.get('/templates', emailView, emailTemplatesController.getAll);

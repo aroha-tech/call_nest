@@ -115,6 +115,16 @@ async function ensureFreshGmailAccount(account, tenantId, updatedBy) {
   if (!needsRefresh) return account;
   const refreshed = await googleOAuth.refreshAccessToken(account.refresh_token);
   if (refreshed?.error || !refreshed?.access_token) {
+    try {
+      await emailAccountService.recordOAuthConnectionFailureQuiet(
+        tenantId,
+        account.id,
+        'OAUTH_MEETING_SYNC_REFRESH',
+        emailAccountService.sanitizeOAuthErrorDetail(refreshed?.error || 'Token refresh failed')
+      );
+    } catch (_) {
+      /* non-fatal */
+    }
     throw buildProviderReconnectError(
       'Google',
       'calendar + Meet sync',
@@ -128,6 +138,9 @@ async function ensureFreshGmailAccount(account, tenantId, updatedBy) {
       access_token: refreshed.access_token,
       refresh_token: refreshed.refresh_token || account.refresh_token,
       token_expires_at: refreshed.expires_at ? new Date(refreshed.expires_at * 1000) : null,
+      oauth_last_error_at: null,
+      oauth_last_error_code: null,
+      oauth_last_error_detail: null,
     },
     updatedBy
   );
@@ -151,6 +164,16 @@ async function ensureFreshOutlookAccount(account, tenantId, updatedBy) {
   if (!needsRefresh) return account;
   const refreshed = await outlookOAuth.refreshAccessToken(account.refresh_token);
   if (refreshed?.error || !refreshed?.access_token) {
+    try {
+      await emailAccountService.recordOAuthConnectionFailureQuiet(
+        tenantId,
+        account.id,
+        'OAUTH_MEETING_SYNC_REFRESH',
+        emailAccountService.sanitizeOAuthErrorDetail(refreshed?.error || 'Token refresh failed')
+      );
+    } catch (_) {
+      /* non-fatal */
+    }
     throw buildProviderReconnectError(
       'Microsoft',
       'calendar + Teams sync',
@@ -164,6 +187,9 @@ async function ensureFreshOutlookAccount(account, tenantId, updatedBy) {
       access_token: refreshed.access_token,
       refresh_token: refreshed.refresh_token || account.refresh_token,
       token_expires_at: refreshed.expires_at ? new Date(refreshed.expires_at * 1000) : null,
+      oauth_last_error_at: null,
+      oauth_last_error_code: null,
+      oauth_last_error_detail: null,
     },
     updatedBy
   );

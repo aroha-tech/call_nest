@@ -22,6 +22,7 @@ import {
   describeTenantSlugSourceIssue,
 } from '../features/auth/utils/slugUtils';
 import { getTenantWorkspaceUrl } from '../config/tenantWorkspaceUrl';
+import { PRODUCT_DISPLAY_NAME } from '../config/productBrand';
 import styles from './TenantCompanySettingsPage.module.scss';
 
 const SLUG_DEBOUNCE_MS = 400;
@@ -665,7 +666,7 @@ export function TenantCompanySettingsPage() {
               />
               <Checkbox label="Load industry based pipelines" checked={industryExperienceActive} disabled />
               <Checkbox label="Apply industry based email & SMS templates" checked={industryExperienceActive} disabled />
-              <div className={styles.checkboxWithHint} title="Call Nest never bulk-deletes your data when you change industry.">
+              <div className={styles.checkboxWithHint} title={`${PRODUCT_DISPLAY_NAME} never bulk-deletes your data when you change industry.`}>
                 <Checkbox label="Reset existing data when changing industry" checked={false} disabled />
               </div>
             </div>
@@ -814,8 +815,8 @@ export function TenantCompanySettingsPage() {
                   )}
 
                   <p className={styles.asideFootnote}>
-                    Want a different setup? You can switch to another industry at any time. Your existing data stays in
-                    Call Nest unless you remove it elsewhere.
+                    Want a different setup? You can switch to another industry at any time. Your existing data stays in{' '}
+                    {PRODUCT_DISPLAY_NAME} unless you remove it elsewhere.
                   </p>
                   <div className={styles.asideFootActions}>
                     <Button type="button" variant="secondary" size="sm" onClick={scrollToIndustry}>

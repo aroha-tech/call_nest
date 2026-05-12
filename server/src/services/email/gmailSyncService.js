@@ -3,6 +3,7 @@ import { env } from '../../config/env.js';
 import * as emailAccountService from '../tenant/emailAccountService.js';
 import * as emailMessageService from '../tenant/emailMessageService.js';
 import { query } from '../../config/db.js';
+import { isLikelyGoogleOAuthOrApiAuthFailure } from './emailOAuthAuthHeuristics.js';
 
 function getOAuthClient(account) {
   const redirectUri =
@@ -120,6 +121,18 @@ export async function syncGmailForTenant(tenantId, createdBy) {
         `Failed to sync Gmail for account ${account.id} (${account.email_address}):`,
         err
       );
+      if (isLikelyGoogleOAuthOrApiAuthFailure(err)) {
+        try {
+          await emailAccountService.recordOAuthConnectionFailureQuiet(
+            tenantId,
+            account.id,
+            'OAUTH_GMAIL_SYNC',
+            emailAccountService.sanitizeOAuthErrorDetail(err.message)
+          );
+        } catch (_) {
+          /* non-fatal */
+        }
+      }
     }
   }
   return { inserted: totalInserted };

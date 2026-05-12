@@ -9,6 +9,7 @@ import { Checkbox } from '../components/ui/Checkbox';
 import { InfoHelpIcon } from '../components/ui/InfoHelpIcon';
 import { meetingsAPI } from '../services/meetingsAPI';
 import { ScriptBodyEditor } from '../features/callScripts/ScriptBodyEditor';
+import { IconChevronDown } from '../features/contacts/ListActionsMenuIcons';
 import styles from './MeetingAttendeeEmailSettingsPage.module.scss';
 
 const TEMPLATE_TABS = [
@@ -97,6 +98,11 @@ export function MeetingAttendeeEmailSettingsPage() {
   const [attendeePlaceholderHelp, setAttendeePlaceholderHelp] = useState([]);
   const [testEmailTo, setTestEmailTo] = useState('');
   const [sendingTestEmail, setSendingTestEmail] = useState(false);
+  const [automationExpanded, setAutomationExpanded] = useState(false);
+
+  React.useEffect(() => {
+    if (tab !== 'reminder') setAutomationExpanded(false);
+  }, [tab]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -379,72 +385,9 @@ export function MeetingAttendeeEmailSettingsPage() {
       <div className={styles.layout}>
         <Card className={styles.configCard}>
           <p className={styles.intro}>
-            Configure timing and message content on the left. The right panel shows a live preview with example data.
+            Choose an email type, edit subject and content below, then adjust timing on the Reminder tab. The preview
+            uses example data.
           </p>
-
-          <div className={styles.configSection}>
-            <div className={styles.sectionTitle}>Automation</div>
-            <div className={styles.grid2}>
-              <Select
-                label="Send reminders"
-                value={settings?.reminder_enabled ? 'yes' : 'no'}
-                onChange={(e) => updateField('reminder_enabled', e.target.value === 'yes')}
-                options={[
-                  { value: 'yes', label: 'Enabled' },
-                  { value: 'no', label: 'Disabled' },
-                ]}
-                disabled={saving || loading}
-              />
-              <Select
-                label="Send feedback request"
-                value={settings?.feedback_enabled ? 'yes' : 'no'}
-                onChange={(e) => updateField('feedback_enabled', e.target.value === 'yes')}
-                options={[
-                  { value: 'yes', label: 'Enabled' },
-                  { value: 'no', label: 'Disabled' },
-                ]}
-                disabled={saving || loading}
-              />
-            </div>
-            <div className={styles.grid2}>
-              <Input
-                label="After meeting — delay value"
-                type="number"
-                min="1"
-                value={settings?.feedback_delay_value ?? 2}
-                onChange={(e) => updateField('feedback_delay_value', Number(e.target.value || 1))}
-                disabled={saving || loading}
-              />
-              <Select
-                label="Delay unit"
-                value={settings?.feedback_delay_unit || 'hours'}
-                onChange={(e) => updateField('feedback_delay_unit', e.target.value)}
-                options={[
-                  { value: 'minutes', label: 'Minutes' },
-                  { value: 'hours', label: 'Hours' },
-                  { value: 'days', label: 'Days' },
-                ]}
-                disabled={saving || loading}
-              />
-            </div>
-            <div className={styles.grid2}>
-              <Input
-                label="Thank you page URL (optional)"
-                value={settings?.thank_you_page_url || ''}
-                onChange={(e) => updateField('thank_you_page_url', e.target.value)}
-                disabled={saving || loading}
-                placeholder="https://yourcompany.com/thank-you"
-              />
-              <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 4 }}>
-                <Checkbox
-                  label="Include meeting details in email"
-                  checked={Boolean(settings?.include_meeting_details)}
-                  onChange={(e) => updateField('include_meeting_details', e.target.checked)}
-                  disabled={saving || loading}
-                />
-              </div>
-            </div>
-          </div>
 
           <div className={styles.tabs}>
             {TEMPLATE_TABS.map((item) => (
@@ -463,51 +406,6 @@ export function MeetingAttendeeEmailSettingsPage() {
             <p className={styles.muted}>Loading settings…</p>
           ) : settings ? (
             <div className={styles.form}>
-              {tab === 'reminder' ? (
-                <div className={styles.reminderSchedule}>
-                  <div className={styles.label} style={{ marginBottom: 10 }}>
-                    Reminder schedule
-                  </div>
-                  <p className={styles.hint} style={{ marginTop: 0 }}>
-                    Send this many minutes/hours/days before the meeting start. Each row is one reminder.
-                  </p>
-                  {(settings?.reminder_offsets || []).map((item, idx) => (
-                    <div key={`offset-${idx}`} className={styles.reminderRow}>
-                      <Input
-                        label={idx === 0 ? 'Amount' : undefined}
-                        type="number"
-                        min="1"
-                        value={item?.value ?? 1}
-                        onChange={(e) => updateReminderOffset(idx, 'value', e.target.value)}
-                        disabled={saving}
-                      />
-                      <Select
-                        label={idx === 0 ? 'Unit' : undefined}
-                        value={item?.unit || 'minutes'}
-                        onChange={(e) => updateReminderOffset(idx, 'unit', e.target.value)}
-                        options={[
-                          { value: 'minutes', label: 'Minutes' },
-                          { value: 'hours', label: 'Hours' },
-                          { value: 'days', label: 'Days' },
-                        ]}
-                        disabled={saving}
-                      />
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => removeReminderOffset(idx)}
-                        disabled={saving || (settings?.reminder_offsets || []).length <= 1}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  ))}
-                  <button type="button" className={styles.addReminderLink} onClick={addReminderOffset} disabled={saving}>
-                    + Add another reminder
-                  </button>
-                </div>
-              ) : null}
-
               <Input
                 label="Email subject"
                 value={activeSubject}
@@ -545,6 +443,163 @@ export function MeetingAttendeeEmailSettingsPage() {
                   placeholder="Write your email. Merge fields use {{name}} syntax."
                 />
               </div>
+
+              {tab === 'reminder' ? (
+                <div className={styles.configSection}>
+                  <button
+                    type="button"
+                    id="meeting-email-automation-trigger"
+                    className={styles.automationToggle}
+                    aria-expanded={automationExpanded}
+                    aria-controls="meeting-email-automation-panel"
+                    onClick={() => setAutomationExpanded((v) => !v)}
+                    disabled={saving || loading}
+                  >
+                    <span className={styles.automationToggleText}>
+                      <span className={styles.sectionTitle}>Automation</span>
+                      <span className={styles.automationToggleHint}>
+                        {automationExpanded
+                          ? 'Hide reminder timing and related options'
+                          : 'Show reminder timing, feedback delay, and schedule'}
+                      </span>
+                    </span>
+                    <IconChevronDown
+                      className={`${styles.automationChevron} ${automationExpanded ? styles.automationChevronOpen : ''}`}
+                    />
+                  </button>
+                  {automationExpanded ? (
+                    <div
+                      id="meeting-email-automation-panel"
+                      role="region"
+                      aria-labelledby="meeting-email-automation-trigger"
+                      className={styles.automationPanel}
+                    >
+                      <p className={styles.hint} style={{ marginTop: 0 }}>
+                        Reminders, feedback timing, and related options apply to your meetings.
+                      </p>
+                      <div className={styles.grid2}>
+                        <Select
+                          label="Send reminders"
+                          value={settings?.reminder_enabled ? 'yes' : 'no'}
+                          onChange={(e) => updateField('reminder_enabled', e.target.value === 'yes')}
+                          options={[
+                            { value: 'yes', label: 'Enabled' },
+                            { value: 'no', label: 'Disabled' },
+                          ]}
+                          disabled={saving || loading}
+                        />
+                        <Select
+                          label="Send feedback request"
+                          value={settings?.feedback_enabled ? 'yes' : 'no'}
+                          onChange={(e) => updateField('feedback_enabled', e.target.value === 'yes')}
+                          options={[
+                            { value: 'yes', label: 'Enabled' },
+                            { value: 'no', label: 'Disabled' },
+                          ]}
+                          disabled={saving || loading}
+                        />
+                      </div>
+                      <div className={styles.grid2}>
+                        <Input
+                          label="After meeting — delay value"
+                          type="number"
+                          min="1"
+                          value={settings?.feedback_delay_value ?? 2}
+                          onChange={(e) => updateField('feedback_delay_value', Number(e.target.value || 1))}
+                          disabled={saving || loading}
+                        />
+                        <Select
+                          label="Delay unit"
+                          value={settings?.feedback_delay_unit || 'hours'}
+                          onChange={(e) => updateField('feedback_delay_unit', e.target.value)}
+                          options={[
+                            { value: 'minutes', label: 'Minutes' },
+                            { value: 'hours', label: 'Hours' },
+                            { value: 'days', label: 'Days' },
+                          ]}
+                          disabled={saving || loading}
+                        />
+                      </div>
+                      <div className={styles.grid2}>
+                        <Input
+                          label="Thank you page URL (optional)"
+                          value={settings?.thank_you_page_url || ''}
+                          onChange={(e) => updateField('thank_you_page_url', e.target.value)}
+                          disabled={saving || loading}
+                          placeholder="https://yourcompany.com/thank-you"
+                        />
+                        <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 4 }}>
+                          <Checkbox
+                            label="Include meeting details in email"
+                            checked={Boolean(settings?.include_meeting_details)}
+                            onChange={(e) => updateField('include_meeting_details', e.target.checked)}
+                            disabled={saving || loading}
+                          />
+                        </div>
+                      </div>
+
+                      <div className={styles.reminderSchedule}>
+                        <div className={styles.label} style={{ marginBottom: 10 }}>
+                          Reminder schedule
+                        </div>
+                        <p className={styles.hint} style={{ marginTop: 0 }}>
+                          Send this many minutes/hours/days before the meeting start. Each row is one reminder.
+                        </p>
+                        {(settings?.reminder_offsets || []).map((item, idx) => (
+                          <div key={`offset-${idx}`} className={styles.reminderRow}>
+                            <Input
+                              label={idx === 0 ? 'Amount' : undefined}
+                              type="number"
+                              min="1"
+                              value={item?.value ?? 1}
+                              onChange={(e) => updateReminderOffset(idx, 'value', e.target.value)}
+                              disabled={saving}
+                            />
+                            <Select
+                              label={idx === 0 ? 'Unit' : undefined}
+                              value={item?.unit || 'minutes'}
+                              onChange={(e) => updateReminderOffset(idx, 'unit', e.target.value)}
+                              options={[
+                                { value: 'minutes', label: 'Minutes' },
+                                { value: 'hours', label: 'Hours' },
+                                { value: 'days', label: 'Days' },
+                              ]}
+                              disabled={saving}
+                            />
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={() => removeReminderOffset(idx)}
+                              disabled={saving || (settings?.reminder_offsets || []).length <= 1}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ))}
+                        <button type="button" className={styles.addReminderLink} onClick={addReminderOffset} disabled={saving}>
+                          + Add another reminder
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className={styles.configSection}>
+                  <div className={styles.sectionTitle}>Email options</div>
+                  <Checkbox
+                    label="Include meeting details in email"
+                    checked={Boolean(settings?.include_meeting_details)}
+                    onChange={(e) => updateField('include_meeting_details', e.target.checked)}
+                    disabled={saving || loading}
+                  />
+                  {tab === 'feedback' ? (
+                    <p className={styles.hint} style={{ marginBottom: 0 }}>
+                      Reminder and feedback timing are configured on the <strong>Reminder email</strong> tab under
+                      Automation.
+                    </p>
+                  ) : null}
+                </div>
+              )}
 
               <div className={styles.footerNote}>
                 <InfoHelpIcon

@@ -1,4 +1,5 @@
 import React from 'react';
+import { PRODUCT_DISPLAY_NAME } from '../../config/productBrand';
 import styles from './NestInsightsPanel.module.scss';
 
 const SEVERITY_CLASS = {
@@ -37,7 +38,8 @@ export function NestInsightsPanel({ bundle, loading, error }) {
         </span>
       </div>
       <p className={styles.sub}>
-        Guidance from Call Nest using your metrics, trends, and peer context. Explanations stay on your servers.
+        Guidance from {PRODUCT_DISPLAY_NAME} using your metrics, trends, and peer context. Explanations stay on your
+        servers.
       </p>
       {insights.length === 0 ? (
         <p className={styles.muted}>No prioritized insights for this range — keep logging activity for richer guidance.</p>

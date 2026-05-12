@@ -14,6 +14,7 @@ import { useAppSelector } from '../app/hooks';
 import { selectUser } from '../features/auth/authSelectors';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import { useTenant } from '../context/TenantContext';
+import { PRODUCT_DISPLAY_NAME } from '../config/productBrand';
 import { downloadPaymentInvoiceHtml } from '../utils/billingInvoiceDownload';
 import styles from './BillingPage.module.scss';
 import listStyles from '../components/admin/adminDataList.module.scss';
@@ -258,7 +259,7 @@ export function BillingPage() {
         key: data.keyId,
         amount: data.amount,
         currency: data.currency || 'INR',
-        name: 'Call Nest',
+        name: PRODUCT_DISPLAY_NAME,
         description: data.plan?.name || plan.name,
         order_id: data.orderId,
         handler: async (response) => {
@@ -299,7 +300,7 @@ export function BillingPage() {
       payment: row,
       customerEmail: user?.email,
       workspaceLabel: tenantSlug || undefined,
-      productName: 'Call Nest',
+      productName: PRODUCT_DISPLAY_NAME,
     });
   };
 

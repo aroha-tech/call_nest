@@ -7,7 +7,14 @@ import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } fro
 import { ConfirmModal, ModalFooter } from '../../components/ui/Modal';
 import { SlidePanel } from '../../components/ui/SlidePanel';
 import { IconButton } from '../../components/ui/IconButton';
-import { EditIcon, PauseIcon, PlayIcon, TrashIcon, RefreshIcon } from '../../components/ui/ActionIcons';
+import {
+  EditIcon,
+  PauseIcon,
+  PlayIcon,
+  TrashIcon,
+  RefreshIcon,
+  VerifyConnectionIcon,
+} from '../../components/ui/ActionIcons';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
@@ -20,6 +27,7 @@ import { useTableLoadingState } from '../../hooks/useTableLoadingState';
 import { TableDataRegion } from '../../components/admin/TableDataRegion';
 import { usePermissions } from '../../hooks/usePermission';
 import { PERMISSIONS } from '../../utils/permissionUtils';
+import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 
 const PROVIDER_OPTIONS = [
   { value: 'smtp', label: 'SMTP (Custom)' },
@@ -29,38 +37,89 @@ const PROVIDER_OPTIONS = [
 
 const OAUTH_PROVIDERS = new Set(['gmail', 'outlook']);
 
+function parseOAuthAccessTokenExpiryMs(expiresRaw) {
+  const raw = String(expiresRaw || '').trim();
+  if (!raw) return NaN;
+  // MySQL DATETIME often arrives without timezone; treat it as UTC for token expiry checks.
+  const normalized = raw.includes('T')
+    ? raw
+    : raw.includes(' ')
+      ? raw.replace(' ', 'T')
+      : raw;
+  const withZone = /Z$|[+-]\d{2}:\d{2}$/.test(normalized) ? normalized : `${normalized}Z`;
+  return new Date(withZone).getTime();
+}
+
+function rowHasOAuthRefreshToken(row) {
+  const v = row?.oauth_has_refresh_token;
+  return v === true || v === 1 || v === '1';
+}
+
+/**
+ * "Reauthorization" in the UI should mean the user must visit Google/Microsoft again — not
+ * "the short-lived access token is near expiry" (normal; the server refreshes when a refresh_token exists).
+ */
 function getReauthState(row) {
   const provider = String(row?.provider || '').toLowerCase();
   if (!OAUTH_PROVIDERS.has(provider)) {
     return { requiresReauth: false, label: 'N/A', variant: 'muted', reason: '' };
   }
+
+  if (row.oauth_last_error_at || row.oauth_last_error_code) {
+    const detail = String(row.oauth_last_error_detail || '').trim();
+    const code = String(row.oauth_last_error_code || '').trim();
+    const parts = [
+      'The server recorded an authentication or permission failure for this account (for example refresh revoked, expired consent, or Graph returned 401/403).',
+      detail ? `Detail: ${detail}` : null,
+      code ? `Code: ${code}` : null,
+      'Use Verify to test the connection now, or Reconnect to sign in again with Google or Microsoft.',
+    ].filter(Boolean);
+    return {
+      requiresReauth: true,
+      label: 'Reconnect recommended',
+      variant: 'warning',
+      reason: parts.join(' '),
+    };
+  }
+
+  if (rowHasOAuthRefreshToken(row)) {
+    const expMs = parseOAuthAccessTokenExpiryMs(row?.token_expires_at);
+    let reason =
+      'Connected with offline access; the app refreshes the access token automatically when you send or sync mail.';
+    if (Number.isFinite(expMs)) {
+      const minutesLeft = Math.floor((expMs - Date.now()) / 60000);
+      if (minutesLeft <= 0) {
+        reason +=
+          ' Current access token is past its nominal expiry; it will be renewed on the next email operation.';
+      } else {
+        reason += ` (Current access token ~${minutesLeft} min remaining.)`;
+      }
+    }
+    return {
+      requiresReauth: false,
+      label: 'Authorized',
+      variant: 'success',
+      reason,
+    };
+  }
+
   const expiresRaw = row?.token_expires_at;
   if (!expiresRaw) {
     return {
       requiresReauth: true,
       label: 'Reauthorization needed',
       variant: 'warning',
-      reason: 'Token expiry not available',
+      reason:
+        'No refresh token on file (or offline access missing). Reconnect so the app can renew access without asking you each hour.',
     };
   }
-  const expMs = (() => {
-    const raw = String(expiresRaw || '').trim();
-    if (!raw) return NaN;
-    // MySQL DATETIME often arrives without timezone; treat it as UTC for token expiry checks.
-    const normalized = raw.includes('T')
-      ? raw
-      : raw.includes(' ')
-        ? raw.replace(' ', 'T')
-        : raw;
-    const withZone = /Z$|[+-]\d{2}:\d{2}$/.test(normalized) ? normalized : `${normalized}Z`;
-    return new Date(withZone).getTime();
-  })();
+  const expMs = parseOAuthAccessTokenExpiryMs(expiresRaw);
   if (!Number.isFinite(expMs)) {
     return {
       requiresReauth: true,
       label: 'Reauthorization needed',
       variant: 'warning',
-      reason: 'Token expiry is invalid',
+      reason: 'Access token expiry is invalid — reconnect the account.',
     };
   }
   const minutesLeft = Math.floor((expMs - Date.now()) / 60000);
@@ -69,15 +128,30 @@ function getReauthState(row) {
       requiresReauth: true,
       label: 'Reauthorization needed',
       variant: 'warning',
-      reason: minutesLeft <= 0 ? 'Token expired' : `Token expires in ${minutesLeft} min`,
+      reason:
+        minutesLeft <= 0
+          ? 'Access token expired and there is no refresh token — reconnect.'
+          : `Access token ends in ${minutesLeft} min without refresh storage — reconnect before it lapses.`,
     };
   }
   return {
     requiresReauth: false,
     label: 'Authorized',
     variant: 'success',
-    reason: `Token valid for ~${Math.floor(minutesLeft / 60)}h`,
+    reason: `Access token valid ~${Math.floor(minutesLeft / 60)}h (no long-lived refresh stored — reconnect if sending stops working).`,
   };
+}
+
+function authorizationDetailTitle(row, formatDateTime) {
+  const state = getReauthState(row);
+  const parts = [];
+  if (state.reason) parts.push(state.reason);
+  if (row.oauth_last_error_at && formatDateTime) {
+    parts.push(`Issue recorded: ${formatDateTime(row.oauth_last_error_at)}`);
+  } else if (row.oauth_last_verified_at && formatDateTime) {
+    parts.push(`Last verified (send or check): ${formatDateTime(row.oauth_last_verified_at)}`);
+  }
+  return parts.length ? parts.join('\n\n') : undefined;
 }
 
 const defaultFormData = () => ({
@@ -97,6 +171,7 @@ export function EmailAccountsPage() {
   const { can } = usePermissions();
   const canManageAccounts =
     can(PERMISSIONS.EMAIL_ACCOUNTS_MANAGE) || can(PERMISSIONS.SETTINGS_MANAGE);
+  const { formatDateTime } = useDateTimeDisplay();
 
   const [showInactive, setShowInactive] = useState(false);
   const fetchFn = useCallback(
@@ -117,6 +192,7 @@ export function EmailAccountsPage() {
   const [oauthMessage, setOauthMessage] = useState(null);
   const [oauthError, setOauthError] = useState(null);
   const [oauthLoading, setOauthLoading] = useState(null); // 'google' | 'outlook'
+  const [verifyingAccountId, setVerifyingAccountId] = useState(null);
 
   // Handle OAuth callback query params
   useEffect(() => {
@@ -256,6 +332,25 @@ export function EmailAccountsPage() {
     }
   };
 
+  const handleVerifyOAuth = async (row) => {
+    setOauthError(null);
+    setOauthMessage(null);
+    setVerifyingAccountId(row.id);
+    try {
+      await emailAccountsAPI.verifyOAuth(row.id);
+      setOauthMessage(
+        `Connection verified for ${row.email_address || row.account_name || 'account'}.`
+      );
+      refetch();
+    } catch (err) {
+      setOauthError(
+        err.response?.data?.error || err.message || 'Verification failed'
+      );
+    } finally {
+      setVerifyingAccountId(null);
+    }
+  };
+
   const handleReconnect = async (row) => {
     const provider = (row.provider || '').toLowerCase();
     if (provider !== 'gmail' && provider !== 'outlook') return;
@@ -345,7 +440,7 @@ export function EmailAccountsPage() {
               <TableHeaderCell>Authorization</TableHeaderCell>
               <TableHeaderCell>Status</TableHeaderCell>
               {canManageAccounts ? (
-                <TableHeaderCell width="180px" align="center">Actions</TableHeaderCell>
+                <TableHeaderCell width="220px" align="center">Actions</TableHeaderCell>
               ) : null}
             </TableRow>
           </TableHead>
@@ -360,12 +455,24 @@ export function EmailAccountsPage() {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <Badge
-                    variant={getReauthState(row).variant}
-                    title={getReauthState(row).reason || undefined}
-                  >
-                    {getReauthState(row).label}
-                  </Badge>
+                  <div>
+                    <Badge
+                      variant={getReauthState(row).variant}
+                      title={authorizationDetailTitle(row, formatDateTime)}
+                    >
+                      {getReauthState(row).label}
+                    </Badge>
+                    {row.oauth_last_error_at || row.oauth_last_error_code ? (
+                      <div className={listStyles.mutedSmall} style={{ marginTop: 4 }}>
+                        Issue recorded
+                        {row.oauth_last_error_at ? ` ${formatDateTime(row.oauth_last_error_at)}` : ''}
+                      </div>
+                    ) : row.oauth_last_verified_at ? (
+                      <div className={listStyles.mutedSmall} style={{ marginTop: 4 }}>
+                        Last verified {formatDateTime(row.oauth_last_verified_at)}
+                      </div>
+                    ) : null}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <Badge variant={row.status === 'active' ? 'success' : 'muted'}>{row.status}</Badge>
@@ -374,18 +481,28 @@ export function EmailAccountsPage() {
                 <TableCell align="center">
                   <div className={styles.actions}>
                     {(row.provider === 'gmail' || row.provider === 'outlook') && (
-                      <IconButton
-                        size="sm"
-                        title={
-                          getReauthState(row).requiresReauth
-                            ? 'Reauthorize now (required)'
-                            : 'Reauthorize account permissions'
-                        }
-                        onClick={() => handleReconnect(row)}
-                        disabled={!!oauthLoading}
-                      >
-                        <RefreshIcon />
-                      </IconButton>
+                      <>
+                        <IconButton
+                          size="sm"
+                          title="Verify connection (checks refresh with Google or Microsoft and updates tokens)"
+                          onClick={() => handleVerifyOAuth(row)}
+                          disabled={!!oauthLoading || verifyingAccountId === row.id}
+                        >
+                          <VerifyConnectionIcon />
+                        </IconButton>
+                        <IconButton
+                          size="sm"
+                          title={
+                            getReauthState(row).requiresReauth
+                              ? 'Reconnect with Google or Microsoft (recommended)'
+                              : 'Reauthorize account permissions'
+                          }
+                          onClick={() => handleReconnect(row)}
+                          disabled={!!oauthLoading || verifyingAccountId === row.id}
+                        >
+                          <RefreshIcon />
+                        </IconButton>
+                      </>
                     )}
                     {row.status === 'inactive' ? (
                       <IconButton size="sm" variant="success" title="Activate" onClick={() => setConfirmAction({ id: row.id, action: 'activate', name: row.account_name || row.email_address })}>

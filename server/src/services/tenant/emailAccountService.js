@@ -1,8 +1,11 @@
 import { query } from '../../config/db.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
 
-const LIST_COLUMNS =
-  'id, tenant_id, provider, account_name, email_address, display_name, status, token_expires_at, created_at, updated_at';
+const LIST_COLUMNS = `id, tenant_id, provider, account_name, email_address, display_name, status, token_expires_at,
+  oauth_last_verified_at,
+  oauth_last_error_at, oauth_last_error_code, oauth_last_error_detail,
+  (refresh_token IS NOT NULL AND TRIM(refresh_token) <> '') AS oauth_has_refresh_token,
+  created_at, updated_at`;
 
 export async function findAll(tenantId, includeInactive = false) {
   let sql = `
@@ -68,6 +71,7 @@ export async function create(tenantId, data, createdBy) {
     access_token = null,
     refresh_token = null,
     token_expires_at = null,
+    oauth_last_verified_at = null,
     smtp_host = null,
     smtp_port = null,
     smtp_secure = true,
@@ -85,8 +89,9 @@ export async function create(tenantId, data, createdBy) {
   const result = await query(
     `INSERT INTO email_accounts
      (tenant_id, provider, account_name, email_address, display_name, access_token, refresh_token, token_expires_at,
+      oauth_last_verified_at,
       smtp_host, smtp_port, smtp_secure, smtp_user, smtp_password_encrypted, status, created_by, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
       provider,
@@ -96,6 +101,7 @@ export async function create(tenantId, data, createdBy) {
       access_token || null,
       refresh_token || null,
       token_expires_at || null,
+      oauth_last_verified_at || null,
       smtp_host?.trim() || null,
       smtp_port ?? null,
       smtp_secure ? 1 : 0,
@@ -135,6 +141,10 @@ export async function update(tenantId, id, data, updatedBy) {
     'access_token',
     'refresh_token',
     'token_expires_at',
+    'oauth_last_verified_at',
+    'oauth_last_error_at',
+    'oauth_last_error_code',
+    'oauth_last_error_detail',
     'smtp_host',
     'smtp_port',
     'smtp_secure',
@@ -173,6 +183,47 @@ export async function update(tenantId, id, data, updatedBy) {
     entity_id: Number(id),
   });
   return row;
+}
+
+/** Single-line detail for oauth_last_error_detail (DB max 512). */
+export function sanitizeOAuthErrorDetail(text) {
+  if (text == null) return null;
+  let s = String(text).replace(/\s+/g, ' ').trim();
+  if (!s) return null;
+  if (s.length > 512) s = `${s.slice(0, 509)}...`;
+  return s;
+}
+
+/**
+ * Records a provider/auth failure for Email Accounts UI (no tenant activity row).
+ * @param {string} code Stable machine code, max 64 chars.
+ */
+export async function recordOAuthConnectionFailureQuiet(tenantId, accountId, code, detail) {
+  const c = String(code || 'OAUTH_UNKNOWN').trim().slice(0, 64) || 'OAUTH_UNKNOWN';
+  const d = sanitizeOAuthErrorDetail(detail);
+  await query(
+    `UPDATE email_accounts
+     SET oauth_last_error_at = UTC_TIMESTAMP(),
+         oauth_last_error_code = ?,
+         oauth_last_error_detail = ?
+     WHERE id = ? AND tenant_id = ? AND (is_deleted = 0 OR is_deleted IS NULL)`,
+    [c, d, accountId, tenantId]
+  );
+}
+
+/**
+ * After successful Gmail/Outlook send: touch verified and clear last OAuth error (no activity row).
+ */
+export async function patchOauthHealthOnSendSuccess(tenantId, id) {
+  await query(
+    `UPDATE email_accounts
+     SET oauth_last_verified_at = UTC_TIMESTAMP(),
+         oauth_last_error_at = NULL,
+         oauth_last_error_code = NULL,
+         oauth_last_error_detail = NULL
+     WHERE id = ? AND tenant_id = ? AND (is_deleted = 0 OR is_deleted IS NULL)`,
+    [id, tenantId]
+  );
 }
 
 export async function remove(tenantId, id, deletedByUserId = null) {
