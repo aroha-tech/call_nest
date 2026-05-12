@@ -211,6 +211,14 @@ export const env = {
     keySecret: (process.env.RAZORPAY_KEY_SECRET || '').trim(),
     webhookSecret: (process.env.RAZORPAY_WEBHOOK_SECRET || '').trim(),
   },
+
+  /**
+   * Symmetric AES-256-GCM key for at-rest encryption of tenant provider credentials
+   * (tenant_telephony_accounts.credentials_*). Must be 32 raw bytes encoded as base64 or hex.
+   * Generate with `openssl rand -base64 32`. Required in production; dev falls back to a
+   * JWT-derived key with a console warning. See server/src/utils/secretCrypto.js.
+   */
+  appEncryptionKey: (process.env.APP_ENCRYPTION_KEY || '').trim(),
 };
 
 /**

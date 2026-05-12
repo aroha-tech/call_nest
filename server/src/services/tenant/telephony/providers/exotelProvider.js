@@ -1,22 +1,59 @@
 import { randomUUID } from 'crypto';
 import { env } from '../../../../config/env.js';
 
-function requireExotelApiCredentials() {
-  const sid = env.telephony.exotelSid;
-  const apiKey = env.telephony.exotelApiKey;
-  const apiToken = env.telephony.exotelApiToken;
-  const subdomain = env.telephony.exotelSubdomain;
+/**
+ * Resolve Exotel credentials for this call. Order of precedence:
+ *   1. `credentials` arg passed in by the caller (BYO: per-tenant config from tenant_telephony_accounts)
+ *   2. server env (`EXOTEL_*` — the platform's default Exotel account)
+ *
+ * Returns a shape ready to talk to the Exotel REST API.
+ */
+function resolveExotelCredentials(credentials = null) {
+  const sid =
+    String(credentials?.exotel_sid || credentials?.sid || env.telephony.exotelSid || '').trim();
+  const apiKey =
+    String(credentials?.exotel_api_key || credentials?.api_key || env.telephony.exotelApiKey || '').trim();
+  const apiToken =
+    String(credentials?.exotel_api_token || credentials?.api_token || env.telephony.exotelApiToken || '').trim();
+  const subdomain =
+    String(credentials?.exotel_subdomain || credentials?.subdomain || env.telephony.exotelSubdomain || '').trim();
+
   if (!sid || !apiKey || !apiToken || !subdomain) {
     const err = new Error(
-      'Exotel provider not configured. Set EXOTEL_SID, EXOTEL_API_KEY, EXOTEL_API_TOKEN, and EXOTEL_SUBDOMAIN.'
+      'Exotel provider not configured. Either configure tenant BYO account or set EXOTEL_SID, EXOTEL_API_KEY, EXOTEL_API_TOKEN and EXOTEL_SUBDOMAIN on the server.'
     );
     err.status = 500;
     throw err;
   }
-  const statusCallback =
-    String(env.telephony.exotelStatusCallbackUrl || '').trim() ||
-    `${String(env.apiBaseUrl || '').replace(/\/$/, '')}/api/public/telephony/exotel/status`;
-  return { sid, apiKey, apiToken, subdomain, statusCallback };
+
+  const recordCalls =
+    credentials?.exotel_record_calls != null
+      ? Boolean(credentials.exotel_record_calls)
+      : env.telephony.exotelRecordCalls;
+  const recordingChannels =
+    String(credentials?.exotel_recording_channels || env.telephony.exotelRecordingChannels || '').trim() || '';
+
+  return {
+    sid,
+    apiKey,
+    apiToken,
+    subdomain,
+    recordCalls,
+    recordingChannels,
+  };
+}
+
+function buildStatusCallback({ statusCallbackOverride = null, webhookToken = null }) {
+  // Per-tenant webhook routing: append the tenant's webhook_token so the callback is unambiguous.
+  if (statusCallbackOverride) return String(statusCallbackOverride).trim();
+  const base = `${String(env.apiBaseUrl || '').replace(/\/$/, '')}/api/public/telephony/exotel/status`;
+  const envOverride = String(env.telephony.exotelStatusCallbackUrl || '').trim();
+  const baseUrl = envOverride || base;
+  if (webhookToken) {
+    const sep = baseUrl.includes('?') ? '&' : '/';
+    return `${baseUrl}${sep}${encodeURIComponent(webhookToken)}`;
+  }
+  return baseUrl;
 }
 
 function toFormBody(payload) {
@@ -28,7 +65,6 @@ function toFormBody(payload) {
   return form.toString();
 }
 
-/** Map Exotel API / webhook raw status to DB enum values (see contact_call_attempts.status). */
 function normalizeExotelCallStatus(raw) {
   const s = String(raw || 'queued')
     .trim()
@@ -47,17 +83,29 @@ function normalizeExotelCallStatus(raw) {
 export const exotelProvider = {
   code: 'exotel',
 
-  async startOutboundCall({ to, metadata = {} }) {
+  /**
+   * Place an outbound call.
+   *
+   * @param {object} args
+   * @param {string} args.to                       Destination E.164 phone.
+   * @param {object} [args.metadata]               Caller/leg overrides.
+   * @param {object|null} [args.credentials]       Per-tenant credentials (BYO). null/undefined falls back to env.
+   * @param {string|null} [args.webhookToken]      Tenant webhook routing token to append to the StatusCallback URL.
+   * @param {string|null} [args.statusCallbackOverride] Full StatusCallback override for this account.
+   */
+  async startOutboundCall({ to, metadata = {}, credentials = null, webhookToken = null, statusCallbackOverride = null }) {
     if (!to) {
       const err = new Error('Missing destination number');
       err.status = 400;
       throw err;
     }
-    const { sid, apiKey, apiToken, subdomain, statusCallback } = requireExotelApiCredentials();
+    const { sid, apiKey, apiToken, subdomain, recordCalls, recordingChannels } =
+      resolveExotelCredentials(credentials);
+    const statusCallback = buildStatusCallback({ statusCallbackOverride, webhookToken });
+
     const envCaller = String(env.telephony.exotelCallerId || '').trim();
     const envLeg = String(env.telephony.exotelAgentLeg || '').trim();
-    const callerId =
-      String(metadata.exotelCallerId || '').trim() || envCaller;
+    const callerId = String(metadata.exotelCallerId || '').trim() || envCaller;
     const agentLeg = String(metadata.exotelAgentLeg || '').trim() || envLeg;
 
     if (!callerId) {
@@ -76,10 +124,9 @@ export const exotelProvider = {
       CallType: 'trans',
       TimeLimit: 3600,
     };
-    if (env.telephony.exotelRecordCalls) {
+    if (recordCalls) {
       base.Record = 'true';
-      const ch = String(env.telephony.exotelRecordingChannels || '').trim();
-      if (ch) base.RecordingChannels = ch;
+      if (recordingChannels) base.RecordingChannels = recordingChannels;
     }
     if (statusCallback) {
       base.StatusCallback = statusCallback;

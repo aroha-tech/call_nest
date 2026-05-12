@@ -1,5 +1,10 @@
 import { query } from '../../config/db.js';
 import { normalizeAttemptStatusForDb } from '../tenant/callsService.js';
+import { settleCallAttempt } from '../billing/callCreditsService.js';
+import {
+  findAccountByAccountSid,
+  findAccountByWebhookToken,
+} from '../tenant/telephony/tenantTelephonyAccountsService.js';
 
 function normalizeExotelStatus(payload = {}) {
   const raw = String(
@@ -45,6 +50,10 @@ function pickProviderCallId(payload = {}) {
   ).trim();
 }
 
+function pickAccountSid(payload = {}) {
+  return String(payload.AccountSid || payload.account_sid || payload.Sid || '').trim();
+}
+
 function pickRecordingUrl(payload = {}) {
   const direct = payload.RecordingUrl || payload.recording_url || payload.Recording_URL;
   if (direct != null && String(direct).trim()) return String(direct).trim();
@@ -58,26 +67,66 @@ function pickRecordingUrl(payload = {}) {
   return null;
 }
 
-export async function handleExotelStatusCallback(payload = {}) {
+/**
+ * Resolve which tenant a webhook belongs to. Priority:
+ *   1. webhook_token in the URL (most reliable, set by us when starting the call).
+ *   2. AccountSid in the webhook payload (fallback when a tenant cannot configure custom URLs).
+ * Returns either { account, tenantId } where account is non-null for BYO, or { tenantId: null }
+ * meaning the webhook is for a default-account call (lookup by provider_call_id below).
+ */
+async function resolveTenantForWebhook(webhookToken, payload) {
+  if (webhookToken) {
+    const account = await findAccountByWebhookToken(webhookToken);
+    if (!account) {
+      const err = new Error('Unknown Exotel webhook token');
+      err.status = 401;
+      throw err;
+    }
+    return { account, tenantId: Number(account.tenant_id) };
+  }
+  const accountSid = pickAccountSid(payload);
+  if (accountSid) {
+    const account = await findAccountByAccountSid('exotel', accountSid);
+    if (account) {
+      return { account, tenantId: Number(account.tenant_id) };
+    }
+  }
+  // Default-account call: tenant will be resolved from the attempt row by provider_call_id.
+  return { account: null, tenantId: null };
+}
+
+/**
+ * Handle an inbound Exotel status callback.
+ *
+ * @param {object} payload   Exotel's body (JSON or form-encoded; both parsed upstream).
+ * @param {object} options
+ * @param {string|null} options.webhookToken  The token captured from the URL (`/status/:token`),
+ *                                            or null when the legacy global `/status` URL was hit.
+ */
+export async function handleExotelStatusCallback(payload = {}, { webhookToken = null } = {}) {
   const providerCallId = pickProviderCallId(payload);
   if (!providerCallId) {
     const err = new Error('Missing CallSid/CallUUID in Exotel webhook payload');
     err.status = 400;
     throw err;
   }
+
   const status = normalizeAttemptStatusForDb('exotel', normalizeExotelStatus(payload));
   const durationSec = parseDuration(payload);
   const recordingUrl = pickRecordingUrl(payload);
 
-  const [attempt] = await query(
-    `SELECT id, tenant_id
-     FROM contact_call_attempts
-     WHERE provider = 'exotel'
-       AND provider_call_id = ?
-     ORDER BY id DESC
-     LIMIT 1`,
-    [providerCallId]
-  );
+  const { account, tenantId: routedTenantId } = await resolveTenantForWebhook(webhookToken, payload);
+
+  // Find the attempt. When we know the tenantId, scope by it to avoid cross-tenant collisions
+  // on provider_call_id (Exotel SIDs are unique within an Exotel account; different BYO tenants
+  // could theoretically collide on the same call id).
+  const lookupParams = routedTenantId
+    ? [providerCallId, routedTenantId]
+    : [providerCallId];
+  const lookupSql = routedTenantId
+    ? `SELECT id, tenant_id FROM contact_call_attempts WHERE provider = 'exotel' AND provider_call_id = ? AND tenant_id = ? ORDER BY id DESC LIMIT 1`
+    : `SELECT id, tenant_id FROM contact_call_attempts WHERE provider = 'exotel' AND provider_call_id = ? ORDER BY id DESC LIMIT 1`;
+  const [attempt] = await query(lookupSql, lookupParams);
   if (!attempt) {
     return { matched: false, provider_call_id: providerCallId, status };
   }
@@ -109,13 +158,29 @@ export async function handleExotelStatusCallback(payload = {}) {
     [...uparams, attempt.id, attempt.tenant_id]
   );
 
+  // Settle billing on terminal states. Idempotent: settleCallAttempt no-ops if already settled.
+  let billing = null;
+  if (finished) {
+    try {
+      billing = await settleCallAttempt(attempt.id);
+    } catch (err) {
+      console.error('[exotelWebhook] settleCallAttempt failed', {
+        attempt_id: attempt.id,
+        tenant_id: attempt.tenant_id,
+        error: err?.message || err,
+      });
+    }
+  }
+
   return {
     matched: true,
     attempt_id: attempt.id,
     tenant_id: attempt.tenant_id,
+    account_id: account?.id || null,
     provider_call_id: providerCallId,
     status,
     duration_sec: durationSec,
     recording_url: recordingUrl || undefined,
+    billing,
   };
 }

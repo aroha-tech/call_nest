@@ -238,71 +238,74 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
+  width: auto;
+  height: auto;
+  min-width: 22px;
+  min-height: 22px;
+  border-radius: 0;
+  background: transparent;
 }
 
-// Colorful KPI card icon styles matching modern SaaS design
+// KPI strip icons: colored glyph only (no tile background)
 .kpiMatLeaderboard {
-  background: color-mix(in srgb, #6366f1 18%, transparent);
+  background: transparent;
   color: #818cf8;
 }
 
 .kpiMatContacts {
-  background: color-mix(in srgb, #22c55e 18%, transparent);
+  background: transparent;
   color: #4ade80;
 }
 
 .kpiMatCampaign {
-  background: color-mix(in srgb, #10b981 18%, transparent);
+  background: transparent;
   color: #34d399;
 }
 
 .kpiMatEvent {
-  background: color-mix(in srgb, #22c55e 18%, transparent);
+  background: transparent;
   color: #4ade80;
 }
 
 .kpiMatEmail {
-  background: color-mix(in srgb, #a855f7 18%, transparent);
+  background: transparent;
   color: #c084fc;
 }
 
 .kpiMatCall {
-  background: color-mix(in srgb, #22c55e 18%, transparent);
+  background: transparent;
   color: #4ade80;
 }
 
 // Light theme adjustments for KPI icons
 :root[data-color-scheme='light'] {
   .kpiMatLeaderboard {
-    background: color-mix(in srgb, #6366f1 12%, transparent);
+    background: transparent;
     color: #4f46e5;
   }
 
   .kpiMatContacts {
-    background: color-mix(in srgb, #22c55e 12%, transparent);
+    background: transparent;
     color: #16a34a;
   }
 
   .kpiMatCampaign {
-    background: color-mix(in srgb, #10b981 12%, transparent);
+    background: transparent;
     color: #059669;
   }
 
   .kpiMatEvent {
-    background: color-mix(in srgb, #22c55e 12%, transparent);
+    background: transparent;
     color: #16a34a;
   }
 
   .kpiMatEmail {
-    background: color-mix(in srgb, #a855f7 12%, transparent);
+    background: transparent;
     color: #9333ea;
   }
 
   .kpiMatCall {
-    background: color-mix(in srgb, #22c55e 12%, transparent);
+    background: transparent;
     color: #16a34a;
   }
 }
@@ -1046,12 +1049,16 @@
 .activityIconWrap {
   box-sizing: border-box;
   flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  border-radius: $radius-full;
+  width: auto;
+  height: auto;
+  min-width: 22px;
+  min-height: 22px;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  background: transparent;
 }
 
 .activityIconGlyph {
@@ -1060,51 +1067,51 @@
   height: 17px;
 }
 
-// Colorful activity feed icons
+// Activity feed icons: glyph tint only
 .activityIconCall {
-  background: color-mix(in srgb, #22c55e 18%, transparent);
+  background: transparent;
   color: #4ade80;
   border: none;
 }
 
 .activityIconWa {
-  background: color-mix(in srgb, #25d366 18%, transparent);
+  background: transparent;
   color: #25d366;
   border: none;
 }
 
 .activityIconEmail {
-  background: color-mix(in srgb, #a855f7 18%, transparent);
+  background: transparent;
   color: #c084fc;
   border: none;
 }
 
 .activityIconTeam {
-  background: color-mix(in srgb, #0ea5e9 18%, transparent);
+  background: transparent;
   color: #38bdf8;
   border: none;
 }
 
 .activityIconWorkspace {
-  background: color-mix(in srgb, #6366f1 18%, transparent);
+  background: transparent;
   color: #818cf8;
   border: none;
 }
 
 .activityIconCampaign {
-  background: color-mix(in srgb, #f97316 18%, transparent);
+  background: transparent;
   color: #fb923c;
   border: none;
 }
 
 .activityIconCrm {
-  background: color-mix(in srgb, #06b6d4 18%, transparent);
+  background: transparent;
   color: #22d3ee;
   border: none;
 }
 
 .activityIconSettings {
-  background: color-mix(in srgb, #14b8a6 18%, transparent);
+  background: transparent;
   color: #14b8a6;
   border: none;
 }
@@ -1112,42 +1119,42 @@
 // Light theme adjustments for activity icons
 :root[data-color-scheme='light'] {
   .activityIconCall {
-    background: color-mix(in srgb, #22c55e 12%, transparent);
+    background: transparent;
     color: #16a34a;
   }
 
   .activityIconWa {
-    background: color-mix(in srgb, #25d366 12%, transparent);
+    background: transparent;
     color: #128c7e;
   }
 
   .activityIconEmail {
-    background: color-mix(in srgb, #a855f7 12%, transparent);
+    background: transparent;
     color: #9333ea;
   }
 
   .activityIconTeam {
-    background: color-mix(in srgb, #0ea5e9 12%, transparent);
+    background: transparent;
     color: #0284c7;
   }
 
   .activityIconWorkspace {
-    background: color-mix(in srgb, #6366f1 12%, transparent);
+    background: transparent;
     color: #4f46e5;
   }
 
   .activityIconCampaign {
-    background: color-mix(in srgb, #f97316 12%, transparent);
+    background: transparent;
     color: #ea580c;
   }
 
   .activityIconCrm {
-    background: color-mix(in srgb, #06b6d4 12%, transparent);
+    background: transparent;
     color: #0891b2;
   }
 
   .activityIconSettings {
-    background: color-mix(in srgb, #14b8a6 12%, transparent);
+    background: transparent;
     color: #0f766e;
   }
 }

@@ -76,6 +76,8 @@ import { NotificationsPage } from '../features/notifications/NotificationsPage';
 import { MeetingAttendeeEmailSettingsPage } from '../pages/MeetingAttendeeEmailSettingsPage';
 import { BillingPage } from '../pages/BillingPage';
 import { PlatformBillingPage } from '../pages/PlatformBillingPage';
+import { PlatformTenantTelephonyPage } from '../pages/PlatformTenantTelephonyPage';
+import { TenantTelephonyPage } from '../pages/TenantTelephonyPage';
 import { TenantDomainHostGate } from './TenantDomainHostGate';
 
 /**
@@ -824,6 +826,23 @@ function TenantRoutes() {
         }
       />
       <Route
+        path="/settings/telephony"
+        element={
+          <ProtectedRoute
+            permissions={[
+              PERMISSIONS.SETTINGS_MANAGE,
+              PERMISSIONS.TELEPHONY_ACCOUNTS_VIEW,
+              PERMISSIONS.TELEPHONY_ACCOUNTS_MANAGE,
+              PERMISSIONS.BILLING_CREDITS_VIEW,
+            ]}
+          >
+            <AppShellLayout>
+              <TenantTelephonyPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/users"
         element={
           <ProtectedRoute permissions={[PERMISSIONS.USERS_MANAGE, PERMISSIONS.USERS_TEAM]}>
@@ -943,6 +962,16 @@ function PlatformRoutes() {
           <ProtectedRoute>
             <AppShellLayout>
               <PlatformBillingPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/telephony-billing"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <PlatformTenantTelephonyPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

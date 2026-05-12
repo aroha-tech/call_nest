@@ -1,0 +1,213 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.topAlert {
+  margin-bottom: 0;
+}
+
+.card {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.cardSub {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  opacity: 0.75;
+  max-width: 720px;
+}
+
+.subsectionTitle {
+  margin: 6px 0 4px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.cardActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px 18px;
+}
+
+.muted {
+  opacity: 0.65;
+  font-size: 0.85rem;
+}
+
+.dim {
+  font-weight: 400;
+  opacity: 0.75;
+  font-size: 0.85rem;
+}
+
+.warn {
+  color: var(--color-danger, #f43f5e);
+  font-weight: 600;
+}
+
+.mono {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.82rem;
+}
+
+.cellStack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.badgeStack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ---------- top status banner ---------- */
+.bannerCard {
+  padding: 18px 20px;
+}
+
+.bannerGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.bannerCell {
+  background: var(--color-surface-2, rgba(99, 102, 241, 0.06));
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.06));
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.bannerCellHero {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(168, 85, 247, 0.08));
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.bannerLabel {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.bannerValue {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.bannerFoot {
+  margin-top: 6px;
+  font-size: 0.82rem;
+  opacity: 0.78;
+}
+
+.capBar {
+  margin-top: 8px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.capBarFill {
+  height: 100%;
+  background: var(--color-success, #10b981);
+}
+
+.capBarFillOver {
+  height: 100%;
+  background: var(--color-danger, #f43f5e);
+}
+
+/* ---------- account add/edit form (inline inside card) ---------- */
+.opCard {
+  padding: 14px 16px;
+}
+
+.opTitle {
+  font-weight: 600;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+}
+
+.accountFormCard {
+  margin-top: 4px;
+  background: var(--color-surface-2, rgba(99, 102, 241, 0.04));
+}
+
+.toggleRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+/* ---------- webhook url + ledger amounts ---------- */
+.urlRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.url {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.78rem;
+  padding: 4px 8px;
+  background: var(--color-surface-2, rgba(99, 102, 241, 0.06));
+  border-radius: 6px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entryType {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.82rem;
+}
+
+.amountPos {
+  color: var(--color-success, #10b981);
+  font-weight: 600;
+}
+
+.amountNeg {
+  color: var(--color-danger, #f43f5e);
+  font-weight: 600;
+}

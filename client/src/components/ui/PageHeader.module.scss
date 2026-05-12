@@ -63,28 +63,25 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: auto;
+  height: auto;
   flex-shrink: 0;
-  border-radius: $radius-full;
-  background: linear-gradient(148deg, #1e3a8a 0%, #1d4ed8 42%, #3b82f6 100%);
-  color: #ffffff;
-  border: 1px solid color-mix(in srgb, #ffffff 22%, #1d4ed8);
-  box-shadow:
-    0 1px 0 color-mix(in srgb, #ffffff 35%, transparent) inset,
-    0 2px 5px rgba(15, 23, 42, 0.12),
-    0 10px 28px color-mix(in srgb, #2563eb 28%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-primary-600, #2563eb);
+  border: none;
+  box-shadow: none;
 }
 
 .titleIcon {
   line-height: 1;
-  font-size: 18px;
+  font-size: 22px;
   font-variation-settings:
-    'FILL' 1,
+    'FILL' 0,
     'wght' 500,
     'GRAD' 0,
     'opsz' 24;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.18));
+  filter: none;
 }
 
 .titleInfoBtn {

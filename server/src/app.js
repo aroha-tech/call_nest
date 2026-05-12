@@ -28,6 +28,7 @@ import campaignStatusesMasterRoutes from './routes/superAdmin/campaignStatusesMa
 import industryFieldDefinitionsRoutes from './routes/superAdmin/industryFieldDefinitions.js';
 import platformBillingRoutes from './routes/superAdmin/billing.js';
 import dialerPhoneNumbersAdminRoutes from './routes/superAdmin/dialerPhoneNumbers.js';
+import tenantTelephonyAdminRoutes from './routes/superAdmin/tenantTelephony.js';
 
 // Tenant routes
 import dialingSetsRoutes from './routes/tenant/dialingSets.js';
@@ -74,6 +75,8 @@ import taskManagerRoutes from './routes/tenant/taskManager.js';
 import reportsHubRoutes from './routes/tenant/reportsHub.js';
 import notificationsRoutes from './routes/tenant/notifications.js';
 import billingRoutes from './routes/tenant/billing.js';
+import telephonyAccountsRoutes from './routes/tenant/telephonyAccounts.js';
+import callCreditsRoutes from './routes/tenant/callCredits.js';
 import { initTenantRealtimeSocket } from './realtime/tenantRealtimeSocket.js';
 import { startTenantBackgroundJobWorker } from './workers/tenantBackgroundJobWorker.js';
 import { startMeetingReminderFeedbackWorker } from './workers/meetingReminderFeedbackWorker.js';
@@ -179,6 +182,7 @@ app.use('/api/admin/campaign-types', campaignTypesMasterRoutes);
 app.use('/api/admin/campaign-statuses', campaignStatusesMasterRoutes);
 app.use('/api/admin/billing', platformBillingRoutes);
 app.use('/api/admin/dialer-phone-numbers', dialerPhoneNumbersAdminRoutes);
+app.use('/api/admin/tenant-telephony', tenantTelephonyAdminRoutes);
 
 // Tenant routes (tenant users only)
 app.use('/api/tenant/dialing-sets', dialingSetsRoutes);
@@ -217,6 +221,8 @@ app.use('/api/tenant/task-manager', taskManagerRoutes);
 app.use('/api/tenant/reports', reportsHubRoutes);
 app.use('/api/tenant/notifications', notificationsRoutes);
 app.use('/api/tenant/billing', billingRoutes);
+app.use('/api/tenant/telephony-accounts', telephonyAccountsRoutes);
+app.use('/api/tenant/call-credits', callCreditsRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);

@@ -2,7 +2,24 @@ import { query, withConnection } from '../../config/db.js';
 import { startCallForContact } from './callsService.js';
 import { enrichDispositionsForDialerSession } from './dispositionApplyDealHelper.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
-import { getDefaultTelephonyProviderCode } from './telephony/telephonyProviderRegistry.js';
+import {
+  getDefaultTelephonyProviderCode,
+  resolveProviderForTenant,
+} from './telephony/telephonyProviderRegistry.js';
+
+/**
+ * Resolve the provider code we should record on a dialer_sessions row.
+ * Tenants on BYO mode use their own provider; default-account tenants use the platform default.
+ * Falls back to the env default if anything goes wrong (defensive — sessions should still be creatable).
+ */
+async function resolveSessionProviderCode(tenantId) {
+  try {
+    const resolved = await resolveProviderForTenant(tenantId);
+    return resolved.providerCode;
+  } catch {
+    return getDefaultTelephonyProviderCode();
+  }
+}
 
 function normalizeIds(arr, max = 200) {
   if (!Array.isArray(arr)) return [];
@@ -14,7 +31,10 @@ export async function createSession(
   user,
   {
     contact_ids = [],
-    provider = getDefaultTelephonyProviderCode(),
+    // `provider` from the client is intentionally ignored: the tenant's configured
+    // account/provider always wins (see resolveProviderForTenant). Accepted only for
+    // backwards compatibility with the existing API contract.
+    provider: _ignoredProvider, // eslint-disable-line no-unused-vars
     dialing_set_id = null,
     call_script_id = null,
   } = {}
@@ -74,11 +94,13 @@ export async function createSession(
   );
   const userSessionNo = Math.max(1, Number(nextRow?.next_no) || 1);
 
+  const tenantProviderCode = await resolveSessionProviderCode(tenantId);
+
   const result = await query(
     `INSERT INTO dialer_sessions (
        tenant_id, created_by_user_id, user_session_no, provider, status, started_at, ended_at, paused_at, paused_seconds, dialing_set_id, call_script_id
      ) VALUES (?, ?, ?, ?, 'ready', NULL, NULL, NULL, 0, ?, ?)`,
-    [tenantId, uid, userSessionNo, String(provider || getDefaultTelephonyProviderCode()), dialingSetId, callScriptId]
+    [tenantId, uid, userSessionNo, tenantProviderCode, dialingSetId, callScriptId]
   );
   const sessionId = result.insertId;
 
@@ -88,7 +110,7 @@ export async function createSession(
     summary: `Dialer session #${userSessionNo} started (${ids.length} contact(s) queued)`,
     payload_json: {
       session_id: sessionId,
-        provider: String(provider || getDefaultTelephonyProviderCode()),
+      provider: tenantProviderCode,
       queue_size: ids.length,
     },
   });

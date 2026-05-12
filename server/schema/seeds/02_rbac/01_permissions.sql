@@ -44,6 +44,10 @@ INSERT IGNORE INTO permissions (code, description) VALUES
 
   -- Telephony configuration
   ('telephony.manage', 'Manage telephony settings and configurations'),
+  ('telephony.accounts.view', 'View tenant telephony provider accounts (BYO)'),
+  ('telephony.accounts.manage', 'Add, edit, or remove tenant telephony provider accounts (BYO)'),
+  ('billing.credits.view', 'View call credit wallet balance and ledger'),
+  ('billing.credits.manage', 'Top up or adjust the tenant call credit wallet'),
 
   -- WhatsApp (granular; settings.manage still grants full module access in API checks)
   ('whatsapp.view', 'View WhatsApp templates, messages, and account list'),

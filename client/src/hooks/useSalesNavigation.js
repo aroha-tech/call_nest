@@ -15,6 +15,7 @@ const PLATFORM_NAV_ITEMS = [
   { key: 'tenants', label: 'Tenants', path: '/admin/tenants' },
   { key: 'users', label: 'Users', path: '/admin/users' },
   { key: 'billing', label: 'Billing', path: '/admin/billing' },
+  { key: 'telephony-billing', label: 'Telephony & Credits', path: '/admin/telephony-billing' },
   { key: 'workflow-map', label: 'Workflow', path: '/admin/workflow/map' },
   {
     key: 'masters',
@@ -236,6 +237,17 @@ const TENANT_ADMIN_NAV_ITEMS = [
         permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
       },
       { key: 'billing', label: 'Billing & plans', path: '/settings/billing', permission: PERMISSIONS.SETTINGS_MANAGE },
+      {
+        key: 'telephony',
+        label: 'Telephony & calls',
+        path: '/settings/telephony',
+        permissions: [
+          PERMISSIONS.SETTINGS_MANAGE,
+          PERMISSIONS.TELEPHONY_ACCOUNTS_VIEW,
+          PERMISSIONS.TELEPHONY_ACCOUNTS_MANAGE,
+          PERMISSIONS.BILLING_CREDITS_VIEW,
+        ],
+      },
     ],
   },
 ];

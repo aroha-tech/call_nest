@@ -5,8 +5,10 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border-radius: $radius-md;
-  transition: background $transition-fast, color $transition-fast;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: color $transition-fast;
 }
 
 .icon {
@@ -31,72 +33,72 @@
 
 // Color variants - matching screenshot design
 .iconWrap_blue {
-  background: color-mix(in srgb, #2563eb 18%, transparent);
+  background: transparent;
   color: #3b82f6;
 }
 
 .iconWrap_green {
-  background: color-mix(in srgb, #22c55e 18%, transparent);
+  background: transparent;
   color: #4ade80;
 }
 
 .iconWrap_purple {
-  background: color-mix(in srgb, #2563eb 18%, transparent);
+  background: transparent;
   color: #3b82f6;
 }
 
 .iconWrap_orange {
-  background: color-mix(in srgb, #f97316 18%, transparent);
+  background: transparent;
   color: #fb923c;
 }
 
 .iconWrap_yellow {
-  background: color-mix(in srgb, #eab308 18%, transparent);
+  background: transparent;
   color: #facc15;
 }
 
 .iconWrap_red {
-  background: color-mix(in srgb, #ef4444 18%, transparent);
+  background: transparent;
   color: #f87171;
 }
 
 .iconWrap_cyan {
-  background: color-mix(in srgb, #06b6d4 18%, transparent);
+  background: transparent;
   color: #22d3ee;
 }
 
 .iconWrap_emerald {
-  background: color-mix(in srgb, #10b981 18%, transparent);
+  background: transparent;
   color: #34d399;
 }
 
 .iconWrap_rose {
-  background: color-mix(in srgb, #f43f5e 18%, transparent);
+  background: transparent;
   color: #fb7185;
 }
 
 .iconWrap_sky {
-  background: color-mix(in srgb, #0ea5e9 18%, transparent);
+  background: transparent;
   color: #38bdf8;
 }
 
 .iconWrap_indigo {
-  background: color-mix(in srgb, #2563eb 18%, transparent);
+  background: transparent;
   color: #3b82f6;
 }
 
 .iconWrap_teal {
-  background: color-mix(in srgb, #14b8a6 18%, transparent);
+  background: transparent;
   color: #2dd4bf;
 }
 
 .iconWrap_amber {
-  background: color-mix(in srgb, #f59e0b 18%, transparent);
+  background: transparent;
   color: #fbbf24;
 }
 
 .iconWrap_pink {
-  background: color-mix(in srgb, #ec4899 18%, transparent);
+  background: transparent;
   color: #f472b6;
 }
 
@@ -134,72 +136,72 @@
 // Light theme adjustments
 :root[data-color-scheme='light'] {
   .iconWrap_blue {
-    background: color-mix(in srgb, #2563eb 12%, transparent);
+    background: transparent;
     color: #1d4ed8;
   }
 
   .iconWrap_green {
-    background: color-mix(in srgb, #22c55e 12%, transparent);
+    background: transparent;
     color: #16a34a;
   }
 
   .iconWrap_purple {
-    background: color-mix(in srgb, #2563eb 12%, transparent);
+    background: transparent;
     color: #1d4ed8;
   }
 
   .iconWrap_orange {
-    background: color-mix(in srgb, #f97316 12%, transparent);
+    background: transparent;
     color: #ea580c;
   }
 
   .iconWrap_yellow {
-    background: color-mix(in srgb, #eab308 12%, transparent);
+    background: transparent;
     color: #ca8a04;
   }
 
   .iconWrap_red {
-    background: color-mix(in srgb, #ef4444 12%, transparent);
+    background: transparent;
     color: #dc2626;
   }
 
   .iconWrap_cyan {
-    background: color-mix(in srgb, #06b6d4 12%, transparent);
+    background: transparent;
     color: #0891b2;
   }
 
   .iconWrap_emerald {
-    background: color-mix(in srgb, #10b981 12%, transparent);
+    background: transparent;
     color: #059669;
   }
 
   .iconWrap_rose {
-    background: color-mix(in srgb, #f43f5e 12%, transparent);
+    background: transparent;
     color: #e11d48;
   }
 
   .iconWrap_sky {
-    background: color-mix(in srgb, #0ea5e9 12%, transparent);
+    background: transparent;
     color: #0284c7;
   }
 
   .iconWrap_indigo {
-    background: color-mix(in srgb, #2563eb 12%, transparent);
+    background: transparent;
     color: #1d4ed8;
   }
 
   .iconWrap_teal {
-    background: color-mix(in srgb, #14b8a6 12%, transparent);
+    background: transparent;
     color: #0d9488;
   }
 
   .iconWrap_amber {
-    background: color-mix(in srgb, #f59e0b 12%, transparent);
+    background: transparent;
     color: #d97706;
   }
 
   .iconWrap_pink {
-    background: color-mix(in srgb, #ec4899 12%, transparent);
+    background: transparent;
     color: #db2777;
   }
 }

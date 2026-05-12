@@ -74,12 +74,26 @@ Server runs on `http://localhost:4000`
 - Telephony providers (default + supported codes):
   - Default: `TELEPHONY_DEFAULT_PROVIDER=exotel`
   - Built-in codes: `exotel`, `twilio`, `knowlarity`, `myoperator`, `ozonetel`, `dummy`
+  - Per-tenant Bring-Your-Own (BYO) Exotel accounts are managed via:
+    - Tenant admin UI: `GET/POST/PATCH/DELETE /api/tenant/telephony-accounts`
+    - Super admin: `GET/PATCH /api/admin/tenant-telephony/:tenant_id/billing` (rate, BYO fee, min balance, modes)
+  - Provider credentials are encrypted at rest with AES-256-GCM. Set `APP_ENCRYPTION_KEY`
+    (32 bytes, base64 or hex; generate with `openssl rand -base64 32`).
+  - Two call billing modes per tenant (`tenants.call_billing_mode`): `credit` (debit wallet
+    per connected minute) or `unlimited` (no debit; subscription-covered). Defaults:
+    - `telephony.default_call_rate_paise_per_minute` (default-account tenants)
+    - `telephony.default_byo_platform_fee_paise_per_minute` (BYO tenants)
+    - `telephony.default_call_min_balance_paise` (block calls if balance < this)
+    All three are stored in `platform_settings` and overridable per-tenant.
   - Provider env quick refs:
     - Knowlarity: `KNOWLARITY_API_KEY`, `KNOWLARITY_AUTH_TOKEN`, `KNOWLARITY_K_NUMBER`, `KNOWLARITY_CALLER_ID` (`KNOWLARITY_API_URL` optional)
     - Ozonetel: `OZONETEL_API_KEY`, `OZONETEL_USERNAME`, `OZONETEL_AGENT_ID`, `OZONETEL_CAMPAIGN_NAME` (`OZONETEL_API_URL` optional)
     - MyOperator: `MYOPERATOR_API_URL`, `MYOPERATOR_AUTH_TOKEN` (+ optional `MYOPERATOR_AGENT_NUMBER`, `MYOPERATOR_CALLER_ID`)
   - Public webhook callbacks:
-    - Exotel: `POST /api/public/telephony/exotel/status` (`EXOTEL_WEBHOOK_TOKEN`)
+    - Exotel (platform default): `POST /api/public/telephony/exotel/status` (`EXOTEL_WEBHOOK_TOKEN`)
+    - Exotel (per-tenant BYO): `POST /api/public/telephony/exotel/status/:tenant_token`
+      (tenant_token is unique per BYO account; the API auto-builds this URL and feeds it to
+      Exotel as `StatusCallback` so webhook routing back to the right tenant always works.)
     - Knowlarity: `POST /api/public/telephony/knowlarity/status` (`KNOWLARITY_WEBHOOK_TOKEN`)
     - Ozonetel: `POST /api/public/telephony/ozonetel/status` (`OZONETEL_WEBHOOK_TOKEN`)
 

@@ -1,8 +1,10 @@
 import { query } from '../../config/db.js';
 import {
   getDefaultTelephonyProviderCode,
-  getTelephonyProvider,
+  resolveProviderForTenant,
 } from './telephony/telephonyProviderRegistry.js';
+import { touchLastUsed } from './telephony/tenantTelephonyAccountsService.js';
+import { assertCanStartCall } from '../billing/callCreditsService.js';
 import { resolveExotelDisplayNumbers } from './telephonyNumberResolveService.js';
 import * as opportunitiesService from './opportunitiesService.js';
 import { loadDispositionCallApplyMeta } from './dispositionApplyDealHelper.js';
@@ -307,7 +309,10 @@ export async function startCallForContact(
   {
     contact_id,
     contact_phone_id = null,
-    provider = getDefaultTelephonyProviderCode(),
+    // NOTE: `provider` is accepted for backwards compatibility but is intentionally ignored.
+    // Provider/account is always resolved from the tenant's configuration via
+    // resolveProviderForTenant() so the frontend cannot bypass billing/account rules.
+    provider: _ignoredProvider, // eslint-disable-line no-unused-vars
     notes = null,
     dialer_session_id = null,
   } = {}
@@ -346,17 +351,39 @@ export async function startCallForContact(
     throw err;
   }
 
-  const p = getTelephonyProvider(provider);
+  // Pre-flight billing gate: blocks here only when call_billing_mode = 'credit' and balance is too low.
+  // Unlimited tenants always pass. BYO tenants still need credits to cover the platform fee.
+  await assertCanStartCall(tenantId);
+
+  // Resolve provider + per-tenant credentials. BYO tenants use their own Exotel account;
+  // default-account tenants use platform env credentials. This call also enforces that
+  // BYO tenants without an active account get a 409 error instead of silently using env creds.
+  const resolved = await resolveProviderForTenant(tenantId);
+  const p = resolved.provider;
+
   let callMeta = { tenantId, contactId: cid, userId: user.id };
   if (p.code === 'exotel') {
     const r = await resolveExotelDisplayNumbers(tenantId, user.id);
+    // Account-level numbers (BYO) win over tenant-level when both are set.
+    const callerId = r.callerId || resolved.callerIdAccountDefault || null;
+    const agentLeg = r.agentLeg || resolved.agentLegAccountDefault || null;
     callMeta = {
       ...callMeta,
-      exotelCallerId: r.callerId,
-      exotelAgentLeg: r.agentLeg,
+      exotelCallerId: callerId,
+      exotelAgentLeg: agentLeg,
     };
   }
-  const providerRes = await p.startOutboundCall({ to, metadata: callMeta });
+  const providerRes = await p.startOutboundCall({
+    to,
+    metadata: callMeta,
+    credentials: resolved.credentials || null,
+    webhookToken: resolved.webhookToken || null,
+    statusCallbackOverride: resolved.statusCallbackOverride || null,
+  });
+
+  if (resolved.accountId) {
+    touchLastUsed(resolved.accountId).catch(() => { /* non-fatal */ });
+  }
 
   const startedAt = new Date();
   const isDummy = p.code === 'dummy';
@@ -373,6 +400,8 @@ export async function startCallForContact(
        manager_id,
        dialer_session_id,
        provider,
+       tenant_telephony_account_id,
+       billing_mode_at_call,
        provider_call_id,
        direction,
        status,
@@ -382,7 +411,7 @@ export async function startCallForContact(
        ended_at,
        duration_sec,
        created_by
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'outbound', ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'outbound', ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
       cid,
@@ -391,6 +420,8 @@ export async function startCallForContact(
       row.manager_id ?? null,
       dialerSessionId,
       p.code,
+      resolved.accountId ?? null,
+      resolved.callBillingMode || null,
       providerRes?.provider_call_id ?? null,
       statusDb,
       0,

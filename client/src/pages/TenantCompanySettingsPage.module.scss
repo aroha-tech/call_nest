@@ -507,25 +507,28 @@
 
 .activeIndustryIconWrap {
   flex-shrink: 0;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: auto;
+  height: auto;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: $radius-full;
-  background: color-mix(in srgb, var(--color-primary-500) 22%, transparent);
-  color: var(--color-primary-100);
-  border: 1px solid color-mix(in srgb, #ffffff 12%, var(--color-primary-600));
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-primary-500);
+  border: none;
+  box-shadow: none;
 }
 
 .industryBannerSymbol {
   color: inherit;
   font-variation-settings:
-    'FILL' 1,
+    'FILL' 0,
     'wght' 600,
     'GRAD' 0,
     'opsz' 24;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2));
+  filter: none;
 }
 
 :global(html[data-color-scheme='light']) {
@@ -535,15 +538,15 @@
   }
 
   .activeIndustryIconWrap {
-    background: linear-gradient(160deg, #eef2ff 0%, #e0e7ff 55%, #c7d2fe 100%);
-    border: 1px solid color-mix(in srgb, var(--color-primary-700) 32%, #94a3b8);
-    color: #312e81;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    background: transparent;
+    border: none;
+    color: var(--color-primary-600, #4f46e5);
+    box-shadow: none;
   }
 
   .industryBannerSymbol {
-    color: #312e81;
-    filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.65));
+    color: inherit;
+    filter: none;
   }
 
   .activeSetupGlow {

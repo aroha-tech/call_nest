@@ -122,7 +122,7 @@ export function NotificationItemRichPanel({
 
   return (
     <div className={`${styles.panelRow} ${unread ? styles.panelRowUnread : ''}`}>
-      <div className={styles.panelIcon} style={{ background: tone.iconBg }}>
+      <div className={styles.panelIcon}>
         <NotificationTypeIcon moduleKey={n.module_key} eventType={n.event_type} color={tone.iconColor} />
       </div>
       <div className={styles.panelBody}>
@@ -169,7 +169,7 @@ export function NotificationItemRichPage({ n, formatDateTime, markRead, dismiss 
 
   return (
     <div className={`${styles.pageCard} ${unread ? styles.pageCardUnread : ''}`}>
-      <div className={styles.pageIcon} style={{ background: tone.iconBg }}>
+      <div className={styles.pageIcon}>
         <NotificationTypeIcon moduleKey={n.module_key} eventType={n.event_type} color={tone.iconColor} />
       </div>
       <div className={styles.pageCenter}>

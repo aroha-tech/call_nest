@@ -231,12 +231,16 @@
 .caIconWrap {
   box-sizing: border-box;
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
+  width: auto;
+  height: auto;
+  min-width: 22px;
+  min-height: 22px;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  background: transparent;
 }
 
 .caIconGlyph {
@@ -252,9 +256,9 @@
 .caIconDialer,
 .caIconDeal,
 .caIconCrm {
-  background: var(--color-bg-subtle);
+  background: transparent;
   color: var(--color-accent-brand);
-  border: 1px solid var(--color-border-subtle);
+  border: none;
 }
 
 .caDetailText {

@@ -90,6 +90,7 @@ export async function findAll({
             t.email_communication_enabled, t.email_module_enabled, t.email_automation_enabled,
             t.reports_advanced_enabled,
             t.theme_json,
+            t.telephony_account_mode, t.call_billing_mode,
             ${TENANT_USER_COUNT_SQL} AS user_count
      FROM tenants t
      ${whereSQL}

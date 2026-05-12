@@ -584,12 +584,16 @@ export const SHELL_NAV_ICON_ACCENTS = {
   'background-jobs': '#eab308',
   'meeting-attendee-emails': '#06b6d4',
   billing: '#22c55e',
+  'telephony-billing': '#f59e0b',
+  telephony: '#f59e0b',
   'dialer-workspace': '#38bdf8',
 };
 
 const NAV_ICON_MAP = {
   dashboard: IconDashboard,
   billing: IconCreditCard,
+  'telephony-billing': IconCreditCard,
+  telephony: IconCreditCard,
   tenants: IconBuilding,
   users: IconUsers,
   masters: IconLayers,

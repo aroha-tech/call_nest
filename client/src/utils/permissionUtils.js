@@ -135,6 +135,14 @@ export const PERMISSIONS = {
 
   // Telephony
   TELEPHONY_MANAGE: 'telephony.manage',
+  /** View tenant BYO telephony provider accounts (read-only). */
+  TELEPHONY_ACCOUNTS_VIEW: 'telephony.accounts.view',
+  /** Add/edit/delete tenant BYO telephony provider accounts. */
+  TELEPHONY_ACCOUNTS_MANAGE: 'telephony.accounts.manage',
+  /** View call credit wallet balance and ledger. */
+  BILLING_CREDITS_VIEW: 'billing.credits.view',
+  /** Top up or adjust the tenant call credit wallet (super-admin only). */
+  BILLING_CREDITS_MANAGE: 'billing.credits.manage',
 
   // Masters (Super Admin)
   MASTERS_MANAGE: 'masters.manage',

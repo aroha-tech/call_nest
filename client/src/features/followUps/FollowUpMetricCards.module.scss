@@ -82,13 +82,17 @@
 
 .iconWrap {
   flex-shrink: 0;
-  width: 48px;
-  height: 48px;
-  border-radius: $radius-md;
+  width: auto;
+  height: auto;
+  min-width: 22px;
+  min-height: 22px;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .iconGlyph {
@@ -143,39 +147,39 @@
 }
 
 .iconWrap_total {
-  background: rgba(59, 130, 246, 0.12);
+  background: transparent;
   color: rgba(148, 197, 255, 1);
-  border: 1px solid rgba(59, 130, 246, 0.18);
+  border: none;
 }
 .iconWrap_pending {
-  background: rgba(56, 189, 248, 0.12);
+  background: transparent;
   color: rgba(149, 230, 255, 1);
-  border: 1px solid rgba(56, 189, 248, 0.18);
+  border: none;
 }
 .iconWrap_upcoming {
-  background: rgba(96, 165, 250, 0.12);
+  background: transparent;
   color: rgba(171, 211, 255, 1);
-  border: 1px solid rgba(96, 165, 250, 0.18);
+  border: none;
 }
 .iconWrap_completed {
-  background: rgba(34, 197, 94, 0.12);
+  background: transparent;
   color: rgba(143, 255, 188, 1);
-  border: 1px solid rgba(34, 197, 94, 0.18);
+  border: none;
 }
 .iconWrap_cancelled {
-  background: rgba(239, 68, 68, 0.12);
+  background: transparent;
   color: rgba(255, 163, 163, 1);
-  border: 1px solid rgba(239, 68, 68, 0.18);
+  border: none;
 }
 .iconWrap_missed {
-  background: rgba(249, 115, 22, 0.12);
+  background: transparent;
   color: rgba(255, 197, 151, 1);
-  border: 1px solid rgba(249, 115, 22, 0.18);
+  border: none;
 }
 .iconWrap_today {
-  background: rgba(245, 158, 11, 0.12);
+  background: transparent;
   color: rgba(255, 216, 143, 1);
-  border: 1px solid rgba(245, 158, 11, 0.18);
+  border: none;
 }
 
 .value {
