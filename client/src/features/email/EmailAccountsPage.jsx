@@ -13,7 +13,6 @@ import {
   PlayIcon,
   TrashIcon,
   RefreshIcon,
-  VerifyConnectionIcon,
 } from '../../components/ui/ActionIcons';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
@@ -55,6 +54,27 @@ function rowHasOAuthRefreshToken(row) {
   return v === true || v === 1 || v === '1';
 }
 
+function parseRowDateMs(value) {
+  if (value == null || value === '') return NaN;
+  const t = new Date(value).getTime();
+  return Number.isFinite(t) ? t : NaN;
+}
+
+/**
+ * OAuth tokens live on the server for the tenant. Switching browsers or PCs does not require a new sign-in.
+ * Legacy rows sometimes kept oauth_last_error_* set after later successful refreshes; treat those as non-blocking.
+ */
+function oauthLastErrorIsStale(row) {
+  if (!rowHasOAuthRefreshToken(row)) return false;
+  const errMs = parseRowDateMs(row.oauth_last_error_at);
+  const okMs = parseRowDateMs(row.oauth_last_verified_at);
+  if (Number.isFinite(okMs) && Number.isFinite(errMs) && okMs >= errMs) return true;
+  // Ancient error timestamps with offline access still on file: almost certainly superseded (tokens refresh on send).
+  const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+  if (Number.isFinite(errMs) && Date.now() - errMs > ONE_YEAR_MS) return true;
+  return false;
+}
+
 /**
  * "Reauthorization" in the UI should mean the user must visit Google/Microsoft again — not
  * "the short-lived access token is near expiry" (normal; the server refreshes when a refresh_token exists).
@@ -65,18 +85,21 @@ function getReauthState(row) {
     return { requiresReauth: false, label: 'N/A', variant: 'muted', reason: '' };
   }
 
-  if (row.oauth_last_error_at || row.oauth_last_error_code) {
+  const hasBlockingError =
+    (row.oauth_last_error_at || row.oauth_last_error_code) && !oauthLastErrorIsStale(row);
+
+  if (hasBlockingError) {
     const detail = String(row.oauth_last_error_detail || '').trim();
     const code = String(row.oauth_last_error_code || '').trim();
     const parts = [
       'The server recorded an authentication or permission failure for this account (for example refresh revoked, expired consent, or Graph returned 401/403).',
       detail ? `Detail: ${detail}` : null,
       code ? `Code: ${code}` : null,
-      'Use Verify to test the connection now, or Reconnect to sign in again with Google or Microsoft.',
+      'Sign in again with Google or Microsoft for this mailbox if mail or calendar stops working (same tenant — one sign-in updates tokens for all browsers).',
     ].filter(Boolean);
     return {
       requiresReauth: true,
-      label: 'Reconnect recommended',
+      label: 'Authorization issue',
       variant: 'warning',
       reason: parts.join(' '),
     };
@@ -107,10 +130,10 @@ function getReauthState(row) {
   if (!expiresRaw) {
     return {
       requiresReauth: true,
-      label: 'Reauthorization needed',
+      label: 'Connection incomplete',
       variant: 'warning',
       reason:
-        'No refresh token on file (or offline access missing). Reconnect so the app can renew access without asking you each hour.',
+        'No refresh token on file (offline access missing). Connect again with Google or Microsoft so the server can renew access without hourly sign-in.',
     };
   }
   const expMs = parseOAuthAccessTokenExpiryMs(expiresRaw);
@@ -119,7 +142,7 @@ function getReauthState(row) {
       requiresReauth: true,
       label: 'Reauthorization needed',
       variant: 'warning',
-      reason: 'Access token expiry is invalid — reconnect the account.',
+      reason: 'Access token expiry is invalid — connect the account again with Google or Microsoft.',
     };
   }
   const minutesLeft = Math.floor((expMs - Date.now()) / 60000);
@@ -130,23 +153,31 @@ function getReauthState(row) {
       variant: 'warning',
       reason:
         minutesLeft <= 0
-          ? 'Access token expired and there is no refresh token — reconnect.'
-          : `Access token ends in ${minutesLeft} min without refresh storage — reconnect before it lapses.`,
+          ? 'Access token expired and there is no refresh token — connect again with Google or Microsoft.'
+          : `Access token ends in ${minutesLeft} min without refresh storage — connect again before it lapses.`,
     };
   }
   return {
     requiresReauth: false,
     label: 'Authorized',
     variant: 'success',
-    reason: `Access token valid ~${Math.floor(minutesLeft / 60)}h (no long-lived refresh stored — reconnect if sending stops working).`,
+    reason: `Access token valid ~${Math.floor(minutesLeft / 60)}h (no long-lived refresh stored — connect again if sending stops working).`,
   };
+}
+
+function oauthShowsRecordedIssue(row) {
+  const provider = String(row?.provider || '').toLowerCase();
+  if (!OAUTH_PROVIDERS.has(provider)) return false;
+  return (
+    !!(row.oauth_last_error_at || row.oauth_last_error_code) && !oauthLastErrorIsStale(row)
+  );
 }
 
 function authorizationDetailTitle(row, formatDateTime) {
   const state = getReauthState(row);
   const parts = [];
   if (state.reason) parts.push(state.reason);
-  if (row.oauth_last_error_at && formatDateTime) {
+  if (oauthShowsRecordedIssue(row) && row.oauth_last_error_at && formatDateTime) {
     parts.push(`Issue recorded: ${formatDateTime(row.oauth_last_error_at)}`);
   } else if (row.oauth_last_verified_at && formatDateTime) {
     parts.push(`Last verified (send or check): ${formatDateTime(row.oauth_last_verified_at)}`);
@@ -192,7 +223,6 @@ export function EmailAccountsPage() {
   const [oauthMessage, setOauthMessage] = useState(null);
   const [oauthError, setOauthError] = useState(null);
   const [oauthLoading, setOauthLoading] = useState(null); // 'google' | 'outlook'
-  const [verifyingAccountId, setVerifyingAccountId] = useState(null);
 
   // Handle OAuth callback query params
   useEffect(() => {
@@ -332,25 +362,6 @@ export function EmailAccountsPage() {
     }
   };
 
-  const handleVerifyOAuth = async (row) => {
-    setOauthError(null);
-    setOauthMessage(null);
-    setVerifyingAccountId(row.id);
-    try {
-      await emailAccountsAPI.verifyOAuth(row.id);
-      setOauthMessage(
-        `Connection verified for ${row.email_address || row.account_name || 'account'}.`
-      );
-      refetch();
-    } catch (err) {
-      setOauthError(
-        err.response?.data?.error || err.message || 'Verification failed'
-      );
-    } finally {
-      setVerifyingAccountId(null);
-    }
-  };
-
   const handleReconnect = async (row) => {
     const provider = (row.provider || '').toLowerCase();
     if (provider !== 'gmail' && provider !== 'outlook') return;
@@ -381,7 +392,7 @@ export function EmailAccountsPage() {
         title="Email Accounts"
         description={
           canManageAccounts
-            ? 'Connect Gmail or Outlook to send mail and use the same sign-in for calendar and video meetings (Google Meet / Microsoft Teams). Use Reconnect on an account if Meet or Teams links fail after a permission update.'
+            ? 'Connect Gmail or Outlook once per account; tokens are stored for this workspace so all devices use the same authorization. Use the row action to sign in again only if the provider revoked access or permissions changed.'
             : 'View connected email accounts. Only an admin can add or edit connections.'
         }
         actions={
@@ -462,7 +473,7 @@ export function EmailAccountsPage() {
                     >
                       {getReauthState(row).label}
                     </Badge>
-                    {row.oauth_last_error_at || row.oauth_last_error_code ? (
+                    {oauthShowsRecordedIssue(row) ? (
                       <div className={listStyles.mutedSmall} style={{ marginTop: 4 }}>
                         Issue recorded
                         {row.oauth_last_error_at ? ` ${formatDateTime(row.oauth_last_error_at)}` : ''}
@@ -481,28 +492,18 @@ export function EmailAccountsPage() {
                 <TableCell align="center">
                   <div className={styles.actions}>
                     {(row.provider === 'gmail' || row.provider === 'outlook') && (
-                      <>
-                        <IconButton
-                          size="sm"
-                          title="Verify connection (checks refresh with Google or Microsoft and updates tokens)"
-                          onClick={() => handleVerifyOAuth(row)}
-                          disabled={!!oauthLoading || verifyingAccountId === row.id}
-                        >
-                          <VerifyConnectionIcon />
-                        </IconButton>
-                        <IconButton
-                          size="sm"
-                          title={
-                            getReauthState(row).requiresReauth
-                              ? 'Reconnect with Google or Microsoft (recommended)'
-                              : 'Reauthorize account permissions'
-                          }
-                          onClick={() => handleReconnect(row)}
-                          disabled={!!oauthLoading || verifyingAccountId === row.id}
-                        >
-                          <RefreshIcon />
-                        </IconButton>
-                      </>
+                      <IconButton
+                        size="sm"
+                        title={
+                          getReauthState(row).requiresReauth
+                            ? 'Sign in again with Google or Microsoft (recommended)'
+                            : 'Sign in again to refresh permissions for this mailbox'
+                        }
+                        onClick={() => handleReconnect(row)}
+                        disabled={!!oauthLoading}
+                      >
+                        <RefreshIcon />
+                      </IconButton>
                     )}
                     {row.status === 'inactive' ? (
                       <IconButton size="sm" variant="success" title="Activate" onClick={() => setConfirmAction({ id: row.id, action: 'activate', name: row.account_name || row.email_address })}>

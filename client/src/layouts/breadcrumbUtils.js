@@ -27,6 +27,7 @@ const TENANT_PATH_OVERRIDES = {
   '/calls/dial-sessions': 'Dial sessions',
   '/settings': 'Settings',
   '/settings/meetings-mail-settings': 'Meetings mail settings',
+  '/settings/lead-import': 'Lead import',
   '/profile': 'Profile',
   '/leads/import': 'Import leads',
   '/leads/import/history': 'Import history',

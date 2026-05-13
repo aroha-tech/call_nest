@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { query } from '../../config/db.js';
 import { env } from '../../config/env.js';
 import { parseMeetingInstantUtc } from '../../utils/meetingInstant.js';
-import { normalizeEmailRecipientListString } from '../../utils/emailRecipientList.js';
+import { normalizeEmailRecipientListString, firstInvalidEmailInRecipientList } from '../../utils/emailRecipientList.js';
 import * as sendEmailService from '../email/sendEmailService.js';
 import { createAndDispatchNotification, listUserIdsByRoles } from './notificationService.js';
 import { meetingDetailsCardFieldValues } from './meetingEmailDetailsBox.js';
@@ -26,6 +26,19 @@ const DEFAULT_REMINDER_OFFSETS = [
 
 const ALLOWED_UNITS = new Set(['minutes', 'hours', 'days']);
 
+/** Email kinds that can each have their own default CC/BCC (matches UI tabs). */
+export const MEETING_EMAIL_CC_BCC_KINDS = Object.freeze([
+  'created',
+  'reminder',
+  'feedback',
+  'updated',
+  'cancelled',
+]);
+
+function emptyCcBccByKind() {
+  return Object.fromEntries(MEETING_EMAIL_CC_BCC_KINDS.map((k) => [k, { cc: '', bcc: '' }]));
+}
+
 const DEFAULTS = {
   reminder_enabled: true,
   reminder_offsets: DEFAULT_REMINDER_OFFSETS,
@@ -41,6 +54,7 @@ const DEFAULTS = {
   thank_you_page_url: '',
   default_cc_email: '',
   default_bcc_email: '',
+  default_cc_bcc_by_kind: emptyCcBccByKind(),
 };
 
 function asBool(v, fallback) {
@@ -83,6 +97,79 @@ function parseJsonOrNull(raw) {
   } catch {
     return null;
   }
+}
+
+function cloneCcBccByKind(by) {
+  const out = emptyCcBccByKind();
+  for (const k of MEETING_EMAIL_CC_BCC_KINDS) {
+    if (by?.[k] && typeof by[k] === 'object') {
+      out[k].cc = String(by[k].cc ?? '');
+      out[k].bcc = String(by[k].bcc ?? '');
+    }
+  }
+  return out;
+}
+
+/**
+ * Build per-kind CC/BCC from DB row (JSON column + legacy flat columns).
+ */
+function defaultCcBccByKindFromRow(row) {
+  const out = emptyCcBccByKind();
+  const legacyCc = normalizeEmailRecipientListString(row?.default_cc_email != null ? String(row.default_cc_email) : '');
+  const legacyBcc = normalizeEmailRecipientListString(row?.default_bcc_email != null ? String(row.default_bcc_email) : '');
+  const jsonParsed = parseJsonOrNull(row?.default_cc_bcc_json);
+  let anyFromJson = false;
+  if (jsonParsed && typeof jsonParsed === 'object' && !Array.isArray(jsonParsed)) {
+    for (const k of MEETING_EMAIL_CC_BCC_KINDS) {
+      const entry = jsonParsed[k];
+      if (entry && typeof entry === 'object') {
+        out[k].cc = normalizeEmailRecipientListString(String(entry.cc ?? '')).slice(0, 1000);
+        out[k].bcc = normalizeEmailRecipientListString(String(entry.bcc ?? '')).slice(0, 1000);
+        if (out[k].cc || out[k].bcc) anyFromJson = true;
+      }
+    }
+  }
+  if (!anyFromJson && (legacyCc || legacyBcc)) {
+    for (const k of MEETING_EMAIL_CC_BCC_KINDS) {
+      out[k] = { cc: legacyCc, bcc: legacyBcc };
+    }
+  } else {
+    for (const k of MEETING_EMAIL_CC_BCC_KINDS) {
+      out[k].cc = normalizeEmailRecipientListString(out[k].cc || '').slice(0, 1000);
+      out[k].bcc = normalizeEmailRecipientListString(out[k].bcc || '').slice(0, 1000);
+    }
+  }
+  return out;
+}
+
+/**
+ * Normalized CC/BCC strings for one email type (for outbound mail and workspace).
+ * @param {object} setting - row-shaped or getOrCreateForUser() result
+ * @param {string} kind - created | reminder | feedback | updated | cancelled
+ */
+export function getCcBccForKind(setting, kind) {
+  const k = String(kind || '').trim().toLowerCase();
+  const byKind = setting?.default_cc_bcc_by_kind;
+  if (byKind && typeof byKind === 'object' && !Array.isArray(byKind) && MEETING_EMAIL_CC_BCC_KINDS.includes(k)) {
+    const slot = byKind[k];
+    if (slot && typeof slot === 'object') {
+      return {
+        cc: normalizeEmailRecipientListString(String(slot.cc ?? '')),
+        bcc: normalizeEmailRecipientListString(String(slot.bcc ?? '')),
+      };
+    }
+  }
+  const cc = normalizeEmailRecipientListString(setting?.default_cc_email || '');
+  const bcc = normalizeEmailRecipientListString(setting?.default_bcc_email || '');
+  return { cc, bcc };
+}
+
+function ccBccFromSettingForKind(setting, kind) {
+  const { cc, bcc } = getCcBccForKind(setting, kind);
+  return {
+    cc: cc || undefined,
+    bcc: bcc || undefined,
+  };
 }
 
 function applyTemplateVars(text, vars) {
@@ -145,6 +232,7 @@ function meetingVars(meeting, feedbackLink = '') {
     company_name: meeting.tenant_company_name || 'Your Company',
     contact_name: meeting.contact_name || '',
     feedback_link: feedbackLink,
+    feedback_url: feedbackLink,
     meeting_card_date: card.date,
     meeting_card_time: card.timeLine,
     calendar_google_url: buildGoogleCalendarUrl(meeting),
@@ -205,6 +293,8 @@ export async function getOrCreateForUser(tenantId, userId) {
     [tid, uid]
   );
   if (!row) return { ...DEFAULTS, user_id: uid };
+  const default_cc_bcc_by_kind = defaultCcBccByKindFromRow(row);
+  const createdSlot = default_cc_bcc_by_kind.created || { cc: '', bcc: '' };
   return {
     user_id: uid,
     reminder_enabled: Boolean(row.reminder_enabled),
@@ -219,13 +309,57 @@ export async function getOrCreateForUser(tenantId, userId) {
     feedback_body_html: row.feedback_body_html || '',
     feedback_body_text: row.feedback_body_text || '',
     thank_you_page_url: row.thank_you_page_url || '',
-    default_cc_email: normalizeEmailRecipientListString(row.default_cc_email != null ? String(row.default_cc_email) : ''),
-    default_bcc_email: normalizeEmailRecipientListString(row.default_bcc_email != null ? String(row.default_bcc_email) : ''),
+    default_cc_bcc_by_kind,
+    default_cc_email: createdSlot.cc,
+    default_bcc_email: createdSlot.bcc,
   };
 }
 
 export async function updateForUser(tenantId, userId, actingUserId, payload) {
   const current = await getOrCreateForUser(tenantId, userId);
+  const nextByKind = cloneCcBccByKind(current.default_cc_bcc_by_kind);
+  const incomingByKind = payload?.default_cc_bcc_by_kind;
+  if (incomingByKind && typeof incomingByKind === 'object' && !Array.isArray(incomingByKind)) {
+    for (const k of MEETING_EMAIL_CC_BCC_KINDS) {
+      if (incomingByKind[k] && typeof incomingByKind[k] === 'object') {
+        if (incomingByKind[k].cc !== undefined) {
+          nextByKind[k].cc = normalizeEmailRecipientListString(String(incomingByKind[k].cc ?? '')).slice(0, 1000);
+        }
+        if (incomingByKind[k].bcc !== undefined) {
+          nextByKind[k].bcc = normalizeEmailRecipientListString(String(incomingByKind[k].bcc ?? '')).slice(0, 1000);
+        }
+      }
+    }
+  } else if (payload?.default_cc_email !== undefined || payload?.default_bcc_email !== undefined) {
+    const lc = normalizeEmailRecipientListString(
+      asString(payload?.default_cc_email, current.default_cc_email)
+    ).slice(0, 1000);
+    const lb = normalizeEmailRecipientListString(
+      asString(payload?.default_bcc_email, current.default_bcc_email)
+    ).slice(0, 1000);
+    for (const k of MEETING_EMAIL_CC_BCC_KINDS) {
+      nextByKind[k] = { cc: lc, bcc: lb };
+    }
+  }
+
+  for (const k of MEETING_EMAIL_CC_BCC_KINDS) {
+    const badCc = firstInvalidEmailInRecipientList(nextByKind[k].cc);
+    if (badCc) {
+      const err = new Error(`Invalid CC for ${k}: "${badCc}" is not a valid email address`);
+      err.status = 400;
+      throw err;
+    }
+    const badBcc = firstInvalidEmailInRecipientList(nextByKind[k].bcc);
+    if (badBcc) {
+      const err = new Error(`Invalid BCC for ${k}: "${badBcc}" is not a valid email address`);
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  const legacyCreatedCc = nextByKind.created?.cc || '';
+  const legacyCreatedBcc = nextByKind.created?.bcc || '';
+
   const next = {
     reminder_enabled: asBool(payload?.reminder_enabled, current.reminder_enabled),
     reminder_offsets: normalizeOffsets(payload?.reminder_offsets ?? current.reminder_offsets),
@@ -241,12 +375,9 @@ export async function updateForUser(tenantId, userId, actingUserId, payload) {
     feedback_body_html: asString(payload?.feedback_body_html, current.feedback_body_html),
     feedback_body_text: asString(payload?.feedback_body_text, current.feedback_body_text),
     thank_you_page_url: asString(payload?.thank_you_page_url, current.thank_you_page_url).trim(),
-    default_cc_email: normalizeEmailRecipientListString(
-      asString(payload?.default_cc_email, current.default_cc_email)
-    ).slice(0, 1000),
-    default_bcc_email: normalizeEmailRecipientListString(
-      asString(payload?.default_bcc_email, current.default_bcc_email)
-    ).slice(0, 1000),
+    default_cc_email: legacyCreatedCc,
+    default_bcc_email: legacyCreatedBcc,
+    default_cc_bcc_json: JSON.stringify(nextByKind),
   };
   await query(
     `UPDATE tenant_user_meeting_email_settings
@@ -265,6 +396,7 @@ export async function updateForUser(tenantId, userId, actingUserId, payload) {
          include_meeting_details = 1,
          default_cc_email = ?,
          default_bcc_email = ?,
+         default_cc_bcc_json = CAST(? AS JSON),
          updated_by = ?,
          updated_at = CURRENT_TIMESTAMP
      WHERE tenant_id = ? AND user_id = ? AND deleted_at IS NULL`,
@@ -283,6 +415,7 @@ export async function updateForUser(tenantId, userId, actingUserId, payload) {
       next.thank_you_page_url || null,
       next.default_cc_email || null,
       next.default_bcc_email || null,
+      next.default_cc_bcc_json,
       actingUserId ?? null,
       Number(tenantId),
       Number(userId),
@@ -314,6 +447,7 @@ async function getSettingsForUsers(tenantId, userIds) {
       feedback_subject: row.feedback_subject || DEFAULTS.feedback_subject,
       feedback_body_html: row.feedback_body_html || '',
       feedback_body_text: row.feedback_body_text || '',
+      default_cc_bcc_by_kind: defaultCcBccByKindFromRow(row),
       default_cc_email: row.default_cc_email != null ? String(row.default_cc_email) : '',
       default_bcc_email: row.default_bcc_email != null ? String(row.default_bcc_email) : '',
     });
@@ -382,15 +516,6 @@ async function updateReminderStatus(id, status, errMsg = null) {
   );
 }
 
-function ccBccFromSetting(setting) {
-  const cc = normalizeEmailRecipientListString(setting?.default_cc_email || '');
-  const bcc = normalizeEmailRecipientListString(setting?.default_bcc_email || '');
-  return {
-    cc: cc || undefined,
-    bcc: bcc || undefined,
-  };
-}
-
 async function sendReminderEmail(meeting, setting) {
   const vars = meetingVars(meeting, '');
   const subject = applyTemplateVars(setting.reminder_subject, vars);
@@ -399,7 +524,7 @@ async function sendReminderEmail(meeting, setting) {
     setting.reminder_body_html,
     Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, escapeHtml(v)]))
   );
-  const { cc, bcc } = ccBccFromSetting(setting);
+  const { cc, bcc } = ccBccFromSettingForKind(setting, 'reminder');
   await sendEmailService.sendEmail(
     Number(meeting.tenant_id),
     {
@@ -429,7 +554,7 @@ async function sendFeedbackEmail(meeting, setting, token) {
     setting.feedback_body_html,
     Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, escapeHtml(v)]))
   );
-  const { cc, bcc } = ccBccFromSetting(setting);
+  const { cc, bcc } = ccBccFromSettingForKind(setting, 'feedback');
   await sendEmailService.sendEmail(
     Number(meeting.tenant_id),
     {
@@ -440,7 +565,6 @@ async function sendFeedbackEmail(meeting, setting, token) {
       subject,
       body_text: bodyText || undefined,
       body_html: bodyHtml || undefined,
-      
     },
     null
   );
@@ -749,7 +873,7 @@ export async function sendTestEmailForUser(tenantId, userId, type, toEmail, emai
     normalizedType === 'reminder'
       ? applyTemplateVars(setting.reminder_body_html || '', toHtmlVars)
       : applyTemplateVars(setting.feedback_body_html || '', toHtmlVars);
-  const { cc, bcc } = ccBccFromSetting(setting);
+  const { cc, bcc } = ccBccFromSettingForKind(setting, normalizedType);
 
   await sendEmailService.sendEmail(
     Number(tenantId),

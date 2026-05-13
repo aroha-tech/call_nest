@@ -19,3 +19,15 @@ export function normalizeEmailRecipientListString(raw) {
   const parts = parseEmailRecipientList(raw);
   return parts.length ? parts.join(', ') : '';
 }
+
+const SIMPLE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * @returns {null | string} first invalid token, or null if all valid / empty
+ */
+export function firstInvalidEmailInRecipientList(raw) {
+  for (const p of parseEmailRecipientList(raw)) {
+    if (!SIMPLE_EMAIL_RE.test(p)) return p;
+  }
+  return null;
+}

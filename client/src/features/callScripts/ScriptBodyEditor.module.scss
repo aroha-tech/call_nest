@@ -162,15 +162,16 @@
       fill: var(--color-primary-500);
     }
 
-    :global(button) {
+    /* Icon-only Quill controls — exclude custom Visual/HTML tabs (see .cn-html-mode-tab). */
+    :global(.ql-formats button:not(.cn-html-mode-tab)) {
       border-radius: 10px;
       width: 28px;
       height: 28px;
       padding: 4px;
     }
 
-    :global(button:hover),
-    :global(button:focus-visible) {
+    :global(.ql-formats button:not(.cn-html-mode-tab):hover),
+    :global(.ql-formats button:not(.cn-html-mode-tab):focus-visible) {
       outline: 2px solid var(--color-focus-ring);
       outline-offset: 2px;
     }
@@ -216,7 +217,7 @@
 .toolbarDense {
   padding: 4px 6px !important;
 
-  :global(button) {
+  :global(button:not(.cn-html-mode-tab)) {
     width: 24px !important;
     height: 24px !important;
     padding: 2px !important;
@@ -386,19 +387,28 @@
 }
 
 .htmlModeFormats {
-  margin-right: 6px;
+  display: inline-flex;
+  align-items: stretch;
+  gap: 6px;
+  margin-right: 8px;
+  flex-shrink: 0;
+  vertical-align: middle;
 }
 
 .htmlModeBtn {
   font: inherit;
   font-size: 12px;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 6px 12px;
+  min-width: 72px;
+  box-sizing: border-box;
   border-radius: 8px;
   border: 1px solid var(--color-border-subtle);
   background: var(--color-bg-subtle);
   color: var(--color-text-secondary);
   cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.2;
 
   &:hover:not(:disabled) {
     background: var(--color-bg-hover);
@@ -406,8 +416,13 @@
   }
 
   &:disabled {
-    opacity: 0.5;
+    opacity: 0.55;
     cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
   }
 }
 
@@ -415,6 +430,90 @@
   background: var(--color-bg-hover);
   border-color: var(--color-border-strong);
   color: var(--color-text-primary);
+}
+
+/** Visual + &lt;table&gt;: contenteditable body (Quill not used). */
+.visualHtmlPreviewWrap {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+}
+
+.visualHtmlPreviewBanner {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-info) 10%, var(--color-bg-muted));
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.visualToHtmlBtn {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-primary-600);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+
+  &:hover:not(:disabled) {
+    color: var(--color-primary-500);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.visualHtmlPreviewBody {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--color-text-primary);
+  box-sizing: border-box;
+  cursor: text;
+  outline: none;
+
+  &:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+  }
+
+  &[contenteditable='false'] {
+    cursor: not-allowed;
+    opacity: 0.85;
+  }
+
+  :global(table) {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  :global(tr) {
+    display: table-row;
+  }
+
+  :global(td),
+  :global(th) {
+    display: table-cell;
+    vertical-align: top;
+  }
+
+  :global(a) {
+    color: var(--color-primary-600);
+    cursor: default;
+  }
 }
 
 .htmlSourceTextarea {

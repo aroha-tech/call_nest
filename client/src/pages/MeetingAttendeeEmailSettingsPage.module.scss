@@ -474,6 +474,22 @@
   color: var(--color-text-primary);
   padding-top: 2px;
 
+  /* Keep table-based email layouts intact (some globals target prose only). */
+  :global(table) {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  :global(tr) {
+    display: table-row;
+  }
+
+  :global(td),
+  :global(th) {
+    display: table-cell;
+    vertical-align: top;
+  }
+
   :global(p) {
     margin: 0 0 0.75em;
   }
@@ -680,6 +696,21 @@
   overflow: auto;
   padding: 4px 2px;
 
+  :global(table) {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  :global(tr) {
+    display: table-row;
+  }
+
+  :global(td),
+  :global(th) {
+    display: table-cell;
+    vertical-align: top;
+  }
+
   :global(p) {
     margin: 0 0 0.75em;
   }
@@ -729,4 +760,29 @@
   font-size: $font-size-sm;
   color: var(--color-text-muted);
   line-height: 1.4;
+}
+
+.recipientPanel {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+  padding: $space-4 $space-4;
+  border-radius: $radius-md;
+  border: 1px solid var(--color-border-subtle);
+  background: color-mix(in srgb, var(--color-bg-muted) 88%, var(--color-bg-elevated));
+}
+
+.recipientPanelTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+
+.recipientPanelHint {
+  margin: -6px 0 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
 }

@@ -41,6 +41,7 @@ import * as contactActivityEventsService from './contactActivityEventsService.js
 import { createAndDispatchNotification } from './notificationService.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
 import * as tenantIndustryFieldsService from './tenantIndustryFieldsService.js';
+import * as leadImportDistributionService from './leadImportDistributionService.js';
 
 function assertUniquePhoneLabels(phones) {
   if (!Array.isArray(phones)) return;
@@ -4610,6 +4611,25 @@ export async function importContactsCsv(
     importAssignedUserIdRaw
   );
 
+  let importAssignmentModeNorm = 'manual';
+  let preloadedDistStore = null;
+  if (type === 'lead' && user.role !== 'agent') {
+    preloadedDistStore = await leadImportDistributionService.getLeadImportDistributionJson(tenantId);
+    importAssignmentModeNorm = leadImportDistributionService.normalizeAssignmentMode(
+      preloadedDistStore.default_assignment_mode
+    );
+  }
+
+  let leadImportAssigner = null;
+  if (preloadedDistStore && (importAssignmentModeNorm === 'weighted' || importAssignmentModeNorm === 'ai')) {
+    leadImportAssigner = await leadImportDistributionService.prepareLeadImportAssigner(tenantId, user, {
+      type,
+      defaultManagerId,
+      importManagerIdRaw,
+      distStore: preloadedDistStore,
+    });
+  }
+
   const allFields = await query(
     `SELECT id, name, label, type
      FROM contact_custom_fields
@@ -4777,7 +4797,11 @@ export async function importContactsCsv(
       let effManagerId = manager_id;
       let effAssignedUserId = assigned_user_id;
       if (effManagerId === undefined && defaultManagerId !== undefined) effManagerId = defaultManagerId;
-      if (effAssignedUserId === undefined && defaultAssignedUserId !== undefined) {
+      if (
+        importAssignmentModeNorm === 'manual' &&
+        effAssignedUserId === undefined &&
+        defaultAssignedUserId !== undefined
+      ) {
         effAssignedUserId = defaultAssignedUserId;
       }
 
@@ -4826,6 +4850,26 @@ export async function importContactsCsv(
           updated++;
         }
       } else {
+        if (
+          leadImportAssigner &&
+          type === 'lead' &&
+          assigned_user_id == null
+        ) {
+          const picked = await leadImportAssigner.assignForRow({
+            first_name,
+            last_name,
+            display_name,
+            email,
+            finalSource,
+            primaryPhone,
+          });
+          if (picked?.assigned_user_id != null) {
+            effAssignedUserId = picked.assigned_user_id;
+            if (effManagerId === undefined && picked.manager_id != null) {
+              effManagerId = picked.manager_id;
+            }
+          }
+        }
         const createPayload = {
           type,
           first_name,
@@ -4895,6 +4939,7 @@ export async function importContactsCsv(
         failed: errors.length,
         filename: fname || null,
         created_source: created_source || 'import',
+        import_assignment_mode: importAssignmentModeNorm,
       },
     });
   }

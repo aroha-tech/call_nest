@@ -2,7 +2,6 @@ import * as sendEmailService from '../email/sendEmailService.js';
 import * as meetingUserAttendeeEmailTemplatesService from './meetingUserAttendeeEmailTemplatesService.js';
 import * as meetingDefaultEmailSettingsService from './meetingDefaultEmailSettingsService.js';
 import * as meetingEmailContentResolve from './meetingEmailContentResolve.js';
-import { normalizeEmailRecipientListString } from '../../utils/emailRecipientList.js';
 import { parseMeetingInstantUtc } from '../../utils/meetingInstant.js';
 
 function pad2(n) {
@@ -175,8 +174,9 @@ export async function trySendMeetingAttendeeEmail(tenantId, userId, meeting, kin
     if (ownerUserId) {
       try {
         const ownerSettings = await meetingDefaultEmailSettingsService.getOrCreateForUser(tenantId, ownerUserId);
-        cc = normalizeEmailRecipientListString(ownerSettings?.default_cc_email || '') || undefined;
-        bcc = normalizeEmailRecipientListString(ownerSettings?.default_bcc_email || '') || undefined;
+        const pair = meetingDefaultEmailSettingsService.getCcBccForKind(ownerSettings, kind);
+        cc = pair.cc || undefined;
+        bcc = pair.bcc || undefined;
       } catch (_) {
         /* non-fatal */
       }
@@ -249,8 +249,9 @@ export async function sendMeetingAttendeeEmailWithTemplate(tenantId, userId, mee
   if (ownerUserId) {
     try {
       const ownerSettings = await meetingDefaultEmailSettingsService.getOrCreateForUser(tenantId, ownerUserId);
-      cc = normalizeEmailRecipientListString(ownerSettings?.default_cc_email || '') || undefined;
-      bcc = normalizeEmailRecipientListString(ownerSettings?.default_bcc_email || '') || undefined;
+      const pair = meetingDefaultEmailSettingsService.getCcBccForKind(ownerSettings, kind);
+      cc = pair.cc || undefined;
+      bcc = pair.bcc || undefined;
     } catch (_) {
       /* non-fatal */
     }

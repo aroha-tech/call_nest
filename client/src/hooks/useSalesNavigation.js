@@ -210,6 +210,7 @@ const TENANT_ADMIN_NAV_ITEMS = [
     permission: PERMISSIONS.SETTINGS_MANAGE,
     children: [
       { key: 'settings-main', label: 'Company', path: '/settings', permission: PERMISSIONS.SETTINGS_MANAGE },
+      { key: 'lead-import', label: 'Lead import', path: '/settings/lead-import', permission: PERMISSIONS.SETTINGS_MANAGE },
       { key: 'contact-fields', label: 'Contact Fields', path: '/settings/contact-fields', permission: PERMISSIONS.SETTINGS_MANAGE },
       {
         key: 'contact-tags',
@@ -279,6 +280,7 @@ const MANAGER_NAV_ITEMS = [
     path: '/settings/contact-tags',
     permissions: [PERMISSIONS.CONTACTS_UPDATE, PERMISSIONS.LEADS_UPDATE],
   },
+  { key: 'lead-import-settings', label: 'Lead import', path: '/settings/lead-import', permission: PERMISSIONS.LEADS_CREATE },
   {
     key: 'background-jobs',
     label: 'Background tasks',

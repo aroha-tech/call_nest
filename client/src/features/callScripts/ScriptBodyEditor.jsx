@@ -7,6 +7,31 @@ import styles from './ScriptBodyEditor.module.scss';
 
 const getBundledQuill = () => ReactQuill.Quill;
 
+/** Insert HTML at caret inside a contenteditable root (Visual + tables path). */
+function insertHtmlAtCaretInElement(rootEl, htmlString) {
+  const html = String(htmlString ?? '');
+  if (!rootEl || !html) return;
+  rootEl.focus();
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0);
+    if (rootEl.contains(range.commonAncestorContainer)) {
+      range.deleteContents();
+      const frag = range.createContextualFragment(html);
+      range.insertNode(frag);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      return;
+    }
+  }
+  const wrap = document.createElement('span');
+  wrap.innerHTML = html;
+  while (wrap.firstChild) {
+    rootEl.appendChild(wrap.firstChild);
+  }
+}
+
 export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
   {
     value = '',
@@ -36,6 +61,18 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
   const toolbarId = useMemo(() => `quill-toolbar-${Math.random().toString(36).slice(2)}`, []);
   const { grouped, moduleOrder, moduleLabels, loading: varsLoading } = useTemplateVariables();
   const [htmlSourceMode, setHtmlSourceMode] = useState(false);
+
+  /** True when showing the raw HTML textarea (exclusive with Quill visual editor). */
+  const inHtmlEditor = Boolean(enableHtmlSourceToggle && htmlSourceMode);
+
+  /** Quill cannot preserve `<table>`; Visual uses a contenteditable surface for real HTML editing. */
+  const bodyHasTable = useMemo(() => /<table\b/i.test(String(value ?? '')), [value]);
+  const visualIsRenderedPreview = Boolean(
+    enableHtmlSourceToggle && !htmlSourceMode && bodyHasTable
+  );
+
+  const visualTableEditableRef = useRef(null);
+
   const [varMenuOpen, setVarMenuOpen] = useState(false);
   const varMenuWrapRef = useRef(null);
   const varBtnRef = useRef(null);
@@ -70,9 +107,29 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
 
   const varsLoadingEffective = variableGroups != null ? false : varsLoading;
 
+  const emitFromVisualTableEditor = useCallback(() => {
+    const el = visualTableEditableRef.current;
+    if (!el) return;
+    const html = el.innerHTML;
+    onChange?.(html);
+    const plain = el.innerText ?? '';
+    onEditorState?.(plain, plain.length);
+  }, [onChange, onEditorState]);
+
+  /** Sync external `value` into the contenteditable when not focused (e.g. reset / tab switch). */
+  useLayoutEffect(() => {
+    if (!visualIsRenderedPreview || !visualTableEditableRef.current) return;
+    const el = visualTableEditableRef.current;
+    if (document.activeElement === el) return;
+    const next = value ?? '';
+    if ((el.innerHTML || '') !== next) {
+      el.innerHTML = next;
+    }
+  }, [value, visualIsRenderedPreview]);
+
   useImperativeHandle(ref, () => ({
     insertAtCursor(text) {
-      if (enableHtmlSourceToggle && htmlSourceMode && htmlTextareaRef.current) {
+      if (inHtmlEditor && htmlTextareaRef.current) {
         const ta = htmlTextareaRef.current;
         const start = typeof ta.selectionStart === 'number' ? ta.selectionStart : ta.value.length;
         const end = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : start;
@@ -83,6 +140,11 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
           const pos = start + text.length;
           ta.setSelectionRange(pos, pos);
         });
+        return;
+      }
+      if (enableHtmlSourceToggle && !htmlSourceMode && bodyHasTable && visualTableEditableRef.current) {
+        insertHtmlAtCaretInElement(visualTableEditableRef.current, String(text ?? ''));
+        emitFromVisualTableEditor();
         return;
       }
       const quill = getQuill();
@@ -100,13 +162,17 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
       quill.setSelection(startIndex + text.length);
     },
     focus() {
-      if (enableHtmlSourceToggle && htmlSourceMode) {
+      if (inHtmlEditor) {
         htmlTextareaRef.current?.focus();
+        return;
+      }
+      if (enableHtmlSourceToggle && !htmlSourceMode && bodyHasTable) {
+        visualTableEditableRef.current?.focus();
         return;
       }
       getQuill()?.focus();
     },
-  }), [getQuill, enableHtmlSourceToggle, htmlSourceMode, onChange]);
+  }), [getQuill, inHtmlEditor, onChange, onEditorState, enableHtmlSourceToggle, htmlSourceMode, bodyHasTable, emitFromVisualTableEditor]);
 
   useEffect(() => {
     const quill = getQuill();
@@ -141,7 +207,7 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
   const insertVariable = useCallback(
     (key) => {
       if (!key) return;
-      if (enableHtmlSourceToggle && htmlSourceMode && htmlTextareaRef.current) {
+      if (inHtmlEditor && htmlTextareaRef.current) {
         const ta = htmlTextareaRef.current;
         const insert = `{{${key}}}`;
         const start = typeof ta.selectionStart === 'number' ? ta.selectionStart : ta.value.length;
@@ -155,6 +221,11 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
         });
         return;
       }
+      if (enableHtmlSourceToggle && !htmlSourceMode && bodyHasTable && visualTableEditableRef.current) {
+        insertHtmlAtCaretInElement(visualTableEditableRef.current, `{{${key}}}`);
+        emitFromVisualTableEditor();
+        return;
+      }
       const quill = getQuill();
       if (!quill) return;
       const insert = `{{${key}}}`;
@@ -164,7 +235,7 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
       quill.setSelection(index + insert.length);
       quill.focus();
     },
-    [getQuill, enableHtmlSourceToggle, htmlSourceMode, onChange]
+    [getQuill, inHtmlEditor, onChange, enableHtmlSourceToggle, htmlSourceMode, bodyHasTable, emitFromVisualTableEditor]
   );
 
   const computeMenuPos = useCallback(() => {
@@ -275,7 +346,7 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
             <span className={`ql-formats ${styles.htmlModeFormats}`}>
               <button
                 type="button"
-                className={`${styles.htmlModeBtn} ${!htmlSourceMode ? styles.htmlModeBtnActive : ''}`}
+                className={`cn-html-mode-tab ${styles.htmlModeBtn} ${!htmlSourceMode ? styles.htmlModeBtnActive : ''}`}
                 onClick={() => setHtmlSourceMode(false)}
                 disabled={readOnly}
               >
@@ -283,7 +354,7 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
               </button>
               <button
                 type="button"
-                className={`${styles.htmlModeBtn} ${htmlSourceMode ? styles.htmlModeBtnActive : ''}`}
+                className={`cn-html-mode-tab ${styles.htmlModeBtn} ${htmlSourceMode ? styles.htmlModeBtnActive : ''}`}
                 onClick={() => setHtmlSourceMode(true)}
                 disabled={readOnly}
               >
@@ -308,7 +379,11 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
           ) : null}
           <div
             className={styles.toolbarVisualRow}
-            style={enableHtmlSourceToggle && htmlSourceMode ? { display: 'none' } : undefined}
+            style={
+              enableHtmlSourceToggle && (inHtmlEditor || visualIsRenderedPreview)
+                ? { display: 'none' }
+                : undefined
+            }
           >
             <span className="ql-formats">
               <select className="ql-header" defaultValue="">
@@ -337,7 +412,7 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
             </span>
           </div>
         </div>
-        {htmlSourceMode && enableHtmlSourceToggle ? (
+        {inHtmlEditor ? (
           <textarea
             ref={htmlTextareaRef}
             className={styles.htmlSourceTextarea}
@@ -348,6 +423,36 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
             placeholder="Raw HTML for the email body. Merge fields use {{name}} syntax."
             aria-label="Email HTML source"
           />
+        ) : visualIsRenderedPreview ? (
+          <div className={styles.visualHtmlPreviewWrap}>
+            <div className={styles.visualHtmlPreviewBanner}>
+              Edit the email below (real HTML, including tables). Use{' '}
+              <button
+                type="button"
+                className={styles.visualToHtmlBtn}
+                onClick={() => setHtmlSourceMode(true)}
+                disabled={readOnly}
+              >
+                HTML
+              </button>{' '}
+              for raw source.
+            </div>
+            <div
+              ref={visualTableEditableRef}
+              className={styles.visualHtmlPreviewBody}
+              role="textbox"
+              aria-multiline="true"
+              aria-label="Email body visual editor"
+              contentEditable={!readOnly}
+              suppressContentEditableWarning
+              onInput={emitFromVisualTableEditor}
+              onBlur={emitFromVisualTableEditor}
+              onClick={(e) => {
+                const a = e.target instanceof Element ? e.target.closest('a') : null;
+                if (a) e.preventDefault();
+              }}
+            />
+          </div>
         ) : (
           <ReactQuill
             ref={quillRef}

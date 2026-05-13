@@ -8,7 +8,7 @@ import { Modal, ModalFooter } from '../components/ui/Modal';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
 import { meetingsAPI } from '../services/meetingsAPI';
 import { ScriptBodyEditor } from '../features/callScripts/ScriptBodyEditor';
-import { formatEmailRecipientListDisplay } from '../utils/emailRecipientList';
+import { formatEmailRecipientListDisplay, validateEmailRecipientList } from '../utils/emailRecipientList';
 import { IconChevronDown } from '../features/contacts/ListActionsMenuIcons';
 import styles from './MeetingAttendeeEmailSettingsPage.module.scss';
 
@@ -74,6 +74,54 @@ function cardMeta(kind) {
   return EMAIL_TYPE_CARDS.find((c) => c.kind === kind) || EMAIL_TYPE_CARDS[0];
 }
 
+const EMAIL_KINDS = EMAIL_TYPE_CARDS.map((c) => c.kind);
+
+function ensureDefaultCcBccByKind(settings) {
+  if (!settings || typeof settings !== 'object') return settings;
+  const by = { ...(settings.default_cc_bcc_by_kind || {}) };
+  for (const k of EMAIL_KINDS) {
+    const slot = by[k];
+    if (!slot || typeof slot !== 'object') {
+      by[k] = { cc: '', bcc: '' };
+    } else {
+      by[k] = { cc: String(slot.cc ?? ''), bcc: String(slot.bcc ?? '') };
+    }
+  }
+  const allEmpty = EMAIL_KINDS.every((k) => !String(by[k].cc || '').trim() && !String(by[k].bcc || '').trim());
+  if (allEmpty && (String(settings.default_cc_email || '').trim() || String(settings.default_bcc_email || '').trim())) {
+    const cc = String(settings.default_cc_email || '');
+    const bcc = String(settings.default_bcc_email || '');
+    for (const k of EMAIL_KINDS) {
+      by[k] = { cc, bcc };
+    }
+  }
+  return { ...settings, default_cc_bcc_by_kind: by };
+}
+
+function validateAllMeetingCcBcc(settings) {
+  const by = settings?.default_cc_bcc_by_kind || {};
+  /** @type {Record<string, string>} */
+  const errors = {};
+  for (const k of EMAIL_KINDS) {
+    const slot = by[k] || {};
+    const ccRes = validateEmailRecipientList(slot.cc || '');
+    if (!ccRes.valid) {
+      errors[`${k}_cc`] =
+        ccRes.invalidParts.length > 0
+          ? `Invalid email address: ${ccRes.invalidParts.join(', ')}`
+          : 'Invalid CC list';
+    }
+    const bccRes = validateEmailRecipientList(slot.bcc || '');
+    if (!bccRes.valid) {
+      errors[`${k}_bcc`] =
+        bccRes.invalidParts.length > 0
+          ? `Invalid email address: ${bccRes.invalidParts.join(', ')}`
+          : 'Invalid BCC list';
+    }
+  }
+  return errors;
+}
+
 const EMAIL_TYPE_TAB_KIND_CLASS = {
   created: styles.emailTypeTab_kind_created,
   reminder: styles.emailTypeTab_kind_reminder,
@@ -105,6 +153,7 @@ function buildPreviewVars(tab) {
     contact_name: 'Rahul Patel',
     company_name: 'Your Company',
     feedback_link: 'https://yourcompany.com/feedback/abc123',
+    feedback_url: 'https://yourcompany.com/feedback/abc123',
     start_at: '06 May 2026, 10:00 AM',
     end_at: '06 May 2026, 11:00 AM',
     meeting_status: tab === 'cancelled' ? 'cancelled' : 'scheduled',
@@ -146,6 +195,7 @@ export function MeetingAttendeeEmailSettingsPage() {
   const [attendeePlaceholderHelp, setAttendeePlaceholderHelp] = useState([]);
   const [previewTemplateOpen, setPreviewTemplateOpen] = useState(false);
   const [automationExpanded, setAutomationExpanded] = useState(false);
+  const [ccBccErrors, setCcBccErrors] = useState({});
 
   React.useEffect(() => {
     if (tab !== 'reminder') setAutomationExpanded(false);
@@ -155,12 +205,14 @@ export function MeetingAttendeeEmailSettingsPage() {
     setLoading(true);
     setError(null);
     setSuccessMsg(null);
+    setCcBccErrors({});
     try {
       const [res, resT] = await Promise.all([
         meetingsAPI.getDefaultEmailSettings(),
         meetingsAPI.getUserAttendeeEmailTemplates(),
       ]);
-      setSettings(res?.data?.data ?? null);
+      const raw = res?.data?.data ?? null;
+      setSettings(raw ? ensureDefaultCcBccByKind(raw) : null);
       setAttendeeTemplates(resT?.data?.data ?? []);
       setAttendeePlaceholderHelp(resT?.data?.placeholder_help ?? []);
     } catch (e) {
@@ -194,6 +246,7 @@ export function MeetingAttendeeEmailSettingsPage() {
       'contact_name',
       'company_name',
       'feedback_link',
+      'feedback_url',
       'calendar_google_url',
       'calendar_outlook_url',
     ];
@@ -244,17 +297,41 @@ export function MeetingAttendeeEmailSettingsPage() {
     ];
   }, [attendeePlaceholderHelp]);
 
+  function updateCcBccField(kind, field, value) {
+    setError(null);
+    setCcBccErrors((prev) => {
+      const next = { ...prev };
+      delete next[`${kind}_${field}`];
+      return next;
+    });
+    setSettings((prev) => {
+      if (!prev) return prev;
+      const ensured = ensureDefaultCcBccByKind(prev);
+      const by = { ...ensured.default_cc_bcc_by_kind };
+      by[kind] = { ...(by[kind] || { cc: '', bcc: '' }), [field]: value };
+      return { ...prev, default_cc_bcc_by_kind: by };
+    });
+  }
+
   function updateField(field, value) {
     setSettings((prev) => ({ ...(prev || {}), [field]: value }));
   }
 
   async function save() {
+    const errs = validateAllMeetingCcBcc(settings);
+    if (Object.keys(errs).length) {
+      setCcBccErrors(errs);
+      setError('Fix invalid CC or BCC email addresses before saving.');
+      return;
+    }
+    setCcBccErrors({});
     setSaving(true);
     setError(null);
     setSuccessMsg(null);
     try {
       const res = await meetingsAPI.putDefaultEmailSettings(settings || {});
-      setSettings(res?.data?.data ?? null);
+      const raw = res?.data?.data ?? null;
+      setSettings(raw ? ensureDefaultCcBccByKind(raw) : null);
       setSuccessMsg('Settings saved.');
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || 'Save failed');
@@ -264,6 +341,13 @@ export function MeetingAttendeeEmailSettingsPage() {
   }
 
   async function saveAttendeeTemplates() {
+    const errs = validateAllMeetingCcBcc(settings);
+    if (Object.keys(errs).length) {
+      setCcBccErrors(errs);
+      setError('Fix invalid CC or BCC email addresses before saving.');
+      return;
+    }
+    setCcBccErrors({});
     setSaving(true);
     setError(null);
     setSuccessMsg(null);
@@ -279,7 +363,8 @@ export function MeetingAttendeeEmailSettingsPage() {
         meetingsAPI.putDefaultEmailSettings(settings || {}),
       ]);
       setAttendeeTemplates(resT?.data?.data ?? []);
-      setSettings(resS?.data?.data ?? settings);
+      const rawS = resS?.data?.data ?? settings;
+      setSettings(rawS ? ensureDefaultCcBccByKind(rawS) : null);
       setAttendeePlaceholderHelp(resT?.data?.placeholder_help ?? attendeePlaceholderHelp);
       setSuccessMsg('Settings saved.');
     } catch (e) {
@@ -296,7 +381,8 @@ export function MeetingAttendeeEmailSettingsPage() {
     try {
       if (tab === 'reminder' || tab === 'feedback') {
         const res = await meetingsAPI.resetDefaultEmailSection({ section: tab });
-        setSettings(res?.data?.data ?? null);
+        const raw = res?.data?.data ?? null;
+        setSettings(raw ? ensureDefaultCcBccByKind(raw) : null);
       } else {
         await meetingsAPI.resetUserAttendeeEmailTemplate({ template_kind: tab });
         const [resT, resS] = await Promise.all([
@@ -304,7 +390,8 @@ export function MeetingAttendeeEmailSettingsPage() {
           meetingsAPI.getDefaultEmailSettings(),
         ]);
         setAttendeeTemplates(resT?.data?.data ?? []);
-        setSettings(resS?.data?.data ?? settings);
+        const rawS = resS?.data?.data ?? settings;
+        setSettings(rawS ? ensureDefaultCcBccByKind(rawS) : null);
         setAttendeePlaceholderHelp(resT?.data?.placeholder_help ?? attendeePlaceholderHelp);
       }
       setSuccessMsg('Restored default content for this email type.');
@@ -342,6 +429,10 @@ export function MeetingAttendeeEmailSettingsPage() {
   }
 
   const meta = cardMeta(tab);
+  const activeCcBcc = useMemo(() => {
+    const by = settings?.default_cc_bcc_by_kind?.[tab];
+    return by && typeof by === 'object' ? { cc: String(by.cc ?? ''), bcc: String(by.bcc ?? '') } : { cc: '', bcc: '' };
+  }, [settings, tab]);
   const attendeeActive = attendeeTemplates.find((t) => t.template_kind === tab) || null;
   const activeSubject =
     tab === 'reminder'
@@ -383,10 +474,9 @@ export function MeetingAttendeeEmailSettingsPage() {
   );
 
   const previewCcDisplay =
-    formatEmailRecipientListDisplay(settings?.default_cc_email) ||
-    'amit.kumar@example.com, neha.sharma@example.com';
+    formatEmailRecipientListDisplay(activeCcBcc.cc) || 'amit.kumar@example.com, neha.sharma@example.com';
   const previewBccDisplay =
-    formatEmailRecipientListDisplay(settings?.default_bcc_email) || 'sneha.verma@example.com';
+    formatEmailRecipientListDisplay(activeCcBcc.bcc) || 'sneha.verma@example.com';
 
   return (
     <div className={styles.page}>
@@ -527,22 +617,33 @@ export function MeetingAttendeeEmailSettingsPage() {
                 />
               </div>
 
-              <Input
-                label="CC"
-                value={settings?.default_cc_email ?? ''}
-                onChange={(e) => updateField('default_cc_email', e.target.value)}
-                placeholder="email1@company.com, email2@company.com (or one per line)"
-                disabled={saving || loading}
-                suffix={personSuffix}
-              />
-              <Input
-                label="BCC"
-                value={settings?.default_bcc_email ?? ''}
-                onChange={(e) => updateField('default_bcc_email', e.target.value)}
-                placeholder="email1@company.com; email2@company.com"
-                disabled={saving || loading}
-                suffix={personSuffix}
-              />
+              <div className={styles.recipientPanel} role="group" aria-labelledby={`cc-bcc-heading-${tab}`}>
+                <h3 className={styles.recipientPanelTitle} id={`cc-bcc-heading-${tab}`}>
+                  Additional recipients for <strong>{meta.tabLabel}</strong> emails only
+                </h3>
+                <p className={styles.recipientPanelHint}>
+                  CC and BCC here apply only to this email type (for example, Invitation vs Reminder). Separate
+                  multiple addresses with commas, semicolons, or line breaks. Leave blank to send only to the attendee.
+                </p>
+                <Input
+                  label="CC (optional)"
+                  value={activeCcBcc.cc}
+                  onChange={(e) => updateCcBccField(tab, 'cc', e.target.value)}
+                  placeholder="manager@company.com, team@company.com"
+                  disabled={saving || loading}
+                  suffix={personSuffix}
+                  error={ccBccErrors[`${tab}_cc`]}
+                />
+                <Input
+                  label="BCC (optional)"
+                  value={activeCcBcc.bcc}
+                  onChange={(e) => updateCcBccField(tab, 'bcc', e.target.value)}
+                  placeholder="archive@company.com"
+                  disabled={saving || loading}
+                  suffix={personSuffix}
+                  error={ccBccErrors[`${tab}_bcc`]}
+                />
+              </div>
 
               <div className={styles.additionalBlock}>
                 <div className={styles.additionalTitle}>Additional options</div>
@@ -733,7 +834,7 @@ export function MeetingAttendeeEmailSettingsPage() {
                 <span className={styles.previewMetaLabel}>CC</span>
                 <span
                   className={
-                    formatEmailRecipientListDisplay(settings?.default_cc_email) ? '' : styles.previewMetaFaint
+                    formatEmailRecipientListDisplay(activeCcBcc.cc) ? '' : styles.previewMetaFaint
                   }
                 >
                   {previewCcDisplay}
@@ -743,7 +844,7 @@ export function MeetingAttendeeEmailSettingsPage() {
                 <span className={styles.previewMetaLabel}>BCC</span>
                 <span
                   className={
-                    formatEmailRecipientListDisplay(settings?.default_bcc_email) ? '' : styles.previewMetaFaint
+                    formatEmailRecipientListDisplay(activeCcBcc.bcc) ? '' : styles.previewMetaFaint
                   }
                 >
                   {previewBccDisplay}

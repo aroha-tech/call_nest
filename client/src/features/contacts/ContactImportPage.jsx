@@ -8,7 +8,6 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Alert } from '../../components/ui/Alert';
 import { Spinner } from '../../components/ui/Spinner';
-import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown';
 import { InfoHelpIcon } from '../../components/ui/InfoHelpIcon';
@@ -299,6 +298,13 @@ export function ContactImportPage({ type }) {
     const step3Current = current === 3 && !result;
     return { step1Done, step2Done, step3Done, step1Current, step2Current, step3Current };
   }, [file, hasPreview, result]);
+
+  const importSettingsHelpMessage = useMemo(() => {
+    const base =
+      'Duplicates are matched by email. Optional default manager and agent apply when a row does not set them; column mapping always wins.';
+    if (type !== 'lead') return base;
+    return `${base} Automatic lead assignment (percentages or smart routing) is configured under Settings → Lead import.`;
+  }, [type]);
 
   const resetFileAndPreview = () => {
     setPreview(null);
@@ -762,7 +768,7 @@ export function ContactImportPage({ type }) {
                     <InfoHelpIcon
                       title="Import settings info"
                       modalTitle="Import settings"
-                      message="Duplicates are matched by email. File-level manager/agent values override defaults."
+                      message={importSettingsHelpMessage}
                     />
                   </div>
 
@@ -820,6 +826,13 @@ export function ContactImportPage({ type }) {
                           onChange={(e) => setImportAssignedUserId(e.target.value)}
                           options={agentSelectOptions}
                         />
+                      </div>
+                    ) : null}
+                    {type === 'lead' && canSetImportOwnership ? (
+                      <div className={styles.footerNote} style={{ marginTop: 10 }}>
+                        Automatic lead assignment is set under{' '}
+                        <Link to="/settings/lead-import">Settings → Lead import</Link>. The default agent here applies
+                        when the workspace rule is manual or the row has no assignee column.
                       </div>
                     ) : null}
                   </div>
@@ -1070,6 +1083,13 @@ export function ContactImportPage({ type }) {
                   </div>
                   <div className={styles.footerNote} style={{ marginBottom: 10 }}>
                     Check outcome and fix any row errors before starting import.
+                    {type === 'lead' && canSetImportOwnership ? (
+                      <>
+                        {' '}
+                        Lead assignment rules:{' '}
+                        <Link to="/settings/lead-import">Settings → Lead import</Link>.
+                      </>
+                    ) : null}
                   </div>
                   {reviewData && Number(reviewData.totalRows) > IMPORT_BACKGROUND_ROW_THRESHOLD ? (
                     <Alert variant="info" style={{ marginBottom: 12 }}>
@@ -1178,6 +1198,13 @@ export function ContactImportPage({ type }) {
                   <b>Sample CSV</b>: the <b>Upload file</b> panel offers a template for your workspace industry (when set)
                   plus a minimal template.
                 </div>
+                {type === 'lead' && canSetImportOwnership ? (
+                  <div style={{ marginTop: 6 }}>
+                    <b>Lead assignment</b>: open{' '}
+                    <Link to="/settings/lead-import">Settings → Lead import</Link> to choose manual, percentage spread,
+                    or smart routing for new leads.
+                  </div>
+                ) : null}
               </div>
             </div>
 

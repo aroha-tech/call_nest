@@ -65,9 +65,14 @@ export async function workspace(req, res, next) {
       : {
           default_cc_email: '',
           default_bcc_email: '',
+          default_cc_bcc_by_kind: null,
         };
 
     const preview = await buildAttendeeEmailBodies(tenantId, meeting, editorTemplate, {});
+
+    const ccBcc = ownerUserId
+      ? meetingDefaultEmailSettingsService.getCcBccForKind(ownerSettings, kind)
+      : { cc: '', bcc: '' };
 
     return res.json({
       data: {
@@ -80,8 +85,8 @@ export async function workspace(req, res, next) {
           body_text: stored.body_text ?? '',
         },
         owner_settings: {
-          default_cc_email: normalizeEmailRecipientListString(String(ownerSettings.default_cc_email || '')),
-          default_bcc_email: normalizeEmailRecipientListString(String(ownerSettings.default_bcc_email || '')),
+          default_cc_email: normalizeEmailRecipientListString(String(ccBcc.cc || '')),
+          default_bcc_email: normalizeEmailRecipientListString(String(ccBcc.bcc || '')),
         },
         preview: {
           subject: preview.subject,

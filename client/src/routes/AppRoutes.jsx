@@ -50,6 +50,7 @@ import { ContactBlacklistPage } from '../features/contacts/ContactBlacklistPage'
 import { BackgroundJobsPage } from '../pages/BackgroundJobsPage';
 import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
 import { TenantCompanySettingsPage } from '../pages/TenantCompanySettingsPage';
+import { LeadImportAssignmentSettingsPage } from '../pages/LeadImportAssignmentSettingsPage';
 import { DialerWorkspaceSettingsPage } from '../pages/DialerWorkspaceSettingsPage';
 import { DialerPhoneNumbersPage } from '../pages/DialerPhoneNumbersPage';
 import { PlatformDialerPhoneNumbersPage } from '../pages/PlatformDialerPhoneNumbersPage';
@@ -793,6 +794,16 @@ function TenantRoutes() {
           <ProtectedRoute permissions={[PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ]}>
             <AppShellLayout>
               <BackgroundJobsPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/lead-import"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <LeadImportAssignmentSettingsPage />
             </AppShellLayout>
           </ProtectedRoute>
         }
