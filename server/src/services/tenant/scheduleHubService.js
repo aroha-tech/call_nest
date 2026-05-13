@@ -301,6 +301,7 @@ export async function listMeetingsPaged(
       m.title,
       m.start_at,
       m.end_at,
+      m.meeting_timezone,
       m.meeting_status,
       m.attendance_status,
       m.location,

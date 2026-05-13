@@ -41,6 +41,14 @@ import {
   buildAttemptHistoryEntries,
   sanitizeAttemptNotesForDisplay,
 } from '../utils/callAttemptNotesDisplay';
+import { localDateTimeInputToUtcMysql } from '../utils/meetingDateTime';
+import {
+  DEFAULT_MEETING_TIMEZONE,
+  addMinutesToCivilDateTimeLocalString,
+  civilDateTimeLocalStringToUtcMs,
+  civilDateTimeNowPlusMinutesInZone,
+} from '../utils/meetingTimezone';
+import { COMMON_TIMEZONE_OPTIONS } from '../utils/dateTimeDisplay';
 import styles from './DialerSessionPage.module.scss';
 
 /** Display-only: maps `contact_phones.label` ENUM (and primary) to a short title. */
@@ -194,15 +202,6 @@ function coerceAttemptId(v) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-function localDatetimeToMysql(s) {
-  if (!s) return '';
-  const t = String(s).trim();
-  if (!t) return '';
-  const n = t.replace('T', ' ');
-  if (n.length === 16) return `${n}:00`;
-  return n.length === 19 ? n : n;
-}
-
 function isProviderReauthError(errorLike) {
   return String(errorLike?.response?.data?.code || '').trim() === 'PROVIDER_REAUTH_REQUIRED';
 }
@@ -304,6 +303,7 @@ export function DialerSessionPage() {
     end_at: '',
     location: '',
     description: '',
+    meeting_timezone: DEFAULT_MEETING_TIMEZONE,
   });
   const [tick, setTick] = useState(0);
   const [uiTimer, setUiTimer] = useState(() => {
@@ -1221,14 +1221,9 @@ export function DialerSessionPage() {
         return;
       }
       if (nextActionCode === 'schedule_meeting') {
-        const now = new Date();
-        const start = new Date(now.getTime() + 30 * 60 * 1000);
-        const end = new Date(start.getTime() + 30 * 60 * 1000);
-        const toLocal = (d) =>
-          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(
-            2,
-            '0'
-          )}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        const z = DEFAULT_MEETING_TIMEZONE;
+        const startAt = civilDateTimeNowPlusMinutesInZone(30, z);
+        const endAt = startAt ? addMinutesToCivilDateTimeLocalString(startAt, 30, z) : '';
         setMeetingForm({
           email_account_id: activeEmailAccountOptions[0]?.value || '',
           assigned_user_id: String(nextFlow.defaultAssignedUserId || user?.id || ''),
@@ -1237,10 +1232,11 @@ export function DialerSessionPage() {
           meeting_duration_min: '30',
           title: `${leadContact?.display_name || 'Contact'} follow-up`,
           attendee_email: leadContact?.email || '',
-          start_at: toLocal(start),
-          end_at: toLocal(end),
+          start_at: startAt,
+          end_at: endAt,
           location: '',
           description: '',
+          meeting_timezone: z,
         });
         setMeetingModalOpen(true);
         return;
@@ -1335,8 +1331,9 @@ export function DialerSessionPage() {
       );
       return;
     }
-    const startTs = new Date(meetingForm.start_at).getTime();
-    const endTs = new Date(meetingForm.end_at).getTime();
+    const tz = meetingForm.meeting_timezone || DEFAULT_MEETING_TIMEZONE;
+    const startTs = civilDateTimeLocalStringToUtcMs(meetingForm.start_at, tz);
+    const endTs = civilDateTimeLocalStringToUtcMs(meetingForm.end_at, tz);
     if (!Number.isFinite(startTs) || !Number.isFinite(endTs)) {
       setActionModalError('Enter a valid start/end date and time.');
       return;
@@ -1362,8 +1359,9 @@ export function DialerSessionPage() {
         contact_id: Number(currentItem.contact_id),
         title: meetingForm.title.trim(),
         attendee_email: meetingForm.attendee_email?.trim() || null,
-        start_at: localDatetimeToMysql(meetingForm.start_at),
-        end_at: localDatetimeToMysql(meetingForm.end_at),
+        start_at: localDateTimeInputToUtcMysql(meetingForm.start_at, tz),
+        end_at: localDateTimeInputToUtcMysql(meetingForm.end_at, tz),
+        meeting_timezone: tz,
         location: meetingForm.location?.trim() || null,
         description: meetingForm.description?.trim() || null,
         meeting_status: 'scheduled',
@@ -1378,12 +1376,11 @@ export function DialerSessionPage() {
     }
   }
 
-  function syncMeetingEndFromStart(nextStart, nextDuration) {
+  function syncMeetingEndFromStart(nextStart, nextDuration, meetingTz) {
     const d = Number(nextDuration);
-    const startDate = new Date(nextStart);
-    if (!Number.isFinite(d) || Number.isNaN(startDate.getTime())) return '';
-    const endDate = new Date(startDate.getTime() + d * 60000);
-    return formatDateTimeLocalInputValue(endDate);
+    const z = meetingTz || DEFAULT_MEETING_TIMEZONE;
+    if (!nextStart || !Number.isFinite(d) || d <= 0) return '';
+    return addMinutesToCivilDateTimeLocalString(nextStart, d, z);
   }
 
   async function saveDialCallNotesClick() {
@@ -2815,7 +2812,7 @@ export function DialerSessionPage() {
                     return {
                       ...prev,
                       meeting_duration_min: nextDuration,
-                      end_at: syncMeetingEndFromStart(prev.start_at, nextDuration) || prev.end_at,
+                      end_at: syncMeetingEndFromStart(prev.start_at, nextDuration, prev.meeting_timezone) || prev.end_at,
                     };
                   })
                 }
@@ -2827,6 +2824,19 @@ export function DialerSessionPage() {
                   { value: '90', label: '90 minutes' },
                 ]}
               />
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Select
+                  label="Meeting timezone"
+                  value={meetingForm.meeting_timezone || DEFAULT_MEETING_TIMEZONE}
+                  onChange={(e) =>
+                    setMeetingForm((prev) => ({
+                      ...prev,
+                      meeting_timezone: e.target.value,
+                    }))
+                  }
+                  options={COMMON_TIMEZONE_OPTIONS}
+                />
+              </div>
               <Input
                 label="Title"
                 value={meetingForm.title}
@@ -2847,7 +2857,7 @@ export function DialerSessionPage() {
                   setMeetingForm((prev) => ({
                     ...prev,
                     start_at: v,
-                    end_at: syncMeetingEndFromStart(v, prev.meeting_duration_min) || prev.end_at,
+                    end_at: syncMeetingEndFromStart(v, prev.meeting_duration_min, prev.meeting_timezone) || prev.end_at,
                   }))
                 }
               />

@@ -22,6 +22,7 @@ import { Badge } from '../components/ui/Badge';
 import { TableDataRegion } from '../components/admin/TableDataRegion';
 import listStyles from '../components/admin/adminDataList.module.scss';
 import { ScriptBodyEditor } from '../features/callScripts/ScriptBodyEditor';
+import { formatEmailRecipientListDisplay } from '../utils/emailRecipientList';
 import { InfoHelpIcon, infoHelpHeadingRowClassName } from '../components/ui/InfoHelpIcon';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
 import { Checkbox } from '../components/ui/Checkbox';
@@ -32,6 +33,13 @@ import { useAppSelector } from '../app/hooks';
 import { selectUser } from '../features/auth/authSelectors';
 import styles from './MeetingsPage.module.scss';
 import attendeeMailStyles from './MeetingAttendeeEmailSettingsPage.module.scss';
+import {
+  localDateTimeInputToUtcMysql,
+  utcMysqlOrIsoToLocalDateTimeInput,
+  utcMysqlRangeForLocalMonth,
+} from '../utils/meetingDateTime';
+import { DEFAULT_MEETING_TIMEZONE, addMinutesToCivilDateTimeLocalString, civilDateTimeLocalStringToUtcMs } from '../utils/meetingTimezone';
+import { COMMON_TIMEZONE_OPTIONS } from '../utils/dateTimeDisplay';
 
 function UiIcon({ children, className = '' }) {
   return (
@@ -75,21 +83,6 @@ function toYmd(d) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-function localDatetimeToMysql(s) {
-  if (!s) return '';
-  const t = String(s).trim();
-  if (!t) return '';
-  const n = t.replace('T', ' ');
-  if (n.length === 16) return `${n}:00`;
-  return n.length === 19 ? n : n;
-}
-
-function mysqlToDatetimeLocal(mysql) {
-  if (!mysql) return '';
-  const s = String(mysql).replace(' ', 'T').slice(0, 16);
-  return s;
-}
-
 /** Human label for merge-field keys shown on chips (e.g. start_at → Start At). */
 function formatMergeFieldLabel(key) {
   return String(key)
@@ -97,16 +90,6 @@ function formatMergeFieldLabel(key) {
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(' ');
-}
-
-function monthRange(year, month0) {
-  const from = new Date(year, month0, 1, 0, 0, 0);
-  const to = new Date(year, month0 + 1, 0, 23, 59, 59);
-  const fmt = (d) =>
-    `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(
-      d.getSeconds()
-    )}`;
-  return { from: fmt(from), to: fmt(to) };
 }
 
 function buildMonthCells(year, month0) {
@@ -144,8 +127,9 @@ function meetingPayloadFromForm(form, accounts, editingMeeting = null) {
     '';
   return {
     title: form.title?.trim() ?? '',
-    start_at: localDatetimeToMysql(form.start_at) || '',
-    end_at: localDatetimeToMysql(form.end_at) || '',
+    start_at: localDateTimeInputToUtcMysql(form.start_at, form.meeting_timezone) || '',
+    end_at: localDateTimeInputToUtcMysql(form.end_at, form.meeting_timezone) || '',
+    meeting_timezone: form.meeting_timezone || DEFAULT_MEETING_TIMEZONE,
     location: form.location?.trim() ?? '',
     description: form.description?.trim() ?? '',
     meeting_status: form.meeting_status || 'scheduled',
@@ -168,105 +152,15 @@ function meetingPreviewKindLabel(kind) {
   return 'Cancelled';
 }
 
-/** Split rendered HTML so meeting details can sit before closing lines (same as Meetings mail settings). */
-function splitPreviewHtmlBeforeClosing(html) {
-  const h = String(html || '');
-  if (!h.trim()) return { before: '', after: '' };
-  const needles = [
-    'We apologize',
-    'Thanks,',
-    'Thank you,',
-    'Best regards',
-    'Kind regards',
-    'Warm regards',
-    'Regards,',
-    'Sincerely',
-    'We hope your meeting',
-    'Please share your feedback',
-  ];
-  let bestCut = -1;
-  for (const n of needles) {
-    let from = 0;
-    while (from < h.length) {
-      const idx = h.indexOf(n, from);
-      if (idx === -1) break;
-      const pOpen = h.lastIndexOf('<p', idx);
-      const cutCandidate = pOpen >= 0 ? pOpen : idx;
-      if (bestCut === -1 || cutCandidate < bestCut) bestCut = cutCandidate;
-      from = idx + n.length;
-    }
-  }
-  if (bestCut >= 0) return { before: h.slice(0, bestCut), after: h.slice(bestCut) };
-  return { before: h, after: '' };
-}
-
 function meetingPreviewEmailSubtitle(kind) {
   if (kind === 'created') return 'This is how the invitation will look to the attendee.';
   if (kind === 'updated') return 'This is how the update email will look to the attendee.';
   return 'This is how the cancellation email will look to the attendee.';
 }
 
-function meetingPreviewHeroIconName(kind) {
-  if (kind === 'created') return 'calendar_add_on';
-  if (kind === 'updated') return 'sync';
-  return 'highlight_off';
-}
-
-function meetingPreviewDetailsToneClass(kind) {
-  if (kind === 'created') return attendeeMailStyles.meetingDetailsAlert_tone_created;
-  if (kind === 'updated') return attendeeMailStyles.meetingDetailsAlert_tone_updated;
-  if (kind === 'cancelled') return attendeeMailStyles.meetingDetailsAlert_tone_cancelled;
-  return attendeeMailStyles.meetingDetailsAlert_tone_created;
-}
-
 function previewMetaCcBccDisplay(raw) {
-  const t = String(raw || '').trim();
+  const t = formatEmailRecipientListDisplay(raw);
   return t || '—';
-}
-
-function MeetingPreviewCalendarLinksRow() {
-  return (
-    <div className={attendeeMailStyles.calendarRow}>
-      <span className={attendeeMailStyles.calendarLink}>
-        <svg className={attendeeMailStyles.calBrandIcon} viewBox="0 0 24 24" aria-hidden>
-          <path
-            fill="#4285F4"
-            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-          />
-          <path
-            fill="#34A853"
-            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-          />
-          <path
-            fill="#FBBC05"
-            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-          />
-          <path
-            fill="#EA4335"
-            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-          />
-        </svg>
-        Add to Google Calendar
-      </span>
-      <span className={attendeeMailStyles.calendarLink}>
-        <svg className={attendeeMailStyles.calBrandIcon} viewBox="0 0 24 24" aria-hidden>
-          <path fill="#0078D4" d="M7 3h9a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z" />
-          <path fill="#fff" d="M7 7h12v2H7zm0 4h12v2H7zm0 4h8v2H7z" opacity="0.9" />
-        </svg>
-        Add to Outlook
-      </span>
-      <span className={attendeeMailStyles.calendarLink}>
-        <svg className={attendeeMailStyles.calBrandIcon} viewBox="0 0 24 24" aria-hidden>
-          <rect x="3" y="5" width="18" height="16" rx="2" fill="#E11D48" />
-          <path d="M3 10h18" stroke="#fff" strokeWidth="1.5" />
-          <text x="12" y="17.5" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700">
-            31
-          </text>
-        </svg>
-        Add to iCal
-      </span>
-    </div>
-  );
 }
 
 function isProviderReauthError(errorLike) {
@@ -401,22 +295,12 @@ export function MeetingsPage() {
   const [meetingPreviewSubModal, setMeetingPreviewSubModal] = useState(null);
   /** Which resolved modal we are fetching for (for button loading). */
   const [meetingPreviewResolveFor, setMeetingPreviewResolveFor] = useState(null);
-  const [meetingPreviewIncludeDetails, setMeetingPreviewIncludeDetails] = useState(true);
   const [meetingPreviewOwnerUserId, setMeetingPreviewOwnerUserId] = useState(null);
   const [meetingPreviewEnvelope, setMeetingPreviewEnvelope] = useState({
     to: '',
     fromLine: '',
     cc: '',
     bcc: '',
-  });
-  /** Resolved template + merge only (no appended details box) — used like Meetings mail settings stream. */
-  const [meetingPreviewStreamHtml, setMeetingPreviewStreamHtml] = useState('');
-  const [meetingPreviewDetailsCard, setMeetingPreviewDetailsCard] = useState({
-    title: '',
-    date: '',
-    timeLine: '',
-    platform: '',
-    link: '',
   });
 
   const meetingTemplateHtmlRef = useRef(null);
@@ -434,20 +318,6 @@ export function MeetingsPage() {
       },
     ];
   }, [previewPlaceholderHelp]);
-
-  const meetingPreviewStreamParts = useMemo(() => {
-    const full = String(meetingPreviewStreamHtml || '');
-    if (!meetingPreviewIncludeDetails) {
-      return { mode: 'single', single: full, intro: '', closing: '' };
-    }
-    const { before, after } = splitPreviewHtmlBeforeClosing(full);
-    const closingTrim = (after || '').trim();
-    const beforeTrim = (before || '').trim();
-    if (!beforeTrim && closingTrim) {
-      return { mode: 'split', single: '', intro: full, closing: '' };
-    }
-    return { mode: 'split', single: '', intro: before || '', closing: after || '' };
-  }, [meetingPreviewStreamHtml, meetingPreviewIncludeDetails]);
 
   const insertTemplateMergeField = useCallback(
     (fieldKey) => {
@@ -635,7 +505,7 @@ export function MeetingsPage() {
     return primary?.phone ? String(primary.phone) : '';
   }, [selectedEntityDetail]);
 
-  const { from, to } = useMemo(() => monthRange(year, month0), [year, month0]);
+  const { from, to } = useMemo(() => utcMysqlRangeForLocalMonth(year, month0), [year, month0]);
 
   useEffect(() => {
     let cancelled = false;
@@ -790,6 +660,7 @@ export function MeetingsPage() {
       meeting_duration_min: '30',
       attendance_status: 'unknown',
       send_reminder: true,
+      meeting_timezone: DEFAULT_MEETING_TIMEZONE,
     });
     setModalOpen(true);
   }
@@ -819,6 +690,7 @@ export function MeetingsPage() {
       meeting_duration_min: '60',
       attendance_status: 'unknown',
       send_reminder: true,
+      meeting_timezone: DEFAULT_MEETING_TIMEZONE,
     });
     setModalOpen(true);
   }
@@ -835,8 +707,8 @@ export function MeetingsPage() {
       attendee_email: m.attendee_email || '',
       location: m.location || '',
       description: m.description || '',
-      start_at: mysqlToDatetimeLocal(m.start_at),
-      end_at: mysqlToDatetimeLocal(m.end_at),
+      start_at: utcMysqlOrIsoToLocalDateTimeInput(m.start_at, m.meeting_timezone || DEFAULT_MEETING_TIMEZONE),
+      end_at: utcMysqlOrIsoToLocalDateTimeInput(m.end_at, m.meeting_timezone || DEFAULT_MEETING_TIMEZONE),
       meeting_status: m.meeting_status || 'scheduled',
       assigned_user_id: m.assigned_user_id != null ? String(m.assigned_user_id) : '',
       meeting_owner_user_id: m.meeting_owner_user_id != null ? String(m.meeting_owner_user_id) : '',
@@ -844,6 +716,7 @@ export function MeetingsPage() {
       meeting_duration_min: m.meeting_duration_min != null ? String(m.meeting_duration_min) : '30',
       attendance_status: m.attendance_status || 'unknown',
       send_reminder: m.send_reminder == null ? true : Number(m.send_reminder) !== 0,
+      meeting_timezone: m.meeting_timezone || DEFAULT_MEETING_TIMEZONE,
     });
     setModalOpen(true);
   }
@@ -878,14 +751,15 @@ export function MeetingsPage() {
       setError('Please fill all required fields marked with *.');
       return;
     }
-    const start_at = localDatetimeToMysql(form.start_at);
-    const end_at = localDatetimeToMysql(form.end_at);
+    const tz = form.meeting_timezone || DEFAULT_MEETING_TIMEZONE;
+    const start_at = localDateTimeInputToUtcMysql(form.start_at, tz);
+    const end_at = localDateTimeInputToUtcMysql(form.end_at, tz);
     if (!start_at || !end_at) {
       setError('Please provide valid start and end date/time.');
       return;
     }
-    const startTs = new Date(form.start_at).getTime();
-    const endTs = new Date(form.end_at).getTime();
+    const startTs = civilDateTimeLocalStringToUtcMs(form.start_at, tz);
+    const endTs = civilDateTimeLocalStringToUtcMs(form.end_at, tz);
     if (!Number.isFinite(startTs) || !Number.isFinite(endTs)) {
       setError('Invalid start/end datetime');
       return;
@@ -920,6 +794,7 @@ export function MeetingsPage() {
         assigned_user_id: Number(form.assigned_user_id),
         attendance_status: form.attendance_status || 'unknown',
         send_reminder: Boolean(form.send_reminder),
+        meeting_timezone: tz,
       };
       if (editing) {
         const res = await meetingsAPI.update(editing.id, payload);
@@ -1020,7 +895,7 @@ export function MeetingsPage() {
 
   const activeTemplate = emailTemplates.find((t) => t.template_kind === templateTab);
 
-  async function refreshMeetingPreviewWithDraft(draft, includeMeetingDetails) {
+  async function refreshMeetingPreviewWithDraft(draft) {
     const kind = templateKindForMeetingForm(!!editing, form.meeting_status);
     setMeetingPreviewKind(kind);
     setMeetingPreviewResolving(true);
@@ -1035,7 +910,6 @@ export function MeetingsPage() {
           body_html: draft.body_html,
           body_text: draft.body_text,
         },
-        include_meeting_details: Boolean(includeMeetingDetails),
       });
       const d = res?.data?.data;
       const env = d?.envelope || {};
@@ -1050,14 +924,6 @@ export function MeetingsPage() {
         bcc: String(own.default_bcc_email || '').trim(),
       });
       const prev = d?.preview;
-      setMeetingPreviewStreamHtml(prev?.body_without_details_html ?? '');
-      setMeetingPreviewDetailsCard({
-        title: String(d?.details_card?.title ?? ''),
-        date: String(d?.details_card?.date ?? ''),
-        timeLine: String(d?.details_card?.timeLine ?? ''),
-        platform: String(d?.details_card?.platform ?? ''),
-        link: String(d?.details_card?.link ?? ''),
-      });
       setMeetingPreviewResolved({
         subject: prev?.subject ?? '',
         body_html: prev?.body_html ?? '',
@@ -1075,7 +941,7 @@ export function MeetingsPage() {
   async function openMeetingPreviewResolvedModal(mode) {
     setMeetingPreviewResolveFor(mode);
     try {
-      const ok = await refreshMeetingPreviewWithDraft(meetingPreviewDraft, meetingPreviewIncludeDetails);
+      const ok = await refreshMeetingPreviewWithDraft(meetingPreviewDraft);
       if (ok) setMeetingPreviewSubModal(mode);
     } finally {
       setMeetingPreviewResolveFor(null);
@@ -1103,10 +969,6 @@ export function MeetingsPage() {
       const d = res?.data?.data;
       setPreviewPlaceholderHelp(res?.data?.placeholder_help ?? []);
       const own = d?.owner_settings || {};
-      const includeBool = Object.prototype.hasOwnProperty.call(own, 'include_meeting_details')
-        ? Boolean(own.include_meeting_details)
-        : true;
-      setMeetingPreviewIncludeDetails(includeBool);
       const tpl = d?.template;
       const draft = {
         subject: tpl?.subject ?? '',
@@ -1125,14 +987,6 @@ export function MeetingsPage() {
         bcc: String(own.default_bcc_email || '').trim(),
       });
       const prev = d?.preview;
-      setMeetingPreviewStreamHtml(prev?.body_without_details_html ?? '');
-      setMeetingPreviewDetailsCard({
-        title: String(d?.details_card?.title ?? ''),
-        date: String(d?.details_card?.date ?? ''),
-        timeLine: String(d?.details_card?.timeLine ?? ''),
-        platform: String(d?.details_card?.platform ?? ''),
-        link: String(d?.details_card?.link ?? ''),
-      });
       setMeetingPreviewResolved({
         subject: prev?.subject ?? '',
         body_html: prev?.body_html ?? '',
@@ -1710,10 +1564,10 @@ export function MeetingsPage() {
                 onChange={(e) => {
                   const mins = Number(e.target.value || 0);
                   setForm((f) => {
-                    const startMs = new Date(f.start_at).getTime();
+                    const z = f.meeting_timezone || DEFAULT_MEETING_TIMEZONE;
                     const endAt =
-                      Number.isFinite(startMs) && mins > 0
-                        ? formatDateTimeLocalInputValue(new Date(startMs + mins * 60000))
+                      f.start_at && Number.isFinite(mins) && mins > 0
+                        ? addMinutesToCivilDateTimeLocalString(f.start_at, mins, z)
                         : f.end_at;
                     return { ...f, meeting_duration_min: e.target.value, end_at: endAt };
                   });
@@ -1823,6 +1677,24 @@ export function MeetingsPage() {
                 )}
               </div>
             ) : null}
+            <div className={`${styles.iconField} ${styles.followUpIconBlue}`} style={{ gridColumn: '1 / -1' }}>
+              <UiIcon>
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 2" />
+              </UiIcon>
+              <Select
+                label="Meeting timezone *"
+                value={form.meeting_timezone || DEFAULT_MEETING_TIMEZONE}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, meeting_timezone: e.target.value }));
+                  setMeetingFormErrors((e2) => ({ ...e2, meeting_timezone: undefined }));
+                }}
+                options={COMMON_TIMEZONE_OPTIONS}
+                required
+                disabled={!canManage}
+                error={meetingFormErrors.meeting_timezone}
+              />
+            </div>
             <div>
               <DateTimePickerField
                 label="Start *"
@@ -1831,12 +1703,10 @@ export function MeetingsPage() {
                 min={formatDateTimeLocalInputValue(new Date())}
                 onChange={(v) => {
                   setForm((f) => {
+                    const z = f.meeting_timezone || DEFAULT_MEETING_TIMEZONE;
                     const mins = Number(f.meeting_duration_min || 0);
-                    const startMs = new Date(v).getTime();
                     const endAt =
-                      Number.isFinite(startMs) && mins > 0
-                        ? formatDateTimeLocalInputValue(new Date(startMs + mins * 60000))
-                        : f.end_at;
+                      v && Number.isFinite(mins) && mins > 0 ? addMinutesToCivilDateTimeLocalString(v, mins, z) : f.end_at;
                     return { ...f, start_at: v, end_at: endAt };
                   });
                   setMeetingFormErrors((e2) => ({ ...e2, start_at: undefined, end_at: undefined }));
@@ -2075,30 +1945,6 @@ export function MeetingsPage() {
                   disabled={!canManage}
                 />
               </div>
-              <Checkbox
-                className={styles.meetingPreviewIncludeCheckbox}
-                label="Include meeting details in email"
-                checked={meetingPreviewIncludeDetails}
-                onChange={async (e) => {
-                  const v = e.target.checked;
-                  setMeetingPreviewIncludeDetails(v);
-                  await refreshMeetingPreviewWithDraft(meetingPreviewDraft, v);
-                  if (canManage) {
-                    try {
-                      const payload = { include_meeting_details: v };
-                      if (meetingPreviewOwnerUserId != null && Number(meetingPreviewOwnerUserId) > 0) {
-                        payload.for_user_id = Number(meetingPreviewOwnerUserId);
-                      }
-                      await meetingsAPI.putDefaultEmailSettings(payload);
-                    } catch (err) {
-                      setMeetingPreviewError(
-                        err?.response?.data?.error || err?.message || 'Could not save default for meeting owner'
-                      );
-                    }
-                  }
-                }}
-                disabled={!canManage || meetingPreviewLoading || meetingPreviewResolving}
-              />
               <div className={styles.composeMessageBlock}>
                 <div className={`${infoHelpHeadingRowClassName} ${styles.composeMessageLabelRow}`}>
                   <h4 className={styles.composeMessageHeading}>Message (formatted)</h4>
@@ -2112,6 +1958,7 @@ export function MeetingsPage() {
                 <ScriptBodyEditor
                   key={meetingPreviewKind}
                   scrollableLayout
+                  enableHtmlSourceToggle
                   variableGroups={meetingPreviewVariableGroups}
                   value={meetingPreviewDraft.body_html}
                   onChange={(html) => setMeetingPreviewDraft((d) => ({ ...d, body_html: html }))}
@@ -2165,7 +2012,7 @@ export function MeetingsPage() {
                       title="Preview info"
                       modalTitle="Email preview"
                       message={
-                        'Matches the sent attendee email: same email account, To, and optional CC/BCC from the meeting owner’s Meetings mail settings.\n\nWhen “Include meeting details in email” is on, the preview matches the mail settings page: your template first, then one styled Meeting details block (not a duplicate of the template’s own list).'
+                        'Matches the sent attendee email: same email account, To, and optional CC/BCC from the meeting owner’s Meetings mail settings.\n\nThe message body is exactly what you edit in your template (including any meeting summary and calendar links you add with merge fields).'
                       }
                       size="sm"
                     />
@@ -2208,79 +2055,21 @@ export function MeetingsPage() {
               </div>
 
               <div className={`${attendeeMailStyles.previewBodyRegion} ${styles.previewMeetingBodyRegion}`}>
-                {meetingPreviewStreamParts.mode === 'single' ? (
-                  <div className={attendeeMailStyles.previewStream}>
-                    <div
-                      className={attendeeMailStyles.previewBody}
-                      dangerouslySetInnerHTML={{ __html: meetingPreviewStreamParts.single || '<p>—</p>' }}
-                    />
-                  </div>
-                ) : (
-                  <div className={attendeeMailStyles.previewStream}>
-                    {String(meetingPreviewStreamParts.intro || '').trim() ? (
-                      <div
-                        className={attendeeMailStyles.previewBody}
-                        dangerouslySetInnerHTML={{ __html: meetingPreviewStreamParts.intro }}
-                      />
-                    ) : null}
-                    <div
-                      className={`${attendeeMailStyles.meetingDetailsAlert} ${meetingPreviewDetailsToneClass(
-                        meetingPreviewKind
-                      )}`}
-                    >
-                      <div className={attendeeMailStyles.meetingDetailsHeroRow}>
-                        <span className={attendeeMailStyles.meetingDetailsHeroIcon} aria-hidden>
-                          <MaterialSymbol
-                            name={meetingPreviewHeroIconName(meetingPreviewKind)}
-                            size="md"
-                            className={attendeeMailStyles.meetingDetailsHeroGlyph}
-                          />
-                        </span>
-                        <div className={attendeeMailStyles.meetingDetailsHeroCopy}>
-                          <div className={attendeeMailStyles.meetingDetailsAlertTitle}>Meeting details</div>
-                          <div className={attendeeMailStyles.meetingDetailsGrid}>
-                            {[
-                              { label: 'Meeting Title', value: meetingPreviewDetailsCard.title || '—', isLink: false },
-                              { label: 'Date', value: meetingPreviewDetailsCard.date || '—', isLink: false },
-                              { label: 'Time', value: meetingPreviewDetailsCard.timeLine || '—', isLink: false },
-                              { label: 'Platform', value: meetingPreviewDetailsCard.platform || '—', isLink: false },
-                              {
-                                label: 'Meeting Link',
-                                value: meetingPreviewDetailsCard.link || '',
-                                isLink: true,
-                              },
-                            ].map((row) => (
-                              <div key={row.label} className={attendeeMailStyles.meetingDetailLine}>
-                                <span className={attendeeMailStyles.meetingDetailLabel}>{row.label}</span>
-                                <span className={attendeeMailStyles.meetingDetailValue}>
-                                  {row.isLink && row.value ? (
-                                    <a href={row.value} target="_blank" rel="noopener noreferrer">
-                                      {row.value}
-                                    </a>
-                                  ) : (
-                                    row.value || '—'
-                                  )}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    {String(meetingPreviewStreamParts.closing || '').trim() ? (
-                      <div
-                        className={attendeeMailStyles.previewBody}
-                        dangerouslySetInnerHTML={{ __html: meetingPreviewStreamParts.closing }}
-                      />
-                    ) : null}
-                    <MeetingPreviewCalendarLinksRow />
-                  </div>
-                )}
+                <div className={attendeeMailStyles.previewStream}>
+                  <div
+                    className={attendeeMailStyles.previewBody}
+                    dangerouslySetInnerHTML={{
+                      __html: meetingPreviewResolved.body_html?.trim()
+                        ? meetingPreviewResolved.body_html
+                        : '<p>—</p>',
+                    }}
+                  />
+                </div>
               </div>
 
               <div className={attendeeMailStyles.previewInfoBanner}>
                 <MaterialSymbol name="info" size="sm" className={attendeeMailStyles.previewInfoIcon} aria-hidden />
-                <span>Preview uses this meeting’s data. Calendar links are included on the sent message.</span>
+                <span>Preview uses this meeting’s data. Calendar links appear when your template includes them.</span>
               </div>
             </div>
           </div>
@@ -2399,6 +2188,7 @@ export function MeetingsPage() {
                     ref={meetingTemplateHtmlRef}
                     key={templateTab}
                     scrollableLayout
+                    enableHtmlSourceToggle
                     hideVariableMenu
                     variableGroups={null}
                     value={activeTemplate.body_html ?? ''}

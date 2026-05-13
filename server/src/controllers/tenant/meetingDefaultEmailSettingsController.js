@@ -49,6 +49,30 @@ export async function updateMine(req, res, next) {
   }
 }
 
+export async function resetAutomationSection(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    const actorId = req.user?.id;
+    if (!tenantId || !actorId) return res.status(400).json({ error: 'Tenant/user context required' });
+    const body = { ...(req.body || {}) };
+    const targetUserId = resolveTargetUserId(req, body);
+    delete body.for_user_id;
+    if (targetUserId !== Number(actorId) && !canManageOtherUsersMeetingEmail(req)) {
+      return res.status(403).json({ error: 'Permission denied for this user’s settings' });
+    }
+    const { section } = body;
+    const data = await settingsService.resetAutomationSectionForUser(
+      tenantId,
+      targetUserId,
+      actorId ?? null,
+      section
+    );
+    return res.json({ data });
+  } catch (e) {
+    return next(e);
+  }
+}
+
 export async function sendTestEmail(req, res, next) {
   try {
     const tenantId = req.tenant?.id;

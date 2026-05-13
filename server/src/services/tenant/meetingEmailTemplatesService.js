@@ -1,4 +1,12 @@
 import { query } from '../../config/db.js';
+import {
+  DEFAULT_MEETING_INVITATION_EMAIL_HTML,
+  DEFAULT_MEETING_INVITATION_EMAIL_TEXT,
+  DEFAULT_MEETING_UPDATED_EMAIL_HTML,
+  DEFAULT_MEETING_UPDATED_EMAIL_TEXT,
+  DEFAULT_MEETING_CANCELLED_EMAIL_HTML,
+  DEFAULT_MEETING_CANCELLED_EMAIL_TEXT,
+} from '../../utils/defaultMeetingEmailBodiesHtml.js';
 
 export const TEMPLATE_KINDS = ['created', 'updated', 'cancelled'];
 
@@ -8,100 +16,16 @@ const DEFAULT_SUBJECT = {
   cancelled: 'Cancelled: {{title}}',
 };
 
-const DEFAULT_BODY_TEXT = {
-  created: `You have been invited to the following meeting.
-
-Title: {{title}}
-Start: {{start_at}}
-End: {{end_at}}
-Duration (minutes): {{meeting_duration_min}}
-Platform: {{meeting_platform}}
-Meeting link: {{meeting_link}}
-Meeting owner: {{meeting_owner_name}}
-Location: {{location}}
-Status: {{meeting_status}}
-
-{{description}}
-
-Attendee: {{attendee_email}}
-Sent from: {{account_label}} <{{account_email}}>`,
-  updated: `A meeting in your calendar has been updated.
-
-Title: {{title}}
-Start: {{start_at}}
-End: {{end_at}}
-Duration (minutes): {{meeting_duration_min}}
-Platform: {{meeting_platform}}
-Meeting link: {{meeting_link}}
-Meeting owner: {{meeting_owner_name}}
-Location: {{location}}
-Status: {{meeting_status}}
-
-{{description}}
-
-Attendee: {{attendee_email}}
-Sent from: {{account_label}} <{{account_email}}>`,
-  cancelled: `The following meeting has been cancelled.
-
-Title: {{title}}
-Start: {{start_at}}
-End: {{end_at}}
-Duration (minutes): {{meeting_duration_min}}
-Platform: {{meeting_platform}}
-Meeting link: {{meeting_link}}
-Meeting owner: {{meeting_owner_name}}
-Location: {{location}}
-Status: {{meeting_status}}
-
-{{description}}
-
-Attendee: {{attendee_email}}
-Sent from: {{account_label}} <{{account_email}}>`,
+const DEFAULT_BODY_HTML = {
+  created: DEFAULT_MEETING_INVITATION_EMAIL_HTML,
+  updated: DEFAULT_MEETING_UPDATED_EMAIL_HTML,
+  cancelled: DEFAULT_MEETING_CANCELLED_EMAIL_HTML,
 };
 
-const DEFAULT_BODY_HTML = {
-  created: `<p>You have been invited to the following meeting.</p>
-<ul>
-<li><strong>Title:</strong> {{title}}</li>
-<li><strong>Start:</strong> {{start_at}}</li>
-<li><strong>End:</strong> {{end_at}}</li>
-<li><strong>Duration (minutes):</strong> {{meeting_duration_min}}</li>
-<li><strong>Platform:</strong> {{meeting_platform}}</li>
-<li><strong>Meeting link:</strong> {{meeting_link}}</li>
-<li><strong>Meeting owner:</strong> {{meeting_owner_name}}</li>
-<li><strong>Location:</strong> {{location}}</li>
-<li><strong>Status:</strong> {{meeting_status}}</li>
-</ul>
-<p>{{description}}</p>
-<p style="color:#666;font-size:12px;">Attendee: {{attendee_email}} · Sent from {{account_label}} &lt;{{account_email}}&gt;</p>`,
-  updated: `<p>A meeting in your calendar has been updated.</p>
-<ul>
-<li><strong>Title:</strong> {{title}}</li>
-<li><strong>Start:</strong> {{start_at}}</li>
-<li><strong>End:</strong> {{end_at}}</li>
-<li><strong>Duration (minutes):</strong> {{meeting_duration_min}}</li>
-<li><strong>Platform:</strong> {{meeting_platform}}</li>
-<li><strong>Meeting link:</strong> {{meeting_link}}</li>
-<li><strong>Meeting owner:</strong> {{meeting_owner_name}}</li>
-<li><strong>Location:</strong> {{location}}</li>
-<li><strong>Status:</strong> {{meeting_status}}</li>
-</ul>
-<p>{{description}}</p>
-<p style="color:#666;font-size:12px;">Attendee: {{attendee_email}} · Sent from {{account_label}} &lt;{{account_email}}&gt;</p>`,
-  cancelled: `<p>The following meeting has been cancelled.</p>
-<ul>
-<li><strong>Title:</strong> {{title}}</li>
-<li><strong>Start:</strong> {{start_at}}</li>
-<li><strong>End:</strong> {{end_at}}</li>
-<li><strong>Duration (minutes):</strong> {{meeting_duration_min}}</li>
-<li><strong>Platform:</strong> {{meeting_platform}}</li>
-<li><strong>Meeting link:</strong> {{meeting_link}}</li>
-<li><strong>Meeting owner:</strong> {{meeting_owner_name}}</li>
-<li><strong>Location:</strong> {{location}}</li>
-<li><strong>Status:</strong> {{meeting_status}}</li>
-</ul>
-<p>{{description}}</p>
-<p style="color:#666;font-size:12px;">Attendee: {{attendee_email}} · Sent from {{account_label}} &lt;{{account_email}}&gt;</p>`,
+const DEFAULT_BODY_TEXT = {
+  created: DEFAULT_MEETING_INVITATION_EMAIL_TEXT,
+  updated: DEFAULT_MEETING_UPDATED_EMAIL_TEXT,
+  cancelled: DEFAULT_MEETING_CANCELLED_EMAIL_TEXT,
 };
 
 /** Shown in API + UI — use <code>{{name}}</code> in docs */
@@ -113,12 +37,17 @@ export const MEETING_TEMPLATE_PLACEHOLDERS = [
   'description',
   'meeting_status',
   'meeting_platform',
+  'meeting_platform_label',
   'meeting_link',
   'meeting_duration_min',
   'meeting_owner_name',
   'attendee_email',
   'account_label',
   'account_email',
+  'meeting_card_date',
+  'meeting_card_time',
+  'calendar_google_url',
+  'calendar_outlook_url',
 ];
 
 export function getBuiltinDefaults(kind) {
@@ -221,43 +150,34 @@ export async function updateBatch(tenantId, userId, items) {
       ]
     );
   }
-
-  return list(tenantId, userId);
 }
 
-export async function resetOne(tenantId, userId, kind) {
-  if (!TEMPLATE_KINDS.includes(kind)) {
-    const err = new Error('Invalid template_kind');
-    err.status = 400;
-    throw err;
-  }
-  await ensureDefaults(tenantId, userId);
-  const d = getBuiltinDefaults(kind);
-  await query(
-    `UPDATE tenant_meeting_email_templates
-     SET subject = ?, body_html = ?, body_text = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE tenant_id = ? AND template_kind = ? AND deleted_at IS NULL`,
-    [d.subject, d.body_html, d.body_text, userId ?? null, tenantId, kind]
-  );
-  const [row] = await query(
-    `SELECT id, tenant_id, template_kind, subject, body_html, body_text, created_at, updated_at
-     FROM tenant_meeting_email_templates
-     WHERE tenant_id = ? AND template_kind = ? AND deleted_at IS NULL`,
-    [tenantId, kind]
-  );
-  return row || null;
-}
-
-/**
- * Raw row for send path (must call ensureDefaults earlier or rely on list/create).
- */
 export async function findByKind(tenantId, userId, kind) {
   await ensureDefaults(tenantId, userId);
   const [row] = await query(
     `SELECT template_kind, subject, body_html, body_text
      FROM tenant_meeting_email_templates
-     WHERE tenant_id = ? AND template_kind = ? AND deleted_at IS NULL`,
+     WHERE tenant_id = ? AND template_kind = ? AND deleted_at IS NULL
+     LIMIT 1`,
     [tenantId, kind]
   );
   return row || null;
+}
+
+export async function resetOne(tenantId, userId, kind) {
+  const k = String(kind || '').trim();
+  if (!TEMPLATE_KINDS.includes(k)) {
+    const err = new Error('Invalid template_kind');
+    err.status = 400;
+    throw err;
+  }
+  await ensureDefaults(tenantId, userId);
+  const d = getBuiltinDefaults(k);
+  await query(
+    `UPDATE tenant_meeting_email_templates
+     SET subject = ?, body_html = ?, body_text = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE tenant_id = ? AND template_kind = ? AND deleted_at IS NULL`,
+    [d.subject, d.body_html, d.body_text, userId ?? null, tenantId, k]
+  );
+  return findByKind(tenantId, userId, k);
 }

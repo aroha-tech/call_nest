@@ -26,6 +26,29 @@ async function ensureUserDefaults(tenantId, userId, actingUserId) {
   }
 }
 
+export async function resetOneForUser(tenantId, userId, actingUserId, kind) {
+  const k = String(kind || '').trim();
+  if (!USER_TEMPLATE_KINDS.includes(k)) {
+    const err = new Error('Invalid template_kind');
+    err.status = 400;
+    throw err;
+  }
+  await ensureUserDefaults(tenantId, userId, actingUserId);
+  const d = tenantTemplates.getBuiltinDefaults(k);
+  if (!d) {
+    const err = new Error('Invalid template_kind');
+    err.status = 400;
+    throw err;
+  }
+  await query(
+    `UPDATE tenant_user_meeting_attendee_email_templates
+     SET subject = ?, body_html = ?, body_text = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE tenant_id = ? AND user_id = ? AND template_kind = ? AND deleted_at IS NULL`,
+    [d.subject, d.body_html || null, d.body_text || null, actingUserId ?? userId, Number(tenantId), Number(userId), k]
+  );
+  return listForUser(tenantId, userId);
+}
+
 export async function listForUser(tenantId, userId) {
   await ensureUserDefaults(tenantId, userId, userId);
   const rows = await query(

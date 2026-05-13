@@ -26,12 +26,16 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
     scrollableLayout = false,
     /** Shorter fixed frame with compact toolbar (campaign wizard channel step). */
     denseScrollLayout = false,
+    /** Show Visual / HTML source toggle (raw HTML for email templates). */
+    enableHtmlSourceToggle = false,
   },
   ref
 ) {
   const quillRef = useRef(null);
+  const htmlTextareaRef = useRef(null);
   const toolbarId = useMemo(() => `quill-toolbar-${Math.random().toString(36).slice(2)}`, []);
   const { grouped, moduleOrder, moduleLabels, loading: varsLoading } = useTemplateVariables();
+  const [htmlSourceMode, setHtmlSourceMode] = useState(false);
   const [varMenuOpen, setVarMenuOpen] = useState(false);
   const varMenuWrapRef = useRef(null);
   const varBtnRef = useRef(null);
@@ -68,6 +72,19 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
 
   useImperativeHandle(ref, () => ({
     insertAtCursor(text) {
+      if (enableHtmlSourceToggle && htmlSourceMode && htmlTextareaRef.current) {
+        const ta = htmlTextareaRef.current;
+        const start = typeof ta.selectionStart === 'number' ? ta.selectionStart : ta.value.length;
+        const end = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : start;
+        const next = `${ta.value.slice(0, start)}${text}${ta.value.slice(end)}`;
+        onChange?.(next);
+        requestAnimationFrame(() => {
+          ta.focus();
+          const pos = start + text.length;
+          ta.setSelectionRange(pos, pos);
+        });
+        return;
+      }
       const quill = getQuill();
       if (!quill) return;
       const sel = quill.getSelection(true);
@@ -83,9 +100,13 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
       quill.setSelection(startIndex + text.length);
     },
     focus() {
+      if (enableHtmlSourceToggle && htmlSourceMode) {
+        htmlTextareaRef.current?.focus();
+        return;
+      }
       getQuill()?.focus();
     },
-  }), [getQuill]);
+  }), [getQuill, enableHtmlSourceToggle, htmlSourceMode, onChange]);
 
   useEffect(() => {
     const quill = getQuill();
@@ -120,6 +141,20 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
   const insertVariable = useCallback(
     (key) => {
       if (!key) return;
+      if (enableHtmlSourceToggle && htmlSourceMode && htmlTextareaRef.current) {
+        const ta = htmlTextareaRef.current;
+        const insert = `{{${key}}}`;
+        const start = typeof ta.selectionStart === 'number' ? ta.selectionStart : ta.value.length;
+        const end = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : start;
+        const next = `${ta.value.slice(0, start)}${insert}${ta.value.slice(end)}`;
+        onChange?.(next);
+        requestAnimationFrame(() => {
+          ta.focus();
+          const pos = start + insert.length;
+          ta.setSelectionRange(pos, pos);
+        });
+        return;
+      }
       const quill = getQuill();
       if (!quill) return;
       const insert = `{{${key}}}`;
@@ -129,7 +164,7 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
       quill.setSelection(index + insert.length);
       quill.focus();
     },
-    [getQuill]
+    [getQuill, enableHtmlSourceToggle, htmlSourceMode, onChange]
   );
 
   const computeMenuPos = useCallback(() => {
@@ -196,6 +231,11 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
   }, [toolbarId]);
 
   useEffect(() => {
+    if (enableHtmlSourceToggle) return;
+    if (htmlSourceMode) setHtmlSourceMode(false);
+  }, [enableHtmlSourceToggle, htmlSourceMode]);
+
+  useEffect(() => {
     if (!varMenuOpen) return;
     const onDocMouseDown = (e) => {
       const wrap = varMenuWrapRef.current;
@@ -231,28 +271,26 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
     >
       <div className={styles.editorWrap}>
         <div id={toolbarId} className={`ql-toolbar ql-snow ${styles.toolbar} ${scrollableLayout && denseScrollLayout ? styles.toolbarDense : ''}`.trim()}>
-          <span className="ql-formats">
-            <select className="ql-header" defaultValue="">
-              <option value="">Normal</option>
-              <option value="1">Heading 1</option>
-              <option value="2">Heading 2</option>
-              <option value="3">Heading 3</option>
-            </select>
-          </span>
-          <span className="ql-formats">
-            <button type="button" className="ql-bold" />
-            <button type="button" className="ql-italic" />
-            <button type="button" className="ql-underline" />
-            <button type="button" className="ql-strike" />
-          </span>
-          <span className="ql-formats">
-            <button type="button" className="ql-list" value="ordered" />
-            <button type="button" className="ql-list" value="bullet" />
-          </span>
-          <span className="ql-formats">
-            <button type="button" className="ql-link" />
-            <button type="button" className="ql-image" />
-          </span>
+          {enableHtmlSourceToggle ? (
+            <span className={`ql-formats ${styles.htmlModeFormats}`}>
+              <button
+                type="button"
+                className={`${styles.htmlModeBtn} ${!htmlSourceMode ? styles.htmlModeBtnActive : ''}`}
+                onClick={() => setHtmlSourceMode(false)}
+                disabled={readOnly}
+              >
+                Visual
+              </button>
+              <button
+                type="button"
+                className={`${styles.htmlModeBtn} ${htmlSourceMode ? styles.htmlModeBtnActive : ''}`}
+                onClick={() => setHtmlSourceMode(true)}
+                disabled={readOnly}
+              >
+                HTML
+              </button>
+            </span>
+          ) : null}
           {!hideVariableMenu ? (
             <span className={`ql-formats ${styles.variableFormat}`} ref={varMenuWrapRef}>
               <button
@@ -268,20 +306,60 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
               </button>
             </span>
           ) : null}
-          <span className="ql-formats">
-            <button type="button" className="ql-clean" />
-          </span>
+          <div
+            className={styles.toolbarVisualRow}
+            style={enableHtmlSourceToggle && htmlSourceMode ? { display: 'none' } : undefined}
+          >
+            <span className="ql-formats">
+              <select className="ql-header" defaultValue="">
+                <option value="">Normal</option>
+                <option value="1">Heading 1</option>
+                <option value="2">Heading 2</option>
+                <option value="3">Heading 3</option>
+              </select>
+            </span>
+            <span className="ql-formats">
+              <button type="button" className="ql-bold" />
+              <button type="button" className="ql-italic" />
+              <button type="button" className="ql-underline" />
+              <button type="button" className="ql-strike" />
+            </span>
+            <span className="ql-formats">
+              <button type="button" className="ql-list" value="ordered" />
+              <button type="button" className="ql-list" value="bullet" />
+            </span>
+            <span className="ql-formats">
+              <button type="button" className="ql-link" />
+              <button type="button" className="ql-image" />
+            </span>
+            <span className="ql-formats">
+              <button type="button" className="ql-clean" />
+            </span>
+          </div>
         </div>
-        <ReactQuill
-          ref={quillRef}
-          theme="snow"
-          value={value}
-          onChange={handleChange}
-          modules={quillModules}
-          placeholder={placeholder}
-          className={styles.quillEditor}
-          readOnly={readOnly}
-        />
+        {htmlSourceMode && enableHtmlSourceToggle ? (
+          <textarea
+            ref={htmlTextareaRef}
+            className={styles.htmlSourceTextarea}
+            value={value ?? ''}
+            onChange={(e) => onChange?.(e.target.value)}
+            readOnly={readOnly}
+            spellCheck={false}
+            placeholder="Raw HTML for the email body. Merge fields use {{name}} syntax."
+            aria-label="Email HTML source"
+          />
+        ) : (
+          <ReactQuill
+            ref={quillRef}
+            theme="snow"
+            value={value}
+            onChange={handleChange}
+            modules={quillModules}
+            placeholder={placeholder}
+            className={styles.quillEditor}
+            readOnly={readOnly}
+          />
+        )}
       </div>
       {!hideVariableMenu && varMenuOpen && varMenuPos
         ? createPortal(

@@ -1,6 +1,8 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import { env } from '../../config/env.js';
+import { utcMysqlToProviderLocalDateTime } from '../../utils/meetingTimezone.js';
+import { meetingInstantToIsoUtc } from '../../utils/meetingInstant.js';
 import * as emailAccountService from './emailAccountService.js';
 import * as googleOAuth from '../email/googleOAuthService.js';
 import * as outlookOAuth from '../email/outlookOAuthService.js';
@@ -58,11 +60,22 @@ function throwGoogleCalendarError(error, featureLabel) {
   throw err;
 }
 
-function toIsoFromMysqlDatetime(v) {
-  if (!v) return null;
-  const d = new Date(String(v).replace(' ', 'T'));
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString();
+function toProviderStartEnd(meeting) {
+  const start = utcMysqlToProviderLocalDateTime(meeting.start_at, meeting.meeting_timezone);
+  const end = utcMysqlToProviderLocalDateTime(meeting.end_at, meeting.meeting_timezone);
+  if (!start?.dateTime || !end?.dateTime) {
+    const s = meetingInstantToIsoUtc(meeting.start_at);
+    const e = meetingInstantToIsoUtc(meeting.end_at);
+    if (!s || !e) return null;
+    return {
+      start: { dateTime: s.slice(0, 19), timeZone: 'UTC' },
+      end: { dateTime: e.slice(0, 19), timeZone: 'UTC' },
+    };
+  }
+  return {
+    start: { dateTime: start.dateTime, timeZone: start.timeZone },
+    end: { dateTime: end.dateTime, timeZone: end.timeZone },
+  };
 }
 
 function sleep(ms) {
@@ -224,8 +237,7 @@ async function createGoogleEvent(account, meeting) {
         summary: meeting.title,
         description: meeting.description || undefined,
         location: meeting.location || undefined,
-        start: { dateTime: toIsoFromMysqlDatetime(meeting.start_at), timeZone: 'UTC' },
-        end: { dateTime: toIsoFromMysqlDatetime(meeting.end_at), timeZone: 'UTC' },
+        ...(toProviderStartEnd(meeting) || {}),
         attendees: meeting.attendee_email ? [{ email: meeting.attendee_email }] : [],
         conferenceData: {
           createRequest: {
@@ -288,12 +300,12 @@ async function updateGoogleEvent(account, meeting) {
     Boolean(existingEvent?.hangoutLink) ||
     Boolean(existingEvent?.conferenceData?.entryPoints?.some((e) => e.entryPointType === 'video'));
 
+  const se = toProviderStartEnd(meeting);
   const requestBody = {
     summary: meeting.title,
     description: meeting.description || undefined,
     location: meeting.location || undefined,
-    start: { dateTime: toIsoFromMysqlDatetime(meeting.start_at), timeZone: 'UTC' },
-    end: { dateTime: toIsoFromMysqlDatetime(meeting.end_at), timeZone: 'UTC' },
+    ...(se || {}),
     attendees: meeting.attendee_email ? [{ email: meeting.attendee_email }] : [],
   };
   if (!hasVideo) {
@@ -366,8 +378,7 @@ async function createOutlookEvent(account, meeting) {
     body: JSON.stringify({
       subject: meeting.title,
       body: { contentType: 'HTML', content: meeting.description || '' },
-      start: { dateTime: toIsoFromMysqlDatetime(meeting.start_at), timeZone: 'UTC' },
-      end: { dateTime: toIsoFromMysqlDatetime(meeting.end_at), timeZone: 'UTC' },
+      ...(toProviderStartEnd(meeting) || {}),
       location: { displayName: meeting.location || '' },
       attendees: meeting.attendee_email
         ? [{ emailAddress: { address: meeting.attendee_email }, type: 'required' }]
@@ -420,8 +431,7 @@ async function updateOutlookEvent(account, meeting) {
       body: JSON.stringify({
         subject: meeting.title,
         body: { contentType: 'HTML', content: meeting.description || '' },
-        start: { dateTime: toIsoFromMysqlDatetime(meeting.start_at), timeZone: 'UTC' },
-        end: { dateTime: toIsoFromMysqlDatetime(meeting.end_at), timeZone: 'UTC' },
+        ...(toProviderStartEnd(meeting) || {}),
         location: { displayName: meeting.location || '' },
         attendees: meeting.attendee_email
           ? [{ emailAddress: { address: meeting.attendee_email }, type: 'required' }]

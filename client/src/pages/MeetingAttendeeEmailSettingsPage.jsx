@@ -4,11 +4,11 @@ import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { Select } from '../components/ui/Select';
-import { Checkbox } from '../components/ui/Checkbox';
 import { Modal, ModalFooter } from '../components/ui/Modal';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
 import { meetingsAPI } from '../services/meetingsAPI';
 import { ScriptBodyEditor } from '../features/callScripts/ScriptBodyEditor';
+import { formatEmailRecipientListDisplay } from '../utils/emailRecipientList';
 import { IconChevronDown } from '../features/contacts/ListActionsMenuIcons';
 import styles from './MeetingAttendeeEmailSettingsPage.module.scss';
 
@@ -98,40 +98,7 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-/** Split rendered HTML so meeting details can sit before closing / thanks lines (preview only). */
-function splitPreviewHtmlBeforeClosing(html) {
-  const h = String(html || '');
-  if (!h.trim()) return { before: '', after: '' };
-  const needles = [
-    'We apologize',
-    'Thanks,',
-    'Thank you,',
-    'Best regards',
-    'Kind regards',
-    'Warm regards',
-    'Regards,',
-    'Sincerely',
-    'We hope your meeting',
-    'Please share your feedback',
-  ];
-  let bestCut = -1;
-  for (const n of needles) {
-    let from = 0;
-    while (from < h.length) {
-      const idx = h.indexOf(n, from);
-      if (idx === -1) break;
-      const pOpen = h.lastIndexOf('<p', idx);
-      const cutCandidate = pOpen >= 0 ? pOpen : idx;
-      if (bestCut === -1 || cutCandidate < bestCut) bestCut = cutCandidate;
-      from = idx + n.length;
-    }
-  }
-  if (bestCut >= 0) return { before: h.slice(0, bestCut), after: h.slice(bestCut) };
-  return { before: h, after: '' };
-}
-
-function buildPreviewVars(tab, includeMeetingDetails) {
-  const include = includeMeetingDetails !== false;
+function buildPreviewVars(tab) {
   const base = {
     title: 'SEO Proposal Discussion',
     attendee_email: 'rahul.patel@example.com',
@@ -142,34 +109,23 @@ function buildPreviewVars(tab, includeMeetingDetails) {
     end_at: '06 May 2026, 11:00 AM',
     meeting_status: tab === 'cancelled' ? 'cancelled' : 'scheduled',
     meeting_platform: 'google_meet',
+    meeting_platform_label: 'Google Meet',
     meeting_link: 'https://meet.google.com/abc-defg-hij',
     meeting_duration_min: '60',
     meeting_owner_name: 'John Doe',
     account_label: 'Your Company',
     account_email: 'sales@yourcompany.com',
-  };
-  if (!include) {
-    return {
-      ...base,
-      meeting_date: '',
-      meeting_time: '',
-      meeting_end_time: '',
-      meeting_link: '',
-      meeting_platform: '',
-      location: '',
-      description: '',
-    };
-  }
-  return {
-    ...base,
     meeting_date: '06 May 2026 (Wednesday)',
     meeting_time: '10:00 AM - 11:00 AM (IST)',
     meeting_end_time: '11:00 AM',
-    meeting_link: 'https://meet.google.com/abc-defg-hij',
-    meeting_platform: tab === 'reminder' || tab === 'feedback' ? 'Google Meet' : 'google_meet',
+    meeting_card_date: '06 May 2026 (Wednesday)',
+    meeting_card_time: '10:00 AM - 11:00 AM (IST)',
+    calendar_google_url: 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Sample',
+    calendar_outlook_url: 'https://outlook.live.com/calendar/0/deeplink/compose',
     location: 'Google Meet',
     description: 'Sample agenda for preview.',
   };
+  return base;
 }
 
 function applyTemplate(text, plainVars, htmlVars) {
@@ -177,55 +133,6 @@ function applyTemplate(text, plainVars, htmlVars) {
     const v = htmlVars ? htmlVars[key] : plainVars[key];
     return v !== undefined && v !== null ? String(v) : `{{${key}}}`;
   });
-}
-
-function previewCcBccLine(raw, fallback) {
-  const t = String(raw || '').trim();
-  return t || fallback;
-}
-
-function IconGoogleCal() {
-  return (
-    <svg className={styles.calBrandIcon} viewBox="0 0 24 24" aria-hidden>
-      <path
-        fill="#4285F4"
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-      />
-    </svg>
-  );
-}
-
-function IconOutlookCal() {
-  return (
-    <svg className={styles.calBrandIcon} viewBox="0 0 24 24" aria-hidden>
-      <path fill="#0078D4" d="M7 3h9a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z" />
-      <path fill="#fff" d="M7 7h12v2H7zm0 4h12v2H7zm0 4h8v2H7z" opacity="0.9" />
-    </svg>
-  );
-}
-
-function IconIcsCal() {
-  return (
-    <svg className={styles.calBrandIcon} viewBox="0 0 24 24" aria-hidden>
-      <rect x="3" y="5" width="18" height="16" rx="2" fill="#E11D48" />
-      <path d="M3 10h18" stroke="#fff" strokeWidth="1.5" />
-      <text x="12" y="17.5" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700">
-        31
-      </text>
-    </svg>
-  );
 }
 
 export function MeetingAttendeeEmailSettingsPage() {
@@ -276,14 +183,19 @@ export function MeetingAttendeeEmailSettingsPage() {
       'meeting_date',
       'meeting_time',
       'meeting_end_time',
+      'meeting_card_date',
+      'meeting_card_time',
       'meeting_link',
       'meeting_platform',
+      'meeting_platform_label',
       'location',
       'description',
       'attendee_email',
       'contact_name',
       'company_name',
       'feedback_link',
+      'calendar_google_url',
+      'calendar_outlook_url',
     ];
     return [
       {
@@ -308,12 +220,17 @@ export function MeetingAttendeeEmailSettingsPage() {
           'description',
           'meeting_status',
           'meeting_platform',
+          'meeting_platform_label',
           'meeting_link',
           'meeting_duration_min',
           'meeting_owner_name',
           'attendee_email',
           'account_label',
           'account_email',
+          'meeting_card_date',
+          'meeting_card_time',
+          'calendar_google_url',
+          'calendar_outlook_url',
         ];
     return [
       {
@@ -372,6 +289,32 @@ export function MeetingAttendeeEmailSettingsPage() {
     }
   }
 
+  async function resetCurrentTabDefaults() {
+    setSaving(true);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      if (tab === 'reminder' || tab === 'feedback') {
+        const res = await meetingsAPI.resetDefaultEmailSection({ section: tab });
+        setSettings(res?.data?.data ?? null);
+      } else {
+        await meetingsAPI.resetUserAttendeeEmailTemplate({ template_kind: tab });
+        const [resT, resS] = await Promise.all([
+          meetingsAPI.getUserAttendeeEmailTemplates(),
+          meetingsAPI.getDefaultEmailSettings(),
+        ]);
+        setAttendeeTemplates(resT?.data?.data ?? []);
+        setSettings(resS?.data?.data ?? settings);
+        setAttendeePlaceholderHelp(resT?.data?.placeholder_help ?? attendeePlaceholderHelp);
+      }
+      setSuccessMsg('Restored default content for this email type.');
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || 'Reset failed');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function cancelEdits() {
     setSuccessMsg(null);
     await load();
@@ -413,10 +356,7 @@ export function MeetingAttendeeEmailSettingsPage() {
         ? settings?.feedback_body_html || ''
         : attendeeActive?.body_html || '';
 
-  const previewPlain = useMemo(
-    () => buildPreviewVars(tab, settings?.include_meeting_details),
-    [tab, settings?.include_meeting_details]
-  );
+  const previewPlain = useMemo(() => buildPreviewVars(tab), [tab]);
 
   const previewHtmlVars = useMemo(
     () =>
@@ -436,39 +376,17 @@ export function MeetingAttendeeEmailSettingsPage() {
     [activeBodyHtml, previewPlain, previewHtmlVars]
   );
 
-  const previewStreamParts = useMemo(() => {
-    const full = String(resolvedPreviewBodyHtml || '');
-    if (!full.trim()) {
-      return {
-        intro: '<p class="muted">No message body yet.</p>',
-        closing: '',
-        fullOnly: '<p class="muted">No message body yet.</p>',
-      };
-    }
-    const { before, after } = splitPreviewHtmlBeforeClosing(full);
-    const closingTrim = (after || '').trim();
-    const beforeTrim = (before || '').trim();
-    if (!beforeTrim && closingTrim) {
-      return { intro: full, closing: '', fullOnly: full };
-    }
-    return { intro: before, closing: after, fullOnly: full };
-  }, [resolvedPreviewBodyHtml]);
-
-  const previewCcDisplay = previewCcBccLine(
-    settings?.default_cc_email,
-    'amit.kumar@example.com, neha.sharma@example.com'
-  );
-  const previewBccDisplay = previewCcBccLine(settings?.default_bcc_email, 'sneha.verma@example.com');
-
   const personSuffix = (
     <span className={styles.inputSuffixIcon} aria-hidden>
       <MaterialSymbol name="person_add" size="sm" />
     </span>
   );
 
-  const showCalendarLinks =
-    settings?.include_meeting_details &&
-    (tab === 'reminder' || tab === 'created' || tab === 'updated' || tab === 'cancelled');
+  const previewCcDisplay =
+    formatEmailRecipientListDisplay(settings?.default_cc_email) ||
+    'amit.kumar@example.com, neha.sharma@example.com';
+  const previewBccDisplay =
+    formatEmailRecipientListDisplay(settings?.default_bcc_email) || 'sneha.verma@example.com';
 
   return (
     <div className={styles.page}>
@@ -486,6 +404,14 @@ export function MeetingAttendeeEmailSettingsPage() {
       <div className={styles.pageToolbar}>
         <Button type="button" variant="secondary" onClick={cancelEdits} disabled={saving || loading}>
           Cancel
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={resetCurrentTabDefaults}
+          disabled={saving || loading || !settings}
+        >
+          Reset to default
         </Button>
         <Button
           type="button"
@@ -584,6 +510,7 @@ export function MeetingAttendeeEmailSettingsPage() {
                 <ScriptBodyEditor
                   key={tab}
                   scrollableLayout
+                  enableHtmlSourceToggle
                   variableGroups={tab === 'reminder' || tab === 'feedback' ? variableGroupsAutomation : variableGroupsAttendee}
                   value={activeBodyHtml}
                   onChange={(html) => {
@@ -604,7 +531,7 @@ export function MeetingAttendeeEmailSettingsPage() {
                 label="CC"
                 value={settings?.default_cc_email ?? ''}
                 onChange={(e) => updateField('default_cc_email', e.target.value)}
-                placeholder="Add CC email addresses"
+                placeholder="email1@company.com, email2@company.com (or one per line)"
                 disabled={saving || loading}
                 suffix={personSuffix}
               />
@@ -612,7 +539,7 @@ export function MeetingAttendeeEmailSettingsPage() {
                 label="BCC"
                 value={settings?.default_bcc_email ?? ''}
                 onChange={(e) => updateField('default_bcc_email', e.target.value)}
-                placeholder="Add BCC email addresses"
+                placeholder="email1@company.com; email2@company.com"
                 disabled={saving || loading}
                 suffix={personSuffix}
               />
@@ -749,29 +676,26 @@ export function MeetingAttendeeEmailSettingsPage() {
                         </div>
                       </div>
                     ) : null}
-                    <Checkbox
-                      label="Include meeting details in email"
-                      checked={Boolean(settings?.include_meeting_details)}
-                      onChange={(e) => updateField('include_meeting_details', e.target.checked)}
-                      disabled={saving || loading}
-                    />
                   </>
-                ) : (
-                  <>
-                    <Checkbox
-                      label="Include meeting details in email"
-                      checked={Boolean(settings?.include_meeting_details)}
-                      onChange={(e) => updateField('include_meeting_details', e.target.checked)}
-                      disabled={saving || loading}
-                    />
-                    {tab === 'feedback' ? (
-                      <p className={styles.hint} style={{ marginBottom: 0 }}>
-                        Reminder and feedback timing are configured under <strong>Automation</strong> on the{' '}
-                        <strong>Default Meeting Reminder</strong> card.
-                      </p>
-                    ) : null}
-                  </>
-                )}
+                ) : null}
+                {tab === 'reminder' ? (
+                  <p className={styles.hint} style={{ marginBottom: 0 }}>
+                    The reminder body can include the meeting summary and calendar links. Use{' '}
+                    <strong>Reset to default</strong> in the toolbar to restore the built-in reminder layout.
+                  </p>
+                ) : null}
+                {tab === 'feedback' ? (
+                  <p className={styles.hint} style={{ marginBottom: 0 }}>
+                    Reminder and feedback timing are configured under <strong>Automation</strong> on the{' '}
+                    <strong>Default Meeting Reminder</strong> card.
+                  </p>
+                ) : null}
+                {tab === 'created' || tab === 'updated' || tab === 'cancelled' ? (
+                  <p className={styles.hint} style={{ marginBottom: 0 }}>
+                    Meeting summary and “Add to calendar” links are part of the email HTML above. Use{' '}
+                    <strong>Reset to default</strong> in the toolbar to restore the built-in layout for this email type.
+                  </p>
+                ) : null}
               </div>
 
               <div className={styles.formInfoBanner}>
@@ -807,11 +731,23 @@ export function MeetingAttendeeEmailSettingsPage() {
               </div>
               <div className={styles.previewMetaRow}>
                 <span className={styles.previewMetaLabel}>CC</span>
-                <span className={settings?.default_cc_email?.trim() ? '' : styles.previewMetaFaint}>{previewCcDisplay}</span>
+                <span
+                  className={
+                    formatEmailRecipientListDisplay(settings?.default_cc_email) ? '' : styles.previewMetaFaint
+                  }
+                >
+                  {previewCcDisplay}
+                </span>
               </div>
               <div className={styles.previewMetaRow}>
                 <span className={styles.previewMetaLabel}>BCC</span>
-                <span className={settings?.default_bcc_email?.trim() ? '' : styles.previewMetaFaint}>{previewBccDisplay}</span>
+                <span
+                  className={
+                    formatEmailRecipientListDisplay(settings?.default_bcc_email) ? '' : styles.previewMetaFaint
+                  }
+                >
+                  {previewBccDisplay}
+                </span>
               </div>
             </div>
 
@@ -820,91 +756,28 @@ export function MeetingAttendeeEmailSettingsPage() {
                 <p className={styles.muted}>Loading…</p>
               ) : (
                 <div className={styles.previewStream}>
-                {settings?.include_meeting_details ? (
-                  <>
-                    <div
-                      className={styles.previewBody}
-                      dangerouslySetInnerHTML={{ __html: previewStreamParts.intro }}
-                    />
-                    <div
-                      className={`${styles.meetingDetailsAlert} ${styles[`meetingDetailsAlert_tone_${tab}`]}`}
-                    >
-                      <div className={styles.meetingDetailsHeroRow}>
-                        <span className={styles.meetingDetailsHeroIcon} aria-hidden>
-                          <MaterialSymbol name={meta.previewHeroIcon} size="md" className={styles.meetingDetailsHeroGlyph} />
-                        </span>
-                        <div className={styles.meetingDetailsHeroCopy}>
-                          <div className={styles.meetingDetailsAlertTitle}>Meeting details</div>
-                          <div className={styles.meetingDetailsGrid}>
-                            {[
-                              { label: 'Meeting Title', value: previewPlain.title || '—', isLink: false },
-                              { label: 'Date', value: previewPlain.meeting_date || '—', isLink: false },
-                              { label: 'Time', value: previewPlain.meeting_time || '—', isLink: false },
-                              { label: 'Platform', value: previewPlain.meeting_platform || '—', isLink: false },
-                              {
-                                label: 'Meeting Link',
-                                value: previewPlain.meeting_link || '',
-                                isLink: true,
-                              },
-                            ].map((row) => (
-                              <div key={row.label} className={styles.meetingDetailLine}>
-                                <span className={styles.meetingDetailLabel}>{row.label}</span>
-                                <span className={styles.meetingDetailValue}>
-                                  {row.isLink && row.value ? (
-                                    <a href={row.value} target="_blank" rel="noopener noreferrer">
-                                      {row.value}
-                                    </a>
-                                  ) : (
-                                    row.value || '—'
-                                  )}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    {previewStreamParts.closing.trim() ? (
-                      <div
-                        className={styles.previewBody}
-                        dangerouslySetInnerHTML={{ __html: previewStreamParts.closing }}
-                      />
-                    ) : null}
-                  </>
-                ) : (
                   <div
                     className={styles.previewBody}
-                    dangerouslySetInnerHTML={{ __html: previewStreamParts.fullOnly }}
+                    dangerouslySetInnerHTML={{
+                      __html: resolvedPreviewBodyHtml.trim()
+                        ? resolvedPreviewBodyHtml
+                        : '<p class="muted">No message body yet.</p>',
+                    }}
                   />
-                )}
-
-                {tab === 'feedback' ? (
-                  <div>
-                    <a className={styles.previewCta} href={previewPlain.feedback_link} onClick={(e) => e.preventDefault()}>
-                      Share your feedback
-                    </a>
-                    <p className={styles.muted} style={{ marginTop: 8, fontSize: 12 }}>
-                      {previewPlain.feedback_link}
-                    </p>
-                  </div>
-                ) : null}
-
-                {showCalendarLinks ? (
-                  <div className={styles.calendarRow}>
-                    <span className={styles.calendarLink}>
-                      <IconGoogleCal />
-                      Add to Google Calendar
-                    </span>
-                    <span className={styles.calendarLink}>
-                      <IconOutlookCal />
-                      Add to Outlook
-                    </span>
-                    <span className={styles.calendarLink}>
-                      <IconIcsCal />
-                      Add to iCal
-                    </span>
-                  </div>
-                ) : null}
+                  {tab === 'feedback' ? (
+                    <div>
+                      <a
+                        className={styles.previewCta}
+                        href={previewPlain.feedback_link}
+                        onClick={(e) => e.preventDefault()}
+                      >
+                        Share your feedback
+                      </a>
+                      <p className={styles.muted} style={{ marginTop: 8, fontSize: 12 }}>
+                        {previewPlain.feedback_link}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>

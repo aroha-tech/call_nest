@@ -21,10 +21,12 @@ router.put('/email-templates', meetingsManage, meetingEmailTemplatesController.u
 router.post('/email-templates/reset', meetingsManage, meetingEmailTemplatesController.reset);
 router.get('/default-email-settings', meetingsView, meetingDefaultEmailSettingsController.getMine);
 router.put('/default-email-settings', meetingsManage, meetingDefaultEmailSettingsController.updateMine);
+router.post('/default-email-settings/reset-section', meetingsManage, meetingDefaultEmailSettingsController.resetAutomationSection);
 router.post('/default-email-settings/test-email', meetingsManage, meetingDefaultEmailSettingsController.sendTestEmail);
 
 router.get('/user-attendee-email-templates', meetingsView, meetingUserAttendeeEmailTemplatesController.listMine);
 router.put('/user-attendee-email-templates', meetingsManage, meetingUserAttendeeEmailTemplatesController.updateMine);
+router.post('/user-attendee-email-templates/reset', meetingsManage, meetingUserAttendeeEmailTemplatesController.resetMine);
 router.post('/user-attendee-email-templates/preview', meetingsView, meetingUserAttendeeEmailTemplatesController.previewMine);
 router.post('/user-attendee-email-templates/test-email', meetingsManage, meetingUserAttendeeEmailTemplatesController.sendTestEmail);
 

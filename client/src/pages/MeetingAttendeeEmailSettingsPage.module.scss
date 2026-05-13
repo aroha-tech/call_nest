@@ -520,6 +520,16 @@
   --md-accent: var(--color-danger);
 }
 
+/** Injected outbound-style meeting details HTML inside the preview chrome */
+.meetingDetailsEmailHtml {
+  min-width: 0;
+  overflow-x: auto;
+
+  :global(> div) {
+    margin-top: 0 !important;
+  }
+}
+
 .meetingDetailsHeroRow {
   display: flex;
   gap: 14px;

@@ -1,4 +1,6 @@
 import { query } from '../../config/db.js';
+import { parseMeetingInstantUtc as parseMysqlDateTime } from '../../utils/meetingInstant.js';
+import { normalizeMeetingTimezone } from '../../utils/meetingTimezone.js';
 import { getCreatedByUserIdsForScope } from './userMessageScopeService.js';
 import { trySendMeetingAttendeeEmail } from './meetingNotifyService.js';
 import {
@@ -41,13 +43,6 @@ function parseSendReminderFlag(v) {
   const s = String(v).trim().toLowerCase();
   if (s === 'false' || s === '0' || s === 'no') return 0;
   return 1;
-}
-
-function parseMysqlDateTime(raw) {
-  if (!raw) return null;
-  const d = new Date(String(raw).replace(' ', 'T'));
-  if (Number.isNaN(d.getTime())) return null;
-  return d;
 }
 
 function toMillis(value) {
@@ -176,6 +171,7 @@ export async function listInRange(tenantId, { actingUser = null, email_account_i
       m.attendee_email,
       m.start_at,
       m.end_at,
+      m.meeting_timezone,
       m.meeting_status,
       m.meeting_platform,
       m.meeting_link,
@@ -193,7 +189,8 @@ export async function listInRange(tenantId, { actingUser = null, email_account_i
       COALESCE(ea.account_name, ea.email_address) AS account_label,
       assign_u.name AS assigned_user_name,
       owner_u.name AS meeting_owner_name,
-      creator_u.name AS created_by_name
+      creator_u.name AS created_by_name,
+      COALESCE(owner_u.datetime_timezone, assign_u.datetime_timezone, 'Asia/Kolkata') AS owner_datetime_timezone
     FROM tenant_meetings m
     INNER JOIN email_accounts ea
       ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id AND ea.is_deleted = 0
@@ -246,6 +243,7 @@ const LIST_SELECT = `
       m.attendee_email,
       m.start_at,
       m.end_at,
+      m.meeting_timezone,
       m.meeting_status,
       m.meeting_platform,
       m.meeting_link,
@@ -263,7 +261,8 @@ const LIST_SELECT = `
       COALESCE(ea.account_name, ea.email_address) AS account_label,
       assign_u.name AS assigned_user_name,
       owner_u.name AS meeting_owner_name,
-      creator_u.name AS created_by_name
+      creator_u.name AS created_by_name,
+      COALESCE(owner_u.datetime_timezone, assign_u.datetime_timezone, 'Asia/Kolkata') AS owner_datetime_timezone
     FROM tenant_meetings m
     INNER JOIN email_accounts ea
       ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id AND ea.is_deleted = 0
@@ -398,7 +397,8 @@ export async function findById(tenantId, id) {
         COALESCE(ea.account_name, ea.email_address) AS account_label,
         assign_u.name AS assigned_user_name,
         owner_u.name AS meeting_owner_name,
-        creator_u.name AS created_by_name
+        creator_u.name AS created_by_name,
+        COALESCE(owner_u.datetime_timezone, assign_u.datetime_timezone, 'Asia/Kolkata') AS owner_datetime_timezone
      FROM tenant_meetings m
      INNER JOIN email_accounts ea
        ON ea.id = m.email_account_id AND ea.tenant_id = m.tenant_id AND ea.is_deleted = 0
@@ -476,6 +476,7 @@ export async function create(tenantId, userId, payload) {
     err.status = 400;
     throw err;
   }
+  const meeting_timezone = normalizeMeetingTimezone(payload.meeting_timezone);
   const explicitMeetingLink = trimStr(payload.meeting_link);
   let nativeRoom = null;
   try {
@@ -488,6 +489,7 @@ export async function create(tenantId, userId, payload) {
       attendee_email: trimStr(payload.attendee_email),
       start_at,
       end_at,
+      meeting_timezone,
     });
   } catch (e) {
     // Keep CRM meeting flow alive even when provider calendar integration is misconfigured.
@@ -507,9 +509,9 @@ export async function create(tenantId, userId, payload) {
   const result = await query(
     `INSERT INTO tenant_meetings
       (tenant_id, contact_id, assigned_user_id, email_account_id, title, description, location, attendee_email,
-       start_at, end_at, meeting_status, meeting_platform, meeting_link, meeting_duration_min, meeting_owner_user_id,
+       start_at, end_at, meeting_timezone, meeting_status, meeting_platform, meeting_link, meeting_duration_min, meeting_owner_user_id,
        provider_event_id, provider_calendar_id, attendance_status, send_reminder, created_by, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
       contact_id,
@@ -521,6 +523,7 @@ export async function create(tenantId, userId, payload) {
       trimStr(payload.attendee_email),
       start_at,
       end_at,
+      meeting_timezone,
       status,
       meeting_platform,
       meeting_link,
@@ -614,6 +617,10 @@ export async function update(tenantId, userId, id, payload) {
     updates.push('end_at = ?');
     params.push(trimStr(payload.end_at));
   }
+  if (payload.meeting_timezone !== undefined) {
+    updates.push('meeting_timezone = ?');
+    params.push(normalizeMeetingTimezone(payload.meeting_timezone));
+  }
   if (payload.meeting_platform !== undefined) {
     const platform = normalizeMeetingPlatform(payload.meeting_platform);
     if (!platform) {
@@ -679,6 +686,10 @@ export async function update(tenantId, userId, id, payload) {
 
   const sa = payload.start_at !== undefined ? trimStr(payload.start_at) : existing.start_at;
   const ea = payload.end_at !== undefined ? trimStr(payload.end_at) : existing.end_at;
+  const nextTz =
+    payload.meeting_timezone !== undefined
+      ? normalizeMeetingTimezone(payload.meeting_timezone)
+      : normalizeMeetingTimezone(existing.meeting_timezone);
   if (sa && ea && String(sa) >= String(ea)) {
     const err = new Error('end_at must be after start_at');
     err.status = 400;
@@ -705,6 +716,7 @@ export async function update(tenantId, userId, id, payload) {
     payload.meeting_platform !== undefined ||
     payload.start_at !== undefined ||
     payload.end_at !== undefined ||
+    payload.meeting_timezone !== undefined ||
     payload.title !== undefined;
   if (!hasExplicitLinkInPayload && hasPlatformOrTimeChange) {
     let nativeRoom = null;
@@ -722,6 +734,7 @@ export async function update(tenantId, userId, id, payload) {
             : existing.attendee_email,
         start_at: sa,
         end_at: ea,
+        meeting_timezone: nextTz,
         provider_event_id: existing.provider_event_id,
         provider_calendar_id: existing.provider_calendar_id,
         meeting_link: existing.meeting_link,

@@ -51,7 +51,7 @@ export async function previewMine(req, res, next) {
     const tenantId = req.tenant?.id;
     const userId = req.user?.id;
     if (!tenantId || !userId) return res.status(400).json({ error: 'Tenant/user context required' });
-    const { template_kind, meeting, template_override, include_meeting_details } = req.body || {};
+    const { template_kind, meeting, template_override } = req.body || {};
     if (!['created', 'updated', 'cancelled'].includes(template_kind)) {
       return res.status(400).json({ error: 'Invalid or missing template_kind' });
     }
@@ -64,10 +64,33 @@ export async function previewMine(req, res, next) {
       userId,
       template_kind,
       meeting || {},
-      override,
-      { include_meeting_details: Boolean(include_meeting_details) }
+      override
     );
     return res.json({ data });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+export async function resetMine(req, res, next) {
+  try {
+    const tenantId = req.tenant?.id;
+    const actorId = req.user?.id;
+    if (!tenantId || !actorId) return res.status(400).json({ error: 'Tenant/user context required' });
+    const body = { ...(req.body || {}) };
+    const rawTarget = body.for_user_id;
+    delete body.for_user_id;
+    const { template_kind } = body;
+    let targetUserId = Number(actorId);
+    if (rawTarget != null && rawTarget !== '') {
+      const n = Number(rawTarget);
+      if (Number.isFinite(n) && n > 0) targetUserId = n;
+    }
+    if (targetUserId !== Number(actorId) && !canManageOtherUsersMeetingEmail(req)) {
+      return res.status(403).json({ error: 'Permission denied for this user’s templates' });
+    }
+    const data = await userTemplates.resetOneForUser(tenantId, targetUserId, actorId ?? null, template_kind);
+    return res.json({ data, placeholder_help: meetingEmailTemplatesService.MEETING_TEMPLATE_PLACEHOLDERS });
   } catch (e) {
     return next(e);
   }

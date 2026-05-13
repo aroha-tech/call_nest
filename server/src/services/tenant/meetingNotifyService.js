@@ -2,16 +2,16 @@ import * as sendEmailService from '../email/sendEmailService.js';
 import * as meetingUserAttendeeEmailTemplatesService from './meetingUserAttendeeEmailTemplatesService.js';
 import * as meetingDefaultEmailSettingsService from './meetingDefaultEmailSettingsService.js';
 import * as meetingEmailContentResolve from './meetingEmailContentResolve.js';
-import { buildMeetingDetailsBoxHtml, buildMeetingDetailsBoxText } from './meetingEmailDetailsBox.js';
-import { query } from '../../config/db.js';
+import { normalizeEmailRecipientListString } from '../../utils/emailRecipientList.js';
+import { parseMeetingInstantUtc } from '../../utils/meetingInstant.js';
 
 function pad2(n) {
   return String(n).padStart(2, '0');
 }
 
 function toIcsUtcDateTime(v) {
-  const d = new Date(String(v).replace(' ', 'T'));
-  if (Number.isNaN(d.getTime())) return null;
+  const d = parseMeetingInstantUtc(v);
+  if (!d || Number.isNaN(d.getTime())) return null;
   return (
     `${d.getUTCFullYear()}${pad2(d.getUTCMonth() + 1)}${pad2(d.getUTCDate())}` +
     `T${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}${pad2(d.getUTCSeconds())}Z`
@@ -84,7 +84,9 @@ function ensureJoinDetailsInBodyHtml(bodyHtml, meeting) {
   const link = String(meeting?.meeting_link || '').trim();
   if (!link) return html;
   if (html.includes(link)) return html;
-  const platform = String(meeting?.meeting_platform || '').trim() || 'Meeting';
+  const platform = meetingEmailContentResolve.formatMeetingPlatformLabel(
+    meetingEmailContentResolve.normalizeMeetingPlatform(meeting?.meeting_platform)
+  );
   return `${html}<hr/><p><strong>${platform}</strong><br/><a href="${link}" target="_blank" rel="noopener noreferrer">${link}</a></p>`;
 }
 
@@ -93,50 +95,21 @@ function ensureJoinDetailsInBodyText(bodyText, meeting) {
   const link = String(meeting?.meeting_link || '').trim();
   if (!link) return text;
   if (text.includes(link)) return text;
-  const platform = String(meeting?.meeting_platform || '').trim() || 'Meeting';
+  const platform = meetingEmailContentResolve.formatMeetingPlatformLabel(
+    meetingEmailContentResolve.normalizeMeetingPlatform(meeting?.meeting_platform)
+  );
   return `${text}\n\n${platform}\n${link}\n`;
 }
 
-async function includeMeetingDetailsEnabled(tenantId, meeting) {
-  const ownerUserId =
-    Number(meeting?.meeting_owner_user_id || meeting?.assigned_user_id || meeting?.created_by || 0) || null;
-  if (!ownerUserId) return true;
-  try {
-    const [row] = await query(
-      `SELECT include_meeting_details
-       FROM tenant_user_meeting_email_settings
-       WHERE tenant_id = ? AND user_id = ? AND deleted_at IS NULL
-       LIMIT 1`,
-      [Number(tenantId), ownerUserId]
-    );
-    if (!row) return true;
-    return Boolean(row.include_meeting_details);
-  } catch {
-    // Avoid blocking send if table/migration is not available yet.
-    return true;
-  }
-}
-
 /**
- * Build final subject/HTML/text like outbound attendee mail (merge fields, join link hint, optional details box).
- * @param {{ include_meeting_details?: boolean }} [options] — when `include_meeting_details` is omitted, uses DB flag for meeting owner.
+ * Build final subject/HTML/text like outbound attendee mail (merge fields + join link hint when missing).
  */
-export async function buildAttendeeEmailBodies(tenantId, meeting, templateFrom, options = {}) {
+export async function buildAttendeeEmailBodies(tenantId, meeting, templateFrom, _options = {}) {
   const resolved = meetingEmailContentResolve.resolveTemplateStrings(templateFrom, meeting);
   const subject = resolved.subject;
   let body_text = ensureJoinDetailsInBodyText(resolved.body_text || null, meeting) || null;
   let body_html = ensureJoinDetailsInBodyHtml(resolved.body_html || null, meeting) || null;
-  let includeDetails;
-  if (Object.prototype.hasOwnProperty.call(options, 'include_meeting_details')) {
-    includeDetails = Boolean(options.include_meeting_details);
-  } else {
-    includeDetails = await includeMeetingDetailsEnabled(tenantId, meeting);
-  }
-  if (includeDetails) {
-    body_html = `${body_html || ''}${buildMeetingDetailsBoxHtml(meeting)}`;
-    body_text = `${body_text || ''}${buildMeetingDetailsBoxText(meeting)}`;
-  }
-  return { subject, body_html, body_text, include_meeting_details: includeDetails };
+  return { subject, body_html, body_text };
 }
 
 /**
@@ -202,8 +175,8 @@ export async function trySendMeetingAttendeeEmail(tenantId, userId, meeting, kin
     if (ownerUserId) {
       try {
         const ownerSettings = await meetingDefaultEmailSettingsService.getOrCreateForUser(tenantId, ownerUserId);
-        cc = String(ownerSettings?.default_cc_email || '').trim() || undefined;
-        bcc = String(ownerSettings?.default_bcc_email || '').trim() || undefined;
+        cc = normalizeEmailRecipientListString(ownerSettings?.default_cc_email || '') || undefined;
+        bcc = normalizeEmailRecipientListString(ownerSettings?.default_bcc_email || '') || undefined;
       } catch (_) {
         /* non-fatal */
       }
@@ -276,8 +249,8 @@ export async function sendMeetingAttendeeEmailWithTemplate(tenantId, userId, mee
   if (ownerUserId) {
     try {
       const ownerSettings = await meetingDefaultEmailSettingsService.getOrCreateForUser(tenantId, ownerUserId);
-      cc = String(ownerSettings?.default_cc_email || '').trim() || undefined;
-      bcc = String(ownerSettings?.default_bcc_email || '').trim() || undefined;
+      cc = normalizeEmailRecipientListString(ownerSettings?.default_cc_email || '') || undefined;
+      bcc = normalizeEmailRecipientListString(ownerSettings?.default_bcc_email || '') || undefined;
     } catch (_) {
       /* non-fatal */
     }

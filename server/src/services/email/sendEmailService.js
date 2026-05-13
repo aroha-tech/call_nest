@@ -193,9 +193,9 @@ function applyTemplateVariables(text, variables = {}) {
 
 function toRecipientArray(value) {
   if (!value) return [];
-  if (Array.isArray(value)) return value;
+  if (Array.isArray(value)) return value.map((s) => String(s).trim()).filter(Boolean);
   return String(value)
-    .split(',')
+    .split(/[,;\n\r]+/)
     .map((s) => s.trim())
     .filter(Boolean);
 }

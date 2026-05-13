@@ -174,12 +174,22 @@ function resolveTimeZone(mode, preferences) {
   return preferences.timezone;
 }
 
-export function formatDateTimeDisplay(value, mode, rawPreferences) {
+/**
+ * @param {unknown} value
+ * @param {string} mode
+ * @param {Record<string, unknown>} rawPreferences
+ * @param {{ timeZoneOverride?: string | null }} [options] When set, format date/time parts in this IANA zone (still uses the user's date/time *patterns* from preferences).
+ */
+export function formatDateTimeDisplay(value, mode, rawPreferences, options = {}) {
   if (value == null || value === '') return '—';
   const d = parseDateValue(value);
   if (Number.isNaN(d.getTime())) return '—';
   const prefs = normalizeDateTimePreferences(rawPreferences);
-  const timeZone = resolveTimeZone(mode, prefs);
+  const override =
+    options && typeof options === 'object' && options.timeZoneOverride != null && String(options.timeZoneOverride).trim()
+      ? normalizeTimeZone(options.timeZoneOverride)
+      : null;
+  const timeZone = override || resolveTimeZone(mode, prefs);
   const dateParts = extractDateParts(d, timeZone);
   const datePart = formatDateByPattern(dateParts, prefs.dateFormat);
   const timePart = formatTimeByPattern(d, timeZone, prefs.timeFormat);

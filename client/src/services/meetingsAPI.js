@@ -34,7 +34,7 @@ export const meetingsAPI = {
 
   /**
    * Meeting modal: owner template + mail settings + resolved preview (matches outbound attendee mail).
-   * @param {{ template_kind: 'created'|'updated'|'cancelled', meeting: object, template_override?: { subject?: string, body_html?: string|null, body_text?: string|null }, include_meeting_details?: boolean }} body
+   * @param {{ template_kind: 'created'|'updated'|'cancelled', meeting: object, template_override?: { subject?: string, body_html?: string|null, body_text?: string|null } }} body
    */
   postAttendeeEmailWorkspace: (body) => axiosInstance.post(`${BASE}/attendee-email-workspace`, body),
 
@@ -47,12 +47,16 @@ export const meetingsAPI = {
   /** @param {{ for_user_id?: number|string }} [params] */
   getDefaultEmailSettings: (params) => axiosInstance.get(`${BASE}/default-email-settings`, { params }),
   putDefaultEmailSettings: (body) => axiosInstance.put(`${BASE}/default-email-settings`, body),
+  /** @param {{ section: 'reminder'|'feedback', for_user_id?: number|string }} body */
+  resetDefaultEmailSection: (body) => axiosInstance.post(`${BASE}/default-email-settings/reset-section`, body),
   /** @param {{ type: 'reminder'|'feedback', to_email: string, email_account_id?: number }} body */
   sendDefaultSettingsTestEmail: (body) => axiosInstance.post(`${BASE}/default-email-settings/test-email`, body),
 
   getUserAttendeeEmailTemplates: () => axiosInstance.get(`${BASE}/user-attendee-email-templates`),
   /** @param {{ templates: object[], for_user_id?: number|string }} body */
   putUserAttendeeEmailTemplates: (body) => axiosInstance.put(`${BASE}/user-attendee-email-templates`, body),
+  /** @param {{ template_kind: 'created'|'updated'|'cancelled', for_user_id?: number|string }} body */
+  resetUserAttendeeEmailTemplate: (body) => axiosInstance.post(`${BASE}/user-attendee-email-templates/reset`, body),
   previewUserAttendeeEmailTemplate: (body) => axiosInstance.post(`${BASE}/user-attendee-email-templates/preview`, body),
   /** @param {{ template_kind: 'created'|'updated'|'cancelled', to_email: string, email_account_id?: number }} body */
   sendUserAttendeeEmailTemplateTestEmail: (body) =>

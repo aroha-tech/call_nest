@@ -21,6 +21,8 @@ import { BrowseSavedFiltersModal } from '../features/contacts/BrowseSavedFilters
 import { savedListFiltersAPI } from '../services/savedListFiltersAPI';
 import { ScheduleHubFilterModal } from './ScheduleHubFilterModal';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
+import { formatDateTimeDisplay, normalizeTimeZone } from '../utils/dateTimeDisplay';
+import { DEFAULT_MEETING_TIMEZONE } from '../utils/meetingTimezone';
 import { FOLLOW_UP_TYPE_OPTIONS, followUpTypeLabel } from '../utils/followUpTypeLabels';
 
 function pad2(n) {
@@ -90,6 +92,30 @@ function safeDate(v) {
   }
 }
 
+/** Stored MySQL UTC `DATETIME` / ISO without offset → parse as UTC instant (matches server `timezone: 'Z'`). */
+function parseApiUtcInstant(v) {
+  if (v == null || v === '') return null;
+  if (v instanceof Date && !Number.isNaN(v.getTime())) return v;
+  let s = String(v).trim();
+  if (!s) return null;
+  let n = s.includes('T') ? s : s.replace(' ', 'T');
+  if (!/Z$/i.test(n) && !/[+-]\d{2}:?\d{2}$/.test(n)) n = `${n}Z`;
+  const d = new Date(n);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function apiMysqlUtcToIsoZ(raw) {
+  if (raw == null || raw === '') return '';
+  const d = parseApiUtcInstant(raw);
+  if (!d) return '';
+  return d.toISOString();
+}
+
+function ymdInIanaZone(ms, ianaZone) {
+  const tz = normalizeTimeZone(ianaZone);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(ms));
+}
+
 /** Created-by column: show Self when the logged-in user created the meeting. */
 function meetingCreatedByLabel(row, viewerUserId) {
   const cid = row?.created_by != null ? Number(row.created_by) : null;
@@ -98,11 +124,12 @@ function meetingCreatedByLabel(row, viewerUserId) {
   return row?.created_by_name || '—';
 }
 
-function computeTimeFlag(d, { isOpen }) {
+function computeTimeFlag(d, { isOpen, calendarTimeZone }) {
   if (!d) return { primary: { label: '—', variant: 'muted' }, today: false };
   const now = new Date();
-  const isToday =
-    d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  const isToday = calendarTimeZone
+    ? ymdInIanaZone(d.getTime(), calendarTimeZone) === ymdInIanaZone(now.getTime(), calendarTimeZone)
+    : d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
   if (isOpen && d.getTime() < now.getTime()) return { primary: { label: 'Missed', variant: 'danger' }, today: isToday };
   const nearMs = 120 * 60 * 1000;
   if (isOpen && d.getTime() < now.getTime() + nearMs)
@@ -111,7 +138,7 @@ function computeTimeFlag(d, { isOpen }) {
 }
 
 export function ScheduleHubPage() {
-  const { formatDateTime } = useDateTimeDisplay();
+  const { formatDateTime, datetimeDisplayMode, datetimePreferences } = useDateTimeDisplay();
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAppSelector(selectUser);
   const viewMode = normalizeViewParam(searchParams.get('view'));
@@ -494,9 +521,10 @@ export function ScheduleHubPage() {
                   <TableRow key={r.id}>
                     <TableCell>
                       {(() => {
-                        const d = safeDate(r.start_at);
+                        const d = parseApiUtcInstant(r.start_at);
+                        const meetingTz = r.meeting_timezone || DEFAULT_MEETING_TIMEZONE;
                         const isOpen = r.meeting_status === 'scheduled' || r.meeting_status === 'rescheduled';
-                        const { primary, today: isToday } = computeTimeFlag(d, { isOpen });
+                        const { primary, today: isToday } = computeTimeFlag(d, { isOpen, calendarTimeZone: meetingTz });
                         return (
                           <>
                             <Badge size="sm" variant={primary.variant}>
@@ -513,7 +541,11 @@ export function ScheduleHubPage() {
                         );
                       })()}
                     </TableCell>
-                    <TableCell>{formatDateTime(String(r.start_at || '').replace(' ', 'T'))}</TableCell>
+                    <TableCell>
+                      {formatDateTimeDisplay(apiMysqlUtcToIsoZ(r.start_at), datetimeDisplayMode, datetimePreferences, {
+                        timeZoneOverride: r.meeting_timezone || DEFAULT_MEETING_TIMEZONE,
+                      })}
+                    </TableCell>
                     <TableCell noTruncate>{r.title || '—'}</TableCell>
                     <TableCell noTruncate>{r.contact_name || '—'}</TableCell>
                     <TableCell noTruncate>{r.assigned_name || r.assigned_email || '—'}</TableCell>

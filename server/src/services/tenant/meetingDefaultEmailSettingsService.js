@@ -1,8 +1,22 @@
 import crypto from 'crypto';
 import { query } from '../../config/db.js';
 import { env } from '../../config/env.js';
+import { parseMeetingInstantUtc } from '../../utils/meetingInstant.js';
+import { normalizeEmailRecipientListString } from '../../utils/emailRecipientList.js';
 import * as sendEmailService from '../email/sendEmailService.js';
 import { createAndDispatchNotification, listUserIdsByRoles } from './notificationService.js';
+import { meetingDetailsCardFieldValues } from './meetingEmailDetailsBox.js';
+import {
+  normalizeMeetingPlatform,
+  formatMeetingPlatformLabel,
+} from './meetingEmailContentResolve.js';
+import {
+  DEFAULT_MEETING_REMINDER_EMAIL_HTML,
+  DEFAULT_MEETING_REMINDER_EMAIL_TEXT,
+  DEFAULT_MEETING_FEEDBACK_EMAIL_HTML,
+  DEFAULT_MEETING_FEEDBACK_EMAIL_TEXT,
+} from '../../utils/defaultMeetingEmailBodiesHtml.js';
+import { buildGoogleCalendarUrl, buildOutlookCalendarComposeUrl } from '../../utils/meetingCalendarLinks.js';
 
 const DEFAULT_REMINDER_OFFSETS = [
   { value: 1, unit: 'days' },
@@ -16,20 +30,15 @@ const DEFAULTS = {
   reminder_enabled: true,
   reminder_offsets: DEFAULT_REMINDER_OFFSETS,
   reminder_subject: 'Reminder: {{title}} on {{meeting_date}} at {{meeting_time}}',
-  reminder_body_html:
-    '<p>Hi,</p><p>This is a friendly reminder for your upcoming meeting.</p><p><strong>Title:</strong> {{title}}<br/><strong>Date:</strong> {{meeting_date}}<br/><strong>Time:</strong> {{meeting_time}}<br/><strong>Join Link:</strong> <a href="{{meeting_link}}" target="_blank" rel="noopener noreferrer">{{meeting_link}}</a></p><p>Thanks,<br/>{{company_name}}</p>',
-  reminder_body_text:
-    'This is a friendly reminder for your upcoming meeting.\n\nTitle: {{title}}\nDate: {{meeting_date}}\nTime: {{meeting_time}}\nJoin Link: {{meeting_link}}\n\nThanks,\n{{company_name}}',
+  reminder_body_html: DEFAULT_MEETING_REMINDER_EMAIL_HTML,
+  reminder_body_text: DEFAULT_MEETING_REMINDER_EMAIL_TEXT,
   feedback_enabled: true,
   feedback_delay_value: 2,
   feedback_delay_unit: 'hours',
   feedback_subject: 'How was your meeting with us?',
-  feedback_body_html:
-    '<p>Hi,</p><p>We hope your meeting went well. Please share your feedback.</p><p><a href="{{feedback_link}}" target="_blank" rel="noopener noreferrer">Share your feedback</a></p><p>Thanks,<br/>{{company_name}}</p>',
-  feedback_body_text:
-    'We hope your meeting went well. Please share your feedback:\n{{feedback_link}}\n\nThanks,\n{{company_name}}',
+  feedback_body_html: DEFAULT_MEETING_FEEDBACK_EMAIL_HTML,
+  feedback_body_text: DEFAULT_MEETING_FEEDBACK_EMAIL_TEXT,
   thank_you_page_url: '',
-  include_meeting_details: true,
   default_cc_email: '',
   default_bcc_email: '',
 };
@@ -76,14 +85,6 @@ function parseJsonOrNull(raw) {
   }
 }
 
-function fmtDate(d) {
-  return d.toLocaleDateString(undefined, { dateStyle: 'medium' });
-}
-
-function fmtTime(d) {
-  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-}
-
 function applyTemplateVars(text, vars) {
   return String(text || '').replace(/\{\{(\w+)\}\}/g, (_, key) =>
     vars[key] !== undefined && vars[key] !== null ? String(vars[key]) : `{{${key}}}`
@@ -98,28 +99,56 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-function parseDt(raw) {
-  const d = new Date(String(raw || '').replace(' ', 'T'));
-  if (Number.isNaN(d.getTime())) return null;
-  return d;
+const DEFAULT_MEETING_TZ = 'Asia/Kolkata';
+
+function safeTimeZone(tz) {
+  const s = String(tz || '').trim();
+  if (!s) return DEFAULT_MEETING_TZ;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: s }).format(new Date());
+    return s;
+  } catch {
+    return DEFAULT_MEETING_TZ;
+  }
 }
 
-function meetingVars(meeting, feedbackLink = '', includeMeetingDetails = true) {
+function parseDt(raw) {
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw;
+  return parseMeetingInstantUtc(raw);
+}
+
+function meetingVars(meeting, feedbackLink = '') {
   const start = parseDt(meeting.start_at);
   const end = parseDt(meeting.end_at);
+  const tz = safeTimeZone(meeting.meeting_timezone || meeting.owner_datetime_timezone);
+  const fmtDate = (d) => new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone: tz }).format(d);
+  const fmtTime = (d) => new Intl.DateTimeFormat('en', { hour: '2-digit', minute: '2-digit', timeZone: tz }).format(d);
+  const startT = start ? fmtTime(start) : '';
+  const endT = end ? fmtTime(end) : '';
+  let meeting_time_range = '';
+  if (start) {
+    meeting_time_range = end && end.getTime() !== start.getTime() && endT ? `${startT} - ${endT}` : startT || '';
+  }
+  const card = meetingDetailsCardFieldValues(meeting);
+  const platformKey = normalizeMeetingPlatform(meeting.meeting_platform);
   return {
     title: meeting.title || 'Meeting',
     attendee_email: meeting.attendee_email || '',
-    meeting_date: includeMeetingDetails && start ? fmtDate(start) : '',
-    meeting_time: includeMeetingDetails && start ? fmtTime(start) : '',
-    meeting_end_time: includeMeetingDetails && end ? fmtTime(end) : '',
-    meeting_link: includeMeetingDetails ? meeting.meeting_link || '' : '',
-    meeting_platform: includeMeetingDetails ? meeting.meeting_platform || '' : '',
-    location: includeMeetingDetails ? meeting.location || '' : '',
-    description: includeMeetingDetails ? meeting.description || '' : '',
+    meeting_date: start ? fmtDate(start) : '',
+    meeting_time: meeting_time_range,
+    meeting_end_time: end ? fmtTime(end) : '',
+    meeting_link: meeting.meeting_link || '',
+    meeting_platform: platformKey,
+    meeting_platform_label: formatMeetingPlatformLabel(platformKey),
+    location: meeting.location || '',
+    description: meeting.description || '',
     company_name: meeting.tenant_company_name || 'Your Company',
     contact_name: meeting.contact_name || '',
     feedback_link: feedbackLink,
+    meeting_card_date: card.date,
+    meeting_card_time: card.timeLine,
+    calendar_google_url: buildGoogleCalendarUrl(meeting),
+    calendar_outlook_url: buildOutlookCalendarComposeUrl(meeting),
   };
 }
 
@@ -161,7 +190,7 @@ export async function getOrCreateForUser(tenantId, userId) {
         DEFAULTS.feedback_body_html,
         DEFAULTS.feedback_body_text,
         DEFAULTS.thank_you_page_url || null,
-        DEFAULTS.include_meeting_details ? 1 : 0,
+        1,
         uid,
         uid,
       ]
@@ -190,9 +219,8 @@ export async function getOrCreateForUser(tenantId, userId) {
     feedback_body_html: row.feedback_body_html || '',
     feedback_body_text: row.feedback_body_text || '',
     thank_you_page_url: row.thank_you_page_url || '',
-    include_meeting_details: Boolean(row.include_meeting_details),
-    default_cc_email: row.default_cc_email != null ? String(row.default_cc_email) : '',
-    default_bcc_email: row.default_bcc_email != null ? String(row.default_bcc_email) : '',
+    default_cc_email: normalizeEmailRecipientListString(row.default_cc_email != null ? String(row.default_cc_email) : ''),
+    default_bcc_email: normalizeEmailRecipientListString(row.default_bcc_email != null ? String(row.default_bcc_email) : ''),
   };
 }
 
@@ -213,9 +241,12 @@ export async function updateForUser(tenantId, userId, actingUserId, payload) {
     feedback_body_html: asString(payload?.feedback_body_html, current.feedback_body_html),
     feedback_body_text: asString(payload?.feedback_body_text, current.feedback_body_text),
     thank_you_page_url: asString(payload?.thank_you_page_url, current.thank_you_page_url).trim(),
-    include_meeting_details: asBool(payload?.include_meeting_details, current.include_meeting_details),
-    default_cc_email: asString(payload?.default_cc_email, current.default_cc_email).trim().slice(0, 1000),
-    default_bcc_email: asString(payload?.default_bcc_email, current.default_bcc_email).trim().slice(0, 1000),
+    default_cc_email: normalizeEmailRecipientListString(
+      asString(payload?.default_cc_email, current.default_cc_email)
+    ).slice(0, 1000),
+    default_bcc_email: normalizeEmailRecipientListString(
+      asString(payload?.default_bcc_email, current.default_bcc_email)
+    ).slice(0, 1000),
   };
   await query(
     `UPDATE tenant_user_meeting_email_settings
@@ -231,7 +262,7 @@ export async function updateForUser(tenantId, userId, actingUserId, payload) {
          feedback_body_html = ?,
          feedback_body_text = ?,
          thank_you_page_url = ?,
-         include_meeting_details = ?,
+         include_meeting_details = 1,
          default_cc_email = ?,
          default_bcc_email = ?,
          updated_by = ?,
@@ -250,7 +281,6 @@ export async function updateForUser(tenantId, userId, actingUserId, payload) {
       next.feedback_body_html || null,
       next.feedback_body_text || null,
       next.thank_you_page_url || null,
-      next.include_meeting_details ? 1 : 0,
       next.default_cc_email || null,
       next.default_bcc_email || null,
       actingUserId ?? null,
@@ -284,7 +314,8 @@ async function getSettingsForUsers(tenantId, userIds) {
       feedback_subject: row.feedback_subject || DEFAULTS.feedback_subject,
       feedback_body_html: row.feedback_body_html || '',
       feedback_body_text: row.feedback_body_text || '',
-      include_meeting_details: Boolean(row.include_meeting_details),
+      default_cc_email: row.default_cc_email != null ? String(row.default_cc_email) : '',
+      default_bcc_email: row.default_bcc_email != null ? String(row.default_bcc_email) : '',
     });
   }
   return map;
@@ -295,19 +326,24 @@ async function listSchedulableMeetings() {
     `SELECT
        m.id, m.tenant_id, m.email_account_id, m.title, m.description, m.location, m.attendee_email,
        m.start_at, m.end_at, m.meeting_status, m.meeting_platform, m.meeting_link,
+       m.meeting_timezone,
        m.send_reminder,
        m.assigned_user_id, m.meeting_owner_user_id, m.created_by,
        c.display_name AS contact_name,
-       t.name AS tenant_company_name
+       t.name AS tenant_company_name,
+       COALESCE(owner_tz_u.datetime_timezone, 'Asia/Kolkata') AS owner_datetime_timezone
      FROM tenant_meetings m
      INNER JOIN tenants t ON t.id = m.tenant_id AND t.is_deleted = 0
      LEFT JOIN contacts c ON c.id = m.contact_id AND c.tenant_id = m.tenant_id AND c.deleted_at IS NULL
+     LEFT JOIN users owner_tz_u
+       ON owner_tz_u.id = COALESCE(m.meeting_owner_user_id, m.assigned_user_id, m.created_by)
+       AND owner_tz_u.tenant_id = m.tenant_id
      WHERE m.deleted_at IS NULL
        AND m.attendee_email IS NOT NULL
        AND TRIM(m.attendee_email) <> ''
        AND m.meeting_status IN ('scheduled', 'rescheduled', 'completed')
        AND m.end_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-       AND m.start_at <= DATE_ADD(NOW(), INTERVAL 7 DAY)`
+       AND m.start_at <= DATE_ADD(NOW(), INTERVAL 45 DAY)`
   );
 }
 
@@ -325,6 +361,17 @@ async function markReminderAttempt(tenantId, meetingId, ownerUserId, offsetMinut
   return Number(res?.affectedRows || 0) > 0;
 }
 
+async function getReminderEventRow(tenantId, meetingId, ownerUserId, offsetMinutes) {
+  const [row] = await query(
+    `SELECT id, delivery_status FROM tenant_meeting_reminder_events
+     WHERE tenant_id = ? AND meeting_id = ? AND owner_user_id = ? AND offset_minutes = ?
+       AND deleted_at IS NULL
+     LIMIT 1`,
+    [tenantId, meetingId, ownerUserId, offsetMinutes]
+  );
+  return row || null;
+}
+
 async function updateReminderStatus(id, status, errMsg = null) {
   if (!Number.isFinite(Number(id)) || Number(id) < 1) return;
   await query(
@@ -335,16 +382,31 @@ async function updateReminderStatus(id, status, errMsg = null) {
   );
 }
 
+function ccBccFromSetting(setting) {
+  const cc = normalizeEmailRecipientListString(setting?.default_cc_email || '');
+  const bcc = normalizeEmailRecipientListString(setting?.default_bcc_email || '');
+  return {
+    cc: cc || undefined,
+    bcc: bcc || undefined,
+  };
+}
+
 async function sendReminderEmail(meeting, setting) {
-  const vars = meetingVars(meeting, '', Boolean(setting.include_meeting_details));
+  const vars = meetingVars(meeting, '');
   const subject = applyTemplateVars(setting.reminder_subject, vars);
   const bodyText = applyTemplateVars(setting.reminder_body_text, vars);
-  const bodyHtml = applyTemplateVars(setting.reminder_body_html, Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, escapeHtml(v)])));
+  const bodyHtml = applyTemplateVars(
+    setting.reminder_body_html,
+    Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, escapeHtml(v)]))
+  );
+  const { cc, bcc } = ccBccFromSetting(setting);
   await sendEmailService.sendEmail(
     Number(meeting.tenant_id),
     {
       email_account_id: Number(meeting.email_account_id),
       to: String(meeting.attendee_email).trim(),
+      cc,
+      bcc,
       subject,
       body_text: bodyText || undefined,
       body_html: bodyHtml || undefined,
@@ -360,18 +422,25 @@ function computeFeedbackLink(token) {
 
 async function sendFeedbackEmail(meeting, setting, token) {
   const feedbackLink = computeFeedbackLink(token);
-  const vars = meetingVars(meeting, feedbackLink, Boolean(setting.include_meeting_details));
+  const vars = meetingVars(meeting, feedbackLink);
   const subject = applyTemplateVars(setting.feedback_subject, vars);
   const bodyText = applyTemplateVars(setting.feedback_body_text, vars);
-  const bodyHtml = applyTemplateVars(setting.feedback_body_html, Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, escapeHtml(v)])));
+  const bodyHtml = applyTemplateVars(
+    setting.feedback_body_html,
+    Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, escapeHtml(v)]))
+  );
+  const { cc, bcc } = ccBccFromSetting(setting);
   await sendEmailService.sendEmail(
     Number(meeting.tenant_id),
     {
       email_account_id: Number(meeting.email_account_id),
       to: String(meeting.attendee_email).trim(),
+      cc,
+      bcc,
       subject,
       body_text: bodyText || undefined,
       body_html: bodyHtml || undefined,
+      
     },
     null
   );
@@ -425,20 +494,22 @@ export async function processMeetingReminderAndFeedbackTick() {
     if (setting.reminder_enabled && meetingWantsReminder && m.meeting_status !== 'cancelled') {
       for (const offsetMinutes of setting.reminder_offsets_minutes || []) {
         const dueMs = start.getTime() - offsetMinutes * 60_000;
-        if (nowMs < dueMs || nowMs - dueMs > 5 * 60_000) continue;
+        if (nowMs < dueMs) continue;
+        if (nowMs >= start.getTime()) continue;
+        // Long lead times (e.g. 1 day): only fire within 30m after ideal send time so we don't blast late.
+        // Short lead times (≤2h): any tick from due time until meeting start (covers 5m/15m + missed ticks).
+        if (offsetMinutes > 120 && nowMs - dueMs > 30 * 60_000) continue;
+
         const created = await markReminderAttempt(Number(m.tenant_id), Number(m.id), ownerId, offsetMinutes);
-        if (!created) continue;
-        const [eventRow] = await query(
-          `SELECT id FROM tenant_meeting_reminder_events
-           WHERE tenant_id = ? AND meeting_id = ? AND owner_user_id = ? AND offset_minutes = ? LIMIT 1`,
-          [m.tenant_id, m.id, ownerId, offsetMinutes]
-        );
+        const eventRow = await getReminderEventRow(Number(m.tenant_id), Number(m.id), ownerId, offsetMinutes);
+        if (!eventRow) continue;
+        if (!created && eventRow.delivery_status === 'sent') continue;
         try {
           await sendReminderEmail(m, setting);
-          await updateReminderStatus(Number(eventRow?.id), 'sent');
+          await updateReminderStatus(Number(eventRow.id), 'sent');
           reminderSent++;
         } catch (e) {
-          await updateReminderStatus(Number(eventRow?.id), 'failed', e?.message || 'send_failed');
+          await updateReminderStatus(Number(eventRow.id), 'failed', e?.message || 'send_failed');
         }
       }
     }
@@ -541,6 +612,64 @@ export async function submitFeedbackByToken(token, payload) {
   return { ok: true, meeting_title: row.title || 'Meeting' };
 }
 
+/**
+ * Reset reminder or feedback copy to product defaults (same as new-user defaults).
+ */
+export async function resetAutomationSectionForUser(tenantId, userId, actingUserId, section) {
+  const tid = Number(tenantId);
+  const uid = Number(userId);
+  const sec = String(section || '').trim().toLowerCase();
+  if (!Number.isFinite(tid) || !Number.isFinite(uid)) {
+    const err = new Error('Invalid tenant/user');
+    err.status = 400;
+    throw err;
+  }
+  if (!['reminder', 'feedback'].includes(sec)) {
+    const err = new Error('Invalid section');
+    err.status = 400;
+    throw err;
+  }
+  await getOrCreateForUser(tenantId, uid);
+  if (sec === 'reminder') {
+    await query(
+      `UPDATE tenant_user_meeting_email_settings
+       SET reminder_subject = ?,
+           reminder_body_html = ?,
+           reminder_body_text = ?,
+           updated_by = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE tenant_id = ? AND user_id = ? AND deleted_at IS NULL`,
+      [
+        DEFAULTS.reminder_subject,
+        DEFAULTS.reminder_body_html || null,
+        DEFAULTS.reminder_body_text || null,
+        actingUserId ?? uid,
+        tid,
+        uid,
+      ]
+    );
+  } else {
+    await query(
+      `UPDATE tenant_user_meeting_email_settings
+       SET feedback_subject = ?,
+           feedback_body_html = ?,
+           feedback_body_text = ?,
+           updated_by = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE tenant_id = ? AND user_id = ? AND deleted_at IS NULL`,
+      [
+        DEFAULTS.feedback_subject,
+        DEFAULTS.feedback_body_html || null,
+        DEFAULTS.feedback_body_text || null,
+        actingUserId ?? uid,
+        tid,
+        uid,
+      ]
+    );
+  }
+  return getOrCreateForUser(tenantId, uid);
+}
+
 export async function sendTestEmailForUser(tenantId, userId, type, toEmail, emailAccountId = null) {
   const normalizedType = String(type || '').trim().toLowerCase();
   if (!['reminder', 'feedback'].includes(normalizedType)) {
@@ -594,6 +723,8 @@ export async function sendTestEmailForUser(tenantId, userId, type, toEmail, emai
     attendee_email: recipient,
     start_at: new Date(Date.now() + 24 * 60 * 60_000).toISOString().slice(0, 19).replace('T', ' '),
     end_at: new Date(Date.now() + 25 * 60 * 60_000).toISOString().slice(0, 19).replace('T', ' '),
+    meeting_timezone: 'Asia/Kolkata',
+    owner_datetime_timezone: 'Asia/Kolkata',
     meeting_link: 'https://meet.google.com/abc-defg-hij',
     meeting_platform: 'google_meet',
     location: 'Google Meet',
@@ -603,8 +734,7 @@ export async function sendTestEmailForUser(tenantId, userId, type, toEmail, emai
   };
   const vars = meetingVars(
     sampleMeeting,
-    normalizedType === 'feedback' ? 'https://example.com/feedback/test-link' : '',
-    Boolean(setting.include_meeting_details)
+    normalizedType === 'feedback' ? 'https://example.com/feedback/test-link' : ''
   );
   const toHtmlVars = Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, escapeHtml(v)]));
   const subject =
@@ -619,12 +749,15 @@ export async function sendTestEmailForUser(tenantId, userId, type, toEmail, emai
     normalizedType === 'reminder'
       ? applyTemplateVars(setting.reminder_body_html || '', toHtmlVars)
       : applyTemplateVars(setting.feedback_body_html || '', toHtmlVars);
+  const { cc, bcc } = ccBccFromSetting(setting);
 
   await sendEmailService.sendEmail(
     Number(tenantId),
     {
       email_account_id: Number(account.id),
       to: recipient,
+      cc,
+      bcc,
       subject,
       body_text: bodyText || undefined,
       body_html: bodyHtml || undefined,

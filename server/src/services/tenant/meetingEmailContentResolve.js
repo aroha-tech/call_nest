@@ -1,6 +1,8 @@
 import { query } from '../../config/db.js';
+import { parseMeetingInstantUtc } from '../../utils/meetingInstant.js';
 import * as meetingEmailTemplatesService from './meetingEmailTemplatesService.js';
-import { buildMeetingDetailsBoxHtml, buildMeetingDetailsBoxText } from './meetingEmailDetailsBox.js';
+import { meetingDetailsCardFieldValues } from './meetingEmailDetailsBox.js';
+import { buildGoogleCalendarUrl, buildOutlookCalendarComposeUrl } from '../../utils/meetingCalendarLinks.js';
 
 function escapeHtml(s) {
   if (s == null || s === '') return '';
@@ -11,7 +13,7 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-function normalizeMeetingPlatform(v) {
+export function normalizeMeetingPlatform(v) {
   const raw = String(v || '')
     .trim()
     .toLowerCase();
@@ -22,6 +24,15 @@ function normalizeMeetingPlatform(v) {
   return 'google_meet';
 }
 
+/** Human-readable platform for email templates (use {{meeting_platform_label}} in HTML/text). */
+export function formatMeetingPlatformLabel(normalizedPlatform) {
+  const p = String(normalizedPlatform || '').trim();
+  if (p === 'google_meet') return 'Google Meet';
+  if (p === 'microsoft_teams') return 'Microsoft Teams';
+  if (p === 'custom') return 'Video link';
+  return 'Google Meet';
+}
+
 export function applyTemplateVariables(text, variables = {}) {
   if (!text || typeof text !== 'string') return text;
   return text.replace(/\{\{(\w+)\}\}/g, (_, key) =>
@@ -29,12 +40,26 @@ export function applyTemplateVariables(text, variables = {}) {
   );
 }
 
-function formatDt(mysqlDt) {
+const DEFAULT_MEETING_TZ = 'Asia/Kolkata';
+
+function safeTimeZone(tz) {
+  const s = String(tz || '').trim();
+  if (!s) return DEFAULT_MEETING_TZ;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: s }).format(new Date());
+    return s;
+  } catch {
+    return DEFAULT_MEETING_TZ;
+  }
+}
+
+function formatDt(mysqlDt, meeting = {}) {
   if (!mysqlDt) return '—';
   try {
-    const d = new Date(String(mysqlDt).replace(' ', 'T'));
-    if (Number.isNaN(d.getTime())) return String(mysqlDt);
-    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    const d = parseMeetingInstantUtc(mysqlDt);
+    if (!d) return String(mysqlDt);
+    const tz = safeTimeZone(meeting.meeting_timezone || meeting.owner_datetime_timezone);
+    return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short', timeZone: tz }).format(d);
   } catch {
     return String(mysqlDt);
   }
@@ -43,14 +68,16 @@ function formatDt(mysqlDt) {
 export function buildPlainVars(meeting) {
   const platform = normalizeMeetingPlatform(meeting.meeting_platform);
   const computedLink = String(meeting.meeting_link || '').trim();
+  const card = meetingDetailsCardFieldValues(meeting);
   return {
     title: meeting.title ?? '',
-    start_at: formatDt(meeting.start_at),
-    end_at: formatDt(meeting.end_at),
+    start_at: formatDt(meeting.start_at, meeting),
+    end_at: formatDt(meeting.end_at, meeting),
     location: meeting.location?.trim() || '',
     description: meeting.description?.trim() || '',
     meeting_status: meeting.meeting_status ?? '',
     meeting_platform: platform,
+    meeting_platform_label: formatMeetingPlatformLabel(platform),
     meeting_link: computedLink,
     meeting_duration_min:
       meeting.meeting_duration_min != null ? String(meeting.meeting_duration_min) : '',
@@ -58,6 +85,10 @@ export function buildPlainVars(meeting) {
     attendee_email: meeting.attendee_email?.trim() || '',
     account_label: meeting.account_label || '',
     account_email: meeting.account_email || '',
+    meeting_card_date: card.date,
+    meeting_card_time: card.timeLine,
+    calendar_google_url: buildGoogleCalendarUrl(meeting),
+    calendar_outlook_url: buildOutlookCalendarComposeUrl(meeting),
   };
 }
 
@@ -71,12 +102,17 @@ export function buildHtmlVars(meeting) {
     description: p.description ? escapeHtml(p.description).replace(/\n/g, '<br/>') : '',
     meeting_status: escapeHtml(p.meeting_status),
     meeting_platform: escapeHtml(p.meeting_platform),
+    meeting_platform_label: escapeHtml(p.meeting_platform_label),
     meeting_link: escapeHtml(p.meeting_link),
     meeting_duration_min: escapeHtml(p.meeting_duration_min),
     meeting_owner_name: escapeHtml(p.meeting_owner_name),
     attendee_email: escapeHtml(p.attendee_email),
     account_label: escapeHtml(p.account_label),
     account_email: escapeHtml(p.account_email),
+    meeting_card_date: escapeHtml(p.meeting_card_date),
+    meeting_card_time: escapeHtml(p.meeting_card_time),
+    calendar_google_url: escapeHtml(p.calendar_google_url),
+    calendar_outlook_url: escapeHtml(p.calendar_outlook_url),
   };
 }
 
@@ -125,7 +161,6 @@ export function resolveTemplateStrings(template, meeting) {
  * @param {'created'|'updated'|'cancelled'} kind
  * @param {object} meetingPayload - partial meeting from client (datetime strings ok)
  * @param {{ subject?: string, body_html?: string|null, body_text?: string|null }|null} [templateOverride] - unsaved draft; if null, load from DB
- * @param {{ include_meeting_details?: boolean }} [options] - when true, append the same meeting-details block as outbound mail
  */
 export async function resolveMeetingEmailContent(
   tenantId,
@@ -133,7 +168,7 @@ export async function resolveMeetingEmailContent(
   kind,
   meetingPayload,
   templateOverride = null,
-  options = {}
+  _options = {}
 ) {
   const meeting = await enrichMeetingPayload(tenantId, meetingPayload || {});
 
@@ -168,17 +203,10 @@ export async function resolveMeetingEmailContent(
   }
 
   const resolved = resolveTemplateStrings(template, meeting);
-  const includeDetails = Boolean(options?.include_meeting_details);
-  let body_html = resolved.body_html;
-  let body_text = resolved.body_text;
-  if (includeDetails) {
-    body_html = `${body_html || ''}${buildMeetingDetailsBoxHtml(meeting)}`;
-    body_text = `${body_text || ''}${buildMeetingDetailsBoxText(meeting)}`;
-  }
   return {
     template_kind: kind,
     subject: resolved.subject,
-    body_html,
-    body_text,
+    body_html: resolved.body_html,
+    body_text: resolved.body_text,
   };
 }
