@@ -57,7 +57,7 @@ export async function getById(req, res, next) {
 export async function create(req, res, next) {
   try {
     const tenantId = req.tenant.id;
-    const { script_name, script_body, status } = req.body;
+    const { script_name, script_language, script_body, status } = req.body;
 
     if (!script_name || script_body == null) {
       return res.status(400).json({
@@ -67,7 +67,7 @@ export async function create(req, res, next) {
 
     const script = await callScriptsService.create(
       tenantId,
-      { script_name, script_body, status },
+      { script_name, script_language, script_body, status },
       req.user.id
     );
 
@@ -86,7 +86,7 @@ export async function create(req, res, next) {
 export async function update(req, res, next) {
   try {
     const tenantId = req.tenant.id;
-    const { script_name, script_body, status } = req.body;
+    const { script_name, script_language, script_body, status } = req.body;
 
     const existing = await callScriptsService.findById(tenantId, req.params.id);
     if (!existing) {
@@ -108,7 +108,7 @@ export async function update(req, res, next) {
     const script = await callScriptsService.update(
       tenantId,
       req.params.id,
-      { script_name, script_body, status },
+      { script_name, script_language, script_body, status },
       req.user.id
     );
 

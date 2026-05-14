@@ -5,6 +5,33 @@ function sessionKeyForUser(userId) {
   return `callnest.siteEntryPermissions.u${userId || '0'}`;
 }
 
+function promptMicrophoneIfPromptable() {
+  if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) return Promise.resolve();
+  return new Promise((resolve) => {
+    const finish = () => resolve();
+    const tryGet = () => {
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((stream) => {
+          stream.getTracks().forEach((t) => t.stop());
+          finish();
+        })
+        .catch(finish);
+    };
+    if (navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: 'microphone' })
+        .then((r) => {
+          if (r.state === 'granted' || r.state === 'denied') finish();
+          else tryGet();
+        })
+        .catch(tryGet);
+    } else {
+      tryGet();
+    }
+  });
+}
+
 function promptGeolocationIfPromptable() {
   if (typeof window === 'undefined' || !navigator.geolocation) return Promise.resolve();
   return new Promise((resolve) => {
@@ -50,6 +77,10 @@ export function useSiteEntryPermissions(userId) {
       try {
         if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(key, '1');
         await registerPushSubscriptionIfSupported();
+        if (cancelled) return;
+        await new Promise((r) => setTimeout(r, 700));
+        if (cancelled) return;
+        await promptMicrophoneIfPromptable();
         if (cancelled) return;
         await new Promise((r) => setTimeout(r, 700));
         if (cancelled) return;

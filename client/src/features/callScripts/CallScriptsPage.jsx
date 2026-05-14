@@ -21,6 +21,8 @@ import { renderPreview, linkify, linkifyHtml, stripHtml, DEFAULT_PREVIEW_DATA } 
 import { templateVariablesAPI } from '../../services/templateVariablesAPI';
 import { ScriptBodyEditor } from './ScriptBodyEditor';
 import { ScriptLanguageAssistBar } from './ScriptLanguageAssistBar';
+import { getSpeechRecognitionLangCode } from './scriptLanguageHelpers';
+import { MaterialSymbol } from '../../components/ui/MaterialSymbol';
 import styles from './CallScriptsPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
@@ -97,6 +99,7 @@ export function CallScriptsPage() {
   const [viewScript, setViewScript] = useState(null);
   /** ISO 639-1: script language for translation, dictation, and read-aloud */
   const [scriptLocale, setScriptLocale] = useState('en');
+  const [previewReadBusy, setPreviewReadBusy] = useState(false);
   const editorRef = useRef(null);
 
   const fetchScripts = useCallback(async () => {
@@ -226,7 +229,7 @@ export function CallScriptsPage() {
     setScriptBody(script.script_body || '');
     setEditorPlainText(stripHtml(script.script_body || ''));
     setEditorCursorIndex(0);
-    setScriptLocale('en');
+    setScriptLocale(script.script_language || 'en');
     setShowPreviewModal(false);
     setFormError(null);
     setVariableSearch('');
@@ -267,7 +270,11 @@ export function CallScriptsPage() {
       return;
     }
 
-    const payload = { script_name: scriptName.trim(), script_body: scriptBody };
+    const payload = {
+      script_name: scriptName.trim(),
+      script_language: scriptLocale,
+      script_body: scriptBody
+    };
     const result = editingId
       ? await updateMutation.mutate(editingId, payload)
       : await createMutation.mutate(payload);
@@ -291,6 +298,29 @@ export function CallScriptsPage() {
       setError(result?.error || 'Delete failed');
     }
   };
+
+  const handleTogglePreviewReadAloud = useCallback((textToRead) => {
+    if (previewReadBusy) {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      setPreviewReadBusy(false);
+      return;
+    }
+    const text = stripHtml(textToRead || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!text) return;
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = getSpeechRecognitionLangCode(scriptLocale);
+    u.onend = () => setPreviewReadBusy(false);
+    u.onerror = () => {
+      setPreviewReadBusy(false);
+    };
+    setPreviewReadBusy(true);
+    window.speechSynthesis.speak(u);
+  }, [previewReadBusy, scriptLocale]);
 
   const previewSample = previewSampleData || DEFAULT_PREVIEW_DATA;
   const previewRendered = renderPreview(scriptBody, previewSample);
@@ -633,12 +663,30 @@ export function CallScriptsPage() {
 
       <Modal
         isOpen={showPreviewModal}
-        onClose={() => setShowPreviewModal(false)}
+        onClose={() => {
+          if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
+          setPreviewReadBusy(false);
+          setShowPreviewModal(false);
+        }}
         title="Script Preview"
         size="lg"
         footer={
           <ModalFooter>
-            <Button variant="ghost" onClick={() => setShowPreviewModal(false)}>Close</Button>
+            <Button
+              type="button"
+              variant={previewReadBusy ? 'secondary' : 'ghost'}
+              onClick={() => handleTogglePreviewReadAloud(previewText)}
+              title={previewReadBusy ? 'Stop reading' : 'Read preview aloud'}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              {previewReadBusy ? <MaterialSymbol name="stop_circle" size="sm" /> : <MaterialSymbol name="volume_up" size="sm" />}
+              <span>{previewReadBusy ? 'Stop' : 'Read aloud'}</span>
+            </Button>
+            <Button variant="ghost" onClick={() => {
+              if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
+              setPreviewReadBusy(false);
+              setShowPreviewModal(false);
+            }}>Close</Button>
           </ModalFooter>
         }
       >

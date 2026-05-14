@@ -8,6 +8,7 @@ import {
   getSpeechRecognitionLangCode,
 } from './scriptLanguageHelpers';
 import { scriptLanguageAPI } from '../../services/scriptLanguageAPI';
+import { MaterialSymbol } from '../../components/ui/MaterialSymbol';
 import styles from './ScriptLanguageAssistBar.module.scss';
 
 function labelForLang(code) {
@@ -55,13 +56,28 @@ export function ScriptLanguageAssistBar({
     [editorRef]
   );
 
-  const startBrowserRecognition = useCallback(() => {
+  const startBrowserRecognition = useCallback(async () => {
     const Rec = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
     if (!Rec) {
       setFormError('Speech recognition is not available in this browser. Try Chrome or Edge.');
       return;
     }
     clearError();
+
+    // Actively request microphone permission first to ensure it's not blocked
+    // and to trigger the native permission prompt if needed.
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Stop immediately, we just needed to trigger the prompt/verify access
+        stream.getTracks().forEach((t) => t.stop());
+      }
+    } catch (err) {
+      setMicBusy(false);
+      setFormError('Microphone access is required for dictation. Please allow it in your browser settings.');
+      return;
+    }
+
     const rec = new Rec();
     rec.lang = getSpeechRecognitionLangCode(scriptLocale);
     rec.interimResults = false;
@@ -78,7 +94,12 @@ export function ScriptLanguageAssistBar({
     rec.onerror = (ev) => {
       setMicBusy(false);
       recognitionRef.current = null;
-      const msg = ev.error === 'not-allowed' ? 'Microphone permission denied.' : `Speech recognition error: ${ev.error || 'unknown'}`;
+      let msg = `Speech recognition error: ${ev.error || 'unknown'}`;
+      if (ev.error === 'not-allowed') {
+        msg = 'Microphone permission denied. Please check your browser site settings or ensure the site is loaded securely.';
+      } else if (ev.error === 'network') {
+        msg = 'Network error during speech recognition. Check your connection.';
+      }
       setFormError(msg);
     };
     rec.onend = () => {
@@ -108,7 +129,15 @@ export function ScriptLanguageAssistBar({
     startBrowserRecognition();
   }, [clearError, micBusy, setFormError, startBrowserRecognition, stopBrowserRecognition]);
 
-  const readAloud = useCallback(() => {
+  const toggleReadAloud = useCallback(() => {
+    if (readBusy) {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      setReadBusy(false);
+      return;
+    }
+
     const text = stripHtml(scriptBody || '')
       .replace(/\u00a0/g, ' ')
       .replace(/\s+/g, ' ')
@@ -127,13 +156,15 @@ export function ScriptLanguageAssistBar({
     const u = new SpeechSynthesisUtterance(text);
     u.lang = getSpeechRecognitionLangCode(scriptLocale);
     u.onend = () => setReadBusy(false);
-    u.onerror = () => {
+    u.onerror = (e) => {
       setReadBusy(false);
-      setFormError('Speech synthesis failed.');
+      if (e.error !== 'canceled' && e.error !== 'interrupted') {
+        setFormError('Speech synthesis failed.');
+      }
     };
     setReadBusy(true);
     window.speechSynthesis.speak(u);
-  }, [clearError, scriptBody, scriptLocale, setFormError, stripHtml]);
+  }, [clearError, readBusy, scriptBody, scriptLocale, setFormError, stripHtml]);
 
   const handleLocaleChange = useCallback(
     (e) => {
@@ -196,25 +227,19 @@ export function ScriptLanguageAssistBar({
             onClick={toggleMic}
             title={micBusy ? 'Stop listening' : 'Dictate with browser speech recognition'}
           >
-            {micBusy ? 'Stop' : 'Voice'}
+            {micBusy ? <MaterialSymbol name="stop_circle" /> : <MaterialSymbol name="mic" />}
           </Button>
           <Button
             type="button"
-            variant="ghost"
+            variant={readBusy ? 'secondary' : 'ghost'}
             size="sm"
-            onClick={readAloud}
-            disabled={readBusy}
-            loading={readBusy}
-            title="Read script with browser speech synthesis"
+            onClick={toggleReadAloud}
+            title={readBusy ? 'Stop reading' : 'Read script with browser speech synthesis'}
           >
-            Read aloud
+            {readBusy ? <MaterialSymbol name="stop_circle" /> : <MaterialSymbol name="volume_up" />}
           </Button>
         </div>
       </div>
-      <p className={styles.hint}>
-        Voice and read aloud use the Web Speech API in your browser. Whole-script translation runs on the server
-        (LibreTranslate if configured, otherwise built-in NLLB).
-      </p>
 
       <ConfirmModal
         isOpen={!!langChange}

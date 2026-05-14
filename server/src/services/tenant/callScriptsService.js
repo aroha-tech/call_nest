@@ -31,7 +31,7 @@ async function callScriptCreatedByScopeClause(tenantId, manageAllScripts, acting
 
 export async function findAll(tenantId, includeInactive = false) {
   let sql = `
-    SELECT id, tenant_id, script_name, script_body, variables_used, status, is_default, created_by, created_at, updated_by, updated_at
+    SELECT id, tenant_id, script_name, script_language, script_body, variables_used, status, is_default, created_by, created_at, updated_by, updated_at
     FROM call_scripts
     WHERE tenant_id = ? AND is_deleted = 0
   `;
@@ -85,7 +85,7 @@ export async function findAllPaginated(
   const total = countRow.total;
 
   const rows = await query(
-    `SELECT cs.id, cs.tenant_id, cs.script_name, cs.script_body, cs.variables_used, cs.status, cs.is_default, cs.created_by, cs.created_at, cs.updated_by, cs.updated_at,
+    `SELECT cs.id, cs.tenant_id, cs.script_name, cs.script_language, cs.script_body, cs.variables_used, cs.status, cs.is_default, cs.created_by, cs.created_at, cs.updated_by, cs.updated_at,
             creator.name AS created_by_name, creator.role AS created_by_role
      FROM call_scripts cs
      LEFT JOIN users creator ON creator.id = cs.created_by AND creator.tenant_id = cs.tenant_id AND creator.is_deleted = 0
@@ -141,7 +141,7 @@ async function detectAndValidateVariables(scriptBody) {
 }
 
 export async function create(tenantId, data, createdBy) {
-  const { script_name, script_body, status = 1 } = data;
+  const { script_name, script_language, script_body, status = 1 } = data;
 
   if (!script_name || !script_body) {
     const err = new Error('script_name and script_body are required');
@@ -160,9 +160,9 @@ export async function create(tenantId, data, createdBy) {
   const variablesUsedJson = JSON.stringify(variables_used || []);
 
   const result = await query(
-    `INSERT INTO call_scripts (tenant_id, script_name, script_body, variables_used, status, is_default, created_by, updated_by)
-     VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
-    [tenantId, script_name.trim(), script_body, variablesUsedJson, status ? 1 : 0, createdBy, createdBy]
+    `INSERT INTO call_scripts (tenant_id, script_name, script_language, script_body, variables_used, status, is_default, created_by, updated_by)
+     VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    [tenantId, script_name.trim(), script_language || 'en', script_body, variablesUsedJson, status ? 1 : 0, createdBy, createdBy]
   );
 
   const row = await findById(tenantId, result.insertId);
@@ -184,7 +184,7 @@ export async function update(tenantId, id, data, updatedBy) {
     throw err;
   }
 
-  const { script_name, script_body, status } = data;
+  const { script_name, script_language, script_body, status } = data;
 
   let variables_used = script.variables_used;
   if (script_body !== undefined) {
@@ -204,6 +204,10 @@ export async function update(tenantId, id, data, updatedBy) {
   if (script_name !== undefined) {
     updates.push('script_name = ?');
     params.push(script_name.trim());
+  }
+  if (script_language !== undefined) {
+    updates.push('script_language = ?');
+    params.push(script_language);
   }
   if (script_body !== undefined) {
     updates.push('script_body = ?');
