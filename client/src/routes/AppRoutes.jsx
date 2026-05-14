@@ -76,6 +76,7 @@ import { MeetingAttendeeEmailSettingsPage } from '../pages/MeetingAttendeeEmailS
 import { BillingPage } from '../pages/BillingPage';
 import { PlatformBillingPage } from '../pages/PlatformBillingPage';
 import { PlatformTenantTelephonyPage } from '../pages/PlatformTenantTelephonyPage';
+import { PlatformTenantTelephonyTenantPage } from '../pages/PlatformTenantTelephonyTenantPage';
 import { TenantTelephonyPage } from '../pages/TenantTelephonyPage';
 import { TenantDomainHostGate } from './TenantDomainHostGate';
 import { EmailModuleGate } from '../features/email/EmailModuleGate';
@@ -965,6 +966,16 @@ function PlatformRoutes() {
           <ProtectedRoute>
             <AppShellLayout>
               <PlatformTenantTelephonyPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/telephony-billing/tenant/:tenantId"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <PlatformTenantTelephonyTenantPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

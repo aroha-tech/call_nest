@@ -20,6 +20,7 @@ import { useTemplateVariables } from '../../hooks/useTemplateVariables';
 import { renderPreview, linkify, linkifyHtml, stripHtml, DEFAULT_PREVIEW_DATA } from '../../utils/templateVariables';
 import { templateVariablesAPI } from '../../services/templateVariablesAPI';
 import { ScriptBodyEditor } from './ScriptBodyEditor';
+import { ScriptLanguageAssistBar } from './ScriptLanguageAssistBar';
 import styles from './CallScriptsPage.module.scss';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import { useTableLoadingState } from '../../hooks/useTableLoadingState';
@@ -94,6 +95,8 @@ export function CallScriptsPage() {
   const [myDefaultScriptId, setMyDefaultScriptId] = useState(null);
   const [myDefaultSaving, setMyDefaultSaving] = useState(false);
   const [viewScript, setViewScript] = useState(null);
+  /** ISO 639-1: script language for translation, dictation, and read-aloud */
+  const [scriptLocale, setScriptLocale] = useState('en');
   const editorRef = useRef(null);
 
   const fetchScripts = useCallback(async () => {
@@ -210,6 +213,7 @@ export function CallScriptsPage() {
     setScriptBody('');
     setEditorPlainText('');
     setEditorCursorIndex(0);
+    setScriptLocale('en');
     setShowPreviewModal(false);
     setFormError(null);
     setVariableSearch('');
@@ -222,6 +226,7 @@ export function CallScriptsPage() {
     setScriptBody(script.script_body || '');
     setEditorPlainText(stripHtml(script.script_body || ''));
     setEditorCursorIndex(0);
+    setScriptLocale('en');
     setShowPreviewModal(false);
     setFormError(null);
     setVariableSearch('');
@@ -506,6 +511,16 @@ export function CallScriptsPage() {
             />
             <p className={styles.fieldHint}>Give your script a clear and descriptive name.</p>
           </div>
+
+          <ScriptLanguageAssistBar
+            scriptBody={scriptBody}
+            setScriptBody={setScriptBody}
+            editorRef={editorRef}
+            scriptLocale={scriptLocale}
+            setScriptLocale={setScriptLocale}
+            stripHtml={stripHtml}
+            setFormError={setFormError}
+          />
 
           <div className={styles.bodyRow}>
             <div className={styles.bodyCol}>

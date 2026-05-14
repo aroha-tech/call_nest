@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -6,7 +7,7 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Checkbox } from '../components/ui/Checkbox';
 import { Alert } from '../components/ui/Alert';
-import { Modal } from '../components/ui/Modal';
+import { MaterialSymbol } from '../components/ui/MaterialSymbol';
 import { Badge } from '../components/ui/Badge';
 import { SearchInput } from '../components/ui/SearchInput';
 import {
@@ -61,6 +62,24 @@ const TOPUP_ENTRY_TYPE_OPTIONS = [
   { value: 'adjustment_credit', label: 'Adjustment credit' },
   { value: 'refund', label: 'Refund' },
 ];
+
+function SectionCard({ icon, title, description, actions, children, className = '' }) {
+  return (
+    <Card className={`${styles.sectionCard} ${className}`.trim()}>
+      <header className={styles.sectionCardHead}>
+        <span className={styles.sectionCardIcon} aria-hidden>
+          <MaterialSymbol name={icon} size="sm" />
+        </span>
+        <div className={styles.sectionCardHeadMain}>
+          <h2 className={styles.sectionCardTitle}>{title}</h2>
+          {description ? <p className={styles.sectionCardDesc}>{description}</p> : null}
+        </div>
+        {actions ? <div className={styles.sectionCardActions}>{actions}</div> : null}
+      </header>
+      {children}
+    </Card>
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /* Platform defaults card                                                     */
@@ -471,11 +490,16 @@ function ProviderAccountsSection({ tenant, onChanged, onError }) {
   }
 
   return (
-    <section className={styles.section}>
-      <div className={styles.sectionHead}>
-        <h4 className={styles.sectionTitle}>Provider accounts (BYO Exotel)</h4>
-        <Button size="sm" onClick={openNew}>+ Add account</Button>
-      </div>
+    <SectionCard
+      icon="hub"
+      title="Provider accounts (BYO Exotel)"
+      description="Connect tenant-owned Exotel credentials. In default account mode the platform Exotel is used; add accounts here for BYO mode."
+      actions={
+        <Button size="sm" onClick={openNew}>
+          + Add account
+        </Button>
+      }
+    >
       {loading && !accounts.length ? (
         <p className={styles.muted}>Loading…</p>
       ) : (
@@ -641,12 +665,12 @@ function ProviderAccountsSection({ tenant, onChanged, onError }) {
           </div>
         </Card>
       ) : null}
-    </section>
+    </SectionCard>
   );
 }
 
-/* ----- The main modal --------------------------------------------------- */
-function TenantBillingEditModal({ tenant, isOpen, onClose, onSaved }) {
+/* ----- Per-tenant billing detail (full page; was modal) ------------------- */
+export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMetaLoaded }) {
   const { formatDateTime } = useDateTimeDisplay();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -677,6 +701,12 @@ function TenantBillingEditModal({ tenant, isOpen, onClose, onSaved }) {
       ]);
       const billData = billRes.data?.data;
       setData(billData);
+      if (billData?.tenant && onTenantMetaLoaded) {
+        onTenantMetaLoaded({
+          name: billData.tenant.name,
+          slug: billData.tenant.slug,
+        });
+      }
       setDraft({
         telephony_account_mode: billData?.tenant?.telephony_account_mode || 'default_account',
         call_billing_mode: billData?.tenant?.call_billing_mode || 'credit',
@@ -708,12 +738,10 @@ function TenantBillingEditModal({ tenant, isOpen, onClose, onSaved }) {
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, onTenantMetaLoaded]);
 
   useEffect(() => {
-    if (isOpen) {
-      void loadEverything();
-    } else {
+    if (!tenant?.id) {
       setData(null);
       setDraft(null);
       setError(null);
@@ -722,8 +750,10 @@ function TenantBillingEditModal({ tenant, isOpen, onClose, onSaved }) {
       setTopupType('topup');
       setDebitAmount('');
       setDebitNote('');
+      return;
     }
-  }, [isOpen, loadEverything]);
+    void loadEverything();
+  }, [tenant?.id, loadEverything]);
 
   async function changePage(nextPage) {
     if (!tenant?.id) return;
@@ -837,20 +867,7 @@ function TenantBillingEditModal({ tenant, isOpen, onClose, onSaved }) {
   const totalPages = Math.max(1, Math.ceil((ledger.total || 0) / (ledger.limit || 10)));
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      size="lg"
-      title={tenant ? `Telephony billing — ${tenant.name || tenant.slug}` : 'Tenant telephony billing'}
-      subtitle={tenant ? `tenant #${tenant.id}` : null}
-      footer={
-        <div className={styles.modalFooter}>
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-      }
-    >
+    <div className={styles.detailPage}>
       {error ? (
         <Alert variant="error" className={styles.alertGap}>
           {error}
@@ -860,13 +877,25 @@ function TenantBillingEditModal({ tenant, isOpen, onClose, onSaved }) {
       {loading || !draft || !data ? (
         <p className={styles.muted}>Loading…</p>
       ) : (
-        <div className={styles.modalBody}>
-          {/* Adaptive stats row — wallet for credit; cap+usage for unlimited. */}
-          <WalletOrUnlimitedStats data={data} />
+        <>
+          <SectionCard
+            icon="account_balance_wallet"
+            title="Billing snapshot"
+            description="Wallet balance, lifetime top-ups and spend, and recent call usage. Values reflect the tenant’s current billing mode."
+          >
+            <WalletOrUnlimitedStats data={data} />
+          </SectionCard>
 
-          {/* Modes + per-tenant overrides */}
-          <section className={styles.section}>
-            <h4 className={styles.sectionTitle}>Modes & overrides</h4>
+          <SectionCard
+            icon="tune"
+            title="Modes & overrides"
+            description="Telephony account source (platform vs BYO), credit vs unlimited billing, and optional numeric overrides."
+            actions={
+              <Button onClick={saveBilling} disabled={saving}>
+                {saving ? 'Saving…' : 'Save tenant config'}
+              </Button>
+            }
+          >
             <div className={styles.formGrid}>
               <Select
                 label="Telephony account mode"
@@ -945,24 +974,20 @@ function TenantBillingEditModal({ tenant, isOpen, onClose, onSaved }) {
                 />
               )}
             </div>
-            <div className={styles.sectionActions}>
-              <Button onClick={saveBilling} disabled={saving}>
-                {saving ? 'Saving…' : 'Save tenant config'}
-              </Button>
-            </div>
-          </section>
+          </SectionCard>
 
-          {/* BYO provider accounts */}
           <ProviderAccountsSection
             tenant={tenant}
             onChanged={loadEverything}
             onError={setError}
           />
 
-          {/* Manual wallet operations — only meaningful for credit mode. */}
           {isCredit ? (
-            <section className={styles.section}>
-              <h4 className={styles.sectionTitle}>Manual wallet operations</h4>
+            <SectionCard
+              icon="payments"
+              title="Manual wallet operations"
+              description="Add credits or post a manual debit. Amounts are in paise (₹1 = 100 paise)."
+            >
               <div className={styles.opsGrid}>
                 <Card className={styles.opCard}>
                   <div className={styles.opTitle}>Add credits</div>
@@ -1017,13 +1042,15 @@ function TenantBillingEditModal({ tenant, isOpen, onClose, onSaved }) {
                   </div>
                 </Card>
               </div>
-            </section>
+            </SectionCard>
           ) : null}
 
-          {/* Ledger — credit mode only (unlimited mode never debits the wallet). */}
           {isCredit ? (
-            <section className={styles.section}>
-              <h4 className={styles.sectionTitle}>Ledger</h4>
+            <SectionCard
+              icon="receipt_long"
+              title="Ledger"
+              description="Recent wallet movements: top-ups, per-minute debits, and adjustments."
+            >
               <Table>
                 <TableHead>
                   <TableRow>
@@ -1071,30 +1098,33 @@ function TenantBillingEditModal({ tenant, isOpen, onClose, onSaved }) {
                 onPageChange={(p) => { if (!ledgerBusy) changePage(p); }}
                 hidePageSize
               />
-            </section>
+            </SectionCard>
           ) : null}
 
           {isUnlimited ? (
-            <section className={styles.section}>
-              <h4 className={styles.sectionTitle}>About unlimited mode</h4>
+            <SectionCard
+              icon="info"
+              title="About unlimited mode"
+              description="How billing behaves when the tenant is not on per-minute wallet debit."
+            >
               <p className={styles.muted}>
                 Calls are not debited from the wallet on this plan. Usage is still tracked
                 (minutes &amp; calls) and the monthly cap above blocks new calls once exceeded.
                 If you want this tenant to pay per minute instead, switch{' '}
                 <strong>Call billing mode</strong> to <strong>Credit</strong> and add credits.
               </p>
-            </section>
+            </SectionCard>
           ) : null}
-        </div>
+        </>
       )}
-    </Modal>
+    </div>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/* Tenant list (drives the modal)                                             */
+/* Tenant list → opens dedicated billing page                                 */
 /* -------------------------------------------------------------------------- */
-function TenantBillingList({ refreshKey, onOpenTenant }) {
+function TenantBillingList({ onOpenTenant }) {
   const [tenants, setTenants] = useState([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -1123,7 +1153,7 @@ function TenantBillingList({ refreshKey, onOpenTenant }) {
 
   useEffect(() => {
     void load();
-  }, [load, refreshKey]);
+  }, [load]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -1133,7 +1163,7 @@ function TenantBillingList({ refreshKey, onOpenTenant }) {
         <div>
           <h3 className={styles.cardTitle}>Tenants</h3>
           <p className={styles.cardSub}>
-            Click a tenant to edit telephony mode, billing mode, BYO Exotel accounts, rate
+            Open a tenant to edit telephony mode, billing mode, BYO Exotel accounts, rate
             overrides, monthly cap, and manage their call credit wallet.
           </p>
         </div>
@@ -1208,8 +1238,7 @@ function TenantBillingList({ refreshKey, onOpenTenant }) {
 /* -------------------------------------------------------------------------- */
 export function PlatformTenantTelephonyPage() {
   const [error, setError] = useState(null);
-  const [editingTenant, setEditingTenant] = useState(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const navigate = useNavigate();
 
   return (
     <div className={styles.page}>
@@ -1223,15 +1252,11 @@ export function PlatformTenantTelephonyPage() {
       <PlatformDefaultsCard onError={setError} />
 
       <TenantBillingList
-        refreshKey={refreshKey}
-        onOpenTenant={setEditingTenant}
-      />
-
-      <TenantBillingEditModal
-        tenant={editingTenant}
-        isOpen={!!editingTenant}
-        onClose={() => setEditingTenant(null)}
-        onSaved={() => setRefreshKey((k) => k + 1)}
+        onOpenTenant={(t) =>
+          navigate(`/admin/telephony-billing/tenant/${t.id}`, {
+            state: { name: t.name, slug: t.slug },
+          })
+        }
       />
     </div>
   );

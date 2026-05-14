@@ -277,3 +277,87 @@
   gap: 16px;
   margin-top: 8px;
 }
+
+/* ---------- full-page tenant billing detail ---------- */
+.detailPage {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sectionCard {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sectionCardHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.sectionCardIcon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(168, 85, 247, 0.1));
+  border: 1px solid rgba(99, 102, 241, 0.28);
+  color: var(--color-text-primary, #e2e8f0);
+}
+
+.sectionCardHeadMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.sectionCardTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.sectionCardDesc {
+  margin: 6px 0 0;
+  font-size: 0.88rem;
+  opacity: 0.72;
+  line-height: 1.45;
+}
+
+.sectionCardActions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+}
+
+.providerSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.providerSectionHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.providerSectionTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.providerSectionTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}

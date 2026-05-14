@@ -219,6 +219,25 @@ export const env = {
    * JWT-derived key with a console warning. See server/src/utils/secretCrypto.js.
    */
   appEncryptionKey: (process.env.APP_ENCRYPTION_KEY || '').trim(),
+
+  /**
+   * Self-hosted call script language helpers (LibreTranslate + optional ASR/TTS HTTP proxies).
+   */
+  scriptLanguage: {
+    /** e.g. http://localhost:5000 — LibreTranslate /translate (optional; built-in NLLB runs in Node when unset) */
+    libretranslateBaseUrl: (process.env.LIBRETRANSLATE_BASE_URL || '').trim(),
+    libretranslateApiKey: (process.env.LIBRETRANSLATE_API_KEY || '').trim(),
+    /** POST multipart with field "audio" (+ optional "language"); JSON response { text } */
+    asrProxyUrl: (process.env.SCRIPT_ASR_URL || '').trim(),
+    /** POST JSON { text, locale }; response raw audio (wav/mp3/…) */
+    ttsProxyUrl: (process.env.SCRIPT_TTS_URL || '').trim(),
+    /**
+     * When true, in-process Transformers.js translation is disabled; set LIBRETRANSLATE_BASE_URL to translate.
+     */
+    disableBuiltinTranslation:
+      String(process.env.DISABLE_BUILTIN_SCRIPT_TRANSLATION || '').toLowerCase() === '1' ||
+      String(process.env.DISABLE_BUILTIN_SCRIPT_TRANSLATION || '').toLowerCase() === 'true',
+  },
 };
 
 /**

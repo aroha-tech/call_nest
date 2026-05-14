@@ -39,6 +39,7 @@ import dispositionActionsMapRoutes from './routes/tenant/dispositionActionsMap.j
 import emailTemplatesRoutes from './routes/tenant/emailTemplates.js';
 import whatsappTemplatesRoutes from './routes/tenant/whatsappTemplates.js';
 import callScriptsRoutes from './routes/tenant/callScripts.js';
+import scriptLanguageRoutes from './routes/tenant/scriptLanguage.js';
 import contactsRoutes from './routes/tenant/contacts.js';
 import contactBlacklistRoutes from './routes/tenant/contactBlacklist.js';
 import contactTagsRoutes from './routes/tenant/contactTags.js';
@@ -194,6 +195,7 @@ app.use('/api/tenant/disposition-actions', dispositionActionsMapRoutes);
 app.use('/api/tenant/email-templates', emailTemplatesRoutes);
 app.use('/api/tenant/whatsapp-templates', whatsappTemplatesRoutes);
 app.use('/api/tenant/call-scripts', callScriptsRoutes);
+app.use('/api/tenant/script-language', scriptLanguageRoutes);
 app.use('/api/tenant/users', tenantUsersRoutes);
 app.use('/api/tenant/company', tenantCompanyRoutes);
 app.use('/api/tenant/lead-import-distribution', leadImportDistributionRoutes);
