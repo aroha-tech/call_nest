@@ -16,11 +16,13 @@ import { contactsAPI } from '../../services/contactsAPI';
 import { backgroundJobsAPI } from '../../services/backgroundJobsAPI';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
+import { leadImportDistributionAPI } from '../../services/leadImportDistributionAPI';
 import {
   DEFAULT_PHONE_COUNTRY_CODE,
   getCallingCodeOptionsForSelect,
   normalizeCallingCode,
 } from '../../utils/phoneInput';
+import { AI_ASSISTANT_DISPLAY_NAME } from '../../config/productBrand';
 import listStyles from '../../components/admin/adminDataList.module.scss';
 import styles from './ContactImportPage.module.scss';
 import { BackgroundJobProgressModal } from '../../components/backgroundJobs/BackgroundJobProgressModal';
@@ -131,6 +133,10 @@ export function ContactImportPage({ type }) {
   const [importManagerId, setImportManagerId] = useState('');
   const [importAssignedUserId, setImportAssignedUserId] = useState('');
 
+  /** Workspace lead assignment mode — only used when `type === 'lead'`. */
+  const [leadImportAssignmentMode, setLeadImportAssignmentMode] = useState(null);
+  const [leadImportDistLoading, setLeadImportDistLoading] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
@@ -178,6 +184,46 @@ export function ContactImportPage({ type }) {
       cancelled = true;
     };
   }, [user?.id, user?.isPlatformAdmin]);
+
+  useEffect(() => {
+    if (type !== 'lead' || !canSetImportOwnership) {
+      setLeadImportAssignmentMode(null);
+      setLeadImportDistLoading(false);
+      return;
+    }
+    if (user?.isPlatformAdmin) {
+      setLeadImportAssignmentMode('manual');
+      setLeadImportDistLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLeadImportDistLoading(true);
+    (async () => {
+      try {
+        const res = await leadImportDistributionAPI.get();
+        const data = res?.data?.data;
+        const raw = data?.default_assignment_mode;
+        const m = String(raw || 'manual').toLowerCase();
+        const norm = m === 'weighted' || m === 'ai' ? m : 'manual';
+        if (!cancelled) setLeadImportAssignmentMode(norm);
+      } catch {
+        if (!cancelled) setLeadImportAssignmentMode('manual');
+      } finally {
+        if (!cancelled) setLeadImportDistLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [type, canSetImportOwnership, user?.isPlatformAdmin, user?.id]);
+
+  useEffect(() => {
+    if (type !== 'lead') return;
+    if (leadImportAssignmentMode === 'weighted' || leadImportAssignmentMode === 'ai') {
+      setImportManagerId('');
+      setImportAssignedUserId('');
+    }
+  }, [type, leadImportAssignmentMode]);
 
   const importSampleBundle = useMemo(
     () =>
@@ -285,7 +331,12 @@ export function ContactImportPage({ type }) {
   }, [tenantUsers, user, importManagerId]);
 
   const hasPreview = !!preview && Array.isArray(preview.columns);
-  const canPreview = !!file && !loading;
+  /** Lead imports: default manager/agent only when workspace mode is Manual (spread / X AI use Settings → Lead import). */
+  const ownershipPickersForRequest =
+    canSetImportOwnership && (type !== 'lead' || leadImportAssignmentMode === 'manual');
+  const leadImportModeBlockingStep1 =
+    type === 'lead' && canSetImportOwnership && !user?.isPlatformAdmin && leadImportDistLoading;
+  const canPreview = !!file && !loading && !leadImportModeBlockingStep1;
   const canSubmit = !!file && hasPreview && !!reviewData && !loading && !resolvingPreview;
 
   const importStepper = useMemo(() => {
@@ -300,11 +351,15 @@ export function ContactImportPage({ type }) {
   }, [file, hasPreview, result]);
 
   const importSettingsHelpMessage = useMemo(() => {
-    const base =
-      'Duplicates are matched by email. Optional default manager and agent apply when a row does not set them; column mapping always wins.';
-    if (type !== 'lead') return base;
-    return `${base} Automatic lead assignment (percentages or smart routing) is configured under Settings → Lead import.`;
-  }, [type]);
+    const baseDup = 'Duplicates are matched by email. Column mapping always wins for per-row values.';
+    if (type !== 'lead') {
+      return `${baseDup} Optional default manager and agent apply when a row does not set them.`;
+    }
+    if (leadImportAssignmentMode === 'manual' || leadImportAssignmentMode === null) {
+      return `${baseDup} Optional default manager and agent apply when a row does not set them. How automatic spread or ${AI_ASSISTANT_DISPLAY_NAME} routing works is configured under Settings → Lead import.`;
+    }
+    return `${baseDup} Lead owner assignment uses Settings → Lead import (spread by share or ${AI_ASSISTANT_DISPLAY_NAME}). Default manager/agent on this screen are hidden in that mode.`;
+  }, [type, leadImportAssignmentMode]);
 
   const resetFileAndPreview = () => {
     setPreview(null);
@@ -586,10 +641,10 @@ export function ContactImportPage({ type }) {
         if (tag_ids.length > 0) {
           formData.append('tag_ids', JSON.stringify(tag_ids));
         }
-        if (canSetImportOwnership && importManagerId) {
+        if (ownershipPickersForRequest && importManagerId) {
           formData.append('import_manager_id', String(importManagerId));
         }
-        if (canSetImportOwnership && importAssignedUserId) {
+        if (ownershipPickersForRequest && importAssignedUserId) {
           formData.append('import_assigned_user_id', String(importAssignedUserId));
         }
 
@@ -613,9 +668,9 @@ export function ContactImportPage({ type }) {
           default_country_code: normalizeCallingCode(defaultCountryCode || DEFAULT_PHONE_COUNTRY_CODE),
           mapping,
           tag_ids: tag_ids.length > 0 ? tag_ids : undefined,
-          import_manager_id: canSetImportOwnership && importManagerId ? importManagerId : undefined,
+          import_manager_id: ownershipPickersForRequest && importManagerId ? importManagerId : undefined,
           import_assigned_user_id:
-            canSetImportOwnership && importAssignedUserId ? importAssignedUserId : undefined,
+            ownershipPickersForRequest && importAssignedUserId ? importAssignedUserId : undefined,
         });
         setResult(res?.data || null);
       }
@@ -807,7 +862,7 @@ export function ContactImportPage({ type }) {
                       }}
                       placeholder="Select tags…"
                     />
-                    {canSetImportOwnership ? (
+                    {canSetImportOwnership && ownershipPickersForRequest ? (
                       <div className={styles.grid2}>
                         {user?.role !== 'manager' ? (
                           <Select
@@ -830,9 +885,22 @@ export function ContactImportPage({ type }) {
                     ) : null}
                     {type === 'lead' && canSetImportOwnership ? (
                       <div className={styles.footerNote} style={{ marginTop: 10 }}>
-                        Automatic lead assignment is set under{' '}
-                        <Link to="/settings/lead-import">Settings → Lead import</Link>. The default agent here applies
-                        when the workspace rule is manual or the row has no assignee column.
+                        {leadImportAssignmentMode === 'manual' ? (
+                          <>
+                            Spread-by-share and {AI_ASSISTANT_DISPLAY_NAME} routing are configured under{' '}
+                            <Link to="/settings/lead-import">Settings → Lead import</Link>. The defaults above apply when
+                            the workspace rule is <strong>manual</strong> and the row has no assignee column (mapped
+                            assignee always wins).
+                          </>
+                        ) : leadImportDistLoading ? (
+                          <>Loading lead assignment settings…</>
+                        ) : (
+                          <>
+                            Leads are assigned from your pool under{' '}
+                            <Link to="/settings/lead-import">Settings → Lead import</Link> (spread by share or{' '}
+                            {AI_ASSISTANT_DISPLAY_NAME}). Default manager and agent are not used in that mode.
+                          </>
+                        )}
                       </div>
                     ) : null}
                   </div>
@@ -1201,8 +1269,8 @@ export function ContactImportPage({ type }) {
                 {type === 'lead' && canSetImportOwnership ? (
                   <div style={{ marginTop: 6 }}>
                     <b>Lead assignment</b>: open{' '}
-                    <Link to="/settings/lead-import">Settings → Lead import</Link> to choose manual, percentage spread,
-                    or smart routing for new leads.
+                    <Link to="/settings/lead-import">Settings → Lead import</Link> to choose manual, split by share, or
+                    smart routing for new leads.
                   </div>
                 ) : null}
               </div>

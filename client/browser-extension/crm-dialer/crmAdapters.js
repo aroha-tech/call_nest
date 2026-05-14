@@ -1,5 +1,5 @@
 // Global adapter registry for CRM-specific extraction.
-// Exposed as window.CallNestCrmAdapters so content.js can use it without bundling.
+// Exposed as window.CallNestCrmAdapters (legacy global name) so content.js can use it without bundling.
 (function initCallNestCrmAdapters() {
   const HOST_MAP = {
     'zoho.com': 'zoho_crm',

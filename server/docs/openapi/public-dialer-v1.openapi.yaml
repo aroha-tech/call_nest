@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: Call Nest Public Dialer API v1
+  title: CallXTime Public Dialer API v1
   version: "1.0.0"
   description: |
-    CRM-agnostic public API v1 for integrating external CRMs with Call Nest dialer.
+    CRM-agnostic public API v1 for integrating external CRMs with the CallXTime dialer.
     All endpoints require API-key auth via `x-api-key` header.
 servers:
   - url: https://your-domain.com
@@ -193,7 +193,7 @@ paths:
   /api/public/v1/dialer/providers/zoho/contacts/sync:
     post:
       tags: [Zoho]
-      summary: Sync Zoho contacts into Call Nest
+      summary: Sync Zoho contacts into CallXTime
       requestBody:
         required: true
         content:

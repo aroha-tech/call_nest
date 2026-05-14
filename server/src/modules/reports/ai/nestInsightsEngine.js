@@ -1,11 +1,11 @@
 /**
- * Call Nest — Nest Insights (on-server intelligence)
+ * CallXTime — X Insights (on-server intelligence)
  * Deterministic rules + explainable signals. No third-party AI services.
  * Product-facing "AI" guidance lives here; tune rules without touching SQL.
  */
 
-export const NEST_INSIGHTS_ENGINE_ID = 'nest-insights';
-export const NEST_INSIGHTS_VERSION = '1.0.0';
+export const X_INSIGHTS_ENGINE_ID = 'x-insights';
+export const X_INSIGHTS_VERSION = '1.0.1';
 
 const SEVERITY_RANK = { action: 3, watch: 2, info: 1 };
 
@@ -55,7 +55,7 @@ function pushInsight(list, insight) {
  * @param {object} params.thresholds
  * @param {Array<object>} params.summaryRows - getRolewiseSummary rows (agents in scope)
  */
-export function buildNestInsights({ role, kpiCurrent, kpiPrevious, summaryRows = [], thresholds = {} }) {
+export function buildXInsights({ role, kpiCurrent, kpiPrevious, summaryRows = [], thresholds = {} }) {
   const insights = [];
   const minDialSamples = n(thresholds.min_dial_samples, 40);
   const connectFloor = n(thresholds.connect_rate_floor, 0.12);
@@ -233,8 +233,8 @@ export function buildNestInsights({ role, kpiCurrent, kpiPrevious, summaryRows =
   insights.sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] || b.confidence - a.confidence);
 
   return {
-    engine: NEST_INSIGHTS_ENGINE_ID,
-    version: NEST_INSIGHTS_VERSION,
+    engine: X_INSIGHTS_ENGINE_ID,
+    version: X_INSIGHTS_VERSION,
     generated_at: new Date().toISOString(),
     role: role || 'agent',
     insights,

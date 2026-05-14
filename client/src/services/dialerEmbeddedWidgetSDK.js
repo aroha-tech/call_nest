@@ -7,7 +7,7 @@ export function createEmbeddedWidgetSDK({ baseUrl, apiKey, targetWindow = window
     if (!targetWindow || typeof targetWindow.postMessage !== 'function') return;
     targetWindow.postMessage(
       {
-        source: 'callnest-widget',
+        source: 'callxtime-widget',
         event,
         payload,
       },

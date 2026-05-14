@@ -1,7 +1,7 @@
 {
   "name": "call-nest-server",
   "version": "1.0.0",
-  "description": "Call Nest API — calling + CRM backend",
+  "description": "CallXTime API — calling + CRM backend",
   "main": "src/app.js",
   "type": "module",
   "scripts": {

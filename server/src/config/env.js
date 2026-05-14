@@ -91,7 +91,7 @@ export const env = {
     database: process.env.DB_NAME || 'call_nest',
   },
   superAdmin: {
-    email: process.env.SUPER_ADMIN_EMAIL || 'admin@callnest.com',
+    email: process.env.SUPER_ADMIN_EMAIL || 'admin@callxtime.com',
     password: process.env.SUPER_ADMIN_PASSWORD || 'ChangeMe123!',
   },
   /** Optional. Full URL for WhatsApp status webhook (e.g. ngrok). Used when account has no webhook_url set. */

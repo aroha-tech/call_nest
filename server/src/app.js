@@ -4,6 +4,7 @@ import cors from 'cors';
 import authRoutes from './routes/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { env } from './config/env.js';
+import { PRODUCT_DISPLAY_NAME } from './config/productBrand.js';
 import { initRedis } from './config/redis.js';
 import { tenantResolver } from './middleware/tenantResolver.js';
 import publicRoutes from './routes/publicRoutes.js';
@@ -249,7 +250,7 @@ async function start() {
   }
 
   httpServer.listen(port, () => {
-    console.log(`Call Nest API listening on port ${port}`);
+    console.log(`${PRODUCT_DISPLAY_NAME} API listening on port ${port}`);
     console.log(`Environment: ${env.appEnv}`);
     startTenantBackgroundJobWorker();
     startMeetingReminderFeedbackWorker();

@@ -1,12 +1,12 @@
-# Postman Collection for Call Nest API
+# Postman collection for CallXTime API
 
-Ready-to-import Postman collection and environment files for testing Call Nest API.
+Ready-to-import Postman collection and environment files for testing the CallXTime API.
 
 ## 📁 Files
 
-- **`Call Nest API.postman_collection.json`** - Main API collection with all endpoints
-- **`Call Nest - Local.postman_environment.json`** - Local development environment
-- **`Call Nest - Production.postman_environment.json`** - Production environment template
+- **`CallXTime API.postman_collection.json`** — Main API collection with all endpoints
+- **`CallXTime - Local.postman_environment.json`** — Local development environment
+- **`CallXTime - Production.postman_environment.json`** — Production environment template
 
 ## 🚀 Quick Start
 
@@ -14,16 +14,16 @@ Ready-to-import Postman collection and environment files for testing Call Nest A
 
 1. Open Postman
 2. Click **Import** button (top left)
-3. Select **`Call Nest API.postman_collection.json`**
+3. Select **`CallXTime API.postman_collection.json`**
 4. Click **Import**
 
 ### 2. Import Environment
 
 1. Click **Environments** (left sidebar)
 2. Click **Import**
-3. Select **`Call Nest - Local.postman_environment.json`**
+3. Select **`CallXTime - Local.postman_environment.json`**
 4. Click **Import**
-5. Select **"Call Nest - Local"** from environment dropdown (top right)
+5. Select **"CallXTime - Local"** from environment dropdown (top right)
 
 ### 3. Update Environment Variables
 
@@ -58,7 +58,7 @@ Edit environment variables if needed:
 - **Body:**
   ```json
   {
-    "email": "admin@callnest.com",
+    "email": "admin@callxtime.com",
     "password": "ChangeMe123!"
   }
   ```

@@ -1,6 +1,6 @@
 # Database Migrations
 
-Schema migrations for upgrading existing Call Nest databases.
+Schema migrations for upgrading existing CallXTime (`call_nest`) databases.
 
 ## Migrations (run in order)
 

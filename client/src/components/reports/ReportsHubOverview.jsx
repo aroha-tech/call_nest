@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { reportsHubAPI } from '../../services/reportsHubAPI';
-import { NestInsightsPanel } from './NestInsightsPanel';
+import { AI_INSIGHTS_DISPLAY_NAME } from '../../config/productBrand';
+import { XInsightsPanel } from './XInsightsPanel';
 import { MaterialSymbol } from '../ui/MaterialSymbol';
 import styles from './ReportsHubOverview.module.scss';
 
@@ -171,7 +172,7 @@ export function ReportsHubOverview({
 
       {!simpleMode ? (
         <div className={styles.split}>
-          <NestInsightsPanel bundle={insightsBundle} loading={loading} error="" />
+          <XInsightsPanel bundle={insightsBundle} loading={loading} error="" />
           <div className={styles.side}>
             {canViewTeam && teams?.teams?.length ? (
               <div className={styles.sideBlock}>
@@ -215,12 +216,13 @@ export function ReportsHubOverview({
         </div>
       ) : advancedAvailableForTenant ? (
         <p className={styles.simpleHint}>
-          Switch to <strong>Advanced reports</strong> for Nest Insights (AI guidance), manager team rollups, agent
-          leaderboards, period compare, and the full performance detail workspace.
+          Switch to <strong>Advanced reports</strong> for {AI_INSIGHTS_DISPLAY_NAME} (AI guidance), manager team rollups,
+          agent leaderboards, period compare, and the full performance detail workspace.
         </p>
       ) : (
         <p className={styles.simpleHint}>
-          Advanced mode adds AI insights (Nest Insights), team rollups, leaderboards, and the full performance detail
+          Advanced mode adds AI insights ({AI_INSIGHTS_DISPLAY_NAME}), team rollups, leaderboards, and the full
+          performance detail
           workspace. Your administrator can enable it for this organization in platform settings.
         </p>
       )}

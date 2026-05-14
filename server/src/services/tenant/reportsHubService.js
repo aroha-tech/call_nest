@@ -5,7 +5,7 @@ import {
   buildManagerTeamFilter,
   PERF_REPORTS_AGENT_ROLE_SQL,
 } from '../../modules/reports/reportsScope.js';
-import { buildNestInsights } from '../../modules/reports/ai/index.js';
+import { buildXInsights } from '../../modules/reports/ai/index.js';
 import * as taskManagerService from './taskManagerService.js';
 
 function num(v, d = 0) {
@@ -376,7 +376,7 @@ export async function getLeaderboard(tenantId, actingUser, queryParams) {
   };
 }
 
-export async function getNestInsightsBundle(tenantId, actingUser, queryParams) {
+export async function getXInsightsBundle(tenantId, actingUser, queryParams) {
   const period = resolveReportingPeriod(queryParams || {});
   const managerId = queryParams.manager_id ?? queryParams.managerId;
   const cfg = await taskManagerService.getScoringSettings(tenantId);
@@ -402,7 +402,7 @@ export async function getNestInsightsBundle(tenantId, actingUser, queryParams) {
   ]);
 
   const role = String(actingUser?.role || 'agent').toLowerCase();
-  const insights = buildNestInsights({
+  const insights = buildXInsights({
     role,
     kpiCurrent,
     kpiPrevious,

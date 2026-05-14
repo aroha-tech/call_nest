@@ -1,6 +1,6 @@
-# Call Nest Database Schema
+# CallXTime Database Schema
 
-Complete database schema for the Call Nest CRM application.
+Complete database schema for the CallXTime CRM application.
 
 ## Folder Structure
 

@@ -17,6 +17,7 @@ import {
 } from '../features/auth/utils/slugUtils';
 import { useMutation } from '../hooks/useAsyncData';
 import { InfoHelpIcon, infoHelpHeadingRowClassName } from '../components/ui/InfoHelpIcon';
+import { AI_INSIGHTS_DISPLAY_NAME } from '../config/productBrand';
 import styles from './TenantFormPage.module.scss';
 
 function emptyThemeFormFields() {
@@ -720,7 +721,7 @@ export function TenantFormPage() {
                 <InfoHelpIcon
                   title="Advanced reports"
                   modalTitle="Advanced reports"
-                  message="When off (default), tenant users only see Simple reports: core KPI cards. When on, they can open Advanced reports: Nest Insights (AI), team rollups, leaderboards, period compare, performance detail, coaching, scoring, and CSV export."
+                  message={`When off (default), tenant users only see Simple reports: core KPI cards. When on, they can open Advanced reports: ${AI_INSIGHTS_DISPLAY_NAME} (AI), team rollups, leaderboards, period compare, performance detail, coaching, scoring, and CSV export.`}
                 />
               }
             >

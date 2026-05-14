@@ -1,6 +1,6 @@
-# Call Nest Server — Backend API
+# CallXTime Server — Backend API
 
-Node.js + Express backend for Call Nest SaaS (calling + CRM).
+Node.js + Express backend for CallXTime (calling + CRM).
 
 ## Setup
 

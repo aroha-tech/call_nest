@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
+import { PRODUCT_DISPLAY_NAME } from '../config/productBrand';
 import styles from './AuthLayout.module.scss';
 
 function useAuthHeroMode() {
@@ -61,7 +62,7 @@ export function AuthLayout() {
             text: 'Roles for admins, managers, and agents.',
           },
         ],
-        foot: `© ${year} Call Nest. Architected for the Obsidian Sanctuary.`,
+        foot: `© ${year} ${PRODUCT_DISPLAY_NAME}. Architected for the Obsidian Sanctuary.`,
       };
     }
 
@@ -97,7 +98,7 @@ export function AuthLayout() {
           text: 'Cadences, lists, and outcomes tied to your revenue motion.',
         },
       ],
-      foot: `© ${year} Call Nest. Architected for the Obsidian Sanctuary.`,
+      foot: `© ${year} ${PRODUCT_DISPLAY_NAME}. Architected for the Obsidian Sanctuary.`,
     };
   }, [mode, year]);
 
@@ -105,11 +106,11 @@ export function AuthLayout() {
     <div className={`${styles.wrapper} ${mode === 'register' ? styles.wrapperRegister : ''}`}>
       <aside
         className={`${styles.hero} ${mode === 'register' ? styles.heroRegister : styles.heroLogin}`}
-        aria-label="Call Nest"
+        aria-label={PRODUCT_DISPLAY_NAME}
       >
         <div className={styles.heroTop}>
           <Link to="/" className={styles.logoLink}>
-            Call Nest
+            {PRODUCT_DISPLAY_NAME}
           </Link>
         </div>
         <div className={styles.heroMain}>

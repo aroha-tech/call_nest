@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { query } from '../../config/db.js';
-import { pickNestSmartAgentFromLead } from '../../modules/reports/ai/leadImportRoutingEngine.js';
+import { pickXAiSmartAgentFromLead } from '../../modules/reports/ai/leadImportRoutingEngine.js';
 
 /** @typedef {{ user_id: number; weight: number }} PoolEntry */
 
@@ -258,7 +258,7 @@ export async function createImportLeadAssigner({
       }
       if (mode === 'ai') {
         const id =
-          pickNestSmartAgentFromLead(ctx, pool, meta) ?? pickHashStableFromPool(pool, ctx);
+          pickXAiSmartAgentFromLead(ctx, pool, meta) ?? pickHashStableFromPool(pool, ctx);
         return { assigned_user_id: id, manager_id: managerByAgent.get(id) ?? null };
       }
       return { assigned_user_id: null, manager_id: null };
@@ -317,6 +317,8 @@ export async function updateLeadImportDistributionForApi(tenantId, user, body) {
     }
     if (body?.default_pool !== undefined) {
       next.default_pool = normalizePoolEntries(body.default_pool);
+      // One company-wide list in the UI; drop legacy per-manager rows so imports use default_pool (filtered by team when needed).
+      next.by_manager = {};
     }
     if (body?.by_manager !== undefined && typeof body.by_manager === 'object' && body.by_manager !== null) {
       const entries = Object.entries(body.by_manager);

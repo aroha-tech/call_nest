@@ -1,5 +1,6 @@
 import webpush from 'web-push';
 import { env } from '../../config/env.js';
+import { PRODUCT_DISPLAY_NAME } from '../../config/productBrand.js';
 import { query } from '../../config/db.js';
 
 let vapidConfigured = false;
@@ -33,7 +34,7 @@ export async function sendPushToUserSubscriptions(tenantId, userId, payload) {
   if (!rows.length) return;
 
   const body = JSON.stringify({
-    title: payload?.title || 'Call Nest',
+    title: payload?.title || PRODUCT_DISPLAY_NAME,
     body: payload?.body || '',
     cta_path: payload?.cta_path || '/notifications',
     tag: payload?.tag || `notif-${payload?.id || Date.now()}`,

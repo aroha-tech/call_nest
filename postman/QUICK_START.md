@@ -28,7 +28,7 @@
    DB_PASSWORD=your_password
    DB_NAME=call_nest
    
-   SUPER_ADMIN_EMAIL=admin@callnest.com
+   SUPER_ADMIN_EMAIL=admin@callxtime.com
    SUPER_ADMIN_PASSWORD=ChangeMe123!
    ```
 
@@ -123,11 +123,11 @@ Server should start on `http://localhost:4000`
 
 1. Open Postman
 2. **Import Collection:**
-   - Click **Import** → Select `Call Nest API.postman_collection.json`
+   - Click **Import** → Select `CallXTime API.postman_collection.json`
 3. **Import Environment:**
-   - Click **Environments** → **Import** → Select `Call Nest - Local.postman_environment.json`
+   - Click **Environments** → **Import** → Select `CallXTime - Local.postman_environment.json`
 4. **Select Environment:**
-   - Choose **"Call Nest - Local"** from dropdown (top right)
+   - Choose **"CallXTime - Local"** from dropdown (top right)
 
 ## Step 6: Test APIs
 
@@ -138,7 +138,7 @@ Server should start on `http://localhost:4000`
 
 2. **Login** (`POST /api/auth/login`)
    - Use super admin credentials:
-     - Email: `admin@callnest.com` (from `.env`)
+     - Email: `admin@callxtime.com` (from `.env`)
      - Password: `ChangeMe123!` (from `.env`)
    - ✅ Tokens auto-saved to environment
 

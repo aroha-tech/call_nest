@@ -51,7 +51,7 @@ async function runSqlFile(connection, filePath) {
 }
 
 async function setupDatabase() {
-  console.log('🚀 Setting up Call Nest database...\n');
+  console.log('🚀 Setting up CallXTime database...\n');
 
   // Create connection without database first (for bootstrap)
   const connectionConfig = {

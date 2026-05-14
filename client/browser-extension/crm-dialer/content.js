@@ -70,7 +70,7 @@ function createDialButton(phone, context) {
   button.type = 'button';
   button.className = BUTTON_CLASS;
   button.textContent = 'Call';
-  button.title = `Call ${phone} via Call Nest`;
+  button.title = `Call ${phone} via CallXTime`;
   button.style.marginLeft = '6px';
   button.style.padding = '2px 6px';
   button.style.fontSize = '11px';

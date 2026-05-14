@@ -1,9 +1,9 @@
 ---
-description: Call Nest — stack, structure, and file organization
+description: CallXTime — stack, structure, and file organization
 alwaysApply: true
 ---
 
-# Call Nest — Project Conventions
+# CallXTime — Project Conventions
 
 ## Stack
 - **Frontend**: React | **Backend**: Node + Express | **Database**: MySQL

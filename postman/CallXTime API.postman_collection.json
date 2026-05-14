@@ -1,8 +1,8 @@
 {
 	"info": {
 		"_postman_id": "call-nest-api-collection",
-		"name": "Call Nest API",
-		"description": "API collection for Call Nest SaaS - Calling + CRM",
+		"name": "CallXTime API",
+		"description": "API collection for CallXTime — calling + CRM",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [

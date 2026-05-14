@@ -12,6 +12,6 @@ router.get('/context', reportsAccess, reportsHubController.context);
 router.get('/kpi-summary', reportsAccess, reportsHubController.kpiSummary);
 router.get('/teams', reportsAccess, requireTenantAdvancedReports, reportsHubController.teamsRollup);
 router.get('/leaderboard', reportsAccess, requireTenantAdvancedReports, reportsHubController.leaderboard);
-router.get('/insights', reportsAccess, requireTenantAdvancedReports, reportsHubController.nestInsights);
+router.get('/insights', reportsAccess, requireTenantAdvancedReports, reportsHubController.xInsights);
 
 export default router;

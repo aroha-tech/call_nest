@@ -1,6 +1,6 @@
-# Call Nest CRM Dialer Extension (MVP)
+# CallXTime CRM Dialer Extension (MVP)
 
-PhoneBurner-style browser extension that injects **Call** buttons on CRM pages and triggers the Call Nest Public Dialer API.
+PhoneBurner-style browser extension that injects **Call** buttons on CRM pages and triggers the CallXTime Public Dialer API.
 
 ## Supported model (hardened v1)
 
@@ -36,7 +36,7 @@ Open extension options and set:
 1. User clicks injected **Call** button on CRM page
 2. Extension optionally calls `/api/public/v1/dialer/contacts/upsert`
 3. Extension calls `/api/public/v1/dialer/calls/click-to-call`
-4. Call attempt is created in Call Nest
+4. Call attempt is created in CallXTime
 
 ## Hardening included
 

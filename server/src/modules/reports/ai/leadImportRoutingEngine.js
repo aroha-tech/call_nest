@@ -1,6 +1,6 @@
 /**
- * Call Nest — lead import “smart” routing (on-server)
- * Same product philosophy as Nest Insights: deterministic signals + explainable heuristics.
+ * CallXTime — lead import “smart” routing (on-server)
+ * Same product philosophy as X Insights: deterministic signals + explainable heuristics.
  * No third-party AI APIs — tune scoring here without touching SQL or import plumbing.
  */
 
@@ -99,7 +99,7 @@ function pickHashStableWeighted(pool, ctx) {
  * @param {Map<number, { id: number; label: string; email?: string }>} agentMeta
  * @returns {number|null} user_id
  */
-export function pickNestSmartAgentFromLead(ctx, pool, agentMeta) {
+export function pickXAiSmartAgentFromLead(ctx, pool, agentMeta) {
   if (!pool?.length) return null;
   if (pool.length === 1) return Number(pool[0].user_id);
 

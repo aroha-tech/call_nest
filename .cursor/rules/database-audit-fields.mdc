@@ -1,5 +1,5 @@
 ---
-description: Mandatory audit columns on every new MySQL table (Call Nest CRM)
+description: Mandatory audit columns on every new MySQL table (CallXTime CRM)
 globs: "**/schema/**/*.sql"
 alwaysApply: false
 ---

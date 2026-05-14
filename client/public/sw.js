@@ -13,7 +13,7 @@ self.addEventListener('push', (event) => {
   } catch {
     payload = {};
   }
-  const title = payload.title || 'Call Nest';
+  const title = payload.title || 'CallXTime';
   const options = {
     body: payload.body || 'You have a new notification.',
     data: { cta_path: payload.cta_path || '/' },

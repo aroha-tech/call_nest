@@ -1,6 +1,6 @@
 # Database Seeds
 
-Seed data for initializing the Call Nest database.
+Seed data for initializing the CallXTime database.
 
 ## Folder Structure
 

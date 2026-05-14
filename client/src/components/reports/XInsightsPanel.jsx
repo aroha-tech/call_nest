@@ -1,6 +1,6 @@
 import React from 'react';
-import { PRODUCT_DISPLAY_NAME } from '../../config/productBrand';
-import styles from './NestInsightsPanel.module.scss';
+import { AI_INSIGHTS_DISPLAY_NAME, PRODUCT_DISPLAY_NAME } from '../../config/productBrand';
+import styles from './XInsightsPanel.module.scss';
 
 const SEVERITY_CLASS = {
   action: styles.sevAction,
@@ -8,13 +8,13 @@ const SEVERITY_CLASS = {
   info: styles.sevInfo,
 };
 
-export function NestInsightsPanel({ bundle, loading, error }) {
+export function XInsightsPanel({ bundle, loading, error }) {
   const insights = bundle?.nest_insights?.insights || [];
 
   if (loading) {
     return (
       <div className={styles.panel}>
-        <h3 className={styles.title}>Nest Insights</h3>
+        <h3 className={styles.title}>{AI_INSIGHTS_DISPLAY_NAME}</h3>
         <p className={styles.muted}>Analyzing your workspace signals…</p>
       </div>
     );
@@ -23,7 +23,7 @@ export function NestInsightsPanel({ bundle, loading, error }) {
   if (error) {
     return (
       <div className={styles.panel}>
-        <h3 className={styles.title}>Nest Insights</h3>
+        <h3 className={styles.title}>{AI_INSIGHTS_DISPLAY_NAME}</h3>
         <p className={styles.error}>{error}</p>
       </div>
     );
@@ -32,7 +32,7 @@ export function NestInsightsPanel({ bundle, loading, error }) {
   return (
     <div className={styles.panel}>
       <div className={styles.head}>
-        <h3 className={styles.title}>Nest Insights</h3>
+        <h3 className={styles.title}>{AI_INSIGHTS_DISPLAY_NAME}</h3>
         <span className={styles.badge} title="On-server intelligence — no third-party AI">
           AI
         </span>

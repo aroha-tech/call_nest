@@ -46,9 +46,9 @@ export async function leaderboard(req, res, next) {
   }
 }
 
-export async function nestInsights(req, res, next) {
+export async function xInsights(req, res, next) {
   try {
-    const data = await reportsHubService.getNestInsightsBundle(getTenantId(req), req.user, req.query || {});
+    const data = await reportsHubService.getXInsightsBundle(getTenantId(req), req.user, req.query || {});
     res.json({ data });
   } catch (err) {
     next(err);
