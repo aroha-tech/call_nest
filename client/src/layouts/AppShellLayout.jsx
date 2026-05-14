@@ -14,7 +14,7 @@ import { PRODUCT_DISPLAY_NAME } from '../config/productBrand';
 import styles from './AppShellLayout.module.scss';
 
 /** Survives route changes: each `<Route>` wraps its own `AppShellLayout`, so the component remounts on navigation. */
-const SIDEBAR_OPEN_STORAGE_KEY = 'callnest.shell.sidebarOpen';
+const SIDEBAR_OPEN_STORAGE_KEY = 'callxtime.shell.sidebarOpen';
 
 function readStoredSidebarOpen() {
   if (typeof window === 'undefined') return null;
@@ -238,7 +238,7 @@ export function AppShellLayout({ children }) {
     ? PRODUCT_DISPLAY_NAME
     : titleOverride || name || slug || 'Workspace';
   const workspaceSubtitle = roleLabelForSidebar(user, isPlatform);
-  const logoUrl = !isPlatform && theme?.logoUrl ? String(theme.logoUrl).trim() : '';
+  const logoUrl = isPlatform ? '/logos/CallXTime_Icon_MainLogo.png' : (theme?.logoUrl ? String(theme.logoUrl).trim() : '');
 
   useEffect(() => {
     if (activeParentKey) {
@@ -257,7 +257,7 @@ export function AppShellLayout({ children }) {
   return (
     <div className={`${styles.shell} ${sidebarOpen ? styles.shellSidebarOpen : ''}`}>
       {/* Mobile overlay */}
-      <div 
+      <div
         className={`${styles.mobileOverlay} ${sidebarOpen ? styles.visible : ''}`}
         onClick={() => setSidebarOpen(false)}
       />
@@ -270,14 +270,21 @@ export function AppShellLayout({ children }) {
         <div className={styles.sidebarHeader}>
           {logoUrl ? (
             <div className={styles.brandRow}>
-              <img src={logoUrl} alt="" className={styles.brandLogo} />
-              <span className={styles.brand}>{workspaceTitle}</span>
+              {/* <img src={logoUrl} alt="" className={styles.brandLogo} /> */}
+              <div className={styles.brandTextBlock}>
+                <span className={styles.brand}>{workspaceTitle}</span>
+                {workspaceSubtitle != null && workspaceSubtitle !== '' && (
+                  <span className={styles.tenant}>{workspaceSubtitle}</span>
+                )}
+              </div>
             </div>
           ) : (
-            <span className={styles.brand}>{workspaceTitle}</span>
-          )}
-          {workspaceSubtitle != null && workspaceSubtitle !== '' && (
-            <span className={styles.tenant}>{workspaceSubtitle}</span>
+            <>
+              <span className={styles.brand}>{workspaceTitle}</span>
+              {workspaceSubtitle != null && workspaceSubtitle !== '' && (
+                <span className={styles.tenant}>{workspaceSubtitle}</span>
+              )}
+            </>
           )}
         </div>
         <div className={styles.navSearch}>

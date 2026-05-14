@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { registerPushSubscriptionIfSupported } from '../services/notificationPush';
 
 function sessionKeyForUser(userId) {
-  return `callnest.siteEntryPermissions.u${userId || '0'}`;
+  return `callxtime.siteEntryPermissions.u${userId || '0'}`;
 }
 
 function promptMicrophoneIfPromptable() {

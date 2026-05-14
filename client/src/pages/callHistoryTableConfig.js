@@ -1,4 +1,4 @@
-export const CALL_HISTORY_COLUMNS_STORAGE_KEY = 'callnest.callHistory.visibleColumns.v5';
+export const CALL_HISTORY_COLUMNS_STORAGE_KEY = 'callxtime.callHistory.visibleColumns.v5';
 
 /**
  * @typedef {{

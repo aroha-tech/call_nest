@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 
 /** @typedef {'light' | 'dark'} ColorScheme */
 
-export const COLOR_SCHEME_STORAGE_KEY = 'callnest-color-scheme';
+export const COLOR_SCHEME_STORAGE_KEY = 'callxtime-color-scheme';
 
 /**
  * Read persisted or system preference (no localStorage access during SSR).
@@ -29,10 +29,10 @@ function applyDocumentScheme(scheme) {
 }
 
 const ColorSchemeContext = createContext(
-  /** @type {{ scheme: ColorScheme, setScheme: (s: ColorScheme) => void, toggle: () => void }} */ ({
+  /** @type {{ scheme: ColorScheme, setScheme: (s: ColorScheme) => void, toggle: () => void }} */({
     scheme: 'dark',
-    setScheme: () => {},
-    toggle: () => {},
+    setScheme: () => { },
+    toggle: () => { },
   })
 );
 

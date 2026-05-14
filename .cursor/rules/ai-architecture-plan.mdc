@@ -1,0 +1,57 @@
+---
+description: Architectural plan and guidelines for building the dedicated Python AI Server (Whisper ASR + LLM)
+globs: "ai_server/**/*"
+alwaysApply: false
+---
+
+# Dedicated AI Architecture for CallXTime
+
+To achieve live transcription and auto note-taking, we need to separate our lightweight Node.js API from the heavy machine learning tasks. 
+
+## The Architecture
+
+1. **The Node.js Server (Existing):** Handles user sessions, sockets, database interactions, and routing the live audio streams.
+2. **The AI Server (New):** A new Python-based server (using FastAPI) dedicated purely to running heavy AI models on a GPU.
+   * **Whisper (ASR):** Converts incoming audio streams into text.
+   * **Llama 3 / Mistral (LLM):** Reads the generated transcript and extracts actionable notes.
+
+---
+
+## How does "Self-Learning" / Fine-Tuning work?
+
+AI models do not automatically "self-learn" continuously in real-time (this causes them to degrade and forget things). Instead, we use a two-step approach:
+
+### Step 1: Prompt Engineering & RAG (Immediate "Learning")
+Instead of modifying the model's brain immediately, we give it instructions. We pass a prompt to the open-source LLM like: 
+*"You are an expert sales agent. Read this transcript and extract the customer's budget, timeline, and action items. Here are two examples of how I like my notes formatted: [Example 1], [Example 2]."*
+This is called **Few-Shot Prompting** and is usually 90% of what you need.
+
+### Step 2: Supervised Fine-Tuning (True Customization)
+If the prompt isn't enough and you want the model to natively talk and take notes exactly like your best agents, we **Fine-Tune** it.
+1. **Data Collection:** As your agents use the system, the Node.js server saves the generated transcript + the *final notes the agent saved* into a MySQL table.
+2. **Training Job:** Once you have 500+ examples of "Good Transcript -> Good Notes", we run a Python script (using libraries like `Unsloth` or `HuggingFace PEFT`). 
+3. **Model Update:** This script updates the model's internal weights (using a technique called LoRA). You then load this *custom* model into your AI server. 
+
+---
+
+## Implementation Roadmap
+
+### Phase 1: Outbound IVR Auto-Dialer (Foundation)
+Before building the full Python AI Voice Agent, we will build a simpler, highly effective **Outbound IVR Auto-Dialer** entirely inside Node.js using Exotel.
+* **The Flow:** CallXTime dials a list of leads via Exotel API. Exotel plays a predefined message (e.g., "Press 1 if interested").
+* **The Webhook:** Exotel captures the keypress (DTMF) or spoken word and sends it back to a new CallXTime webhook (`/api/webhooks/exotel-ivr`).
+* **The Result:** The lead's disposition is automatically saved without human intervention. This sets up the campaign queues and Exotel integration we need for the future AI bot.
+
+### Phase 2: Build the Python AI Server (Full AI Bot)
+We will create a new folder named `ai_server/` inside your project. We will set up a **FastAPI** server that has two endpoints:
+* `/transcribe`: Accepts an audio chunk and returns text using `faster-whisper`.
+* `/summarize`: Accepts a full transcript and returns formatted notes using a local LLM via `Ollama` or `vLLM`.
+
+### Phase 3: Connect Node.js (Media Streams)
+We will update the Node.js server to intercept the live Exotel call audio (bypassing WebRTC) and forward the audio chunks to our new Python `/transcribe` endpoint in real-time.
+
+### Phase 4: The UI
+Update the frontend to display the live transcript as it streams in, and add a button to trigger the `/summarize` endpoint when the call ends.
+
+### Phase 5: Data Collection for Fine-Tuning
+Add a database table `training_data_notes` to log every transcript and the final notes the agent approved. We will use this data later to fine-tune our own custom model.

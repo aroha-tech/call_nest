@@ -1,7 +1,7 @@
 import * as integrationAuthService from '../services/public/integrationAuthService.js';
 
 function readApiKey(req) {
-  const h = req.headers['x-api-key'] || req.headers['x-callnest-api-key'];
+  const h = req.headers['x-api-key'] || req.headers['x-callxtime-api-key'];
   if (h) return String(h).trim();
   const auth = String(req.headers.authorization || '').trim();
   if (auth.toLowerCase().startsWith('bearer ')) return auth.slice(7).trim();

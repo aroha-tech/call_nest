@@ -18,89 +18,49 @@ export function AuthLayout() {
   const year = new Date().getFullYear();
 
   const hero = useMemo(() => {
-    if (mode === 'register') {
-      return {
-        headline: (
-          <h1 className={styles.headline}>
-            <span className={styles.headlineStrong}>Start your product&apos;s </span>
-            <span className={styles.headlineAccent}>growth journey</span>
-            <span className={styles.headlineStrong}> today.</span>
-          </h1>
-        ),
-        sub:
-          'Join thousands of growth leaders managing contacts, emails, and meetings in one sanctuary.',
-        tagline: 'Your growth engine is ready.',
-        features: [
-          {
-            icon: 'hub',
-            title: 'Unified Communication',
-            text: 'Every channel in one thread.',
-          },
-          {
-            icon: 'query_stats',
-            title: 'Lead Tracking',
-            text: 'Live signal on high-value prospects.',
-          },
-          {
-            icon: 'verified_user',
-            title: 'Tenant isolation',
-            text: 'Your data stays in your workspace.',
-          },
-          {
-            icon: 'rocket_launch',
-            title: 'Fast setup',
-            text: 'Go live with admin and URL in minutes.',
-          },
-          {
-            icon: 'campaign',
-            title: 'Campaigns',
-            text: 'Cadences and lists aligned to pipeline.',
-          },
-          {
-            icon: 'groups',
-            title: 'Team-ready',
-            text: 'Roles for admins, managers, and agents.',
-          },
-        ],
-        foot: `© ${year} ${PRODUCT_DISPLAY_NAME}. Architected for the Obsidian Sanctuary.`,
-      };
-    }
-
     return {
       headline: (
         <h1 className={styles.headline}>
-          <span className={styles.headlineStrong}>Welcome back to the </span>
-          <span className={styles.headlineAccent}>sanctuary</span>
-          <span className={styles.headlineStrong}> of focus.</span>
+          <span className={styles.headlineStrong}>Power Connections.<br />Drive </span>
+          <span className={styles.headlineAccent}>Growth.</span>
         </h1>
       ),
-      tagline: 'Your growth engine is ready.',
-      sub: 'Sign in to manage your contacts, emails, and meetings.',
+      sub: 'CallXTime is your all-in-one growth engine for calls, meetings, and customer engagement.',
       features: [
         {
-          icon: 'dashboard',
-          title: 'Dashboard',
-          text: 'Pipeline, dispositions, and daily priorities in one view.',
+          icon: 'call',
+          title: 'Smart Calling',
+          text: 'HD calls with intelligent routing and voicemail.',
+          iconColorClass: styles.iconPurple,
         },
         {
-          icon: 'monitoring',
+          icon: 'chat',
+          title: 'AI Transcription',
+          text: 'Real-time transcription and summaries.',
+          iconColorClass: styles.iconGreen,
+        },
+        {
+          icon: 'bar_chart',
           title: 'Analytics',
-          text: 'Campaigns, dialer outcomes, and trends at a glance.',
+          text: 'Track performance and optimize outcomes.',
+          iconColorClass: styles.iconYellow,
         },
         {
-          icon: 'hub',
-          title: 'Networks',
-          text: 'Queues, handoffs, and teamwork in sync across your org.',
+          icon: 'group',
+          title: 'Built for Teams',
+          text: 'Collaborate seamlessly and scale faster.',
+          iconColorClass: styles.iconBlue,
         },
         {
-          icon: 'campaign',
-          title: 'Campaigns',
-          text: 'Cadences, lists, and outcomes tied to your revenue motion.',
+          icon: 'translate',
+          title: 'Global Translation',
+          text: 'AI-driven live translation for international calls.',
+          iconColorClass: styles.iconOrange,
         },
       ],
-      foot: `© ${year} ${PRODUCT_DISPLAY_NAME}. Architected for the Obsidian Sanctuary.`,
+      foot: `© ${year} ${PRODUCT_DISPLAY_NAME}. All rights reserved.`,
     };
-  }, [mode, year]);
+  }, [year]);
 
   return (
     <div className={`${styles.wrapper} ${mode === 'register' ? styles.wrapperRegister : ''}`}>
@@ -109,8 +69,8 @@ export function AuthLayout() {
         aria-label={PRODUCT_DISPLAY_NAME}
       >
         <div className={styles.heroTop}>
-          <Link to="/" className={styles.logoLink}>
-            {PRODUCT_DISPLAY_NAME}
+          <Link to="/" className={styles.logoLink} style={{ display: 'block', textShadow: 'none' }}>
+            <img src="/logos/CallXTime_WhiteLogo.png" alt={PRODUCT_DISPLAY_NAME} style={{ height: '96px', width: 'auto', objectFit: 'contain', transform: 'translateY(-12px)' }} />
           </Link>
         </div>
         <div className={styles.heroMain}>
@@ -119,14 +79,10 @@ export function AuthLayout() {
             {hero.tagline ? <p className={styles.heroTagline}>{hero.tagline}</p> : null}
             <p className={styles.subhead}>{hero.sub}</p>
           </div>
-          <ul
-            className={`${styles.featureList} ${
-              mode === 'login' && hero.features.length > 2 ? styles.featureListQuad : ''
-            } ${mode === 'register' && hero.features.length > 4 ? styles.featureListRegister : ''}`}
-          >
+          <ul className={styles.featureListStack}>
             {hero.features.map((f) => (
               <li key={f.title} className={styles.featureItem}>
-                <span className={styles.featureIconWrap} aria-hidden>
+                <span className={`${styles.featureIconWrap} ${f.iconColorClass || ''}`} aria-hidden>
                   <MaterialSymbol name={f.icon} className={styles.featureIcon} size="md" />
                 </span>
                 <div className={styles.featureCopy}>

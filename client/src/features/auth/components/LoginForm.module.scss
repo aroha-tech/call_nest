@@ -6,6 +6,18 @@
   gap: $space-4;
 }
 
+.headerIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: $radius-md;
+  background: rgba(43, 108, 176, 0.15);
+  color: #63b3ed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: $space-2;
+}
+
 .title {
   margin: 0 0 $space-1;
   font-size: $font-size-2xl;
@@ -92,13 +104,96 @@
 
   a {
     font-weight: $font-weight-semibold;
-    color: var(--color-text-primary);
+    color: #63b3ed;
     text-decoration: none;
 
     &:hover {
-      color: var(--color-text-primary);
+      color: #90cdf4;
       text-decoration: none;
       opacity: 0.92;
     }
+  }
+}
+
+.optionsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: $font-size-xs;
+  margin-top: -$space-1;
+  margin-bottom: $space-2;
+}
+
+.rememberMe {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  
+  input[type="checkbox"] {
+    accent-color: var(--color-primary-600);
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+}
+
+.forgotPassword {
+  color: #63b3ed;
+  text-decoration: none;
+  font-weight: $font-weight-medium;
+  &:hover { text-decoration: underline; }
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: $space-2 0;
+  
+  &::before, &::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  
+  span {
+    padding: 0 $space-4;
+    color: var(--color-text-tertiary);
+    font-size: $font-size-xs;
+  }
+}
+
+.oauthGrid {
+  display: flex;
+  gap: $space-3;
+  margin-bottom: $space-4;
+}
+
+.oauthBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-2;
+  height: 40px;
+  border-radius: $radius-md;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--color-text-primary);
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  cursor: pointer;
+  transition: $transition-fast;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  
+  img {
+    width: 16px;
+    height: 16px;
   }
 }

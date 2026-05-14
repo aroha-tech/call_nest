@@ -22,6 +22,7 @@ export function Input({
   type = 'text',
   error,
   hint,
+  prefix,
   suffix,
   className = '',
   inputClassName = '',
@@ -48,10 +49,11 @@ export function Input({
         </div>
       )}
       <div className={styles.inputWrap}>
+        {prefix && <div className={styles.prefix}>{prefix}</div>}
         <input
           id={inputId}
           type={type}
-          className={`${styles.input} ${error ? styles.hasError : ''} ${suffix ? styles.hasSuffix : ''} ${inputClassName}`}
+          className={`${styles.input} ${error ? styles.hasError : ''} ${prefix ? `${styles.hasPrefix} hasPrefix` : ''} ${suffix ? styles.hasSuffix : ''} ${inputClassName}`}
           aria-invalid={!!error}
           aria-describedby={error ? `${inputId}-error` : undefined}
           {...props}

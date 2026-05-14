@@ -277,13 +277,13 @@ export function LeadColumnCustomizeModal({
   const handleDragOver = useCallback((e) => {
     e.preventDefault();
     const types = e.dataTransfer?.types ? Array.from(e.dataTransfer.types) : [];
-    e.dataTransfer.dropEffect = types.includes('application/x-callnest-column-add') ? 'copy' : 'move';
+    e.dataTransfer.dropEffect = types.includes('application/x-callxtime-column-add') ? 'copy' : 'move';
   }, []);
 
   const handleDropOnRow = useCallback(
     (e, targetId) => {
       e.preventDefault();
-      const addId = e.dataTransfer.getData('application/x-callnest-column-add');
+      const addId = e.dataTransfer.getData('application/x-callxtime-column-add');
       if (addId) {
         if (addId === pinnedColumnId) return;
         setVisibleOrdered((prev) => {
@@ -325,7 +325,7 @@ export function LeadColumnCustomizeModal({
   );
 
   const handleAvailableDragStart = useCallback((e, colId) => {
-    e.dataTransfer.setData('application/x-callnest-column-add', colId);
+    e.dataTransfer.setData('application/x-callxtime-column-add', colId);
     e.dataTransfer.effectAllowed = 'copy';
   }, []);
 
@@ -451,9 +451,8 @@ export function LeadColumnCustomizeModal({
                 return (
                   <li
                     key={col.id}
-                    className={`${styles.rowVisible} ${isDragging ? styles.rowDragging : ''} ${
-                      onOpenColumnSettings ? '' : styles.rowVisibleCompact
-                    }`.trim()}
+                    className={`${styles.rowVisible} ${isDragging ? styles.rowDragging : ''} ${onOpenColumnSettings ? '' : styles.rowVisibleCompact
+                      }`.trim()}
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDropOnRow(e, col.id)}
                     role="listitem"

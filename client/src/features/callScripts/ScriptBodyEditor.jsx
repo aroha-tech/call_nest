@@ -272,14 +272,14 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
     let cancelled = false;
     const configureClipboard = () => {
       const quill = quillRef.current?.getEditor?.();
-      if (cancelled || !quill?.clipboard || quill.__cnCallNestClipboard) return;
+      if (cancelled || !quill?.clipboard || quill.__cnCallXTimeClipboard) return;
       if (!quill.root) {
         requestAnimationFrame(configureClipboard);
         return;
       }
       const Quill = getBundledQuill();
       if (!Quill?.import) return;
-      quill.__cnCallNestClipboard = true;
+      quill.__cnCallXTimeClipboard = true;
       const Delta = Quill.import('delta');
       quill.clipboard.addMatcher(Node.TEXT_NODE, (node, delta) => {
         const text = node.data;
@@ -336,9 +336,8 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
 
   return (
     <div
-      className={`${styles.editorResizeWrap} ${compact ? styles.editorResizeWrapCompact : ''} ${
-        scrollableLayout ? styles.editorResizeWrapScroll : ''
-      } ${scrollableLayout && denseScrollLayout ? styles.editorResizeWrapScrollDense : ''}`.trim()}
+      className={`${styles.editorResizeWrap} ${compact ? styles.editorResizeWrapCompact : ''} ${scrollableLayout ? styles.editorResizeWrapScroll : ''
+        } ${scrollableLayout && denseScrollLayout ? styles.editorResizeWrapScrollDense : ''}`.trim()}
     >
       <div className={styles.editorWrap}>
         <div id={toolbarId} className={`ql-toolbar ql-snow ${styles.toolbar} ${scrollableLayout && denseScrollLayout ? styles.toolbarDense : ''}`.trim()}>
@@ -468,39 +467,39 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
       </div>
       {!hideVariableMenu && varMenuOpen && varMenuPos
         ? createPortal(
-            <div
-              className={styles.variableMenu}
-              role="menu"
-              aria-label="Insert variable menu"
-              style={{ top: varMenuPos.top, left: varMenuPos.left, width: varMenuPos.width }}
-              ref={varMenuRef}
-            >
-              {variableOptions.map((group) => (
-                <div key={group.moduleKey} className={styles.variableMenuGroup}>
-                  <div className={styles.variableMenuGroupTitle}>{group.label}</div>
-                  <div className={styles.variableMenuList}>
-                    {group.list.map((v) => (
-                      <button
-                        key={v.key}
-                        type="button"
-                        className={styles.variableMenuItem}
-                        role="menuitem"
-                        onClick={() => {
-                          insertVariable(v.key);
-                          setVarMenuOpen(false);
-                        }}
-                        title={`Insert {{${v.key}}}`}
-                      >
-                        <span className={styles.variableMenuItemLabel}>{v.label}</span>
-                        <code className={styles.variableMenuItemKey}>{v.key}</code>
-                      </button>
-                    ))}
-                  </div>
+          <div
+            className={styles.variableMenu}
+            role="menu"
+            aria-label="Insert variable menu"
+            style={{ top: varMenuPos.top, left: varMenuPos.left, width: varMenuPos.width }}
+            ref={varMenuRef}
+          >
+            {variableOptions.map((group) => (
+              <div key={group.moduleKey} className={styles.variableMenuGroup}>
+                <div className={styles.variableMenuGroupTitle}>{group.label}</div>
+                <div className={styles.variableMenuList}>
+                  {group.list.map((v) => (
+                    <button
+                      key={v.key}
+                      type="button"
+                      className={styles.variableMenuItem}
+                      role="menuitem"
+                      onClick={() => {
+                        insertVariable(v.key);
+                        setVarMenuOpen(false);
+                      }}
+                      title={`Insert {{${v.key}}}`}
+                    >
+                      <span className={styles.variableMenuItemLabel}>{v.label}</span>
+                      <code className={styles.variableMenuItemKey}>{v.key}</code>
+                    </button>
+                  ))}
                 </div>
-              ))}
-            </div>,
-            document.body
-          )
+              </div>
+            ))}
+          </div>,
+          document.body
+        )
         : null}
     </div>
   );

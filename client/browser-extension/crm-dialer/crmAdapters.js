@@ -1,6 +1,6 @@
 // Global adapter registry for CRM-specific extraction.
-// Exposed as window.CallNestCrmAdapters (legacy global name) so content.js can use it without bundling.
-(function initCallNestCrmAdapters() {
+// Exposed as window.CallXTimeCrmAdapters (legacy global name) so content.js can use it without bundling.
+(function initCallXTimeCrmAdapters() {
   const HOST_MAP = {
     'zoho.com': 'zoho_crm',
     'hubspot.com': 'hubspot',
@@ -118,7 +118,7 @@
     generic_crm: genericAdapter
   };
 
-  window.CallNestCrmAdapters = {
+  window.CallXTimeCrmAdapters = {
     detectCrmFromHost,
     getContext(node, crmCode) {
       const fn = ADAPTERS[crmCode] || ADAPTERS.generic_crm;

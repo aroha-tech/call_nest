@@ -75,9 +75,24 @@
     }
   }
 
+  &.hasPrefix {
+    padding-left: 110px; // Will be overridden or set enough space for the prefix text
+  }
+
   &.hasSuffix {
     padding-right: $space-10;
   }
+}
+
+.prefix {
+  position: absolute;
+  left: $space-3;
+  display: flex;
+  align-items: center;
+  color: var(--color-text-muted);
+  font-size: $font-size-sm;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .suffix {

@@ -17,7 +17,7 @@ self.addEventListener('push', (event) => {
   const options = {
     body: payload.body || 'You have a new notification.',
     data: { cta_path: payload.cta_path || '/' },
-    tag: payload.tag || `callnest-${Date.now()}`,
+    tag: payload.tag || `callxtime-${Date.now()}`,
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });

@@ -1,8 +1,8 @@
 const PHONE_REGEX = /(?:\+?\d[\d\s\-().]{7,}\d)/g;
-const BUTTON_CLASS = 'callnest-crm-dial-btn';
-const PROCESSED_ATTR = 'data-callnest-processed';
+const BUTTON_CLASS = 'callxtime-crm-dial-btn';
+const PROCESSED_ATTR = 'data-callxtime-processed';
 const injectedKeys = new Set();
-const adapters = window.CallNestCrmAdapters || {
+const adapters = window.CallXTimeCrmAdapters || {
   detectCrmFromHost: () => 'generic_crm',
   getContext: () => ({ externalContactId: null, contactName: null })
 };
@@ -16,10 +16,10 @@ function phoneKey(phone) {
 }
 
 function showToast(message, variant = 'info') {
-  let root = document.getElementById('callnest-toast-root');
+  let root = document.getElementById('callxtime-toast-root');
   if (!root) {
     root = document.createElement('div');
-    root.id = 'callnest-toast-root';
+    root.id = 'callxtime-toast-root';
     root.style.position = 'fixed';
     root.style.top = '14px';
     root.style.right = '14px';
@@ -125,7 +125,7 @@ function createDialButton(phone, context) {
 }
 
 function attachToTelLinks(root) {
-  const links = root.querySelectorAll('a[href^="tel:"]:not([data-callnest-processed])');
+  const links = root.querySelectorAll('a[href^="tel:"]:not([data-callxtime-processed])');
   links.forEach((link) => {
     const href = link.getAttribute('href') || '';
     const phone = href.replace(/^tel:/i, '').trim();

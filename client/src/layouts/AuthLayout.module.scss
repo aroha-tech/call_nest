@@ -10,6 +10,25 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   background-color: #04060c;
 
+  // Force dark mode variables
+  --color-text-primary: #f4f7fb;
+  --color-text-secondary: #b8c2d4;
+  --color-text-tertiary: #8b96ab;
+  --color-text-muted: #6b7689;
+  --color-bg-body: #000000;
+  --color-bg-surface: #000000;
+  --color-bg-subtle: #0a0a0a;
+  --color-input-bg: #0a0a0a;
+  --color-input-border: rgba(255, 255, 255, 0.22);
+  --color-input-border-hover: rgba(255, 255, 255, 0.34);
+  --color-input-border-focus: rgba(255, 255, 255, 0.78);
+  --color-border: rgba(255, 255, 255, 0.2);
+  --color-border-subtle: rgba(255, 255, 255, 0.14);
+  --color-border-strong: rgba(255, 255, 255, 0.3);
+  --color-border-focus: rgba(255, 255, 255, 0.72);
+  --color-primary-600: #4f46e5;
+  color: var(--color-text-primary);
+
   @media (max-width: 960px) {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
@@ -82,7 +101,7 @@
     z-index: 0;
     background:
       url('/auth-atmosphere.svg'),
-      #050a12;
+      #000000;
     background-size: cover;
     background-position: 28% 45%;
     background-repeat: no-repeat;
@@ -97,12 +116,12 @@
     background:
       linear-gradient(
         100deg,
-        rgba(2, 5, 12, 0.25) 0%,
-        rgba(4, 9, 18, 0.5) 38%,
-        rgba(5, 11, 22, 0.72) 100%
+        rgba(0, 0, 0, 0.95) 0%,
+        rgba(0, 0, 0, 0.6) 40%,
+        rgba(0, 0, 0, 0.1) 100%
       ),
-      radial-gradient(ellipse 90% 70% at 15% 25%, rgba(var(--color-primary-rgb), 0.14) 0%, transparent 58%),
-      radial-gradient(ellipse 60% 50% at 100% 80%, rgba(0, 0, 0, 0.35) 0%, transparent 50%);
+      radial-gradient(ellipse at 100% 0%, rgba(43, 108, 176, 0.4) 0%, transparent 60%);
+    mix-blend-mode: normal;
   }
 
   > * {
@@ -131,8 +150,8 @@
   min-height: 100vh;
   min-height: 100dvh;
   padding: clamp($space-5, 4vw, $space-10) clamp($space-4, 3vw, $space-8);
-  background: linear-gradient(180deg, #070b14 0%, #05080f 50%, #04060c 100%);
-  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.05);
+  background: #000000;
+  box-shadow: none;
 
   @media (max-width: 960px) {
     min-height: 0;
@@ -143,72 +162,7 @@
   }
 }
 
-:global(html[data-color-scheme='light']) {
-  .wrapper {
-    background-color: #e8eef3;
-  }
 
-  .hero {
-    border-right-color: rgba(15, 23, 42, 0.12);
-    box-shadow:
-      inset -1px 0 0 rgba(255, 255, 255, 0.85),
-      8px 0 28px rgba(15, 23, 42, 0.08);
-
-    &::before {
-      filter: brightness(1.15) saturate(0.88);
-      background-position: 22% 40%;
-    }
-
-    &::after {
-      background:
-        linear-gradient(100deg, rgba(255, 255, 255, 0.5) 0%, rgba(248, 250, 252, 0.78) 55%, rgba(241, 245, 249, 0.92) 100%),
-        radial-gradient(ellipse 85% 65% at 12% 22%, rgba(var(--color-primary-rgb), 0.12) 0%, transparent 55%);
-    }
-  }
-
-  .heroFoot {
-    color: var(--color-text-muted);
-  }
-
-  .featureIconWrap {
-    color: var(--color-primary-700);
-  }
-
-  .featureTitle {
-    color: var(--color-text-primary);
-  }
-
-  .featureText {
-    color: var(--color-text-secondary);
-  }
-
-  .headlineStrong {
-    color: var(--color-text-primary);
-  }
-
-  .heroTagline {
-    color: var(--color-text-secondary);
-  }
-
-  .heroLogin .featureIconWrap,
-  .heroRegister .featureIconWrap {
-    background: transparent;
-    border: none;
-    color: var(--color-primary-600);
-    box-shadow: none;
-  }
-
-  .formColumn {
-    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 55%, #f1f5f9 100%);
-    box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.9);
-  }
-
-  @media (max-width: 960px) {
-    .hero {
-      border-bottom-color: rgba(15, 23, 42, 0.1);
-    }
-  }
-}
 
 .heroTop {
   position: relative;
@@ -240,17 +194,15 @@
 }
 
 .heroCopy {
-  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: $space-4;
-  min-height: min(36vh, 360px);
+  margin-top: $space-8;
 }
 
 .headline {
   margin: 0;
-  font-size: clamp(1.35rem, 2.6vw, 1.85rem);
+  font-size: clamp(2rem, 3.5vw, 3rem);
   font-weight: $font-weight-bold;
   line-height: $line-height-tight;
   letter-spacing: -0.02em;
@@ -263,20 +215,6 @@
 }
 
 .headlineAccent {
-  font-family: Georgia, 'Times New Roman', Times, serif;
-  font-style: italic;
-  font-weight: 500;
-  color: #d8c8f8;
-}
-
-.heroLogin .headlineAccent {
-  font-family: inherit;
-  font-style: italic;
-  font-weight: $font-weight-bold;
-  color: var(--color-primary-400);
-}
-
-.heroRegister .headlineAccent {
   font-family: inherit;
   font-style: italic;
   font-weight: $font-weight-bold;
@@ -302,78 +240,22 @@
   text-shadow: 0 1px 14px rgba(0, 0, 0, 0.35);
 }
 
-.featureList {
+.featureListStack {
   list-style: none;
   margin: 0;
-  margin-top: auto;
-  padding: clamp($space-6, 6vh, $space-10) 0 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: $space-5 $space-8;
+  margin-top: $space-8;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: $space-6;
   width: 100%;
-
-  @media (max-width: 640px) {
-    grid-template-columns: 1fr;
-    gap: $space-5;
-  }
-}
-
-.featureListQuad {
-  grid-template-columns: 1fr 1fr;
-  gap: $space-4 $space-5;
-
-  @media (max-width: 520px) {
-    grid-template-columns: 1fr;
-  }
-}
-
-.featureListRegister {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: $space-4 $space-5;
-
-  @media (max-width: 900px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  @media (max-width: 480px) {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Login + register: nudge feature tiles slightly upward (same rhythm as sign-in) */
-.heroLogin .featureList,
-.heroRegister .featureList {
-  padding-top: clamp($space-3, 2.5vh, $space-6);
-  position: relative;
-  top: -14px;
-}
-
-.heroLogin .featureIconWrap,
-.heroRegister .featureIconWrap {
-  width: auto;
-  height: auto;
-  min-width: 28px;
-  min-height: 28px;
-  border-radius: 0;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: $space-2;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  color: var(--color-primary-600);
-}
-
-.heroLogin .featureIcon,
-.heroRegister .featureIcon {
-  font-size: 24px !important;
 }
 
 .featureItem {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-start;
-  gap: $space-2;
+  gap: $space-4;
   padding: 0;
   border: none;
   background: none;
@@ -383,15 +265,42 @@
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  margin-bottom: 2px;
-  color: rgba(255, 255, 255, 0.92);
-  background: none;
-  box-shadow: none;
-  border-radius: 0;
-  width: auto;
-  height: auto;
-  padding: 0;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  margin-top: 2px;
+}
+
+.iconPurple {
+  background: rgba(107, 70, 193, 0.2);
+  color: #b794f4 !important;
+}
+
+.iconGreen {
+  background: rgba(47, 133, 90, 0.2);
+  color: #68d391 !important;
+}
+
+.iconYellow {
+  background: rgba(183, 121, 31, 0.2);
+  color: #f6e05e !important;
+}
+
+.iconBlue {
+  background: rgba(43, 108, 176, 0.2);
+  color: #63b3ed !important;
+}
+
+.iconOrange {
+  background: rgba(221, 107, 32, 0.2);
+  color: #ed8936 !important;
+}
+
+.featureCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .featureIcon {

@@ -1,6 +1,6 @@
-export const LEAD_TABLE_COLUMNS_STORAGE_KEY = 'callnest.leadList.visibleColumns.v3';
-const LEGACY_LEAD_TABLE_COLUMNS_STORAGE_KEY_V1 = 'callnest.leadList.visibleColumns.v1';
-const LEGACY_LEAD_TABLE_COLUMNS_STORAGE_KEY_V2 = 'callnest.leadList.visibleColumns.v2';
+export const LEAD_TABLE_COLUMNS_STORAGE_KEY = 'callxtime.leadList.visibleColumns.v3';
+const LEGACY_LEAD_TABLE_COLUMNS_STORAGE_KEY_V1 = 'callxtime.leadList.visibleColumns.v1';
+const LEGACY_LEAD_TABLE_COLUMNS_STORAGE_KEY_V2 = 'callxtime.leadList.visibleColumns.v2';
 
 /**
  * @typedef {{

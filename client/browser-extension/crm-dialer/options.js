@@ -58,8 +58,8 @@ async function saveSettings() {
 
 async function renderLogs() {
   const logsBox = document.getElementById('logs');
-  const stored = await chrome.storage.local.get({ callnestLogs: [] });
-  const logs = Array.isArray(stored.callnestLogs) ? stored.callnestLogs : [];
+  const stored = await chrome.storage.local.get({ callxtimeLogs: [] });
+  const logs = Array.isArray(stored.callxtimeLogs) ? stored.callxtimeLogs : [];
   if (!logs.length) {
     logsBox.textContent = 'No logs yet.';
     return;
@@ -71,7 +71,7 @@ async function renderLogs() {
 }
 
 async function clearLogs() {
-  await chrome.storage.local.set({ callnestLogs: [] });
+  await chrome.storage.local.set({ callxtimeLogs: [] });
   await renderLogs();
 }
 

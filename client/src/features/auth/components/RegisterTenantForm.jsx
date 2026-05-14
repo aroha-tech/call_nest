@@ -12,6 +12,7 @@ import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { Alert } from '../../../components/ui/Alert';
+import { MaterialSymbol } from '../../../components/ui/MaterialSymbol';
 import { PasswordField } from './PasswordField';
 import authUi from './authFormShared.module.scss';
 import {
@@ -263,10 +264,12 @@ export function RegisterTenantForm() {
   return (
     <div className={authUi.shell}>
       <form onSubmit={handleSubmit} className={styles.form} noValidate>
-        <h1 className={styles.title}>Register your company</h1>
-        <p className={styles.subtitle}>
-          One workspace URL for your company, tenant-isolated data, and an admin account to invite your team.
-        </p>
+        <div className={styles.headerGroup}>
+          <h1 className={styles.title}>Create your account</h1>
+          <p className={styles.subtitle}>
+            Get started with CallXTime
+          </p>
+        </div>
 
         {error && (
           <Alert variant="error" className={styles.alert} display="inline">
@@ -283,9 +286,10 @@ export function RegisterTenantForm() {
               onChange={handleCompanyChange}
               error={fieldErrors.tenantName}
               disabled={loading}
-              placeholder="Acme Inc"
+              placeholder="Enter company name"
               autoComplete="organization"
               inputClassName={authUi.authInput}
+              suffix={<MaterialSymbol name="domain" size="sm" />}
             />
             <Select
               label="Industry"
@@ -315,9 +319,11 @@ export function RegisterTenantForm() {
                   : 'Lowercase letters & hyphens only — used in your sign-in URL (e.g. acme-corp).'
               }
               disabled={loading}
-              placeholder="acme-corp"
+              placeholder="your-workspace"
               autoComplete="off"
               inputClassName={authUi.authInput}
+              prefix={<span style={{ color: 'rgba(255,255,255,0.4)', paddingRight: '4px' }}>callxtime.com/</span>}
+              suffix={slugRemote.available ? <MaterialSymbol name="check_circle" size="sm" /> : null}
             />
             {showSuggestions && (
               <div className={styles.suggestions}>
@@ -352,12 +358,13 @@ export function RegisterTenantForm() {
               }}
               error={fieldErrors.name}
               disabled={loading}
-              placeholder="Jane Doe"
+              placeholder="Enter your full name"
               autoComplete="name"
               inputClassName={authUi.authInput}
+              suffix={<MaterialSymbol name="person" size="sm" />}
             />
             <Input
-              label="Email"
+              label="Work Email"
               type="email"
               value={email}
               onChange={(e) => {
@@ -367,9 +374,10 @@ export function RegisterTenantForm() {
               }}
               error={fieldErrors.email}
               disabled={loading}
-              placeholder="admin@acme.com"
+              placeholder="Enter your work email"
               autoComplete="email"
               inputClassName={authUi.authInput}
+              suffix={<MaterialSymbol name="mail" size="sm" />}
             />
           </div>
           <div className={styles.passwordBlock}>
@@ -395,7 +403,7 @@ export function RegisterTenantForm() {
             )}
           </div>
           <PasswordField
-            label="Confirm Password"
+            label="Confirm password"
             value={confirmPassword}
             onChange={(e) => {
               setConfirmPassword(e.target.value);
@@ -404,15 +412,54 @@ export function RegisterTenantForm() {
             }}
             error={fieldErrors.confirmPassword}
             disabled={loading}
-            placeholder="••••••••"
+            placeholder="Confirm your password"
             autoComplete="new-password"
             inputClassName={authUi.authInput}
           />
         </div>
 
+        <label className={styles.terms}>
+          <input type="checkbox" defaultChecked />
+          <span>
+            I agree to the <Link to="#">Terms of Service</Link> and <Link to="#">Privacy Policy</Link>
+          </span>
+        </label>
+
         <Button type="submit" fullWidth loading={loading} className={`${styles.submit} ${authUi.authSubmit}`}>
           Create account
         </Button>
+
+        <div className={styles.divider}>
+          <span>or continue with</span>
+        </div>
+        
+        <div className={styles.oauthGrid}>
+          <button type="button" className={styles.oauthBtn}>
+            <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            Google
+          </button>
+          <button type="button" className={styles.oauthBtn}>
+            <svg viewBox="0 0 21 21" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+              <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+              <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+              <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+              <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+            </svg>
+            Microsoft
+          </button>
+          <button type="button" className={styles.oauthBtn}>
+            <svg viewBox="0 0 384 512" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+              <path fill="#ffffff" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.3 48.6-.7 90.4-84.3 102.8-119.5-65.2-30.7-61.7-90-61.9-91.1zm-53.6-165.1c17.5-21.4 28.1-50.5 24.9-79.5-24.6 1.4-53.7 17.2-71.9 38.6-15.6 18.2-28 47.4-24 76 26.5 2 53.6-13.7 71-35.1z"/>
+            </svg>
+            Apple
+          </button>
+        </div>
+
         <p className={styles.footer}>
           Already have an account? <Link to="/login">Sign in</Link>
         </p>

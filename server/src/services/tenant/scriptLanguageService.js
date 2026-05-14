@@ -254,7 +254,7 @@ export async function translateText({ text, source, target }) {
 }
 
 function buildMultipartBody(fields, fileFieldName, fileBuffer, fileName, fileMime) {
-  const boundary = `----CallNestScriptLang${Date.now().toString(36)}`;
+  const boundary = `----CallXTimeScriptLang${Date.now().toString(36)}`;
   const crlf = '\r\n';
   const parts = [];
 

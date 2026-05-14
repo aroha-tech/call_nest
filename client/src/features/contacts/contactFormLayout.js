@@ -88,12 +88,12 @@ function migrateV1ColumnsToLayout(parsed) {
 }
 
 function storageKeyV2(recordType) {
-  return `callnest.contactForm.sectionLayout.v2.${recordType === 'contact' ? 'contact' : 'lead'}`;
+  return `callxtime.contactForm.sectionLayout.v2.${recordType === 'contact' ? 'contact' : 'lead'}`;
 }
 
 /** Legacy key from canvas / left-right layout. */
 function storageKeyV1(recordType) {
-  return `callnest.contactForm.sectionColumns.v1.${recordType === 'contact' ? 'contact' : 'lead'}`;
+  return `callxtime.contactForm.sectionColumns.v1.${recordType === 'contact' ? 'contact' : 'lead'}`;
 }
 
 export function loadContactFormColumns(recordType) {

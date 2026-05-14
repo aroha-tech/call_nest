@@ -41,7 +41,7 @@ export function userSessionsKey(tenantId, userId) {
 }
 
 /** Cluster-wide count of running background jobs (incremented when a worker starts a job, decremented when it finishes). */
-const BACKGROUND_JOB_SLOT_KEY = 'callnest:bg:running_slots';
+const BACKGROUND_JOB_SLOT_KEY = 'callxtime:bg:running_slots';
 
 const BG_SLOT_ACQUIRE_LUA = `
 local c = tonumber(redis.call('GET', KEYS[1]) or '0')

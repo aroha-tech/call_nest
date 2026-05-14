@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styles from './PerformanceReportsGuide.module.scss';
 
-const GUIDE_COLLAPSED_STORAGE_KEY = 'callnest_performance_reports_guide_collapsed';
+const GUIDE_COLLAPSED_STORAGE_KEY = 'callxtime_performance_reports_guide_collapsed';
 
 function readDefaultGuideOpen() {
   if (typeof window === 'undefined') return true;

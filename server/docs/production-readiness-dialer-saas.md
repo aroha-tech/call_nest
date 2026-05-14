@@ -10,7 +10,7 @@ Use this checklist before giving the dialer to external CRM customers or shippin
 - **Host allowlist (extension)**: Keep `allowUnknownCrmHosts` off in production; maintain explicit `allowedHostSuffixes` per customer or ship a preset list.
 - **CORS / API base URL**: Production API must use HTTPS; extension `baseUrl` must match your public API origin.
 - **Secrets**: Never commit API keys; use env-specific docs for ops only.
-- **Webhook signatures**: Document `x-callnest-signature` (HMAC) for outbound events; customers verify server-side.
+- **Webhook signatures**: Document `x-callxtime-signature` (HMAC) for outbound events; customers verify server-side.
 
 ## 2. Database and migrations
 

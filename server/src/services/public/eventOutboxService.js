@@ -50,11 +50,11 @@ async function dispatchSingleOutboxEvent(row, acc) {
   const body = JSON.stringify(row.payload_json && typeof row.payload_json === 'object' ? row.payload_json : {});
   const headers = {
     'content-type': 'application/json',
-    'x-callnest-topic': row.topic,
-    'x-callnest-idempotency-key': row.idempotency_key,
+    'x-callxtime-topic': row.topic,
+    'x-callxtime-idempotency-key': row.idempotency_key,
   };
   if (row.webhook_secret) {
-    headers['x-callnest-signature'] = signPayload(row.webhook_secret, body);
+    headers['x-callxtime-signature'] = signPayload(row.webhook_secret, body);
   }
 
   let responseStatus = null;

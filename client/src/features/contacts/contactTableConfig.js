@@ -1,7 +1,7 @@
 import { customFieldColumnId } from './customFieldColumnIds';
 import { industryFieldColumnId } from './industryFieldColumnIds';
 
-export const CONTACT_TABLE_COLUMNS_STORAGE_KEY = 'callnest.contactList.visibleColumns.v1';
+export const CONTACT_TABLE_COLUMNS_STORAGE_KEY = 'callxtime.contactList.visibleColumns.v1';
 
 /**
  * @typedef {{

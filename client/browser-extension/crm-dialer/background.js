@@ -96,10 +96,10 @@ async function postPublic(path, settings, payload) {
 async function appendLog(entry) {
   const now = new Date().toISOString();
   const record = { at: now, ...entry };
-  const existing = await chrome.storage.local.get({ callnestLogs: [] });
-  const logs = Array.isArray(existing.callnestLogs) ? existing.callnestLogs : [];
+  const existing = await chrome.storage.local.get({ callxtimeLogs: [] });
+  const logs = Array.isArray(existing.callxtimeLogs) ? existing.callxtimeLogs : [];
   logs.unshift(record);
-  await chrome.storage.local.set({ callnestLogs: logs.slice(0, 200) });
+  await chrome.storage.local.set({ callxtimeLogs: logs.slice(0, 200) });
 }
 
 async function upsertContactForCall(phoneE164, context, settings) {
@@ -135,7 +135,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       level: message.payload?.level || 'info',
       event: message.payload?.event || 'client.log',
       details: message.payload?.details || {}
-    }).catch(() => {});
+    }).catch(() => { });
     return false;
   }
 
@@ -202,7 +202,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       level: 'error',
       event: 'dial.failed',
       details: { message: err?.message || 'Dial failed', page: sender?.tab?.url || null }
-    }).catch(() => {});
+    }).catch(() => { });
     sendResponse({ ok: false, error: err?.message || 'Dial failed' });
   });
 

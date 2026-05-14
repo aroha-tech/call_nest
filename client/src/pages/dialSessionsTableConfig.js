@@ -1,4 +1,4 @@
-export const DIAL_SESSIONS_COLUMNS_STORAGE_KEY = 'callnest.dialSessions.visibleColumns.v2';
+export const DIAL_SESSIONS_COLUMNS_STORAGE_KEY = 'callxtime.dialSessions.visibleColumns.v2';
 
 /**
  * @typedef {{

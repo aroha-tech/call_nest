@@ -17,7 +17,7 @@ import { DEAL_CURRENCY_OPTIONS, DEAL_VALUE_TYPE_OPTIONS, DEFAULT_DEAL_CURRENCY }
 import styles from './DealPipelineWizard.module.scss';
 import dealFormStyles from './NewDealWizard.module.scss';
 
-const DRAFT_OPP_STORAGE_KEY = 'callnest_deal_draft_opp_id';
+const DRAFT_OPP_STORAGE_KEY = 'callxtime_deal_draft_opp_id';
 
 function tagsRowToInput(row) {
   const raw = row?.tags_json;
@@ -468,303 +468,303 @@ export function NewDealWizard({
 
   return (
     <>
-    <SlidePanel
-      isOpen
-      size="xlarge"
-      title="New deal"
-      titleHint="Create a new deal and add details to track progress."
-      onClose={() => !saving && !hydrating && onClose()}
-      closeOnOverlay={!saving && !hydrating}
-      closeOnEscape={!saving && !hydrating}
-    >
-      <div className={`${styles.wizardBody} ${dealFormStyles.dealWizard}`}>
-        <div className={dealFormStyles.wizardHeaderRow}>
-          <Button type="button" variant="ghost" size="sm" onClick={saveDraft} disabled={saving || hydrating}>
-            <MaterialSymbol name="bookmark_add" size="sm" style={{ marginRight: 6 }} />
-            Save as draft
-          </Button>
-        </div>
-
-        <div className={styles.stepper} role="tablist">
-          <div className={`${styles.stepTab} ${step === 1 ? styles.stepTabActive : ''}`} role="tab" aria-selected={step === 1}>
-            <span className={styles.stepCircle}>1</span>
-            <span className={styles.stepLabel}>Deal information</span>
+      <SlidePanel
+        isOpen
+        size="xlarge"
+        title="New deal"
+        titleHint="Create a new deal and add details to track progress."
+        onClose={() => !saving && !hydrating && onClose()}
+        closeOnOverlay={!saving && !hydrating}
+        closeOnEscape={!saving && !hydrating}
+      >
+        <div className={`${styles.wizardBody} ${dealFormStyles.dealWizard}`}>
+          <div className={dealFormStyles.wizardHeaderRow}>
+            <Button type="button" variant="ghost" size="sm" onClick={saveDraft} disabled={saving || hydrating}>
+              <MaterialSymbol name="bookmark_add" size="sm" style={{ marginRight: 6 }} />
+              Save as draft
+            </Button>
           </div>
-          <div className={`${styles.stepTab} ${step === 2 ? styles.stepTabActive : ''}`} role="tab" aria-selected={step === 2}>
-            <span className={styles.stepCircle}>2</span>
-            <span className={styles.stepLabel}>Additional details</span>
-          </div>
-        </div>
 
-        {step === 1 ? (
-          <>
-            <div className={styles.grid2}>
-              <Select
-                label="Pipeline"
-                required
-                value={dealId}
-                error={formErrors.dealId}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setDealId(v);
-                  setFormErrors((prev) => ({ ...prev, dealId: undefined }));
-                  const d = deals.find((x) => String(x.id) === String(v));
-                  if (d?.currency_code) setAmountCurrency(String(d.currency_code).toUpperCase());
-                }}
-                options={[{ value: '', label: 'Choose pipeline' }, ...pipelineOptions]}
-                disabled={hydrating}
-              />
-              <Select
-                label="Stage"
-                required
-                value={stageId}
-                error={formErrors.stageId}
-                onChange={(e) => {
-                  setStageId(e.target.value);
-                  setFormErrors((prev) => ({ ...prev, stageId: undefined }));
-                }}
-                options={stageOptions}
-                placeholder={selectedDeal ? 'Choose stage' : 'Select a pipeline first'}
-              />
-              <div className={styles.fullRow}>
-                <div className={dealFormStyles.crmLinkLabel}>Link to CRM *</div>
-                <div className={dealFormStyles.pickBtnRow}>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    disabled={hydrating}
-                    onClick={() => {
-                      setPickerKind('contact');
-                      setPickerOpen(true);
-                      setFormErrors((prev) => ({ ...prev, contact: undefined }));
-                    }}
-                  >
-                    <MaterialSymbol name="contacts" size="sm" style={{ marginRight: 6, color: '#60a5fa' }} />
-                    Pick contact
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    disabled={hydrating}
-                    onClick={() => {
-                      setPickerKind('lead');
-                      setPickerOpen(true);
-                      setFormErrors((prev) => ({ ...prev, contact: undefined }));
-                    }}
-                  >
-                    <MaterialSymbol name="person_search" size="sm" style={{ marginRight: 6, color: '#34d399' }} />
-                    Pick lead
-                  </Button>
-                  <Link
-                    className={dealFormStyles.addContactLink}
-                    to={contactType === 'lead' ? '/leads/new' : '/contacts/new'}
-                    target="_blank"
-                    rel="noreferrer"
-                    title="Add record in new tab"
-                  >
-                    <MaterialSymbol name="person_add" size="sm" />
-                  </Link>
-                </div>
-                {contactId && selectedContactDetail ? (
-                  <div className={dealFormStyles.entityCard}>
-                    <div className={dealFormStyles.entityCardTitle}>
-                      Selected {String(selectedContactDetail.type) === 'lead' ? 'lead' : 'contact'}
-                    </div>
-                    <div className={dealFormStyles.entityCardGrid}>
-                      <div>
-                        <div className={dealFormStyles.entityFieldLabel}>Name</div>
-                        <div className={dealFormStyles.entityFieldValue}>
-                          {selectedContactDetail.display_name || selectedContactDetail.first_name || '—'}
+          <div className={styles.stepper} role="tablist">
+            <div className={`${styles.stepTab} ${step === 1 ? styles.stepTabActive : ''}`} role="tab" aria-selected={step === 1}>
+              <span className={styles.stepCircle}>1</span>
+              <span className={styles.stepLabel}>Deal information</span>
+            </div>
+            <div className={`${styles.stepTab} ${step === 2 ? styles.stepTabActive : ''}`} role="tab" aria-selected={step === 2}>
+              <span className={styles.stepCircle}>2</span>
+              <span className={styles.stepLabel}>Additional details</span>
+            </div>
+          </div>
+
+          {step === 1 ? (
+            <>
+              <div className={styles.grid2}>
+                <Select
+                  label="Pipeline"
+                  required
+                  value={dealId}
+                  error={formErrors.dealId}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setDealId(v);
+                    setFormErrors((prev) => ({ ...prev, dealId: undefined }));
+                    const d = deals.find((x) => String(x.id) === String(v));
+                    if (d?.currency_code) setAmountCurrency(String(d.currency_code).toUpperCase());
+                  }}
+                  options={[{ value: '', label: 'Choose pipeline' }, ...pipelineOptions]}
+                  disabled={hydrating}
+                />
+                <Select
+                  label="Stage"
+                  required
+                  value={stageId}
+                  error={formErrors.stageId}
+                  onChange={(e) => {
+                    setStageId(e.target.value);
+                    setFormErrors((prev) => ({ ...prev, stageId: undefined }));
+                  }}
+                  options={stageOptions}
+                  placeholder={selectedDeal ? 'Choose stage' : 'Select a pipeline first'}
+                />
+                <div className={styles.fullRow}>
+                  <div className={dealFormStyles.crmLinkLabel}>Link to CRM *</div>
+                  <div className={dealFormStyles.pickBtnRow}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={hydrating}
+                      onClick={() => {
+                        setPickerKind('contact');
+                        setPickerOpen(true);
+                        setFormErrors((prev) => ({ ...prev, contact: undefined }));
+                      }}
+                    >
+                      <MaterialSymbol name="contacts" size="sm" style={{ marginRight: 6, color: '#60a5fa' }} />
+                      Pick contact
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={hydrating}
+                      onClick={() => {
+                        setPickerKind('lead');
+                        setPickerOpen(true);
+                        setFormErrors((prev) => ({ ...prev, contact: undefined }));
+                      }}
+                    >
+                      <MaterialSymbol name="person_search" size="sm" style={{ marginRight: 6, color: '#34d399' }} />
+                      Pick lead
+                    </Button>
+                    <Link
+                      className={dealFormStyles.addContactLink}
+                      to={contactType === 'lead' ? '/leads/new' : '/contacts/new'}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Add record in new tab"
+                    >
+                      <MaterialSymbol name="person_add" size="sm" />
+                    </Link>
+                  </div>
+                  {contactId && selectedContactDetail ? (
+                    <div className={dealFormStyles.entityCard}>
+                      <div className={dealFormStyles.entityCardTitle}>
+                        Selected {String(selectedContactDetail.type) === 'lead' ? 'lead' : 'contact'}
+                      </div>
+                      <div className={dealFormStyles.entityCardGrid}>
+                        <div>
+                          <div className={dealFormStyles.entityFieldLabel}>Name</div>
+                          <div className={dealFormStyles.entityFieldValue}>
+                            {selectedContactDetail.display_name || selectedContactDetail.first_name || '—'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className={dealFormStyles.entityFieldLabel}>Email</div>
+                          <div className={dealFormStyles.entityFieldValue}>{selectedContactDetail.email || '—'}</div>
+                        </div>
+                        <div>
+                          <div className={dealFormStyles.entityFieldLabel}>Phone</div>
+                          <div className={dealFormStyles.entityFieldValue}>{selectedContactDetail.primary_phone || '—'}</div>
                         </div>
                       </div>
-                      <div>
-                        <div className={dealFormStyles.entityFieldLabel}>Email</div>
-                        <div className={dealFormStyles.entityFieldValue}>{selectedContactDetail.email || '—'}</div>
-                      </div>
-                      <div>
-                        <div className={dealFormStyles.entityFieldLabel}>Phone</div>
-                        <div className={dealFormStyles.entityFieldValue}>{selectedContactDetail.primary_phone || '—'}</div>
-                      </div>
                     </div>
-                  </div>
-                ) : contactId ? (
-                  <div className={dealFormStyles.entityCardMuted}>Loading contact…</div>
-                ) : null}
-                {formErrors.contact ? (
-                  <p className={dealFormStyles.fieldError} role="alert">
-                    {formErrors.contact}
-                  </p>
-                ) : null}
-              </div>
-              <Select
-                label="Deal owner"
-                required
-                value={ownerId}
-                error={formErrors.ownerId}
-                onChange={(e) => {
-                  setOwnerId(e.target.value);
-                  setFormErrors((prev) => ({ ...prev, ownerId: undefined }));
-                }}
-                options={ownerOptions}
-                placeholder="Select owner"
-              />
-              <Input
-                label="Deal name"
-                required
-                placeholder="e.g. Acme - Enterprise plan"
-                value={title}
-                error={formErrors.title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  setFormErrors((prev) => ({ ...prev, title: undefined }));
-                }}
-              />
-              <div className={`${styles.fullRow} ${dealFormStyles.amountRow}`}>
+                  ) : contactId ? (
+                    <div className={dealFormStyles.entityCardMuted}>Loading contact…</div>
+                  ) : null}
+                  {formErrors.contact ? (
+                    <p className={dealFormStyles.fieldError} role="alert">
+                      {formErrors.contact}
+                    </p>
+                  ) : null}
+                </div>
                 <Select
-                  label="Currency"
-                  value={amountCurrency}
-                  onChange={(e) => setAmountCurrency(e.target.value)}
-                  options={DEAL_CURRENCY_OPTIONS}
+                  label="Deal owner"
+                  required
+                  value={ownerId}
+                  error={formErrors.ownerId}
+                  onChange={(e) => {
+                    setOwnerId(e.target.value);
+                    setFormErrors((prev) => ({ ...prev, ownerId: undefined }));
+                  }}
+                  options={ownerOptions}
+                  placeholder="Select owner"
                 />
                 <Input
-                  label="Amount (optional)"
+                  label="Deal name"
+                  required
+                  placeholder="e.g. Acme - Enterprise plan"
+                  value={title}
+                  error={formErrors.title}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    setFormErrors((prev) => ({ ...prev, title: undefined }));
+                  }}
+                />
+                <div className={`${styles.fullRow} ${dealFormStyles.amountRow}`}>
+                  <Select
+                    label="Currency"
+                    value={amountCurrency}
+                    onChange={(e) => setAmountCurrency(e.target.value)}
+                    options={DEAL_CURRENCY_OPTIONS}
+                  />
+                  <Input
+                    label="Amount (optional)"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    placeholder="Enter amount"
+                    value={amount}
+                    error={formErrors.amount}
+                    onChange={(e) => {
+                      setAmount(e.target.value);
+                      setFormErrors((prev) => ({ ...prev, amount: undefined }));
+                    }}
+                  />
+                </div>
+                <Select
+                  label="Deal value type"
+                  value={valueType}
+                  onChange={(e) => setValueType(e.target.value)}
+                  options={DEAL_VALUE_TYPE_OPTIONS}
+                />
+                <DateTimePickerField label="Expected close date" mode="date" value={closingDate} onChange={setClosingDate} />
+                <Input label="Deal type" value={dealType} onChange={(e) => setDealType(e.target.value)} placeholder="e.g. New business" />
+                <Input
+                  label="Probability (%)"
                   type="number"
                   min={0}
-                  step={0.01}
-                  placeholder="Enter amount"
-                  value={amount}
-                  error={formErrors.amount}
+                  max={100}
+                  step={1}
+                  placeholder="e.g. 50"
+                  value={probability}
+                  error={formErrors.probability}
                   onChange={(e) => {
-                    setAmount(e.target.value);
-                    setFormErrors((prev) => ({ ...prev, amount: undefined }));
+                    setProbability(e.target.value);
+                    setFormErrors((prev) => ({ ...prev, probability: undefined }));
                   }}
                 />
               </div>
-              <Select
-                label="Deal value type"
-                value={valueType}
-                onChange={(e) => setValueType(e.target.value)}
-                options={DEAL_VALUE_TYPE_OPTIONS}
-              />
-              <DateTimePickerField label="Expected close date" mode="date" value={closingDate} onChange={setClosingDate} />
-              <Input label="Deal type" value={dealType} onChange={(e) => setDealType(e.target.value)} placeholder="e.g. New business" />
-              <Input
-                label="Probability (%)"
-                type="number"
-                min={0}
-                max={100}
-                step={1}
-                placeholder="e.g. 50"
-                value={probability}
-                error={formErrors.probability}
-                onChange={(e) => {
-                  setProbability(e.target.value);
-                  setFormErrors((prev) => ({ ...prev, probability: undefined }));
-                }}
-              />
-            </div>
 
-            <div className={dealFormStyles.fullRow}>
-              <div className={styles.sectionLabel}>Priority</div>
-              <div className={dealFormStyles.prioritySeg}>
-                {[
-                  { id: 'low', label: 'Low', dot: '#22c55e' },
-                  { id: 'medium', label: 'Medium', dot: '#f97316' },
-                  { id: 'high', label: 'High', dot: '#ef4444' },
-                ].map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={`${dealFormStyles.priorityBtn} ${priority === p.id ? dealFormStyles.priorityBtnOn : ''}`}
-                    onClick={() => setPriority(p.id)}
-                  >
-                    <span className={dealFormStyles.priorityDot} style={{ background: p.dot }} />
-                    {p.label}
-                  </button>
-                ))}
+              <div className={dealFormStyles.fullRow}>
+                <div className={styles.sectionLabel}>Priority</div>
+                <div className={dealFormStyles.prioritySeg}>
+                  {[
+                    { id: 'low', label: 'Low', dot: '#22c55e' },
+                    { id: 'medium', label: 'Medium', dot: '#f97316' },
+                    { id: 'high', label: 'High', dot: '#ef4444' },
+                  ].map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`${dealFormStyles.priorityBtn} ${priority === p.id ? dealFormStyles.priorityBtnOn : ''}`}
+                      onClick={() => setPriority(p.id)}
+                    >
+                      <span className={dealFormStyles.priorityDot} style={{ background: p.dot }} />
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div className={styles.fullRow}>
-              <label className={styles.sectionLabel} htmlFor="deal-desc">
-                Deal description (optional)
-              </label>
-              <textarea
-                id="deal-desc"
-                className={styles.textarea}
-                rows={3}
-                maxLength={500}
-                placeholder="Add a short description about this deal…"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-              <div className={styles.textareaFooter}>{(description || '').length}/500</div>
-            </div>
+              <div className={styles.fullRow}>
+                <label className={styles.sectionLabel} htmlFor="deal-desc">
+                  Deal description (optional)
+                </label>
+                <textarea
+                  id="deal-desc"
+                  className={styles.textarea}
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Add a short description about this deal…"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+                <div className={styles.textareaFooter}>{(description || '').length}/500</div>
+              </div>
 
-            <Input label="Tags (optional)" placeholder="Comma-separated tags" value={tags} onChange={(e) => setTags(e.target.value)} />
-          </>
-        ) : (
-          <>
-            <div className={styles.backBar}>
-              <button type="button" className={styles.backBtn} onClick={() => setStep(1)} disabled={saving} aria-label="Back">
-                <MaterialSymbol name="arrow_back" size="sm" />
-              </button>
-            </div>
-            <div className={styles.grid2}>
-              <Input label="Next step" value={nextStep} onChange={(e) => setNextStep(e.target.value)} placeholder="What happens next?" />
-              <Input label="Lead source" value={leadSource} onChange={(e) => setLeadSource(e.target.value)} placeholder="e.g. Web, Referral" />
-              <Input
-                label="Expected revenue (optional)"
-                type="number"
-                min={0}
-                step={0.01}
-                value={expectedRevenue}
-                error={formErrors.expectedRevenue}
-                onChange={(e) => {
-                  setExpectedRevenue(e.target.value);
-                  setFormErrors((prev) => ({ ...prev, expectedRevenue: undefined }));
-                }}
-              />
-              <Select label="Campaign (optional)" value={campaignId} onChange={(e) => setCampaignId(e.target.value)} options={campaignOptions} />
-            </div>
-          </>
-        )}
-      </div>
-
-      <ModalFooter className={dealFormStyles.modalFooter}>
-        <label className={dealFormStyles.footerCheck}>
-          <Checkbox checked={createAnother} onChange={(e) => setCreateAnother(e.target.checked)} label="Create another deal" />
-        </label>
-        <div className={dealFormStyles.footerBtns}>
-          <Button type="button" variant="ghost" onClick={onClose} disabled={saving || hydrating}>
-            Cancel
-          </Button>
-          {step === 1 ? (
-            <Button type="button" variant="primary" onClick={goNext} disabled={hydrating}>
-              Next: Additional details
-              <MaterialSymbol name="arrow_forward" size="sm" style={{ marginLeft: 6 }} />
-            </Button>
+              <Input label="Tags (optional)" placeholder="Comma-separated tags" value={tags} onChange={(e) => setTags(e.target.value)} />
+            </>
           ) : (
-            <Button type="button" variant="primary" loading={saving} onClick={submit} disabled={hydrating}>
-              Save deal
-            </Button>
+            <>
+              <div className={styles.backBar}>
+                <button type="button" className={styles.backBtn} onClick={() => setStep(1)} disabled={saving} aria-label="Back">
+                  <MaterialSymbol name="arrow_back" size="sm" />
+                </button>
+              </div>
+              <div className={styles.grid2}>
+                <Input label="Next step" value={nextStep} onChange={(e) => setNextStep(e.target.value)} placeholder="What happens next?" />
+                <Input label="Lead source" value={leadSource} onChange={(e) => setLeadSource(e.target.value)} placeholder="e.g. Web, Referral" />
+                <Input
+                  label="Expected revenue (optional)"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={expectedRevenue}
+                  error={formErrors.expectedRevenue}
+                  onChange={(e) => {
+                    setExpectedRevenue(e.target.value);
+                    setFormErrors((prev) => ({ ...prev, expectedRevenue: undefined }));
+                  }}
+                />
+                <Select label="Campaign (optional)" value={campaignId} onChange={(e) => setCampaignId(e.target.value)} options={campaignOptions} />
+              </div>
+            </>
           )}
         </div>
-      </ModalFooter>
-    </SlidePanel>
 
-    <ContactLeadPickerModal
-      isOpen={pickerOpen}
-      onClose={() => setPickerOpen(false)}
-      pickerType={pickerKind}
-      onPick={(row) => {
-        setContactId(String(row.id));
-        setContactType(String(row.type) === 'lead' ? 'lead' : 'contact');
-        setFormErrors((prev) => ({ ...prev, contact: undefined }));
-      }}
-    />
+        <ModalFooter className={dealFormStyles.modalFooter}>
+          <label className={dealFormStyles.footerCheck}>
+            <Checkbox checked={createAnother} onChange={(e) => setCreateAnother(e.target.checked)} label="Create another deal" />
+          </label>
+          <div className={dealFormStyles.footerBtns}>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={saving || hydrating}>
+              Cancel
+            </Button>
+            {step === 1 ? (
+              <Button type="button" variant="primary" onClick={goNext} disabled={hydrating}>
+                Next: Additional details
+                <MaterialSymbol name="arrow_forward" size="sm" style={{ marginLeft: 6 }} />
+              </Button>
+            ) : (
+              <Button type="button" variant="primary" loading={saving} onClick={submit} disabled={hydrating}>
+                Save deal
+              </Button>
+            )}
+          </div>
+        </ModalFooter>
+      </SlidePanel>
+
+      <ContactLeadPickerModal
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        pickerType={pickerKind}
+        onPick={(row) => {
+          setContactId(String(row.id));
+          setContactType(String(row.type) === 'lead' ? 'lead' : 'contact');
+          setFormErrors((prev) => ({ ...prev, contact: undefined }));
+        }}
+      />
     </>
   );
 }
