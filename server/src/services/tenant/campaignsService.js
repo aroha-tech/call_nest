@@ -125,10 +125,13 @@ function normalizeSettingsJsonForDb(input) {
   const channel = ['phone', 'whatsapp', 'email', 'sms'].includes(channelRaw) ? channelRaw : 'phone';
   const scheduleRaw = String(obj.schedule_mode || 'immediate').toLowerCase();
   const schedule_mode = scheduleRaw === 'scheduled' ? 'scheduled' : 'immediate';
+  const recordRaw = String(obj.static_record_type || 'lead').toLowerCase();
+  const static_record_type = recordRaw === 'contact' ? 'contact' : 'lead';
 
   const out = {
     channel,
     schedule_mode,
+    static_record_type,
     timezone: obj.timezone != null && String(obj.timezone).trim() ? String(obj.timezone).trim() : null,
     start_date: obj.start_date != null && String(obj.start_date).trim() ? String(obj.start_date).trim() : null,
     end_date: obj.end_date != null && String(obj.end_date).trim() ? String(obj.end_date).trim() : null,

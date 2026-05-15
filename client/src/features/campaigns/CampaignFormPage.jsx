@@ -61,6 +61,7 @@ export function CampaignFormPage() {
 
   const [form, setForm] = useState(() => buildEmptyCampaignForm());
   const [formError, setFormError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [loadError, setLoadError] = useState('');
   const [loadingCampaign, setLoadingCampaign] = useState(!isNew);
   const [wizardStep, setWizardStep] = useState(0);
@@ -176,6 +177,25 @@ export function CampaignFormPage() {
   }, []);
 
   useEffect(() => {
+    if (!isNew || campaignStatusRows.length === 0) return;
+    setForm((s) => {
+      if (s.campaign_status_master_id) return s;
+      const planning = campaignStatusRows.find((r) => String(r.code || '').toLowerCase() === 'planning');
+      const pick = planning || campaignStatusRows[0];
+      return pick ? { ...s, campaign_status_master_id: String(pick.id) } : s;
+    });
+  }, [isNew, campaignStatusRows]);
+
+  const clearFieldError = useCallback((key) => {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
     if (isNew) {
       setForm({
         ...buildEmptyCampaignForm(),
@@ -285,14 +305,31 @@ export function CampaignFormPage() {
     return { version: 2, rules };
   };
 
-  function validateWizardStep(stepIndex) {
+  function collectFieldErrors(stepIndex) {
+    const errors = {};
     if (stepIndex === 0) {
-      if (!form.name?.trim()) return 'Campaign name is required';
-      if (!form.campaign_type_master_id) return 'Campaign type is required';
-      if (!form.campaign_status_master_id) return 'Campaign status is required';
-      if (form.schedule_mode === 'scheduled' && !String(form.start_date || '').trim()) {
-        return 'Start date is required when using a scheduled start';
+      if (!form.name?.trim()) errors.name = 'Campaign name is required';
+      if (!form.campaign_type_master_id) errors.campaign_type_master_id = 'Campaign type is required';
+      if (!form.campaign_status_master_id) errors.campaign_status_master_id = 'Campaign status is required';
+      if (
+        form.schedule_mode === 'scheduled' &&
+        !String(form.start_date || '').trim()
+      ) {
+        errors.start_date = 'Start date is required for a scheduled start';
       }
+    }
+    if (stepIndex === 1 && form.type === 'static') {
+      const rt = form.static_record_type === 'contact' ? 'contact' : form.static_record_type === 'lead' ? 'lead' : '';
+      if (!rt) errors.static_record_type = 'Choose leads or contacts for this campaign';
+    }
+    return errors;
+  }
+
+  function validateWizardStep(stepIndex) {
+    const fieldErrs = collectFieldErrors(stepIndex);
+    if (Object.keys(fieldErrs).length > 0) {
+      setFieldErrors(fieldErrs);
+      return 'Please fix the highlighted fields before continuing.';
     }
     if (stepIndex === 1 && form.type === 'filter') {
       return validateRulesForSave(form.filterRules || []);
@@ -302,6 +339,7 @@ export function CampaignFormPage() {
 
   const goWizardBack = () => {
     setFormError('');
+    setFieldErrors({});
     setWizardStep((s) => Math.max(0, s - 1));
   };
 
@@ -312,6 +350,7 @@ export function CampaignFormPage() {
       return;
     }
     setFormError('');
+    setFieldErrors({});
     setWizardStep((s) => Math.min(STEPS.length - 1, s + 1));
   };
 
@@ -373,20 +412,41 @@ export function CampaignFormPage() {
     };
   }, [previewOpen, previewPage, previewSearch, previewLimit, form.filterRules]);
 
+  const validateThroughStep = (maxStep) => {
+    for (let i = 0; i <= maxStep; i += 1) {
+      const fieldErrs = collectFieldErrors(i);
+      if (Object.keys(fieldErrs).length > 0) {
+        setFieldErrors(fieldErrs);
+        setWizardStep(i);
+        return 'Please fix the highlighted fields before saving.';
+      }
+      if (i === 1 && form.type === 'filter') {
+        const ruleErr = validateRulesForSave(form.filterRules || []);
+        if (ruleErr) {
+          setWizardStep(i);
+          return ruleErr;
+        }
+      }
+    }
+    return '';
+  };
+
   const persistCampaign = async ({ asDraft }) => {
     setFormError('');
     if (asDraft) {
       if (!form.name?.trim()) {
+        setFieldErrors({ name: 'Campaign name is required to save a draft' });
         setFormError('Name is required to save a draft');
         return;
       }
+      setFieldErrors({});
     } else {
-      const err =
-        validateWizardStep(0) || (form.type === 'filter' ? validateWizardStep(1) : '');
+      const err = validateThroughStep(wizardStep);
       if (err) {
         setFormError(err);
         return;
       }
+      setFieldErrors({});
     }
 
     let filtersPayload;
@@ -428,6 +488,7 @@ export function CampaignFormPage() {
   };
 
   const handleSaveDraft = () => persistCampaign({ asDraft: true });
+  const handleSave = () => persistCampaign({ asDraft: false });
   const handleLaunchOrSave = () => persistCampaign({ asDraft: false });
 
   const allowed = isNew ? isAdmin && canCreate : isAdmin && canUpdate;
@@ -521,6 +582,8 @@ export function CampaignFormPage() {
                   formatDate={formatDate}
                   launchBusy={createMut.loading || updateMut.loading}
                   onReviewLaunch={handleLaunchOrSave}
+                  fieldErrors={fieldErrors}
+                  onClearFieldError={clearFieldError}
                 />
               </>
             )}
@@ -531,33 +594,28 @@ export function CampaignFormPage() {
           <footer className={pageStyles.campaignFormFooter}>
             <div className={pageStyles.campaignWizardPageInner}>
               <div className={pageStyles.campaignFormFooterInner}>
-                {wizardStep > 0 ? (
-                  <div className={pageStyles.campaignFormFooterLeft}>
-                    <Button type="button" variant="secondary" onClick={goWizardBack}>
-                      Back
-                    </Button>
-                  </div>
-                ) : (
-                  <div className={pageStyles.campaignFormFooterLeft}>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={handleSaveDraft}
-                      disabled={createMut.loading || updateMut.loading}
-                    >
-                      Save as draft
-                    </Button>
-                  </div>
-                )}
+                <div className={pageStyles.campaignFormFooterLeft}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleSaveDraft}
+                    disabled={createMut.loading || updateMut.loading}
+                  >
+                    Save as draft
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleSave}
+                    disabled={createMut.loading || updateMut.loading}
+                  >
+                    {createMut.loading || updateMut.loading ? 'Saving…' : 'Save'}
+                  </Button>
+                </div>
                 <div className={pageStyles.campaignFormFooterRight}>
                   {wizardStep > 0 ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={handleSaveDraft}
-                      disabled={createMut.loading || updateMut.loading}
-                    >
-                      Save as draft
+                    <Button type="button" variant="secondary" onClick={goWizardBack}>
+                      Back
                     </Button>
                   ) : null}
                   {wizardStep === 0 ? (

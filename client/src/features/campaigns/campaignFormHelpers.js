@@ -1,4 +1,9 @@
 import { defaultRule, getPropertyMeta, ruleNeedsValue } from './campaignFilterConfig';
+import { dateToDateOnlyString } from '../../components/ui/dateTimePickerUtils';
+
+export function getImmediateStartDate() {
+  return dateToDateOnlyString(new Date());
+}
 
 export function parseFilters(campaign) {
   if (!campaign?.filters_json) return {};
@@ -101,14 +106,20 @@ export function parseSettingsFromCampaign(campaign) {
     content_html: o.content_html || '',
     audience_estimate_total: o.audience_estimate_total != null ? Number(o.audience_estimate_total) : null,
     audience_estimate_at: o.audience_estimate_at || null,
+    static_record_type: o.static_record_type === 'contact' ? 'contact' : 'lead',
   };
 }
 
 export function buildSettingsPayload(form) {
+  const scheduleImmediate = form.schedule_mode !== 'scheduled';
+  let start_date = form.start_date?.trim() ? form.start_date.trim() : null;
+  if (scheduleImmediate && form.end_date?.trim() && !start_date) {
+    start_date = getImmediateStartDate();
+  }
   return {
     pipeline_id: form.pipeline_id ? Number(form.pipeline_id) : null,
     schedule_mode: form.schedule_mode,
-    start_date: form.start_date || null,
+    start_date,
     end_date: form.end_date || null,
     timezone: form.timezone || null,
     channel: form.channel,
@@ -118,6 +129,7 @@ export function buildSettingsPayload(form) {
     content_html: form.content_html || null,
     audience_estimate_total: form.audience_estimate_total,
     audience_estimate_at: form.audience_estimate_at,
+    static_record_type: form.static_record_type === 'contact' ? 'contact' : 'lead',
   };
 }
 
@@ -151,6 +163,7 @@ export function buildEmptyCampaignForm() {
     pipeline_id: '',
     schedule_mode: 'immediate',
     start_date: '',
+    static_record_type: 'lead',
     end_date: '',
     timezone: getDefaultTimezone(),
     audienceTab: 'filter',

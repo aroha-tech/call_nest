@@ -522,6 +522,27 @@
   margin-top: $space-4;
 }
 
+.staticRecordTabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-2;
+  margin-bottom: $space-3;
+
+  @media (max-width: 560px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.staticRecordTabsError .audienceTab {
+  border-color: var(--color-danger, #dc2626);
+}
+
+.wizardFieldError {
+  margin: 0 0 $space-3;
+  font-size: $font-size-xs;
+  color: var(--color-danger, #dc2626);
+}
+
 .audienceTabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

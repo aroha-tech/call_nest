@@ -8,6 +8,7 @@ import { defaultRule } from './campaignFilterConfig';
 import { ScriptBodyEditor } from '../callScripts/ScriptBodyEditor';
 import { CampaignWizardSectionHeader, WizardDecorIcons } from './campaignWizardDecor';
 import { AudienceSourceIcon, ChannelPickerGlyph, WizardLaunchRocketHero, WizardRocketMini } from './campaignWizardVisuals';
+import { getImmediateStartDate } from './campaignFormHelpers';
 import styles from './CampaignsPage.module.scss';
 
 const STEPS = [
@@ -38,29 +39,15 @@ const PAGE_LEADS = [
   { title: 'Review & Launch', hint: 'Review your campaign details before launching.' },
 ];
 
-const DIALER_SELECT_OPTIONS = [
-  { value: 'active', label: 'Active', dialerKey: 'active' },
-  { value: 'paused', label: 'Paused', dialerKey: 'paused' },
-];
-
 const SCHEDULE_SELECT_OPTIONS = [
   { value: 'immediate', label: 'Start immediately', scheduleKey: 'immediate' },
   { value: 'scheduled', label: 'Scheduled start', scheduleKey: 'scheduled' },
 ];
 
-function DialerGlyph() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M22 16.92v3a2 2 0 01-2.18 2 19.8 19.8 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.8 19.8 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.12.86.3 1.71.6 2.54a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.83.3 1.68.48 2.54.6A2 2 0 0122 16.92z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
+const STATIC_RECORD_OPTIONS = [
+  { value: 'lead', label: 'Leads', desc: 'Assign leads to this campaign.' },
+  { value: 'contact', label: 'Contacts', desc: 'Assign contacts to this campaign.' },
+];
 
 function CalendarGlyph() {
   return (
@@ -111,6 +98,8 @@ export function CampaignFormWizard({
   formatDate,
   launchBusy,
   onReviewLaunch,
+  fieldErrors = {},
+  onClearFieldError,
 }) {
   const descLen = (form.description || '').length;
 
@@ -168,6 +157,10 @@ export function CampaignFormWizard({
         ? formatDateTime(form.start_date)
         : '—';
 
+  const scheduleImmediate = form.schedule_mode === 'immediate';
+  const staticRecordLabel =
+    form.static_record_type === 'contact' ? 'Contacts' : form.static_record_type === 'lead' ? 'Leads' : '—';
+
   const campaignStatusRichOptions = useMemo(
     () =>
       campaignStatusSelectOptions.map((o) => ({
@@ -199,19 +192,6 @@ export function CampaignFormWizard({
     return (
       <span className={styles.selectPillRow}>
         <span className={dotClass} />
-        <span>{option.label}</span>
-      </span>
-    );
-  }, []);
-
-  const formatDialerOptionLabel = useCallback((option) => {
-    if (!option) return null;
-    const active = option.dialerKey === 'active';
-    return (
-      <span className={styles.selectPillRow}>
-        <span className={active ? styles.selectDialerIconActive : styles.selectDialerIconMuted}>
-          <DialerGlyph />
-        </span>
         <span>{option.label}</span>
       </span>
     );
@@ -291,7 +271,11 @@ export function CampaignFormWizard({
                     label="Campaign name"
                     required
                     value={form.name}
-                    onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+                    error={fieldErrors.name}
+                    onChange={(e) => {
+                      onClearFieldError?.('name');
+                      setForm((s) => ({ ...s, name: e.target.value }));
+                    }}
                     placeholder="e.g. Summer offer campaign"
                     inputClassName={styles.wizardInfoControl}
                   />
@@ -299,7 +283,11 @@ export function CampaignFormWizard({
                     label="Campaign type"
                     required
                     value={form.campaign_type_master_id}
-                    onChange={(e) => setForm((s) => ({ ...s, campaign_type_master_id: e.target.value }))}
+                    error={fieldErrors.campaign_type_master_id}
+                    onChange={(e) => {
+                      onClearFieldError?.('campaign_type_master_id');
+                      setForm((s) => ({ ...s, campaign_type_master_id: e.target.value }));
+                    }}
                     placeholder="Select campaign type"
                     options={campaignTypeSelectOptions.filter((o) => o.value !== '')}
                     selectClassName={styles.wizardInfoSelect}
@@ -352,29 +340,33 @@ export function CampaignFormWizard({
                   title="Campaign Settings"
                   hint="Set status, visibility and other preferences."
                 />
-                <div className={`${styles.wizardGrid3} ${styles.wizardInfoGrid}`.trim()}>
+                <div className={`${styles.wizardGrid2} ${styles.wizardInfoGrid}`.trim()}>
                   <Select
                     label="Campaign status"
                     required
                     value={form.campaign_status_master_id}
-                    onChange={(e) => setForm((s) => ({ ...s, campaign_status_master_id: e.target.value }))}
+                    error={fieldErrors.campaign_status_master_id}
+                    onChange={(e) => {
+                      onClearFieldError?.('campaign_status_master_id');
+                      setForm((s) => ({ ...s, campaign_status_master_id: e.target.value }));
+                    }}
                     placeholder="Select status"
                     options={campaignStatusRichOptions}
                     formatOptionLabel={formatStatusOptionLabel}
                     selectClassName={styles.wizardInfoSelect}
                   />
                   <Select
-                    label="Dialer availability"
-                    value={form.status}
-                    onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}
-                    options={DIALER_SELECT_OPTIONS}
-                    formatOptionLabel={formatDialerOptionLabel}
-                    selectClassName={styles.wizardInfoSelect}
-                  />
-                  <Select
                     label="Schedule"
                     value={form.schedule_mode}
-                    onChange={(e) => setForm((s) => ({ ...s, schedule_mode: e.target.value }))}
+                    onChange={(e) => {
+                      const mode = e.target.value;
+                      onClearFieldError?.('start_date');
+                      setForm((s) => ({
+                        ...s,
+                        schedule_mode: mode,
+                        start_date: mode === 'immediate' ? '' : s.start_date,
+                      }));
+                    }}
                     options={SCHEDULE_SELECT_OPTIONS}
                     formatOptionLabel={formatScheduleOptionLabel}
                     selectClassName={styles.wizardInfoSelect}
@@ -384,17 +376,43 @@ export function CampaignFormWizard({
                   <DateTimePickerField
                     mode="date"
                     label="Start date"
-                    required={form.schedule_mode === 'scheduled'}
-                    value={form.start_date || ''}
-                    onChange={(v) => setForm((s) => ({ ...s, start_date: v || '' }))}
-                    placeholder="Select date"
+                    required={!scheduleImmediate}
+                    disabled={scheduleImmediate}
+                    error={fieldErrors.start_date}
+                    hint={
+                      scheduleImmediate
+                        ? 'Uses today’s date when you set an end date; not required on its own.'
+                        : undefined
+                    }
+                    value={
+                      scheduleImmediate
+                        ? form.end_date
+                          ? form.start_date || getImmediateStartDate()
+                          : form.start_date || ''
+                        : form.start_date || ''
+                    }
+                    onChange={(v) => {
+                      if (scheduleImmediate) return;
+                      onClearFieldError?.('start_date');
+                      setForm((s) => ({ ...s, start_date: v || '' }));
+                    }}
+                    placeholder={scheduleImmediate ? 'Today’s date' : 'Select date'}
                     inputClassName={styles.wizardInfoDateTrigger}
                   />
                   <DateTimePickerField
                     mode="date"
                     label="End date (optional)"
                     value={form.end_date || ''}
-                    onChange={(v) => setForm((s) => ({ ...s, end_date: v || '' }))}
+                    onChange={(v) => {
+                      const endVal = v || '';
+                      setForm((s) => {
+                        const next = { ...s, end_date: endVal };
+                        if (s.schedule_mode === 'immediate') {
+                          next.start_date = endVal ? getImmediateStartDate() : '';
+                        }
+                        return next;
+                      });
+                    }}
                     placeholder="Select date"
                     inputClassName={styles.wizardInfoDateTrigger}
                   />
@@ -490,9 +508,52 @@ export function CampaignFormWizard({
               </section>
             ) : (
               <section className={styles.wizardSection}>
+                <CampaignWizardSectionHeader
+                  tone="brand"
+                  icon={WizardDecorIcons.audience}
+                  title="Record type"
+                  hint="Choose whether this campaign targets leads or contacts."
+                />
+                <div
+                  className={`${styles.staticRecordTabs} ${fieldErrors.static_record_type ? styles.staticRecordTabsError : ''}`.trim()}
+                  role="radiogroup"
+                  aria-label="Record type"
+                  aria-invalid={fieldErrors.static_record_type ? true : undefined}
+                >
+                  {STATIC_RECORD_OPTIONS.map((opt) => {
+                    const active = (form.static_record_type || 'lead') === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        className={`${styles.audienceTab} ${active ? styles.audienceTabActive : ''}`.trim()}
+                        onClick={() => {
+                          onClearFieldError?.('static_record_type');
+                          setForm((s) => ({ ...s, static_record_type: opt.value }));
+                        }}
+                      >
+                        <span className={styles.audienceTabIcon}>
+                          <AudienceSourceIcon variant={opt.value === 'lead' ? 'filter' : 'list'} />
+                        </span>
+                        <span className={styles.audienceTabBody}>
+                          <strong>{opt.label}</strong>
+                          <span className={styles.audienceTabDesc}>{opt.desc}</span>
+                        </span>
+                        {active ? <span className={styles.audienceTabCheck}>✓</span> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+                {fieldErrors.static_record_type ? (
+                  <p className={styles.wizardFieldError} role="alert">
+                    {fieldErrors.static_record_type}
+                  </p>
+                ) : null}
                 <p className={styles.wizardMuted}>
-                  For static campaigns, assign contacts (or import with a campaign column) so they reference this campaign.
-                  Filter rules are not used.
+                  After saving, assign {form.static_record_type === 'contact' ? 'contacts' : 'leads'} from the{' '}
+                  {form.static_record_type === 'contact' ? 'Contacts' : 'Leads'} list or import with a campaign column.
                 </p>
               </section>
             )}
@@ -671,6 +732,11 @@ export function CampaignFormWizard({
                       {form.type === 'filter' ? 'Filter (Dynamic rules)' : 'Static list'}
                     </strong>
                   </li>
+                  {form.type === 'static' ? (
+                    <li>
+                      <span>Record type</span> <strong>{staticRecordLabel}</strong>
+                    </li>
+                  ) : null}
                   <li>
                     <span>Rules applied</span>{' '}
                     <strong>
