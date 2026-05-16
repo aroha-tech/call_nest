@@ -1273,7 +1273,7 @@ export function ContactFormPage({ defaultType }) {
         }
       />
 
-      {submitError && <Alert variant="error">{submitError}</Alert>}
+      {submitError && <Alert variant="warning" display="inline">{submitError}</Alert>}
       {(isNew || isEditing) && formErrors.phones && <Alert variant="warning">{formErrors.phones}</Alert>}
       {(isNew || isEditing) && formErrors.contact_channel && !formErrors.phones && (
         <Alert variant="warning" display="inline">

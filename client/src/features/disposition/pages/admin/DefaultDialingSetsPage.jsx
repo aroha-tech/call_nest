@@ -323,7 +323,7 @@ export function DefaultDialingSetsPage() {
         </ModalFooter>
       }>
         <form onSubmit={handleSubmit} className={styles.form}>
-          {submitError && <Alert variant="error">{submitError}</Alert>}
+          {submitError && <Alert variant="warning" display="inline">{submitError}</Alert>}
           <Input label="Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: e.target.value })} error={formErrors.name} placeholder="e.g. Cold Calling Set" />
           <Input label="Description" value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Optional description" />
         </form>

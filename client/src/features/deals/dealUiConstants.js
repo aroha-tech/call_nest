@@ -11,6 +11,25 @@ export const DEAL_CURRENCY_OPTIONS = [
   { value: 'CAD', label: 'CAD — Canadian Dollar' },
 ];
 
+/** Normalize pipeline / deal currency code for display and API payloads. */
+export function normalizePipelineCurrency(dealOrCode) {
+  if (dealOrCode != null && typeof dealOrCode === 'object') {
+    return String(dealOrCode.currency_code || DEFAULT_DEAL_CURRENCY)
+      .trim()
+      .toUpperCase();
+  }
+  return String(dealOrCode || DEFAULT_DEAL_CURRENCY)
+    .trim()
+    .toUpperCase();
+}
+
+/** Currency select options for an opportunity — locked to the pipeline's currency. */
+export function currencyOptionsForPipeline(pipelineCurrency) {
+  const code = normalizePipelineCurrency(pipelineCurrency);
+  const known = DEAL_CURRENCY_OPTIONS.find((o) => o.value === code);
+  return known ? [known] : [{ value: code, label: code }];
+}
+
 /**
  * Default pipeline stages matching the product reference UI.
  * Open-stage % values (10 / 25 / 50 / 75) do not sum to 100 — use pipeline probability_mode "custom"

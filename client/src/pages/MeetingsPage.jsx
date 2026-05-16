@@ -78,6 +78,40 @@ function pad2(n) {
   return String(n).padStart(2, '0');
 }
 
+const REMINDER_OFFSET_UNIT_OPTIONS = [
+  { value: 'minutes', label: 'Minutes' },
+  { value: 'hours', label: 'Hours' },
+  { value: 'days', label: 'Days' },
+];
+
+async function fetchDefaultReminderOffset(ownerUserId) {
+  try {
+    const params =
+      ownerUserId != null && String(ownerUserId).trim() !== ''
+        ? { for_user_id: ownerUserId }
+        : undefined;
+    const res = await meetingsAPI.getDefaultEmailSettings(params);
+    const list = res?.data?.data?.reminder_offsets;
+    const first = Array.isArray(list) ? list[0] : null;
+    const value = Number(first?.value);
+    return {
+      value: Number.isFinite(value) && value > 0 ? value : 10,
+      unit: first?.unit || 'minutes',
+    };
+  } catch {
+    return { value: 10, unit: 'minutes' };
+  }
+}
+
+function reminderOffsetFromMeetingRow(m) {
+  const value = Number(m?.reminder_offset_value);
+  const unit = String(m?.reminder_offset_unit || '').trim();
+  if (Number.isFinite(value) && value > 0 && unit) {
+    return { value, unit };
+  }
+  return null;
+}
+
 /** @param {Date} d */
 function toYmd(d) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -217,6 +251,7 @@ export function MeetingsPage() {
   const user = useAppSelector(selectUser);
   const { canAny } = usePermissions();
   const canManage = canAny([PERMISSIONS.MEETINGS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]);
+  const canMailSettings = canAny([PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE]);
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -268,10 +303,13 @@ export function MeetingsPage() {
     meeting_duration_min: '30',
     attendance_status: 'unknown',
     send_reminder: true,
+    reminder_offset_value: 10,
+    reminder_offset_unit: 'minutes',
   });
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [providerReconnectRequired, setProviderReconnectRequired] = useState(false);
+  const [calendarDayModal, setCalendarDayModal] = useState(null);
 
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [templateTab, setTemplateTab] = useState('created');
@@ -637,9 +675,10 @@ export function MeetingsPage() {
     return { start_at: toLocal(start), end_at: toLocal(end) };
   }
 
-  function openCreate() {
+  async function openCreate() {
     if (!formAccountOptions.length) return navigate('/email/accounts');
     const first = formAccountOptions[0]?.value || '';
+    const reminderDefaults = await fetchDefaultReminderOffset(user?.id);
     setSaveSuccessMessage(null);
     setEditing(null);
     setMeetingFormErrors({});
@@ -660,16 +699,19 @@ export function MeetingsPage() {
       meeting_duration_min: '30',
       attendance_status: 'unknown',
       send_reminder: true,
+      reminder_offset_value: reminderDefaults.value,
+      reminder_offset_unit: reminderDefaults.unit,
       meeting_timezone: DEFAULT_MEETING_TIMEZONE,
     });
     setModalOpen(true);
   }
 
-  function openCreateForDay(dayDate) {
+  async function openCreateForDay(dayDate) {
     if (!canManage) return;
     if (!formAccountOptions.length) return navigate('/email/accounts');
     const first = formAccountOptions[0]?.value || '';
     const { start_at, end_at } = dayDefaultsForCreate(dayDate);
+    const reminderDefaults = await fetchDefaultReminderOffset(user?.id);
     setSaveSuccessMessage(null);
     setEditing(null);
     setMeetingFormErrors({});
@@ -690,17 +732,24 @@ export function MeetingsPage() {
       meeting_duration_min: '60',
       attendance_status: 'unknown',
       send_reminder: true,
+      reminder_offset_value: reminderDefaults.value,
+      reminder_offset_unit: reminderDefaults.unit,
       meeting_timezone: DEFAULT_MEETING_TIMEZONE,
     });
     setModalOpen(true);
   }
 
-  function openEdit(m) {
+  async function openEdit(m) {
     setSaveSuccessMessage(null);
     setEditing(m);
     setMeetingFormErrors({});
     setSelectedEntityId(m.contact_id != null ? String(m.contact_id) : '');
     setSelectedEntityDetail(null);
+    let reminder = reminderOffsetFromMeetingRow(m);
+    if (!reminder) {
+      const ownerId = m.meeting_owner_user_id ?? m.assigned_user_id;
+      reminder = await fetchDefaultReminderOffset(ownerId);
+    }
     setForm({
       email_account_id: String(m.email_account_id),
       title: m.title || '',
@@ -716,6 +765,8 @@ export function MeetingsPage() {
       meeting_duration_min: m.meeting_duration_min != null ? String(m.meeting_duration_min) : '30',
       attendance_status: m.attendance_status || 'unknown',
       send_reminder: m.send_reminder == null ? true : Number(m.send_reminder) !== 0,
+      reminder_offset_value: reminder.value,
+      reminder_offset_unit: reminder.unit,
       meeting_timezone: m.meeting_timezone || DEFAULT_MEETING_TIMEZONE,
     });
     setModalOpen(true);
@@ -796,6 +847,13 @@ export function MeetingsPage() {
         send_reminder: Boolean(form.send_reminder),
         meeting_timezone: tz,
       };
+      if (form.send_reminder) {
+        payload.reminder_offset_value = Math.max(
+          1,
+          Math.floor(Number(form.reminder_offset_value) || 1)
+        );
+        payload.reminder_offset_unit = form.reminder_offset_unit || 'minutes';
+      }
       if (editing) {
         const res = await meetingsAPI.update(editing.id, payload);
         const meta = res?.data?.meta;
@@ -1201,9 +1259,19 @@ export function MeetingsPage() {
                     </button>
                   ))}
                   {dayMeetings.length > 4 ? (
-                    <div className={styles.listHint} onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className={styles.listHintBtn}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const sorted = [...dayMeetings].sort((a, b) =>
+                          String(a.start_at || '').localeCompare(String(b.start_at || ''))
+                        );
+                        setCalendarDayModal({ date: cell.date, meetings: sorted });
+                      }}
+                    >
                       +{dayMeetings.length - 4} more
-                    </div>
+                    </button>
                   ) : null}
                 </div>
               );
@@ -1342,13 +1410,15 @@ export function MeetingsPage() {
                   ) : null}
                 </div>
                 <div className={styles.modalFooterRight}>
-                  <Button type="button" variant="secondary" onClick={() => navigate('/settings/meetings-mail-settings')} disabled={saving} className={styles.footerBtnWide}>
-                    <UiIcon>
-                      <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
-                      <path d="m3.5 7 8.5 6 8.5-6" />
-                    </UiIcon>
-                    Meetings mail settings
-                  </Button>
+                  {canMailSettings ? (
+                    <Button type="button" variant="secondary" onClick={() => navigate('/settings/meetings-mail-settings')} disabled={saving} className={styles.footerBtnWide}>
+                      <UiIcon>
+                        <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+                        <path d="m3.5 7 8.5 6 8.5-6" />
+                      </UiIcon>
+                      Meetings mail settings
+                    </Button>
+                  ) : null}
                   <Button type="button" variant="ghost" onClick={() => setModalOpen(false)} disabled={saving} className={styles.footerBtn}>
                     {canManage ? 'Cancel' : 'Close'}
                   </Button>
@@ -1769,6 +1839,41 @@ export function MeetingsPage() {
                 />
               </div>
             </div>
+            {form.send_reminder ? (
+              <div className={styles.meetingReminderSchedule} style={{ gridColumn: '1 / -1' }}>
+                <p className={styles.meetingReminderScheduleHint}>
+                  Send the reminder email this long before the meeting starts. Defaults come from your{' '}
+                  <a href="/settings/meetings-mail-settings" target="_blank" rel="noopener noreferrer">
+                    Meetings mail settings
+                  </a>
+                  ; you can override for this meeting only.
+                </p>
+                <div className={styles.meetingReminderScheduleRow}>
+                  <Input
+                    label="Reminder — amount"
+                    type="number"
+                    min="1"
+                    value={form.reminder_offset_value ?? 10}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        reminder_offset_value: Number(e.target.value || 1),
+                      }))
+                    }
+                    disabled={!canManage}
+                  />
+                  <Select
+                    label="Unit"
+                    value={form.reminder_offset_unit || 'minutes'}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, reminder_offset_unit: e.target.value }))
+                    }
+                    options={REMINDER_OFFSET_UNIT_OPTIONS}
+                    disabled={!canManage}
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
           <div className={styles.helperNotice}>
             <UiIcon>
@@ -2231,6 +2336,54 @@ export function MeetingsPage() {
           </div>
         )}
       </SlidePanel>
+
+      <Modal
+        isOpen={Boolean(calendarDayModal)}
+        onClose={() => setCalendarDayModal(null)}
+        title={calendarDayModal ? formatDate(calendarDayModal.date) : 'Meetings'}
+        subtitle={
+          calendarDayModal
+            ? `${calendarDayModal.meetings.length} meeting${calendarDayModal.meetings.length === 1 ? '' : 's'}`
+            : undefined
+        }
+        size="md"
+        closeOnOverlay
+        closeOnEscape
+        footer={
+          <ModalFooter>
+            <Button type="button" variant="ghost" onClick={() => setCalendarDayModal(null)}>
+              Close
+            </Button>
+          </ModalFooter>
+        }
+      >
+        {calendarDayModal?.meetings?.length ? (
+          <ul className={styles.dayMeetingsList}>
+            {calendarDayModal.meetings.map((m) => (
+              <li key={m.id}>
+                <button
+                  type="button"
+                  className={`${styles.dayMeetingsListItem} ${styles[meetingChipStatusClass(m)]}`}
+                  onClick={() => {
+                    setCalendarDayModal(null);
+                    openEdit(m);
+                  }}
+                >
+                  <span className={styles.dayMeetingsListTime}>
+                    {formatTime(String(m.start_at || '').replace(' ', 'T'))}
+                  </span>
+                  <span className={styles.dayMeetingsListTitle}>{m.title || 'Untitled meeting'}</span>
+                  <Badge variant={meetingStatusBadgeVariant(m.meeting_status)} size="sm">
+                    {m.meeting_status || 'scheduled'}
+                  </Badge>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className={styles.listHint}>No meetings for this day.</p>
+        )}
+      </Modal>
 
       <ConfirmModal
         isOpen={!!resetTemplateKind}

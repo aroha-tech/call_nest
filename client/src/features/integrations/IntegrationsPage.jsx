@@ -308,7 +308,7 @@ export function IntegrationsPage() {
           </ModalFooter>
         }
       >
-        {submitError ? <Alert variant="error">{submitError}</Alert> : null}
+        {submitError ? <Alert variant="warning" display="inline">{submitError}</Alert> : null}
 
         <div className={styles.formGrid}>
           <Select

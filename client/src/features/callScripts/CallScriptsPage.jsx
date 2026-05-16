@@ -523,7 +523,7 @@ export function CallScriptsPage() {
         }
       >
         <form onSubmit={handleSubmit} className={styles.form}>
-          {formError && <Alert variant="error">{formError}</Alert>}
+          {formError && <Alert variant="warning" display="inline">{formError}</Alert>}
 
           <p className={styles.panelSubtitle}>
             {editingId

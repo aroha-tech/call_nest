@@ -1,7 +1,9 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useEffect, useState, useRef } from 'react';
+import { Alert } from '../../components/ui/Alert';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Button } from '../../components/ui/Button';
+import { Modal, ModalFooter } from '../../components/ui/Modal';
 import { DateTimePickerField } from '../../components/ui/DateTimePickerField';
 import { CampaignFilterBuilder } from './CampaignFilterBuilder';
 import { defaultRule } from './campaignFilterConfig';
@@ -9,6 +11,8 @@ import { ScriptBodyEditor } from '../callScripts/ScriptBodyEditor';
 import { CampaignWizardSectionHeader, WizardDecorIcons } from './campaignWizardDecor';
 import { AudienceSourceIcon, ChannelPickerGlyph, WizardLaunchRocketHero, WizardRocketMini } from './campaignWizardVisuals';
 import { getImmediateStartDate } from './campaignFormHelpers';
+import { ContactLeadPickerModal } from '../../components/crm/ContactLeadPickerModal';
+import { DEFAULT_PREVIEW_DATA, linkifyHtml, renderPreview } from '../../utils/templateVariables';
 import styles from './CampaignsPage.module.scss';
 
 const STEPS = [
@@ -20,9 +24,9 @@ const STEPS = [
 
 const CHANNEL_CARDS = [
   { value: 'phone', label: 'Phone Call' },
-  { value: 'whatsapp', label: 'WhatsApp' },
   { value: 'email', label: 'Email' },
-  { value: 'sms', label: 'SMS' },
+  { value: 'whatsapp', label: 'WhatsApp', comingSoon: true },
+  { value: 'sms', label: 'SMS', comingSoon: true },
 ];
 
 const CHANNEL_HINTS = {
@@ -44,9 +48,99 @@ const SCHEDULE_SELECT_OPTIONS = [
   { value: 'scheduled', label: 'Scheduled start', scheduleKey: 'scheduled' },
 ];
 
+const DEFAULT_EMAIL_TEMPLATE = `<div style="background:#f4f7fb;padding:40px 0;font-family:Arial,sans-serif;">
+  <table align="center" width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
+    <tr>
+      <td style="background:linear-gradient(135deg,#5b5ff8,#7c3aed);padding:30px;text-align:center;">
+        <h1 style="color:#ffffff;margin:0;font-size:28px;">
+          Welcome {{contact.first_name}}
+        </h1>
+        <p style="color:#dbeafe;margin-top:10px;font-size:15px;">
+          We&rsquo;re excited to connect with you.
+        </p>
+      </td>
+    </tr>
+
+    <tr>
+      <td style="padding:35px;">
+        <h2 style="margin-top:0;color:#111827;font-size:22px;">
+          Your Campaign Starts Here &#128640;
+        </h2>
+
+        <p style="color:#4b5563;font-size:15px;line-height:1.7;">
+          Thank you for joining <strong>{{company.name}}</strong>.
+          We&rsquo;re here to help you manage campaigns, automate communication,
+          and grow your business faster.
+        </p>
+        <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:20px;margin:25px 0;">
+          <h3 style="margin-top:0;color:#111827;font-size:18px;">
+            Campaign Details
+          </h3>
+
+          <p style="margin:8px 0;color:#374151;">
+            <strong>Name:</strong> {{contact.first_name}} {{contact.last_name}}
+          </p>
+
+          <p style="margin:8px 0;color:#374151;">
+            <strong>Email:</strong> {{contact.email}}
+          </p>
+
+          <p style="margin:8px 0;color:#374151;">
+            <strong>Status:</strong> Active
+          </p>
+        </div>
+
+        <div style="text-align:center;margin-top:35px;">
+          <a href="#"
+            style="background:linear-gradient(135deg,#5b5ff8,#7c3aed);
+            color:#ffffff;
+            text-decoration:none;
+            padding:14px 30px;
+            border-radius:10px;
+            display:inline-block;
+            font-size:15px;
+            font-weight:bold;">
+            Launch Campaign
+          </a>
+        </div>
+      </td>
+    </tr>
+
+    <tr>
+      <td style="background:#111827;padding:25px;text-align:center;">
+        <p style="color:#9ca3af;font-size:13px;margin:0;">
+          &copy; 2026 {{company.name}}. All rights reserved.
+        </p>
+
+        <p style="color:#6b7280;font-size:12px;margin-top:8px;">
+          You&rsquo;re receiving this email because you subscribed to our platform.
+        </p>
+      </td>
+    </tr>
+  </table>
+</div>`;
+
+const CAMPAIGN_EMAIL_PREVIEW_DATA = {
+  ...DEFAULT_PREVIEW_DATA,
+  'contact.first_name': 'Rahul',
+  'contact.last_name': 'Sharma',
+  'contact.full_name': 'Rahul Sharma',
+  'contact.email': 'rahul@example.com',
+  'contact.phone': '+91 98765 43210',
+  'company.name': 'Arohva',
+  'company.phone': '+91 1800 123 456',
+  'company.email': 'hello@arohva.com',
+  'company.website': 'https://arohva.com',
+  'campaign.name': 'Spring Growth Campaign',
+  'campaign.status': 'Active',
+  'campaign.channel': 'Email',
+  current_year: '2026',
+};
+
 const STATIC_RECORD_OPTIONS = [
   { value: 'lead', label: 'Leads', desc: 'Assign leads to this campaign.' },
   { value: 'contact', label: 'Contacts', desc: 'Assign contacts to this campaign.' },
+  { value: 'both', label: 'Both', desc: 'Assign leads and contacts to this campaign.' },
 ];
 
 function CalendarGlyph() {
@@ -77,6 +171,36 @@ function stripHtml(html) {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function sampleValueForVariable(variable) {
+  const key = String(variable || '').trim();
+  const lower = key.toLowerCase();
+  const label = key
+    .split('.')
+    .pop()
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
+
+  if (lower.includes('email')) return 'rahul@example.com';
+  if (lower.includes('phone') || lower.includes('mobile')) return '+91 98765 43210';
+  if (lower.includes('company')) return 'Arohva';
+  if (lower.includes('name')) return 'Rahul Sharma';
+  if (lower.includes('date')) return '16 May 2026';
+  if (lower.includes('time')) return '10:00 AM';
+  if (lower.includes('year')) return '2026';
+  if (lower.includes('link') || lower.includes('url') || lower.includes('website')) return 'https://example.com';
+  if (lower.includes('status')) return 'Active';
+  return label || 'Sample Value';
+}
+
+function renderCampaignEmailPreview(html) {
+  const rendered = renderPreview(html, CAMPAIGN_EMAIL_PREVIEW_DATA);
+  const withFallbackSamples = rendered.replace(/{{(.*?)}}/g, (_, raw) => {
+    const [variable, fallback] = String(raw).split('|').map((part) => part.trim());
+    return fallback || sampleValueForVariable(variable);
+  });
+  return linkifyHtml(withFallbackSamples);
+}
+
 export function CampaignFormWizard({
   step,
   form,
@@ -101,6 +225,9 @@ export function CampaignFormWizard({
   fieldErrors = {},
   onClearFieldError,
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [emailPreviewOpen, setEmailPreviewOpen] = useState(false);
+  const emailPreviewRef = useRef(null);
   const descLen = (form.description || '').length;
 
   const audienceTab = form.audienceTab || (form.type === 'static' ? 'static' : 'filter');
@@ -120,6 +247,26 @@ export function CampaignFormWizard({
     form.audience_estimate_total != null && Number.isFinite(Number(form.audience_estimate_total))
       ? Number(form.audience_estimate_total)
       : null;
+  const phoneContentHtml = form.phone_content_html ?? (form.channel === 'phone' ? form.content_html || '' : '');
+  const emailContentHtml = form.email_content_html ?? (form.channel === 'email' ? form.content_html || '' : '');
+
+  const selectChannel = useCallback(
+    (channel) => {
+      setForm((s) => ({
+        ...s,
+        channel,
+        email_content_html:
+          channel === 'email' && !s.email_content_html?.trim() ? DEFAULT_EMAIL_TEMPLATE : s.email_content_html,
+      }));
+    },
+    [setForm]
+  );
+
+  useEffect(() => {
+    if (step === 1 && form.type === 'filter' && estimatedTotal == null && !audienceEstimateLoading) {
+      onRecalculateAudience?.();
+    }
+  }, [step, form.type, estimatedTotal, audienceEstimateLoading, onRecalculateAudience]);
 
   const audienceEstimateRecencyLabel = useMemo(() => {
     if (!form.audience_estimate_at) return null;
@@ -129,6 +276,14 @@ export function CampaignFormWizard({
     if (diff >= 0 && diff < 120_000) return 'Just now';
     return formatDateTime ? formatDateTime(form.audience_estimate_at) : String(form.audience_estimate_at);
   }, [form.audience_estimate_at, formatDateTime]);
+
+  const emailPreviewHtml = useMemo(
+    () =>
+      emailContentHtml?.trim()
+        ? renderCampaignEmailPreview(emailContentHtml)
+        : '<p style="color:#94a3b8;text-align:center;padding:40px;">No content yet.</p>',
+    [emailContentHtml]
+  );
 
   const campaignTypeLabel =
     campaignTypeSelectOptions.find((o) => o.value === String(form.campaign_type_master_id))?.label || '—';
@@ -145,7 +300,7 @@ export function CampaignFormWizard({
   const scriptSummary =
     form.call_script_id
       ? scriptSelectOptions.find((o) => o.value === String(form.call_script_id))?.label || '—'
-      : stripHtml(form.content_html)
+      : stripHtml(phoneContentHtml)
         ? 'Custom script'
         : '—';
 
@@ -159,7 +314,7 @@ export function CampaignFormWizard({
 
   const scheduleImmediate = form.schedule_mode === 'immediate';
   const staticRecordLabel =
-    form.static_record_type === 'contact' ? 'Contacts' : form.static_record_type === 'lead' ? 'Leads' : '—';
+    form.static_record_type === 'contact' ? 'Contacts' : form.static_record_type === 'lead' ? 'Leads' : form.static_record_type === 'both' ? 'Both (Leads & Contacts)' : '—';
 
   const campaignStatusRichOptions = useMemo(
     () =>
@@ -446,6 +601,7 @@ export function CampaignFormWizard({
                   aria-selected={audienceTab === 'filter'}
                   className={`${styles.audienceTab} ${audienceTab === 'filter' ? styles.audienceTabActive : ''}`.trim()}
                   onClick={() => setAudienceTab('filter')}
+                  disabled={!!editing}
                 >
                   <span className={styles.audienceTabIcon}>
                     <AudienceSourceIcon variant="filter" />
@@ -484,7 +640,11 @@ export function CampaignFormWizard({
                 </button>
               </div>
               {editing ? (
-                <p className={styles.wizardMuted}>Audience type cannot change after creation.</p>
+                <div style={{ marginTop: '16px' }}>
+                  <Alert variant="warning" display="inline">
+                    Audience type cannot change after creation.
+                  </Alert>
+                </div>
               ) : null}
             </section>
 
@@ -531,7 +691,7 @@ export function CampaignFormWizard({
                         className={`${styles.audienceTab} ${active ? styles.audienceTabActive : ''}`.trim()}
                         onClick={() => {
                           onClearFieldError?.('static_record_type');
-                          setForm((s) => ({ ...s, static_record_type: opt.value }));
+                          setForm((s) => ({ ...s, static_record_type: opt.value, static_contact_ids: [] }));
                         }}
                       >
                         <span className={styles.audienceTabIcon}>
@@ -551,10 +711,10 @@ export function CampaignFormWizard({
                     {fieldErrors.static_record_type}
                   </p>
                 ) : null}
-                <p className={styles.wizardMuted}>
-                  After saving, assign {form.static_record_type === 'contact' ? 'contacts' : 'leads'} from the{' '}
-                  {form.static_record_type === 'contact' ? 'Contacts' : 'Leads'} list or import with a campaign column.
-                </p>
+                
+                <Alert variant="info" style={{ marginTop: 24 }}>
+                  <strong>After saving, assign records from the Leads or Contacts list, or import them with a campaign column.</strong>
+                </Alert>
               </section>
             )}
 
@@ -621,37 +781,50 @@ export function CampaignFormWizard({
           <div className={styles.wizardChannelStep}>
             <section className={styles.wizardSection}>
               <div className={styles.channelGrid}>
-                {CHANNEL_CARDS.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    className={`${styles.channelCard} ${styles[`channelPick_${c.value}`]} ${form.channel === c.value ? styles.channelCardActive : ''}`.trim()}
-                    onClick={() => setForm((s) => ({ ...s, channel: c.value }))}
-                  >
-                    <span className={styles.channelCardIconWrap}>
-                      <ChannelPickerGlyph channel={c.value} />
-                    </span>
-                    <span className={styles.channelCardText}>
-                      <span className={styles.channelCardLabel}>{c.label}</span>
-                      <span className={styles.channelCardHint}>{CHANNEL_HINTS[c.value]}</span>
-                    </span>
-                  </button>
-                ))}
+                {CHANNEL_CARDS.map((c) => {
+                  const active = form.channel === c.value;
+                  return (
+                    <button
+                      key={c.value}
+                      type="button"
+                      className={`${styles.channelCard} ${styles[`channelPick_${c.value}`]} ${active ? styles.channelCardActive : ''} ${c.comingSoon ? styles.channelCardComingSoon : ''}`.trim()}
+                      onClick={() => {
+                        if (!c.comingSoon) selectChannel(c.value);
+                      }}
+                      disabled={c.comingSoon || !!editing}
+                    >
+                      <span className={styles.channelCardIconWrap}>
+                        <ChannelPickerGlyph channel={c.value} />
+                      </span>
+                      <span className={styles.channelCardText}>
+                        <span className={styles.channelCardLabel}>
+                          {c.label}
+                          {c.comingSoon ? <span className={styles.comingSoonBadge}>Coming Soon</span> : null}
+                        </span>
+                        <span className={styles.channelCardHint}>{CHANNEL_HINTS[c.value]}</span>
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
+              {editing ? (
+                <div style={{ marginTop: 16 }}>
+                  <Alert variant="warning" display="inline">
+                    Channel cannot be changed after campaign creation.
+                  </Alert>
+                </div>
+              ) : null}
             </section>
 
             {form.channel === 'phone' ? (
-              <section className={`${styles.wizardSection} ${styles.wizardCallSettingsSection}`.trim()}>
-                <CampaignWizardSectionHeader title="Call settings" />
-                <div className={styles.wizardCallSettingsGrid}>
-                  <Input
-                    label="Caller ID"
-                    value={form.caller_id_label || ''}
-                    onChange={(e) => setForm((s) => ({ ...s, caller_id_label: e.target.value }))}
-                    placeholder="e.g. +91 98765 43210"
-                  />
+              <section className={styles.wizardSection}>
+                <CampaignWizardSectionHeader
+                  title="Call Script"
+                  hint="Select a pre-built script agents will follow during calls, or write inline talking points below."
+                />
+                <div style={{ maxWidth: 400 }}>
                   <Select
-                    label="Call script (optional)"
+                    label="Call script"
                     allowEmpty
                     compact
                     value={form.call_script_id || ''}
@@ -660,40 +833,77 @@ export function CampaignFormWizard({
                     options={[{ value: '', label: '— None —' }, ...scriptSelectOptions]}
                     wrapperClassName={styles.wizardCallScriptSelect}
                   />
-                  <div className={styles.wizardCallSettingsTimeout}>
-                    <Input
-                      label="Timeout (seconds)"
-                      type="number"
-                      min={5}
-                      max={600}
-                      value={form.timeout_seconds ?? 30}
-                      onChange={(e) => setForm((s) => ({ ...s, timeout_seconds: e.target.value }))}
+                </div>
+                <div style={{ marginTop: 16 }}>
+                  <label className={styles.wizardTextareaLabel}>Campaign notes / inline script <span className={styles.optional}>(optional)</span></label>
+                  <div className={styles.wizardQuill}>
+                    <ScriptBodyEditor
+                      value={phoneContentHtml}
+                      onChange={(html) => setForm((s) => ({ ...s, phone_content_html: html }))}
+                      placeholder="Write campaign-specific talking points…"
+                      compact
+                      scrollableLayout
+                      denseScrollLayout
                     />
-                    <p className={styles.wizardFieldHint}>Time to wait for answer</p>
                   </div>
                 </div>
               </section>
-            ) : (
-              <p className={styles.wizardMuted}>
-                {form.channel === 'email'
-                  ? 'Email sending uses the Email module; this selection is saved for reporting and future automation.'
-                  : 'Channel-specific actions will use integrations configured for your tenant.'}
-              </p>
-            )}
-
-            <section className={styles.wizardSection}>
-              <CampaignWizardSectionHeader title="Content / Script" />
-              <div className={styles.wizardQuill}>
-                <ScriptBodyEditor
-                  value={form.content_html || ''}
-                  onChange={(html) => setForm((s) => ({ ...s, content_html: html }))}
-                  placeholder="Hello {{contact.first_name}}, …"
-                  compact
-                  scrollableLayout
-                  denseScrollLayout
+            ) : form.channel === 'email' ? (
+              <section className={styles.wizardSection}>
+                <CampaignWizardSectionHeader
+                  title="Email Template"
+                  hint="Design the email content that will be sent to your audience. Switch between Visual and HTML modes."
                 />
-              </div>
-            </section>
+                <div className={styles.emailTemplateToolbar}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setForm((s) => ({ ...s, email_content_html: DEFAULT_EMAIL_TEMPLATE }))}
+                  >
+                    <span className={styles.emailToolbarBtnInner}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M4 4v5h5M20 20v-5h-5M5 19A8 8 0 0119 8M19 5a8 8 0 00-14 11" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      Reset to default
+                    </span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setEmailPreviewOpen(true)}
+                    disabled={!emailContentHtml?.trim()}
+                  >
+                    <span className={styles.emailToolbarBtnInner}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.75" /></svg>
+                      Preview
+                    </span>
+                  </Button>
+                </div>
+                <div className={styles.wizardQuill}>
+                  <ScriptBodyEditor
+                    value={emailContentHtml || DEFAULT_EMAIL_TEMPLATE}
+                    onChange={(html) => setForm((s) => ({ ...s, email_content_html: html }))}
+                    placeholder="Hello {{contact.first_name}}, …"
+                    compact
+                    scrollableLayout
+                    denseScrollLayout
+                    enableHtmlSourceToggle
+                  />
+                </div>
+              </section>
+            ) : (
+              <section className={styles.wizardSection}>
+                <CampaignWizardSectionHeader
+                  title="Template"
+                  hint={`Pre-approved ${form.channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} templates will be available here.`}
+                />
+                <div className={styles.wizardComingSoonPlaceholder}>
+                  <p className={styles.wizardMuted}>
+                    Template selection for {form.channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} campaigns is coming soon.
+                  </p>
+                </div>
+              </section>
+            )}
           </div>
         ) : null}
 
@@ -776,13 +986,7 @@ export function CampaignFormWizard({
                     </strong>
                   </li>
                   <li>
-                    <span>Caller ID</span> <strong>{form.caller_id_label || '—'}</strong>
-                  </li>
-                  <li>
-                    <span>Script</span> <strong>{scriptSummary}</strong>
-                  </li>
-                  <li>
-                    <span>Timeout</span> <strong>{form.timeout_seconds ?? 30} seconds</strong>
+                    <span>Content</span> <strong>{scriptSummary}</strong>
                   </li>
                 </ul>
               </div>
@@ -830,6 +1034,31 @@ export function CampaignFormWizard({
           </div>
         ) : null}
       </div>
+      {emailPreviewOpen ? (
+        <Modal
+          isOpen
+          onClose={() => setEmailPreviewOpen(false)}
+          title="Email Preview"
+          size="xxl"
+          footer={
+            <ModalFooter>
+              <Button variant="secondary" onClick={() => setEmailPreviewOpen(false)}>
+                Close
+              </Button>
+            </ModalFooter>
+          }
+        >
+          <div className={styles.emailPreviewFrame}>
+            <iframe
+              ref={emailPreviewRef}
+              title="Email preview"
+              srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:24px;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;}</style></head><body>${emailPreviewHtml}</body></html>`}
+              className={styles.emailPreviewIframe}
+              sandbox="allow-same-origin"
+            />
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }

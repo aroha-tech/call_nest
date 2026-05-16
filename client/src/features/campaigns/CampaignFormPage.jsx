@@ -8,10 +8,12 @@ import { campaignsAPI } from '../../services/campaignsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
 import { contactStatusesAPI, campaignTypesAPI, campaignStatusesAPI, callScriptsAPI } from '../../services/dispositionAPI';
 import { contactTagsAPI } from '../../services/contactTagsAPI';
+import { contactsAPI } from '../../services/contactsAPI';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Modal, ModalFooter } from '../../components/ui/Modal';
 import { Alert } from '../../components/ui/Alert';
+import { useToast } from '../../context/ToastContext';
 import { useDateTimeDisplay } from '../../hooks/useDateTimeDisplay';
 import {
   Table,
@@ -59,6 +61,7 @@ export function CampaignFormPage() {
   const canCreate = useAnyPermission(['contacts.create', 'leads.create']);
   const canUpdate = useAnyPermission(['contacts.update', 'leads.update']);
 
+  const { showToast } = useToast();
   const [form, setForm] = useState(() => buildEmptyCampaignForm());
   const [formError, setFormError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
@@ -319,8 +322,8 @@ export function CampaignFormPage() {
       }
     }
     if (stepIndex === 1 && form.type === 'static') {
-      const rt = form.static_record_type === 'contact' ? 'contact' : form.static_record_type === 'lead' ? 'lead' : '';
-      if (!rt) errors.static_record_type = 'Choose leads or contacts for this campaign';
+      const rt = form.static_record_type;
+      if (rt !== 'contact' && rt !== 'lead' && rt !== 'both') errors.static_record_type = 'Choose leads or contacts for this campaign';
     }
     return errors;
   }
@@ -347,6 +350,7 @@ export function CampaignFormPage() {
     const err = validateWizardStep(wizardStep);
     if (err) {
       setFormError(err);
+      showToast('Please fix the highlighted fields', 'warning');
       return;
     }
     setFormError('');
@@ -368,7 +372,9 @@ export function CampaignFormPage() {
       const at = new Date().toISOString();
       setForm((s) => ({ ...s, audience_estimate_total: total, audience_estimate_at: at }));
     } catch (e) {
-      setFormError(e?.response?.data?.error || e?.message || 'Could not estimate audience');
+      const msg = e?.response?.data?.error || e?.message || 'Could not estimate audience';
+      setFormError(msg);
+      showToast(msg, 'error');
     } finally {
       setAudienceEstimateLoading(false);
     }
@@ -437,6 +443,7 @@ export function CampaignFormPage() {
       if (!form.name?.trim()) {
         setFieldErrors({ name: 'Campaign name is required to save a draft' });
         setFormError('Name is required to save a draft');
+        showToast('Please fix the highlighted fields', 'warning');
         return;
       }
       setFieldErrors({});
@@ -444,6 +451,7 @@ export function CampaignFormPage() {
       const err = validateThroughStep(wizardStep);
       if (err) {
         setFormError(err);
+        showToast('Please fix the highlighted fields', 'warning');
         return;
       }
       setFieldErrors({});
@@ -483,7 +491,9 @@ export function CampaignFormPage() {
     if (result?.success) {
       navigate('/campaigns');
     } else {
-      setFormError(result?.error || 'Save failed');
+      const msg = result?.error || 'Save failed';
+      setFormError(msg);
+      showToast(msg, 'error');
     }
   };
 
@@ -556,11 +566,6 @@ export function CampaignFormPage() {
               <p className={pageStyles.wizardMuted}>Loading…</p>
             ) : (
               <>
-                {formError ? (
-                  <Alert variant="error" style={{ marginBottom: 12 }}>
-                    {formError}
-                  </Alert>
-                ) : null}
                 <CampaignFormWizard
                   step={wizardStep}
                   form={form}
@@ -595,14 +600,16 @@ export function CampaignFormPage() {
             <div className={pageStyles.campaignWizardPageInner}>
               <div className={pageStyles.campaignFormFooterInner}>
                 <div className={pageStyles.campaignFormFooterLeft}>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleSaveDraft}
-                    disabled={createMut.loading || updateMut.loading}
-                  >
-                    Save as draft
-                  </Button>
+                  {false && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handleSaveDraft}
+                      disabled={createMut.loading || updateMut.loading}
+                    >
+                      Save as draft
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="secondary"

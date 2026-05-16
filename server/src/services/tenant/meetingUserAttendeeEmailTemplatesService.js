@@ -3,6 +3,40 @@ import * as tenantTemplates from './meetingEmailTemplatesService.js';
 
 export const USER_TEMPLATE_KINDS = ['created', 'updated', 'cancelled'];
 
+function isLegacyAttendeeTemplate(row) {
+  const bodyHtml = String(row?.body_html || '');
+  const bodyText = String(row?.body_text || '');
+  const combined = `${bodyHtml}\n${bodyText}`.toLowerCase();
+  if (!bodyHtml.trim()) return true;
+  return (
+    combined.includes('you have been invited to the following meeting') ||
+    combined.includes('duration (minutes)') ||
+    combined.includes('<li><strong>start') ||
+    combined.includes('meeting link:')
+  );
+}
+
+async function repairLegacyUserTemplate(tenantId, userId, actingUserId, kind) {
+  const d = tenantTemplates.getBuiltinDefaults(kind);
+  if (!d) return null;
+  await query(
+    `UPDATE tenant_user_meeting_attendee_email_templates
+     SET subject = ?,
+         body_html = ?,
+         body_text = NULL,
+         updated_by = ?,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE tenant_id = ? AND user_id = ? AND template_kind = ? AND deleted_at IS NULL`,
+    [d.subject, d.body_html || null, actingUserId ?? userId, Number(tenantId), Number(userId), kind]
+  );
+  return {
+    template_kind: kind,
+    subject: d.subject,
+    body_html: d.body_html,
+    body_text: null,
+  };
+}
+
 async function ensureUserDefaults(tenantId, userId, actingUserId) {
   const tid = Number(tenantId);
   const uid = Number(userId);
@@ -21,7 +55,7 @@ async function ensureUserDefaults(tenantId, userId, actingUserId) {
       `INSERT INTO tenant_user_meeting_attendee_email_templates
         (tenant_id, user_id, template_kind, subject, body_html, body_text, created_by, updated_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [tid, uid, kind, d.subject, d.body_html, d.body_text, actingUserId ?? uid, actingUserId ?? uid]
+      [tid, uid, kind, d.subject, d.body_html, null, actingUserId ?? uid, actingUserId ?? uid]
     );
   }
 }
@@ -44,20 +78,35 @@ export async function resetOneForUser(tenantId, userId, actingUserId, kind) {
     `UPDATE tenant_user_meeting_attendee_email_templates
      SET subject = ?, body_html = ?, body_text = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
      WHERE tenant_id = ? AND user_id = ? AND template_kind = ? AND deleted_at IS NULL`,
-    [d.subject, d.body_html || null, d.body_text || null, actingUserId ?? userId, Number(tenantId), Number(userId), k]
+    [d.subject, d.body_html || null, null, actingUserId ?? userId, Number(tenantId), Number(userId), k]
   );
   return listForUser(tenantId, userId);
 }
 
 export async function listForUser(tenantId, userId) {
   await ensureUserDefaults(tenantId, userId, userId);
-  const rows = await query(
+  let rows = await query(
     `SELECT template_kind, subject, body_html, body_text, updated_at
      FROM tenant_user_meeting_attendee_email_templates
      WHERE tenant_id = ? AND user_id = ? AND deleted_at IS NULL
      ORDER BY FIELD(template_kind, 'created', 'updated', 'cancelled')`,
     [Number(tenantId), Number(userId)]
   );
+  let repaired = false;
+  for (const row of rows || []) {
+    if (!USER_TEMPLATE_KINDS.includes(row.template_kind) || !isLegacyAttendeeTemplate(row)) continue;
+    await repairLegacyUserTemplate(tenantId, userId, userId, row.template_kind);
+    repaired = true;
+  }
+  if (repaired) {
+    rows = await query(
+      `SELECT template_kind, subject, body_html, body_text, updated_at
+       FROM tenant_user_meeting_attendee_email_templates
+       WHERE tenant_id = ? AND user_id = ? AND deleted_at IS NULL
+       ORDER BY FIELD(template_kind, 'created', 'updated', 'cancelled')`,
+      [Number(tenantId), Number(userId)]
+    );
+  }
   return rows || [];
 }
 
@@ -95,7 +144,7 @@ export async function updateBatchForUser(tenantId, userId, actingUserId, items) 
       [
         subject,
         body_html.trim() ? body_html : null,
-        body_text.trim() ? body_text : null,
+        body_html.trim() ? null : body_text.trim() ? body_text : null,
         actingUserId ?? userId,
         Number(tenantId),
         Number(userId),
@@ -121,9 +170,22 @@ export async function findTemplateForUserOrTenant(tenantId, ownerUserId, kind) {
        LIMIT 1`,
       [tid, uid, k]
     );
+    if (row && isLegacyAttendeeTemplate(row)) {
+      return repairLegacyUserTemplate(tid, uid, uid, k);
+    }
     if (row) return row;
   }
 
   // Fallback to tenant-level defaults (existing feature)
-  return tenantTemplates.findByKind(tid, uid || null, k);
+  const tenantRow = await tenantTemplates.findByKind(tid, uid || null, k);
+  if (tenantRow && isLegacyAttendeeTemplate(tenantRow)) {
+    const d = tenantTemplates.getBuiltinDefaults(k);
+    return {
+      template_kind: k,
+      subject: d.subject,
+      body_html: d.body_html,
+      body_text: null,
+    };
+  }
+  return tenantRow;
 }

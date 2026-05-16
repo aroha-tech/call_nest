@@ -104,6 +104,8 @@ export function parseSettingsFromCampaign(campaign) {
     call_script_id: o.call_script_id != null ? String(o.call_script_id) : '',
     timeout_seconds: o.timeout_seconds != null ? Number(o.timeout_seconds) : 30,
     content_html: o.content_html || '',
+    phone_content_html: ch === 'phone' ? o.content_html || '' : o.phone_content_html || '',
+    email_content_html: ch === 'email' ? o.content_html || '' : o.email_content_html || '',
     audience_estimate_total: o.audience_estimate_total != null ? Number(o.audience_estimate_total) : null,
     audience_estimate_at: o.audience_estimate_at || null,
     static_record_type: o.static_record_type === 'contact' ? 'contact' : 'lead',
@@ -126,7 +128,12 @@ export function buildSettingsPayload(form) {
     caller_id_label: form.caller_id_label?.trim() || null,
     call_script_id: form.call_script_id ? Number(form.call_script_id) : null,
     timeout_seconds: Number(form.timeout_seconds) || 30,
-    content_html: form.content_html || null,
+    content_html:
+      form.channel === 'email'
+        ? form.email_content_html || null
+        : form.channel === 'phone'
+          ? form.phone_content_html || null
+          : form.content_html || null,
     audience_estimate_total: form.audience_estimate_total,
     audience_estimate_at: form.audience_estimate_at,
     static_record_type: form.static_record_type === 'contact' ? 'contact' : 'lead',
@@ -172,6 +179,8 @@ export function buildEmptyCampaignForm() {
     call_script_id: '',
     timeout_seconds: 30,
     content_html: '',
+    phone_content_html: '',
+    email_content_html: '',
     audience_estimate_total: null,
     audience_estimate_at: null,
   };

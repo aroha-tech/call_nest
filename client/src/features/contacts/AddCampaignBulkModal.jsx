@@ -128,7 +128,7 @@ export function AddCampaignBulkModal({
         </ModalFooter>
       }
     >
-      {formError ? <Alert variant="error">{formError}</Alert> : null}
+      {formError ? <Alert variant="warning" display="inline">{formError}</Alert> : null}
       <p style={{ margin: '0 0 12px', fontSize: 13, opacity: 0.85 }}>
         Selected records will be moved to the campaign you choose.
       </p>

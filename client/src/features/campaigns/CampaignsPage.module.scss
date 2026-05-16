@@ -524,11 +524,11 @@
 
 .staticRecordTabs {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: $space-2;
   margin-bottom: $space-3;
 
-  @media (max-width: 560px) {
+  @media (max-width: 720px) {
     grid-template-columns: 1fr;
   }
 }
@@ -640,6 +640,37 @@
 .audienceTabDisabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.channelCardComingSoon {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+  position: relative;
+}
+
+.comingSoonBadge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #f59e0b;
+  background: color-mix(in srgb, #f59e0b 14%, transparent);
+  border: 1px solid color-mix(in srgb, #f59e0b 30%, transparent);
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
+.wizardComingSoonPlaceholder {
+  padding: $space-5 $space-4;
+  border-radius: 12px;
+  border: 1px dashed var(--cw-border, rgba(15, 23, 42, 0.15));
+  background: var(--cw-surface-muted, #f8fafc);
+  text-align: center;
 }
 
 .audienceEstimate {
@@ -852,6 +883,35 @@
 
 .wizardChannelStep .wizardQuill {
   margin-top: $space-2;
+}
+
+.emailTemplateToolbar {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  margin-bottom: $space-2;
+  flex-wrap: wrap;
+}
+
+.emailToolbarBtnInner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.emailPreviewFrame {
+  border-radius: $radius-md;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: #f1f5f9;
+}
+
+.emailPreviewIframe {
+  display: block;
+  width: 100%;
+  min-height: 600px;
+  border: none;
+  background: #f1f5f9;
 }
 
 /* Channel & Content step — fit on one screen: tighter sections, cards, editor */

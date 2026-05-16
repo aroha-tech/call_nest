@@ -4,6 +4,18 @@ import styles from './InfoHelpIcon.module.scss';
 /** Merge with local spacing classes; use when an `InfoHelpIcon` sits beside a block heading. */
 export const infoHelpHeadingRowClassName = styles.headingInline;
 
+/** SVG “!” — geometric center in viewBox (avoids font metric drift). */
+function InfoGlyphMark({ className = '' }) {
+  return (
+    <span className={`${styles.glyph} ${className}`.trim()} aria-hidden>
+      <svg className={styles.glyphSvg} viewBox="0 0 10 10" focusable="false" aria-hidden>
+        <rect x="4.15" y="1.35" width="1.7" height="3.95" rx="0.85" />
+        <circle cx="5" cy="7.4" r="0.95" />
+      </svg>
+    </span>
+  );
+}
+
 /**
  * Shows a compact info icon with inline help popover.
  */
@@ -82,7 +94,7 @@ export function InfoHelpIcon({
           setOpen((v) => !v);
         }}
       >
-        <span className={styles.glyph} aria-hidden>!</span>
+        <InfoGlyphMark />
       </button>
       {open ? (
         <div

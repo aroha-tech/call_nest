@@ -13,7 +13,12 @@ import { opportunitiesAPI } from '../../services/opportunitiesAPI';
 import { contactsAPI } from '../../services/contactsAPI';
 import { campaignsAPI } from '../../services/campaignsAPI';
 import { useToast } from '../../context/ToastContext';
-import { DEAL_CURRENCY_OPTIONS, DEAL_VALUE_TYPE_OPTIONS, DEFAULT_DEAL_CURRENCY } from './dealUiConstants';
+import {
+  currencyOptionsForPipeline,
+  DEAL_VALUE_TYPE_OPTIONS,
+  DEFAULT_DEAL_CURRENCY,
+  normalizePipelineCurrency,
+} from './dealUiConstants';
 import styles from './DealPipelineWizard.module.scss';
 import dealFormStyles from './NewDealWizard.module.scss';
 
@@ -79,6 +84,16 @@ export function NewDealWizard({
 
   const selectedDeal = useMemo(() => deals.find((d) => String(d.id) === String(dealId)), [deals, dealId]);
 
+  const pipelineCurrency = useMemo(
+    () => (selectedDeal ? normalizePipelineCurrency(selectedDeal) : ''),
+    [selectedDeal]
+  );
+
+  const lockedCurrencyOptions = useMemo(
+    () => (pipelineCurrency ? currencyOptionsForPipeline(pipelineCurrency) : []),
+    [pipelineCurrency]
+  );
+
   const stageOptions = useMemo(() => {
     const stages = selectedDeal?.stages || [];
     return stages.map((s) => ({
@@ -100,7 +115,11 @@ export function NewDealWizard({
     setOwnerId(defaultOwnerId != null ? String(defaultOwnerId) : '');
     setTitle('');
     setAmount('');
-    setAmountCurrency('USD');
+    const initialDealRow =
+      defaultDealId != null ? deals.find((d) => String(d.id) === String(defaultDealId)) : null;
+    setAmountCurrency(
+      initialDealRow ? normalizePipelineCurrency(initialDealRow) : DEFAULT_DEAL_CURRENCY
+    );
     setValueType('');
     setClosingDate('');
     setDealType('');
@@ -115,7 +134,7 @@ export function NewDealWizard({
     setCampaignId('');
     setServerDraftOppId(null);
     setDraftAnchor(null);
-  }, [defaultDealId, defaultOwnerId]);
+  }, [defaultDealId, defaultOwnerId, deals]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -198,9 +217,9 @@ export function NewDealWizard({
   }, [selectedDeal]);
 
   useEffect(() => {
-    if (!selectedDeal || serverDraftOppId) return;
-    setAmountCurrency((selectedDeal.currency_code || DEFAULT_DEAL_CURRENCY).toUpperCase());
-  }, [selectedDeal?.id, serverDraftOppId, selectedDeal]);
+    if (!pipelineCurrency) return;
+    setAmountCurrency(pipelineCurrency);
+  }, [pipelineCurrency]);
 
   useEffect(() => {
     if (!isOpen || !contactId) {
@@ -279,7 +298,7 @@ export function NewDealWizard({
         owner_id: ownerId ? Number(ownerId) : null,
         title: title.trim() || null,
         amount: amount === '' ? null : Number(amount),
-        amount_currency: amountCurrency || null,
+        amount_currency: pipelineCurrency || amountCurrency || null,
         value_type: valueType || null,
         closing_date: closingDate ? closingDate.slice(0, 10) : null,
         deal_type: dealType.trim() || null,
@@ -307,6 +326,7 @@ export function NewDealWizard({
       leadSource,
       nextStep,
       ownerId,
+      pipelineCurrency,
       priority,
       probability,
       stageId,
@@ -390,7 +410,7 @@ export function NewDealWizard({
         owner_id: Number(ownerId),
         title: title.trim(),
         amount: amount === '' ? null : Number(amount),
-        amount_currency: amountCurrency || null,
+        amount_currency: pipelineCurrency || amountCurrency || null,
         value_type: valueType || null,
         closing_date: closingDate ? closingDate.slice(0, 10) : null,
         deal_type: dealType.trim() || null,
@@ -454,6 +474,7 @@ export function NewDealWizard({
     onClose,
     onCreated,
     ownerId,
+    pipelineCurrency,
     priority,
     probability,
     serverDraftOppId,
@@ -505,11 +526,8 @@ export function NewDealWizard({
                   value={dealId}
                   error={formErrors.dealId}
                   onChange={(e) => {
-                    const v = e.target.value;
-                    setDealId(v);
+                    setDealId(e.target.value);
                     setFormErrors((prev) => ({ ...prev, dealId: undefined }));
-                    const d = deals.find((x) => String(x.id) === String(v));
-                    if (d?.currency_code) setAmountCurrency(String(d.currency_code).toUpperCase());
                   }}
                   options={[{ value: '', label: 'Choose pipeline' }, ...pipelineOptions]}
                   disabled={hydrating}
@@ -624,9 +642,18 @@ export function NewDealWizard({
                 <div className={`${styles.fullRow} ${dealFormStyles.amountRow}`}>
                   <Select
                     label="Currency"
-                    value={amountCurrency}
-                    onChange={(e) => setAmountCurrency(e.target.value)}
-                    options={DEAL_CURRENCY_OPTIONS}
+                    value={pipelineCurrency || amountCurrency}
+                    options={
+                      lockedCurrencyOptions.length
+                        ? lockedCurrencyOptions
+                        : [{ value: '', label: 'Select a pipeline first' }]
+                    }
+                    disabled={!dealId || hydrating}
+                    title={
+                      dealId
+                        ? `Currency is set by the pipeline (${pipelineCurrency})`
+                        : 'Choose a pipeline to set currency'
+                    }
                   />
                   <Input
                     label="Amount (optional)"

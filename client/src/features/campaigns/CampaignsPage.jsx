@@ -587,7 +587,7 @@ export function CampaignsPage() {
                     <TableHeaderCell>Type</TableHeaderCell>
                     <TableHeaderCell>Status</TableHeaderCell>
                     <TableHeaderCell>Audience</TableHeaderCell>
-                    <TableHeaderCell>Est. size</TableHeaderCell>
+                    <TableHeaderCell>Audience size</TableHeaderCell>
                     <TableHeaderCell>Sent</TableHeaderCell>
                     <TableHeaderCell>Open rate</TableHeaderCell>
                     <TableHeaderCell>Click rate</TableHeaderCell>
@@ -605,7 +605,9 @@ export function CampaignsPage() {
                       settings.pipeline_id != null ? String(settings.pipeline_id) : '';
                     const pipelineLabel = pipelineId ? pipelineNameById[pipelineId] || '—' : '—';
                     const est =
-                      settings.audience_estimate_total != null
+                      c.type === 'filter' && c.dynamic_audience_count != null
+                        ? Number(c.dynamic_audience_count)
+                        : settings.audience_estimate_total != null
                         ? Number(settings.audience_estimate_total)
                         : null;
                     const badge = campaignRowStatusBadge(c);
@@ -630,9 +632,9 @@ export function CampaignsPage() {
                         </TableCell>
                         <TableCell>{c.type === 'filter' ? 'Dynamic filter' : 'Static'}</TableCell>
                         <TableCell>
-                          {c.type === 'filter' && est != null && Number.isFinite(est)
-                            ? est.toLocaleString()
-                            : '—'}
+                          {c.type === 'filter'
+                            ? (est != null && Number.isFinite(est) ? est.toLocaleString() : '—')
+                            : (c.assigned_contacts_count != null ? Number(c.assigned_contacts_count).toLocaleString() : '0')}
                         </TableCell>
                         <TableCell>—</TableCell>
                         <TableCell>

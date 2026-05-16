@@ -1,28 +1,19 @@
 import crypto from 'crypto';
-import { query } from '../../config/db.js';
+import { query, withConnection } from '../../config/db.js';
 import { env } from '../../config/env.js';
 import { parseMeetingInstantUtc } from '../../utils/meetingInstant.js';
-import { normalizeEmailRecipientListString, firstInvalidEmailInRecipientList } from '../../utils/emailRecipientList.js';
+import { normalizeEmailRecipientListString, firstInvalidEmailInRecipientList, parseEmailRecipientList } from '../../utils/emailRecipientList.js';
 import * as sendEmailService from '../email/sendEmailService.js';
 import { createAndDispatchNotification, listUserIdsByRoles } from './notificationService.js';
-import { meetingDetailsCardFieldValues } from './meetingEmailDetailsBox.js';
-import {
-  normalizeMeetingPlatform,
-  formatMeetingPlatformLabel,
-} from './meetingEmailContentResolve.js';
+import { buildAutomationEmailBodies } from './meetingEmailContentResolve.js';
 import {
   DEFAULT_MEETING_REMINDER_EMAIL_HTML,
   DEFAULT_MEETING_REMINDER_EMAIL_TEXT,
   DEFAULT_MEETING_FEEDBACK_EMAIL_HTML,
   DEFAULT_MEETING_FEEDBACK_EMAIL_TEXT,
 } from '../../utils/defaultMeetingEmailBodiesHtml.js';
-import { buildGoogleCalendarUrl, buildOutlookCalendarComposeUrl } from '../../utils/meetingCalendarLinks.js';
 
-const DEFAULT_REMINDER_OFFSETS = [
-  { value: 1, unit: 'days' },
-  { value: 1, unit: 'hours' },
-  { value: 15, unit: 'minutes' },
-];
+const DEFAULT_REMINDER_OFFSETS = [{ value: 5, unit: 'minutes' }];
 
 const ALLOWED_UNITS = new Set(['minutes', 'hours', 'days']);
 
@@ -67,6 +58,12 @@ function asString(v, fallback = '') {
   return String(v);
 }
 
+function readLongTextField(v) {
+  if (v == null) return '';
+  if (Buffer.isBuffer(v)) return v.toString('utf8');
+  return String(v);
+}
+
 function normalizeOffsets(raw) {
   const arr = Array.isArray(raw) ? raw : [];
   const cleaned = arr
@@ -76,17 +73,188 @@ function normalizeOffsets(raw) {
     }))
     .filter((x) => Number.isFinite(x.value) && x.value > 0 && ALLOWED_UNITS.has(x.unit))
     .map((x) => ({ value: Math.floor(x.value), unit: x.unit }));
-  return cleaned.length ? cleaned : DEFAULT_REMINDER_OFFSETS;
+  if (!cleaned.length) return DEFAULT_REMINDER_OFFSETS;
+  if (cleaned.length === 1) return [cleaned[0]];
+  // Legacy rows may list multiple offsets (e.g. 1d + 1h + 15m). Prefer minute/hour entries (UI saves one).
+  const minuteEntries = cleaned.filter((x) => x.unit === 'minutes');
+  if (minuteEntries.length) {
+    minuteEntries.sort((a, b) => b.value - a.value);
+    return [minuteEntries[0]];
+  }
+  const hourEntries = cleaned.filter((x) => x.unit === 'hours');
+  if (hourEntries.length) {
+    hourEntries.sort((a, b) => b.value - a.value);
+    return [hourEntries[0]];
+  }
+  return [cleaned[0]];
 }
 
+function offsetItemToMinutes(item) {
+  if (item.unit === 'minutes') return item.value;
+  if (item.unit === 'hours') return item.value * 60;
+  if (item.unit === 'days') return item.value * 24 * 60;
+  return null;
+}
+
+/** Single offset in minutes (only one reminder schedule is supported). */
 function offsetsToMinutes(offsets) {
-  const out = [];
-  for (const item of normalizeOffsets(offsets)) {
-    if (item.unit === 'minutes') out.push(item.value);
-    else if (item.unit === 'hours') out.push(item.value * 60);
-    else if (item.unit === 'days') out.push(item.value * 24 * 60);
+  const normalized = normalizeOffsets(offsets);
+  const minutes = offsetItemToMinutes(normalized[0]);
+  return Number.isFinite(minutes) && minutes > 0 ? [minutes] : [15];
+}
+
+/** Parse amount + unit from API / meeting row. */
+export function parseReminderOffsetPayload(payload) {
+  const value = Number(payload?.reminder_offset_value);
+  const unit = String(payload?.reminder_offset_unit || '')
+    .trim()
+    .toLowerCase();
+  if (Number.isFinite(value) && value > 0 && ALLOWED_UNITS.has(unit)) {
+    return { value: Math.floor(value), unit };
   }
-  return [...new Set(out)].sort((a, b) => b - a);
+  return null;
+}
+
+export function defaultReminderOffsetFromSettings(setting) {
+  const normalized = normalizeOffsets(setting?.reminder_offsets);
+  return normalized[0] || DEFAULT_REMINDER_OFFSETS[0];
+}
+
+/** Minutes before start: meeting fields win, then owner mail settings. */
+export function resolveMeetingReminderOffsetMinutes(meeting, userSetting) {
+  const fromMeeting = parseReminderOffsetPayload(meeting);
+  if (fromMeeting) {
+    const minutes = offsetItemToMinutes(fromMeeting);
+    if (Number.isFinite(minutes) && minutes > 0) return minutes;
+  }
+  const fromUser = (userSetting?.reminder_offsets_minutes || [])[0];
+  if (Number.isFinite(fromUser) && fromUser > 0) return fromUser;
+  return offsetsToMinutes(DEFAULT_REMINDER_OFFSETS)[0];
+}
+
+export async function clearMeetingReminderEvents(tenantId, meetingId) {
+  await query(
+    `UPDATE tenant_meeting_reminder_events
+     SET deleted_at = NOW(), updated_at = NOW()
+     WHERE tenant_id = ? AND meeting_id = ? AND deleted_at IS NULL`,
+    [Number(tenantId), Number(meetingId)]
+  );
+}
+
+/**
+ * Send reminder now if this meeting is in the due window. Used by worker and after create/update.
+ */
+export async function trySendMeetingReminderIfDue(meeting, cachedSetting = null) {
+  const ownerId = ownerIdFromMeeting(meeting);
+  if (!ownerId) return { sent: false, reason: 'no_owner' };
+
+  let setting = cachedSetting;
+  if (!setting) {
+    const map = await getSettingsForUsers(Number(meeting.tenant_id), [ownerId]);
+    setting = map.get(ownerId) || null;
+  }
+  if (!setting?.reminder_enabled) return { sent: false, reason: 'reminder_disabled' };
+  if (Number(meeting.send_reminder) === 0) return { sent: false, reason: 'meeting_send_reminder_off' };
+  if (String(meeting.meeting_status || '').toLowerCase() === 'cancelled') {
+    return { sent: false, reason: 'cancelled' };
+  }
+
+  const start = parseDt(meeting.start_at);
+  if (!start) return { sent: false, reason: 'invalid_start' };
+
+  const offsetMinutes = resolveMeetingReminderOffsetMinutes(meeting, setting);
+  const tid = Number(meeting.tenant_id);
+  const mid = Number(meeting.id);
+  if (!Number.isFinite(offsetMinutes) || offsetMinutes <= 0) {
+    return { sent: false, reason: 'invalid_offset' };
+  }
+  if (await meetingReminderAlreadySent(tid, mid)) {
+    return { sent: false, reason: 'already_sent' };
+  }
+
+  const nowMs = Date.now();
+  if (!isWithinReminderSendWindow(nowMs, start.getTime(), offsetMinutes)) {
+    return { sent: false, reason: 'not_due' };
+  }
+
+  const eventId = await claimMeetingReminderSend(tid, mid, ownerId, offsetMinutes);
+  if (!eventId) return { sent: false, reason: 'claim_failed' };
+
+  try {
+    await sendReminderEmail(meeting, ownerId);
+    await updateReminderStatus(eventId, 'sent');
+    return { sent: true, offsetMinutes };
+  } catch (e) {
+    await updateReminderStatus(eventId, 'failed', e?.message || 'send_failed');
+    console.error('[meeting-reminder] send failed:', {
+      meetingId: mid,
+      tenantId: tid,
+      error: e?.message || e,
+    });
+    return { sent: false, reason: e?.message || 'send_failed' };
+  }
+}
+
+/** Whether the worker should send a reminder for this meeting now. */
+function isWithinReminderSendWindow(nowMs, startMs, offsetMinutes) {
+  const dueMs = startMs - offsetMinutes * 60_000;
+  if (nowMs < dueMs || nowMs >= startMs) return false;
+  // Long lead times (e.g. 1 day): only fire within 30m after ideal send time.
+  if (offsetMinutes > 120 && nowMs - dueMs > 30 * 60_000) return false;
+  return true;
+}
+
+function mergeIncomingHtml(incoming, current) {
+  const next = readLongTextField(incoming).trim();
+  if (next) return next;
+  const prev = readLongTextField(current).trim();
+  if (prev) return prev;
+  return '';
+}
+
+function reminderTemplateFromSetting(setting) {
+  const htmlRaw = readLongTextField(setting?.reminder_body_html).trim();
+  const html = htmlRaw || DEFAULT_MEETING_REMINDER_EMAIL_HTML;
+  return {
+    subject: setting?.reminder_subject || DEFAULTS.reminder_subject,
+    body_html: html,
+    body_text: htmlRaw ? '' : readLongTextField(setting?.reminder_body_text) || DEFAULT_MEETING_REMINDER_EMAIL_TEXT,
+  };
+}
+
+/** Fresh read of reminder template from DB (avoids stale in-memory rows). */
+async function loadReminderTemplateForOwner(tenantId, ownerUserId) {
+  const tid = Number(tenantId);
+  const uid = Number(ownerUserId);
+  if (!Number.isFinite(tid) || !Number.isFinite(uid)) {
+    return reminderTemplateFromSetting(DEFAULTS);
+  }
+  await getOrCreateForUser(tid, uid);
+  const [row] = await query(
+    `SELECT reminder_subject, reminder_body_html, reminder_body_text
+     FROM tenant_user_meeting_email_settings
+     WHERE tenant_id = ? AND user_id = ? AND deleted_at IS NULL
+     LIMIT 1`,
+    [tid, uid]
+  );
+  if (!row) {
+    return reminderTemplateFromSetting(await getOrCreateForUser(tid, uid));
+  }
+  return reminderTemplateFromSetting({
+    reminder_subject: row.reminder_subject,
+    reminder_body_html: readLongTextField(row.reminder_body_html),
+    reminder_body_text: readLongTextField(row.reminder_body_text),
+  });
+}
+
+function feedbackTemplateFromSetting(setting) {
+  const htmlRaw = readLongTextField(setting?.feedback_body_html).trim();
+  const html = htmlRaw || DEFAULT_MEETING_FEEDBACK_EMAIL_HTML;
+  return {
+    subject: setting?.feedback_subject || DEFAULTS.feedback_subject,
+    body_html: html,
+    body_text: htmlRaw ? '' : setting?.feedback_body_text || DEFAULT_MEETING_FEEDBACK_EMAIL_TEXT,
+  };
 }
 
 function parseJsonOrNull(raw) {
@@ -172,72 +340,9 @@ function ccBccFromSettingForKind(setting, kind) {
   };
 }
 
-function applyTemplateVars(text, vars) {
-  return String(text || '').replace(/\{\{(\w+)\}\}/g, (_, key) =>
-    vars[key] !== undefined && vars[key] !== null ? String(vars[key]) : `{{${key}}}`
-  );
-}
-
-function escapeHtml(s) {
-  return String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-const DEFAULT_MEETING_TZ = 'Asia/Kolkata';
-
-function safeTimeZone(tz) {
-  const s = String(tz || '').trim();
-  if (!s) return DEFAULT_MEETING_TZ;
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: s }).format(new Date());
-    return s;
-  } catch {
-    return DEFAULT_MEETING_TZ;
-  }
-}
-
 function parseDt(raw) {
   if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw;
   return parseMeetingInstantUtc(raw);
-}
-
-function meetingVars(meeting, feedbackLink = '') {
-  const start = parseDt(meeting.start_at);
-  const end = parseDt(meeting.end_at);
-  const tz = safeTimeZone(meeting.meeting_timezone || meeting.owner_datetime_timezone);
-  const fmtDate = (d) => new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone: tz }).format(d);
-  const fmtTime = (d) => new Intl.DateTimeFormat('en', { hour: '2-digit', minute: '2-digit', timeZone: tz }).format(d);
-  const startT = start ? fmtTime(start) : '';
-  const endT = end ? fmtTime(end) : '';
-  let meeting_time_range = '';
-  if (start) {
-    meeting_time_range = end && end.getTime() !== start.getTime() && endT ? `${startT} - ${endT}` : startT || '';
-  }
-  const card = meetingDetailsCardFieldValues(meeting);
-  const platformKey = normalizeMeetingPlatform(meeting.meeting_platform);
-  return {
-    title: meeting.title || 'Meeting',
-    attendee_email: meeting.attendee_email || '',
-    meeting_date: start ? fmtDate(start) : '',
-    meeting_time: meeting_time_range,
-    meeting_end_time: end ? fmtTime(end) : '',
-    meeting_link: meeting.meeting_link || '',
-    meeting_platform: platformKey,
-    meeting_platform_label: formatMeetingPlatformLabel(platformKey),
-    location: meeting.location || '',
-    description: meeting.description || '',
-    company_name: meeting.tenant_company_name || 'Your Company',
-    contact_name: meeting.contact_name || '',
-    feedback_link: feedbackLink,
-    feedback_url: feedbackLink,
-    meeting_card_date: card.date,
-    meeting_card_time: card.timeLine,
-    calendar_google_url: buildGoogleCalendarUrl(meeting),
-    calendar_outlook_url: buildOutlookCalendarComposeUrl(meeting),
-  };
 }
 
 export async function getOrCreateForUser(tenantId, userId) {
@@ -293,21 +398,31 @@ export async function getOrCreateForUser(tenantId, userId) {
     [tid, uid]
   );
   if (!row) return { ...DEFAULTS, user_id: uid };
+  const rawOffsets = parseJsonOrNull(row.reminder_offsets_json);
+  const reminder_offsets = normalizeOffsets(rawOffsets);
+  if (Array.isArray(rawOffsets) && rawOffsets.length > 1) {
+    await query(
+      `UPDATE tenant_user_meeting_email_settings
+       SET reminder_offsets_json = CAST(? AS JSON), updated_at = CURRENT_TIMESTAMP
+       WHERE tenant_id = ? AND user_id = ? AND deleted_at IS NULL`,
+      [JSON.stringify(reminder_offsets), tid, uid]
+    );
+  }
   const default_cc_bcc_by_kind = defaultCcBccByKindFromRow(row);
   const createdSlot = default_cc_bcc_by_kind.created || { cc: '', bcc: '' };
   return {
     user_id: uid,
     reminder_enabled: Boolean(row.reminder_enabled),
-    reminder_offsets: normalizeOffsets(parseJsonOrNull(row.reminder_offsets_json)),
+    reminder_offsets,
     reminder_subject: row.reminder_subject || DEFAULTS.reminder_subject,
-    reminder_body_html: row.reminder_body_html || '',
-    reminder_body_text: row.reminder_body_text || '',
+    reminder_body_html: readLongTextField(row.reminder_body_html),
+    reminder_body_text: readLongTextField(row.reminder_body_text),
     feedback_enabled: Boolean(row.feedback_enabled),
     feedback_delay_value: Number(row.feedback_delay_value || DEFAULTS.feedback_delay_value),
     feedback_delay_unit: ALLOWED_UNITS.has(String(row.feedback_delay_unit)) ? row.feedback_delay_unit : DEFAULTS.feedback_delay_unit,
     feedback_subject: row.feedback_subject || DEFAULTS.feedback_subject,
-    feedback_body_html: row.feedback_body_html || '',
-    feedback_body_text: row.feedback_body_text || '',
+    feedback_body_html: readLongTextField(row.feedback_body_html),
+    feedback_body_text: readLongTextField(row.feedback_body_text),
     thank_you_page_url: row.thank_you_page_url || '',
     default_cc_bcc_by_kind,
     default_cc_email: createdSlot.cc,
@@ -355,25 +470,55 @@ export async function updateForUser(tenantId, userId, actingUserId, payload) {
       err.status = 400;
       throw err;
     }
+    
+    // Check maximum limit for CC/BCC (20 email addresses each)
+    const ccEmails = parseEmailRecipientList(nextByKind[k].cc);
+    if (ccEmails.length > 20) {
+      const err = new Error(`CC for ${k} exceeds maximum limit of 20 email addresses`);
+      err.status = 400;
+      throw err;
+    }
+    
+    const bccEmails = parseEmailRecipientList(nextByKind[k].bcc);
+    if (bccEmails.length > 20) {
+      const err = new Error(`BCC for ${k} exceeds maximum limit of 20 email addresses`);
+      err.status = 400;
+      throw err;
+    }
   }
 
   const legacyCreatedCc = nextByKind.created?.cc || '';
   const legacyCreatedBcc = nextByKind.created?.bcc || '';
 
+  const nextReminderHtml =
+    payload?.reminder_body_html !== undefined
+      ? mergeIncomingHtml(payload.reminder_body_html, current.reminder_body_html)
+      : readLongTextField(current.reminder_body_html);
+  const nextFeedbackHtml =
+    payload?.feedback_body_html !== undefined
+      ? mergeIncomingHtml(payload.feedback_body_html, current.feedback_body_html)
+      : readLongTextField(current.feedback_body_html);
+
   const next = {
     reminder_enabled: asBool(payload?.reminder_enabled, current.reminder_enabled),
     reminder_offsets: normalizeOffsets(payload?.reminder_offsets ?? current.reminder_offsets),
     reminder_subject: asString(payload?.reminder_subject, current.reminder_subject).trim() || DEFAULTS.reminder_subject,
-    reminder_body_html: asString(payload?.reminder_body_html, current.reminder_body_html),
-    reminder_body_text: asString(payload?.reminder_body_text, current.reminder_body_text),
+    reminder_body_html: nextReminderHtml,
+    reminder_body_text:
+      payload?.reminder_body_html !== undefined && nextReminderHtml.trim()
+        ? ''
+        : asString(payload?.reminder_body_text, current.reminder_body_text),
     feedback_enabled: asBool(payload?.feedback_enabled, current.feedback_enabled),
     feedback_delay_value: Math.max(1, Math.floor(Number(payload?.feedback_delay_value ?? current.feedback_delay_value) || current.feedback_delay_value)),
     feedback_delay_unit: ALLOWED_UNITS.has(String(payload?.feedback_delay_unit || '').toLowerCase())
       ? String(payload.feedback_delay_unit).toLowerCase()
       : current.feedback_delay_unit,
     feedback_subject: asString(payload?.feedback_subject, current.feedback_subject).trim() || DEFAULTS.feedback_subject,
-    feedback_body_html: asString(payload?.feedback_body_html, current.feedback_body_html),
-    feedback_body_text: asString(payload?.feedback_body_text, current.feedback_body_text),
+    feedback_body_html: nextFeedbackHtml,
+    feedback_body_text:
+      payload?.feedback_body_html !== undefined && nextFeedbackHtml.trim()
+        ? ''
+        : asString(payload?.feedback_body_text, current.feedback_body_text),
     thank_you_page_url: asString(payload?.thank_you_page_url, current.thank_you_page_url).trim(),
     default_cc_email: legacyCreatedCc,
     default_bcc_email: legacyCreatedBcc,
@@ -427,29 +572,15 @@ export async function updateForUser(tenantId, userId, actingUserId, payload) {
 async function getSettingsForUsers(tenantId, userIds) {
   const ids = [...new Set(userIds.map((x) => Number(x)).filter(Number.isFinite))];
   if (!ids.length) return new Map();
-  for (const uid of ids) await getOrCreateForUser(tenantId, uid);
-  const rows = await query(
-    `SELECT *
-     FROM tenant_user_meeting_email_settings
-     WHERE tenant_id = ? AND user_id IN (${ids.map(() => '?').join(',')}) AND deleted_at IS NULL`,
-    [tenantId, ...ids]
-  );
   const map = new Map();
-  for (const row of rows) {
-    map.set(Number(row.user_id), {
-      reminder_enabled: Boolean(row.reminder_enabled),
-      reminder_offsets_minutes: offsetsToMinutes(parseJsonOrNull(row.reminder_offsets_json)),
-      reminder_subject: row.reminder_subject || DEFAULTS.reminder_subject,
-      reminder_body_html: row.reminder_body_html || '',
-      reminder_body_text: row.reminder_body_text || '',
-      feedback_enabled: Boolean(row.feedback_enabled),
-      feedback_delay_minutes: (Number(row.feedback_delay_value) || 1) * (row.feedback_delay_unit === 'days' ? 1440 : row.feedback_delay_unit === 'hours' ? 60 : 1),
-      feedback_subject: row.feedback_subject || DEFAULTS.feedback_subject,
-      feedback_body_html: row.feedback_body_html || '',
-      feedback_body_text: row.feedback_body_text || '',
-      default_cc_bcc_by_kind: defaultCcBccByKindFromRow(row),
-      default_cc_email: row.default_cc_email != null ? String(row.default_cc_email) : '',
-      default_bcc_email: row.default_bcc_email != null ? String(row.default_bcc_email) : '',
+  for (const uid of ids) {
+    const row = await getOrCreateForUser(tenantId, uid);
+    map.set(uid, {
+      ...row,
+      reminder_offsets_minutes: offsetsToMinutes(row.reminder_offsets),
+      feedback_delay_minutes:
+        (Number(row.feedback_delay_value) || 1) *
+        (row.feedback_delay_unit === 'days' ? 1440 : row.feedback_delay_unit === 'hours' ? 60 : 1),
     });
   }
   return map;
@@ -462,6 +593,8 @@ async function listSchedulableMeetings() {
        m.start_at, m.end_at, m.meeting_status, m.meeting_platform, m.meeting_link,
        m.meeting_timezone,
        m.send_reminder,
+       m.reminder_offset_value,
+       m.reminder_offset_unit,
        m.assigned_user_id, m.meeting_owner_user_id, m.created_by,
        c.display_name AS contact_name,
        t.name AS tenant_company_name,
@@ -516,15 +649,69 @@ async function updateReminderStatus(id, status, errMsg = null) {
   );
 }
 
-async function sendReminderEmail(meeting, setting) {
-  const vars = meetingVars(meeting, '');
-  const subject = applyTemplateVars(setting.reminder_subject, vars);
-  const bodyText = applyTemplateVars(setting.reminder_body_text, vars);
-  const bodyHtml = applyTemplateVars(
-    setting.reminder_body_html,
-    Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, escapeHtml(v)]))
+/**
+ * Reserve a reminder send slot (pending). Returns event row id, or null if already sent / locked.
+ * Caller must mark sent only after email succeeds.
+ * Uses one DB connection for GET_LOCK/RELEASE_LOCK (required with mysql pool).
+ */
+async function claimMeetingReminderSend(tenantId, meetingId, ownerUserId, offsetMinutes) {
+  if (await meetingReminderAlreadySent(tenantId, meetingId)) return null;
+
+  const lockKey = `cn_meeting_rem_${tenantId}_${meetingId}`.slice(0, 64);
+
+  return withConnection(async (conn) => {
+    const [lockRows] = await conn.query('SELECT GET_LOCK(?, 5) AS acquired', [lockKey]);
+    if (Number(lockRows?.[0]?.acquired) !== 1) return null;
+
+    try {
+      const [sentRows] = await conn.query(
+        `SELECT id FROM tenant_meeting_reminder_events
+         WHERE tenant_id = ? AND meeting_id = ? AND delivery_status = 'sent' AND deleted_at IS NULL
+         LIMIT 1`,
+        [tenantId, meetingId]
+      );
+      if (sentRows?.length) return null;
+
+      await conn.query(
+        `INSERT IGNORE INTO tenant_meeting_reminder_events
+          (tenant_id, meeting_id, owner_user_id, offset_minutes, delivery_status)
+         VALUES (?, ?, ?, ?, 'pending')`,
+        [tenantId, meetingId, ownerUserId, offsetMinutes]
+      );
+
+      const [eventRows] = await conn.query(
+        `SELECT id, delivery_status FROM tenant_meeting_reminder_events
+         WHERE tenant_id = ? AND meeting_id = ? AND owner_user_id = ? AND offset_minutes = ?
+           AND deleted_at IS NULL
+         LIMIT 1`,
+        [tenantId, meetingId, ownerUserId, offsetMinutes]
+      );
+      const eventRow = eventRows?.[0];
+      if (!eventRow?.id || eventRow.delivery_status === 'sent') return null;
+      return Number(eventRow.id);
+    } finally {
+      await conn.query('SELECT RELEASE_LOCK(?) AS released', [lockKey]);
+    }
+  });
+}
+
+async function meetingReminderAlreadySent(tenantId, meetingId) {
+  const [row] = await query(
+    `SELECT id FROM tenant_meeting_reminder_events
+     WHERE tenant_id = ? AND meeting_id = ? AND delivery_status = 'sent' AND deleted_at IS NULL
+     LIMIT 1`,
+    [tenantId, meetingId]
   );
+  return Boolean(row?.id);
+}
+
+async function sendReminderEmail(meeting, ownerUserId) {
+  const tid = Number(meeting.tenant_id);
+  const setting = await getOrCreateForUser(tid, ownerUserId);
+  const template = await loadReminderTemplateForOwner(tid, ownerUserId);
+  const built = buildAutomationEmailBodies(template, meeting);
   const { cc, bcc } = ccBccFromSettingForKind(setting, 'reminder');
+  const body_html = built.body_html?.trim() || undefined;
   await sendEmailService.sendEmail(
     Number(meeting.tenant_id),
     {
@@ -532,11 +719,11 @@ async function sendReminderEmail(meeting, setting) {
       to: String(meeting.attendee_email).trim(),
       cc,
       bcc,
-      subject,
-      body_text: bodyText || undefined,
-      body_html: bodyHtml || undefined,
+      subject: built.subject,
+      body_text: body_html ? undefined : built.body_text || undefined,
+      body_html,
     },
-    null
+    ownerUserId
   );
 }
 
@@ -545,16 +732,14 @@ function computeFeedbackLink(token) {
   return `${base}/api/public/meetings/feedback/${token}`;
 }
 
-async function sendFeedbackEmail(meeting, setting, token) {
+async function sendFeedbackEmail(meeting, ownerUserId, token) {
+  const setting = await getOrCreateForUser(Number(meeting.tenant_id), ownerUserId);
   const feedbackLink = computeFeedbackLink(token);
-  const vars = meetingVars(meeting, feedbackLink);
-  const subject = applyTemplateVars(setting.feedback_subject, vars);
-  const bodyText = applyTemplateVars(setting.feedback_body_text, vars);
-  const bodyHtml = applyTemplateVars(
-    setting.feedback_body_html,
-    Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, escapeHtml(v)]))
-  );
+  const built = buildAutomationEmailBodies(feedbackTemplateFromSetting(setting), meeting, {
+    feedbackLink,
+  });
   const { cc, bcc } = ccBccFromSettingForKind(setting, 'feedback');
+  const body_html = built.body_html?.trim() || undefined;
   await sendEmailService.sendEmail(
     Number(meeting.tenant_id),
     {
@@ -562,11 +747,11 @@ async function sendFeedbackEmail(meeting, setting, token) {
       to: String(meeting.attendee_email).trim(),
       cc,
       bcc,
-      subject,
-      body_text: bodyText || undefined,
-      body_html: bodyHtml || undefined,
+      subject: built.subject,
+      body_text: body_html ? undefined : built.body_text || undefined,
+      body_html,
     },
-    null
+    ownerUserId
   );
 }
 
@@ -616,26 +801,8 @@ export async function processMeetingReminderAndFeedbackTick() {
 
     const meetingWantsReminder = Number(m.send_reminder) !== 0;
     if (setting.reminder_enabled && meetingWantsReminder && m.meeting_status !== 'cancelled') {
-      for (const offsetMinutes of setting.reminder_offsets_minutes || []) {
-        const dueMs = start.getTime() - offsetMinutes * 60_000;
-        if (nowMs < dueMs) continue;
-        if (nowMs >= start.getTime()) continue;
-        // Long lead times (e.g. 1 day): only fire within 30m after ideal send time so we don't blast late.
-        // Short lead times (≤2h): any tick from due time until meeting start (covers 5m/15m + missed ticks).
-        if (offsetMinutes > 120 && nowMs - dueMs > 30 * 60_000) continue;
-
-        const created = await markReminderAttempt(Number(m.tenant_id), Number(m.id), ownerId, offsetMinutes);
-        const eventRow = await getReminderEventRow(Number(m.tenant_id), Number(m.id), ownerId, offsetMinutes);
-        if (!eventRow) continue;
-        if (!created && eventRow.delivery_status === 'sent') continue;
-        try {
-          await sendReminderEmail(m, setting);
-          await updateReminderStatus(Number(eventRow.id), 'sent');
-          reminderSent++;
-        } catch (e) {
-          await updateReminderStatus(Number(eventRow.id), 'failed', e?.message || 'send_failed');
-        }
-      }
+      const result = await trySendMeetingReminderIfDue(m, setting);
+      if (result.sent) reminderSent++;
     }
 
     if (setting.feedback_enabled && m.meeting_status !== 'cancelled') {
@@ -644,7 +811,7 @@ export async function processMeetingReminderAndFeedbackTick() {
       const req = await ensureFeedbackRequest(Number(m.tenant_id), Number(m.id), ownerId, String(m.attendee_email || '').trim());
       if (!req || req.status === 'sent' || req.status === 'submitted') continue;
       try {
-        await sendFeedbackEmail(m, setting, req.feedback_token);
+        await sendFeedbackEmail(m, ownerId, req.feedback_token);
         await query(
           `UPDATE tenant_meeting_feedback_requests
            SET status = 'sent', sent_at = NOW(), updated_at = NOW()
@@ -856,23 +1023,13 @@ export async function sendTestEmailForUser(tenantId, userId, type, toEmail, emai
     tenant_company_name: 'Your Company',
     contact_name: 'Client',
   };
-  const vars = meetingVars(
-    sampleMeeting,
-    normalizedType === 'feedback' ? 'https://example.com/feedback/test-link' : ''
-  );
-  const toHtmlVars = Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, escapeHtml(v)]));
-  const subject =
+  const feedbackLink =
+    normalizedType === 'feedback' ? 'https://example.com/feedback/test-link' : '';
+  const template =
     normalizedType === 'reminder'
-      ? applyTemplateVars(setting.reminder_subject, vars)
-      : applyTemplateVars(setting.feedback_subject, vars);
-  const bodyText =
-    normalizedType === 'reminder'
-      ? applyTemplateVars(setting.reminder_body_text || '', vars)
-      : applyTemplateVars(setting.feedback_body_text || '', vars);
-  const bodyHtml =
-    normalizedType === 'reminder'
-      ? applyTemplateVars(setting.reminder_body_html || '', toHtmlVars)
-      : applyTemplateVars(setting.feedback_body_html || '', toHtmlVars);
+      ? await loadReminderTemplateForOwner(tid, Number(userId))
+      : feedbackTemplateFromSetting(setting);
+  const built = buildAutomationEmailBodies(template, sampleMeeting, { feedbackLink });
   const { cc, bcc } = ccBccFromSettingForKind(setting, normalizedType);
 
   await sendEmailService.sendEmail(
@@ -882,9 +1039,9 @@ export async function sendTestEmailForUser(tenantId, userId, type, toEmail, emai
       to: recipient,
       cc,
       bcc,
-      subject,
-      body_text: bodyText || undefined,
-      body_html: bodyHtml || undefined,
+      subject: built.subject,
+      body_text: built.body_html?.trim() ? undefined : built.body_text || undefined,
+      body_html: built.body_html || undefined,
     },
     Number(userId)
   );

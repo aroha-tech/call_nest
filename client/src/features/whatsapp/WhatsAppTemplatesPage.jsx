@@ -505,7 +505,7 @@ export function WhatsAppTemplatesPage() {
         }
       >
         <form onSubmit={handleSubmit} className={styles.form}>
-          {submitError && <Alert variant="error">{submitError}</Alert>}
+          {submitError && <Alert variant="warning" display="inline">{submitError}</Alert>}
           <Input
             label="Template name"
             value={formData.template_name}

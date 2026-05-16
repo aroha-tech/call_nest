@@ -31,11 +31,10 @@
 
 .infoBtn {
   box-sizing: border-box;
-  width: 12px;
-  height: 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  width: 10px;
+  height: 10px;
+  display: inline-grid;
+  place-items: center;
   border: 1px solid var(--color-border-subtle);
   border-radius: 999px;
   background: var(--color-bg-subtle);
@@ -43,8 +42,8 @@
   cursor: pointer;
   padding: 0;
   margin: 0;
-  line-height: 0;
-  font: inherit;
+  line-height: 1;
+  font-family: inherit;
   -webkit-appearance: none;
   appearance: none;
   transition: color $transition-fast, background $transition-fast;
@@ -60,12 +59,12 @@
   }
 }
 
-/* Page header / hero: readable “!” + blue accent */
+/* Page header / hero: compact “!” beside H1 (keep below title cap height) */
 .infoBtnTitle {
-  width: 20px;
-  height: 20px;
-  min-width: 20px;
-  min-height: 20px;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  min-height: 14px;
   border: 1px solid color-mix(in srgb, var(--color-chip-blue-border) 45%, var(--color-border-subtle));
   background: linear-gradient(
     165deg,
@@ -92,11 +91,9 @@
       0 1px 3px rgba(15, 23, 42, 0.1);
   }
 
-  .glyph {
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    transform: translateY(0.5px);
+  .glyphSvg {
+    width: 62%;
+    height: 62%;
   }
 }
 
@@ -106,25 +103,33 @@
   justify-content: center;
   width: 100%;
   height: 100%;
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 1;
-  transform: translateY(0.04em);
+  margin: 0;
+  padding: 0;
+  line-height: 0;
+  pointer-events: none;
+}
+
+.glyphSvg {
+  display: block;
+  width: 58%;
+  height: 58%;
+  flex-shrink: 0;
+  fill: currentColor;
 }
 
 .sm {
+  width: 12px;
+  height: 12px;
+}
+
+.md {
   width: 14px;
   height: 14px;
 }
 
-.md {
-  width: 16px;
-  height: 16px;
-}
-
 .lg {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
 }
 
 .popover {

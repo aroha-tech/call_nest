@@ -28,7 +28,7 @@ export function startMeetingReminderFeedbackWorker() {
   };
   const id = setInterval(() => {
     void run();
-  }, 60_000);
+  }, 30_000);
   if (typeof id.unref === 'function') id.unref();
   void run();
 }

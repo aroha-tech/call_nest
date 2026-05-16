@@ -546,7 +546,7 @@ export function EmailAccountsPage() {
         }
       >
         <form onSubmit={handleSubmit} className={styles.form}>
-          {submitError && <Alert variant="error">{submitError}</Alert>}
+          {submitError && <Alert variant="warning" display="inline">{submitError}</Alert>}
           <Select
             label="Provider"
             value={formData.provider}

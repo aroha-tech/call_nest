@@ -20,6 +20,9 @@ export function normalizeEmailRecipientListString(raw) {
   return parts.length ? parts.join(', ') : '';
 }
 
+/** Maximum CC/BCC addresses per field (matches validation in meeting email settings). */
+export const MAX_EMAIL_RECIPIENTS = 20;
+
 const SIMPLE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**

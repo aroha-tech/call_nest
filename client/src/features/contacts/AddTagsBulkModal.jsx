@@ -147,7 +147,7 @@ export function AddTagsBulkModal({
       }
     >
       <div className={styles.body}>
-        {formError ? <Alert variant="error">{formError}</Alert> : null}
+        {formError ? <Alert variant="warning" display="inline">{formError}</Alert> : null}
         {loadError ? <Alert variant="error">{loadError}</Alert> : null}
         <p className={styles.desc}>
           Chosen tags are <strong>added</strong> to each selected record. Existing tags are kept. Tags are managed under

@@ -268,7 +268,7 @@ export function IndustryFieldDefinitionsView({ industryId }) {
         }
       >
         <form id="industry-field-def-form" onSubmit={handleSubmit} className={styles.form}>
-          {submitError ? <Alert variant="error">{submitError}</Alert> : null}
+          {submitError ? <Alert variant="warning" display="inline">{submitError}</Alert> : null}
           {!editing ? (
             <Input
               label="Field key"

@@ -1,6 +1,5 @@
 import React from 'react';
 import { MaterialSymbol } from './MaterialSymbol';
-import { InfoHelpIcon } from './InfoHelpIcon';
 import styles from './PageHeader.module.scss';
 
 function inferTitleIcon(title = '') {
@@ -26,8 +25,7 @@ function inferTitleIcon(title = '') {
 
 export function PageHeader({
   title,
-  description,
-  /** Visible subtitle under the title (e.g. settings pages). Help modal still uses `description` when set. */
+  /** Visible subtitle under the title (e.g. settings pages). */
   subtitle,
   actions,
   breadcrumbs,
@@ -52,13 +50,6 @@ export function PageHeader({
               ) : null}
               <span>{title}</span>
             </span>
-            <InfoHelpIcon
-              title={`About ${title}`}
-              modalTitle={title}
-              message={description || subtitle || ''}
-              variant="title"
-              className={styles.titleInfoBtn}
-            />
           </h1>
           {subtitle ? <p className={styles.description}>{subtitle}</p> : null}
         </div>

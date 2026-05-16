@@ -4,6 +4,13 @@ import { normalizeMeetingTimezone } from '../../utils/meetingTimezone.js';
 import { getCreatedByUserIdsForScope } from './userMessageScopeService.js';
 import { trySendMeetingAttendeeEmail } from './meetingNotifyService.js';
 import {
+  getOrCreateForUser,
+  parseReminderOffsetPayload,
+  defaultReminderOffsetFromSettings,
+  trySendMeetingReminderIfDue,
+  clearMeetingReminderEvents,
+} from './meetingDefaultEmailSettingsService.js';
+import {
   createNativeMeetingRoom,
   updateNativeMeetingRoom,
   deleteNativeMeetingRoom,
@@ -43,6 +50,18 @@ function parseSendReminderFlag(v) {
   const s = String(v).trim().toLowerCase();
   if (s === 'false' || s === '0' || s === 'no') return 0;
   return 1;
+}
+
+async function resolveReminderOffsetForSave(tenantId, ownerUserId, payload, sendReminder) {
+  if (!sendReminder) return { value: null, unit: null };
+  const explicit = parseReminderOffsetPayload(payload);
+  if (explicit) return explicit;
+  const uid = Number(ownerUserId);
+  if (!Number.isFinite(uid) || uid <= 0) {
+    return { value: 10, unit: 'minutes' };
+  }
+  const settings = await getOrCreateForUser(Number(tenantId), uid);
+  return defaultReminderOffsetFromSettings(settings);
 }
 
 function toMillis(value) {
@@ -505,13 +524,19 @@ export async function create(tenantId, userId, payload) {
   }
 
   const sendReminder = parseSendReminderFlag(payload.send_reminder);
+  const reminderOffset = await resolveReminderOffsetForSave(
+    tenantId,
+    meeting_owner_user_id ?? assigned_user_id ?? userId,
+    payload,
+    sendReminder
+  );
 
   const result = await query(
     `INSERT INTO tenant_meetings
       (tenant_id, contact_id, assigned_user_id, email_account_id, title, description, location, attendee_email,
        start_at, end_at, meeting_timezone, meeting_status, meeting_platform, meeting_link, meeting_duration_min, meeting_owner_user_id,
-       provider_event_id, provider_calendar_id, attendance_status, send_reminder, created_by, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       provider_event_id, provider_calendar_id, attendance_status, send_reminder, reminder_offset_value, reminder_offset_unit, created_by, updated_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId,
       contact_id,
@@ -533,6 +558,8 @@ export async function create(tenantId, userId, payload) {
       nativeRoom?.provider_calendar_id || null,
       attendanceRaw,
       sendReminder,
+      sendReminder ? reminderOffset.value : null,
+      sendReminder ? reminderOffset.unit : null,
       userId ?? null,
       userId ?? null,
     ]
@@ -556,6 +583,9 @@ export async function create(tenantId, userId, payload) {
   }
   const notifyKind = row?.meeting_status === 'cancelled' ? 'cancelled' : 'created';
   void trySendMeetingAttendeeEmail(tenantId, userId, row, notifyKind);
+  if (sendReminder && row?.attendee_email) {
+    void trySendMeetingReminderIfDue(row);
+  }
   const escalationRecipients = await listUserIdsByRoles(tenantId, ['admin', 'manager']);
   await createAndDispatchNotification(tenantId, userId, {
     moduleKey: 'meetings',
@@ -681,6 +711,37 @@ export async function update(tenantId, userId, id, payload) {
     updates.push('send_reminder = ?');
     params.push(parseSendReminderFlag(payload.send_reminder));
   }
+  const sendReminderNext =
+    payload.send_reminder !== undefined && payload.send_reminder !== null
+      ? parseSendReminderFlag(payload.send_reminder)
+      : Number(existing.send_reminder) !== 0;
+  const reminderOffsetTouched =
+    payload.reminder_offset_value !== undefined || payload.reminder_offset_unit !== undefined;
+  if (reminderOffsetTouched || payload.send_reminder !== undefined) {
+    const ownerForOffset =
+      payload.meeting_owner_user_id !== undefined
+        ? Number(payload.meeting_owner_user_id) || existing.meeting_owner_user_id
+        : existing.meeting_owner_user_id;
+    const reminderOffset = await resolveReminderOffsetForSave(
+      tenantId,
+      ownerForOffset ?? existing.assigned_user_id ?? userId,
+      {
+        reminder_offset_value:
+          payload.reminder_offset_value !== undefined
+            ? payload.reminder_offset_value
+            : existing.reminder_offset_value,
+        reminder_offset_unit:
+          payload.reminder_offset_unit !== undefined
+            ? payload.reminder_offset_unit
+            : existing.reminder_offset_unit,
+      },
+      sendReminderNext
+    );
+    updates.push('reminder_offset_value = ?');
+    params.push(sendReminderNext ? reminderOffset.value : null);
+    updates.push('reminder_offset_unit = ?');
+    params.push(sendReminderNext ? reminderOffset.unit : null);
+  }
   updates.push('email_account_id = ?');
   params.push(email_account_id);
 
@@ -787,6 +848,14 @@ export async function update(tenantId, userId, id, payload) {
   const meetingDateOrTimeChanged =
     toMillis(existing?.start_at) !== toMillis(row?.start_at) ||
     toMillis(existing?.end_at) !== toMillis(row?.end_at);
+  const reminderScheduleChanged =
+    meetingDateOrTimeChanged ||
+    reminderOffsetTouched ||
+    (payload.send_reminder !== undefined &&
+      parseSendReminderFlag(payload.send_reminder) !== Number(existing.send_reminder));
+  if (reminderScheduleChanged && row?.id) {
+    await clearMeetingReminderEvents(tenantId, row.id);
+  }
   let attendeeEmailNotice = null;
   let attendeeEmailSent = false;
   if (becameCancelled) {
@@ -797,6 +866,9 @@ export async function update(tenantId, userId, id, payload) {
     const r = await trySendMeetingAttendeeEmail(tenantId, userId, row, 'updated');
     attendeeEmailNotice = 'updated';
     attendeeEmailSent = Boolean(r?.sent);
+  }
+  if (Number(row?.send_reminder) !== 0 && row?.attendee_email && !becameCancelled) {
+    void trySendMeetingReminderIfDue(row);
   }
   const escalationRecipients = await listUserIdsByRoles(tenantId, ['admin', 'manager']);
   await createAndDispatchNotification(tenantId, userId, {

@@ -781,9 +781,11 @@ function TenantRoutes() {
       <Route
         path="/settings/meetings-mail-settings"
         element={
-          <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+          <ProtectedRoute permissions={[PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE]}>
             <AppShellLayout>
-              <MeetingAttendeeEmailSettingsPage />
+              <EmailModuleGate>
+                <MeetingAttendeeEmailSettingsPage />
+              </EmailModuleGate>
             </AppShellLayout>
           </ProtectedRoute>
         }

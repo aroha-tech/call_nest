@@ -87,7 +87,7 @@ export function RemoveCampaignBulkModal({
         </ModalFooter>
       }
     >
-      {formError ? <Alert variant="error">{formError}</Alert> : null}
+      {formError ? <Alert variant="warning" display="inline">{formError}</Alert> : null}
       <p style={{ margin: 0, fontSize: 13, opacity: 0.9 }}>
         This clears campaign assignment for all selected {recordLabel}.
       </p>

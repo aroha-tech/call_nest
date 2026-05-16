@@ -3,7 +3,6 @@ import * as meetingUserAttendeeEmailTemplatesService from './meetingUserAttendee
 import * as meetingDefaultEmailSettingsService from './meetingDefaultEmailSettingsService.js';
 import * as meetingEmailContentResolve from './meetingEmailContentResolve.js';
 import { parseMeetingInstantUtc } from '../../utils/meetingInstant.js';
-import { PRODUCT_DISPLAY_NAME } from '../../config/productBrand.js';
 
 function pad2(n) {
   return String(n).padStart(2, '0');
@@ -32,7 +31,7 @@ function buildMeetingIcs(meeting, kind, organizerEmail, attendeeEmail) {
   if (!dtStart || !dtEnd) return null;
 
   const method = kind === 'cancelled' ? 'CANCEL' : 'REQUEST';
-  const uid = `meeting-${meeting?.tenant_id || 't'}-${meeting?.id || 'x'}@callxtime.local`;
+  const uid = `meeting-${meeting?.tenant_id || 't'}-${meeting?.id || 'x'}@callnest.local`;
   const dtStamp = toIcsUtcDateTime(new Date().toISOString()) || dtStart;
   const title = escapeIcsText(meeting?.title || 'Meeting');
   const description = escapeIcsText(
@@ -54,7 +53,7 @@ function buildMeetingIcs(meeting, kind, organizerEmail, attendeeEmail) {
 
   const lines = [
     'BEGIN:VCALENDAR',
-    `PRODID:-//${PRODUCT_DISPLAY_NAME}//Meeting Invite//EN`,
+    'PRODID:-//Call Nest//Meeting Invite//EN',
     'VERSION:2.0',
     'CALSCALE:GREGORIAN',
     `METHOD:${method}`,
@@ -191,7 +190,7 @@ export async function trySendMeetingAttendeeEmail(tenantId, userId, meeting, kin
         cc,
         bcc,
         subject,
-        body_text: body_text || undefined,
+        body_text: body_html?.trim() ? undefined : body_text || undefined,
         body_html: body_html || undefined,
         attachments,
       },
@@ -266,7 +265,7 @@ export async function sendMeetingAttendeeEmailWithTemplate(tenantId, userId, mee
       cc,
       bcc,
       subject,
-      body_text: body_text || undefined,
+      body_text: body_html?.trim() ? undefined : body_text || undefined,
       body_html: body_html || undefined,
       attachments,
     },

@@ -258,7 +258,7 @@ export function AssignContactsBulkModal({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {formError ? <Alert variant="error">{formError}</Alert> : null}
+          {formError ? <Alert variant="warning" display="inline">{formError}</Alert> : null}
           <p style={{ margin: 0, fontSize: 13, opacity: 0.85 }}>
             <strong>Admin:</strong> choose a manager to filter agents to that team. If all selected rows share one
             manager, agents are limited to that team. Choosing No manager also sets No agent.

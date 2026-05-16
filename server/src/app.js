@@ -131,7 +131,7 @@ app.use(
   razorpayWebhookRoutes
 );
 
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true })); // Twilio status callbacks use form-encoded body
 
 // Health check

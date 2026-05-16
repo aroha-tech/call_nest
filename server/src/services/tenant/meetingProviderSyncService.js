@@ -60,6 +60,12 @@ function throwGoogleCalendarError(error, featureLabel) {
   throw err;
 }
 
+/** Disable Google/Calendar-app default popup/email reminders; Call Nest sends its own reminder emails. */
+const PROVIDER_EVENT_NO_REMINDERS = {
+  useDefault: false,
+  overrides: [],
+};
+
 function toProviderStartEnd(meeting) {
   const start = utcMysqlToProviderLocalDateTime(meeting.start_at, meeting.meeting_timezone);
   const end = utcMysqlToProviderLocalDateTime(meeting.end_at, meeting.meeting_timezone);
@@ -232,13 +238,16 @@ async function createGoogleEvent(account, meeting) {
     res = await calendar.events.insert({
       calendarId: 'primary',
       conferenceDataVersion: 1,
-      sendUpdates: 'all',
+      sendUpdates: 'none',
       requestBody: {
         summary: meeting.title,
         description: meeting.description || undefined,
         location: meeting.location || undefined,
         ...(toProviderStartEnd(meeting) || {}),
-        attendees: meeting.attendee_email ? [{ email: meeting.attendee_email }] : [],
+        // Do not add attendee here — guest calendar accounts get Google's own reminder emails
+        // (wrong timing/content). Attendees receive Call Nest invite + ICS via meetingNotifyService.
+        attendees: [],
+        reminders: PROVIDER_EVENT_NO_REMINDERS,
         conferenceData: {
           createRequest: {
             requestId,
@@ -306,7 +315,8 @@ async function updateGoogleEvent(account, meeting) {
     description: meeting.description || undefined,
     location: meeting.location || undefined,
     ...(se || {}),
-    attendees: meeting.attendee_email ? [{ email: meeting.attendee_email }] : [],
+    attendees: [],
+    reminders: PROVIDER_EVENT_NO_REMINDERS,
   };
   if (!hasVideo) {
     requestBody.conferenceData = {
@@ -323,7 +333,7 @@ async function updateGoogleEvent(account, meeting) {
       calendarId: calId,
       eventId: meeting.provider_event_id,
       conferenceDataVersion: hasVideo ? 0 : 1,
-      sendUpdates: 'all',
+      sendUpdates: 'none',
       requestBody,
     });
   } catch (e) {
@@ -361,7 +371,7 @@ async function deleteGoogleEvent(account, meeting) {
     await calendar.events.delete({
       calendarId: meeting.provider_calendar_id || 'primary',
       eventId: meeting.provider_event_id,
-      sendUpdates: 'all',
+      sendUpdates: 'none',
     });
   } catch (e) {
     throwGoogleCalendarError(e, 'native meeting room deletion');
@@ -380,9 +390,7 @@ async function createOutlookEvent(account, meeting) {
       body: { contentType: 'HTML', content: meeting.description || '' },
       ...(toProviderStartEnd(meeting) || {}),
       location: { displayName: meeting.location || '' },
-      attendees: meeting.attendee_email
-        ? [{ emailAddress: { address: meeting.attendee_email }, type: 'required' }]
-        : [],
+      attendees: [],
       isOnlineMeeting: true,
       onlineMeetingProvider: 'teamsForBusiness',
     }),
@@ -433,9 +441,7 @@ async function updateOutlookEvent(account, meeting) {
         body: { contentType: 'HTML', content: meeting.description || '' },
         ...(toProviderStartEnd(meeting) || {}),
         location: { displayName: meeting.location || '' },
-        attendees: meeting.attendee_email
-          ? [{ emailAddress: { address: meeting.attendee_email }, type: 'required' }]
-          : [],
+        attendees: [],
         isOnlineMeeting: true,
         onlineMeetingProvider: 'teamsForBusiness',
       }),

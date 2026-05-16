@@ -158,7 +158,7 @@ export function RemoveTagsBulkModal({
       }
     >
       <div className={styles.body}>
-        {formError ? <Alert variant="error">{formError}</Alert> : null}
+        {formError ? <Alert variant="warning" display="inline">{formError}</Alert> : null}
         {loadError ? <Alert variant="error">{loadError}</Alert> : null}
         <p className={styles.desc}>
           Chosen tags are removed from each selected record where that link exists. Other tags on the row are unchanged.

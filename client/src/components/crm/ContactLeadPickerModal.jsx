@@ -12,7 +12,8 @@ import { contactsAPI } from '../../services/contactsAPI';
  * Same pattern as Meetings — searchable table to pick a contact or lead by id.
  * @param {'contact'|'lead'} pickerType
  */
-export function ContactLeadPickerModal({ isOpen, onClose, pickerType, onPick }) {
+export function ContactLeadPickerModal({ isOpen, onClose, pickerType, onPick, multiSelect = false, initialSelection = [] }) {
+  const [selectedIds, setSelectedIds] = useState(() => new Set(initialSelection));
   const [pickerSearch, setPickerSearch] = useState('');
   const [pickerPage, setPickerPage] = useState(1);
   const [pickerLimit, setPickerLimit] = useState(10);
@@ -64,8 +65,9 @@ export function ContactLeadPickerModal({ isOpen, onClose, pickerType, onPick }) 
     if (isOpen) {
       setPickerSearch('');
       setPickerPage(1);
+      setSelectedIds(new Set(initialSelection));
     }
-  }, [isOpen, pickerType]);
+  }, [isOpen, pickerType, initialSelection]);
 
   return (
     <Modal
@@ -76,8 +78,20 @@ export function ContactLeadPickerModal({ isOpen, onClose, pickerType, onPick }) 
       footer={
         <ModalFooter>
           <Button type="button" variant="secondary" onClick={handleClose}>
-            Close
+            {multiSelect ? 'Cancel' : 'Close'}
           </Button>
+          {multiSelect && (
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => {
+                onPick?.(Array.from(selectedIds));
+                handleClose();
+              }}
+            >
+              Done ({selectedIds.size})
+            </Button>
+          )}
         </ModalFooter>
       }
     >
@@ -110,29 +124,48 @@ export function ContactLeadPickerModal({ isOpen, onClose, pickerType, onPick }) 
             <Table variant="adminList" flexibleLastColumn>
               <TableHead>
                 <TableRow>
+                  {multiSelect && <TableHeaderCell width="48px"></TableHeaderCell>}
                   <TableHeaderCell>Name</TableHeaderCell>
                   <TableHeaderCell width="180px">Phone</TableHeaderCell>
                   <TableHeaderCell width="260px">Email</TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {pickerRows.map((c) => (
-                  <TableRow
-                    key={c.id}
-                    onClick={() => {
-                      onPick?.(c);
-                      handleClose();
-                    }}
-                    style={{ cursor: 'pointer' }}
-                    title="Click to select"
-                  >
-                    <TableCell noTruncate>
-                      {c.display_name || [c.first_name, c.last_name].filter(Boolean).join(' ') || '—'}
-                    </TableCell>
-                    <TableCell noTruncate>{c.primary_phone || '—'}</TableCell>
-                    <TableCell noTruncate>{c.email || '—'}</TableCell>
-                  </TableRow>
-                ))}
+                {pickerRows.map((c) => {
+                  const isSelected = selectedIds.has(c.id);
+                  return (
+                    <TableRow
+                      key={c.id}
+                      onClick={() => {
+                        if (multiSelect) {
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(c.id)) next.delete(c.id);
+                            else next.add(c.id);
+                            return next;
+                          });
+                        } else {
+                          onPick?.(c);
+                          handleClose();
+                        }
+                      }}
+                      style={{ cursor: 'pointer' }}
+                      title="Click to select"
+                      className={isSelected ? listStyles.tableRowSelected : undefined}
+                    >
+                      {multiSelect && (
+                        <TableCell>
+                          <input type="checkbox" checked={isSelected} readOnly style={{ cursor: 'pointer' }} />
+                        </TableCell>
+                      )}
+                      <TableCell noTruncate>
+                        {c.display_name || [c.first_name, c.last_name].filter(Boolean).join(' ') || '—'}
+                      </TableCell>
+                      <TableCell noTruncate>{c.primary_phone || '—'}</TableCell>
+                      <TableCell noTruncate>{c.email || '—'}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

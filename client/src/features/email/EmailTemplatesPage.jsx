@@ -309,7 +309,7 @@ export function EmailTemplatesPage() {
         }
       >
         <form onSubmit={handleSubmit} className={styles.form}>
-          {submitError && <Alert variant="error">{submitError}</Alert>}
+          {submitError && <Alert variant="warning" display="inline">{submitError}</Alert>}
           <Select
             label="Account"
             value={formData.email_account_id}

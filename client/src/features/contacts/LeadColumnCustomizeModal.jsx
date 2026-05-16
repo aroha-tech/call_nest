@@ -618,7 +618,7 @@ export function LeadColumnCustomizeModal({
         }
       >
         <form id="lead-add-custom-field-form" onSubmit={handleCreateCustomField} className={styles.addForm}>
-          {addSubmitError ? <Alert variant="error">{addSubmitError}</Alert> : null}
+          {addSubmitError ? <Alert variant="warning" display="inline">{addSubmitError}</Alert> : null}
           <Input
             label="Field key"
             required

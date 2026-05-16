@@ -412,7 +412,7 @@ export function DefaultDispositionsPage() {
         }
       >
         <form onSubmit={handleSubmit}>
-          {submitError && <Alert variant="error" style={{ marginBottom: '16px' }}>{submitError}</Alert>}
+          {submitError && <Alert variant="warning" display="inline" style={{ marginBottom: '16px' }}>{submitError}</Alert>}
           
           {/* Form Grid - 2 columns on desktop, 1 on mobile */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>

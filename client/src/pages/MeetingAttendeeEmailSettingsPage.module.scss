@@ -50,6 +50,7 @@
   padding: $space-5 $space-6;
   border-radius: $radius-lg;
   box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+  isolation: isolate;
 }
 
 .formSectionHead {
@@ -98,12 +99,18 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  flex-shrink: 0;
+  align-items: flex-start;
 }
 
 /* Per-type accent for tab pills (5 distinct hues). */
 .emailTypeTab {
   --tab-accent: var(--color-primary-500);
 
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -329,34 +336,12 @@
 
 .reminderRow {
   display: grid;
-  grid-template-columns: 100px 1fr auto;
+  grid-template-columns: 100px 1fr;
   gap: 10px;
   align-items: end;
-  margin-bottom: 10px;
 
   @media (max-width: 600px) {
     grid-template-columns: 1fr;
-  }
-}
-
-.addReminderLink {
-  margin-top: 4px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--color-primary-600);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  text-align: left;
-
-  &:hover {
-    text-decoration: underline;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
   }
 }
 
@@ -468,41 +453,24 @@
   min-width: 0;
 }
 
-.previewBody {
-  font-size: $font-size-sm;
-  line-height: 1.55;
-  color: var(--color-text-primary);
-  padding-top: 2px;
+.previewIframe {
+  width: 100%;
+  border: none;
+  display: block;
+  min-height: 200px;
+  height: clamp(220px, 36vh, 420px);
+  background: var(--color-bg-elevated);
+  border-radius: $radius-md;
+}
 
-  /* Keep table-based email layouts intact (some globals target prose only). */
-  :global(table) {
-    border-collapse: collapse;
-    width: 100%;
-  }
-
-  :global(tr) {
-    display: table-row;
-  }
-
-  :global(td),
-  :global(th) {
-    display: table-cell;
-    vertical-align: top;
-  }
-
-  :global(p) {
-    margin: 0 0 0.75em;
-  }
-
-  :global(ul),
-  :global(ol) {
-    margin: 0 0 0.75em;
-    padding-left: 1.25em;
-  }
-
-  :global(a) {
-    color: var(--color-primary-600);
-  }
+.modalPreviewIframe {
+  width: 100%;
+  border: none;
+  display: block;
+  min-height: 240px;
+  height: min(60vh, 520px);
+  background: var(--color-bg-elevated);
+  border-radius: $radius-md;
 }
 
 .meetingDetailsAlert {
@@ -696,21 +664,6 @@
   overflow: auto;
   padding: 4px 2px;
 
-  :global(table) {
-    border-collapse: collapse;
-    width: 100%;
-  }
-
-  :global(tr) {
-    display: table-row;
-  }
-
-  :global(td),
-  :global(th) {
-    display: table-cell;
-    vertical-align: top;
-  }
-
   :global(p) {
     margin: 0 0 0.75em;
   }
@@ -760,29 +713,4 @@
   font-size: $font-size-sm;
   color: var(--color-text-muted);
   line-height: 1.4;
-}
-
-.recipientPanel {
-  display: flex;
-  flex-direction: column;
-  gap: $space-3;
-  padding: $space-4 $space-4;
-  border-radius: $radius-md;
-  border: 1px solid var(--color-border-subtle);
-  background: color-mix(in srgb, var(--color-bg-muted) 88%, var(--color-bg-elevated));
-}
-
-.recipientPanelTitle {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  line-height: 1.4;
-}
-
-.recipientPanelHint {
-  margin: -6px 0 0;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
 }

@@ -613,7 +613,7 @@ export function DispositionsPage({ readOnly = false }) {
         }
       >
         <form onSubmit={handleSubmit}>
-          {submitError && <Alert variant="error" style={{ marginBottom: '16px' }}>{submitError}</Alert>}
+          {submitError && <Alert variant="warning" display="inline" style={{ marginBottom: '16px' }}>{submitError}</Alert>}
           
           {/* Form Grid - 2 columns on desktop, 1 on mobile */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
@@ -732,7 +732,7 @@ export function DispositionsPage({ readOnly = false }) {
           </ModalFooter>
         }
       >
-        {submitError && <Alert variant="error">{submitError}</Alert>}
+        {submitError && <Alert variant="warning" display="inline">{submitError}</Alert>}
         <p style={{ color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
           Import all default dispositions and dialing sets from an industry template.
         </p>

@@ -172,7 +172,24 @@ export const ScriptBodyEditor = forwardRef(function ScriptBodyEditor(
       }
       getQuill()?.focus();
     },
-  }), [getQuill, inHtmlEditor, onChange, onEditorState, enableHtmlSourceToggle, htmlSourceMode, bodyHasTable, emitFromVisualTableEditor]);
+    /** Latest body HTML (flushes table visual editor before read). */
+    getHtml() {
+      if (inHtmlEditor && htmlTextareaRef.current) {
+        const raw = htmlTextareaRef.current.value ?? '';
+        return String(raw).trim() ? raw : value ?? '';
+      }
+      if (enableHtmlSourceToggle && !htmlSourceMode && bodyHasTable && visualTableEditableRef.current) {
+        const raw = visualTableEditableRef.current.innerHTML ?? '';
+        return String(raw).trim() ? raw : value ?? '';
+      }
+      const quill = getQuill();
+      if (quill?.root) {
+        const raw = quill.root.innerHTML ?? '';
+        return String(raw).trim() ? raw : value ?? '';
+      }
+      return value ?? '';
+    },
+  }), [getQuill, inHtmlEditor, onChange, onEditorState, enableHtmlSourceToggle, htmlSourceMode, bodyHasTable, emitFromVisualTableEditor, value]);
 
   useEffect(() => {
     const quill = getQuill();

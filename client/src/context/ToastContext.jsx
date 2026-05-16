@@ -66,7 +66,7 @@ export function ToastProvider({ children }) {
 
     const sig = `${v}|${title}|${body}`;
     const now = Date.now();
-    if (sig === lastDedupeSig && now - lastDedupeAt < 750) return;
+    if (sig === lastDedupeSig && now - lastDedupeAt < 350) return;
     lastDedupeSig = sig;
     lastDedupeAt = now;
 

@@ -264,7 +264,7 @@ export function ContactTagsPage() {
           </ModalFooter>
         }
       >
-        {formError ? <Alert variant="error">{formError}</Alert> : null}
+        {formError ? <Alert variant="warning" display="inline">{formError}</Alert> : null}
         <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. VIP, March campaign" />
       </Modal>
 

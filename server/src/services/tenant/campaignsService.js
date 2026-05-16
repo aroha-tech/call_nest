@@ -66,7 +66,8 @@ async function resolveCampaignStatusMasterId(value) {
 
 const CAMPAIGN_LIST_SELECT = `c.*,
   ctm.name AS campaign_type_name,
-  csm.name AS campaign_status_name`;
+  csm.name AS campaign_status_name,
+  (SELECT COUNT(id) FROM contacts WHERE campaign_id = c.id AND deleted_at IS NULL AND tenant_id = c.tenant_id) AS assigned_contacts_count`;
 
 const CAMPAIGN_LIST_JOIN = `campaigns c
   LEFT JOIN campaign_types_master ctm ON ctm.id = c.campaign_type_master_id AND ctm.is_deleted = 0
@@ -209,6 +210,54 @@ function limitOffsetClause(q) {
   return `LIMIT ${limit} OFFSET ${offset}`;
 }
 
+async function countDynamicCampaignAudience(tenantId, filtersJson) {
+  const where = ['c.tenant_id = ?', 'c.deleted_at IS NULL'];
+  const params = [tenantId];
+  appendCampaignFilterRules(where, params, filtersJson);
+
+  const [row] = await query(
+    `SELECT COUNT(*) AS total
+     FROM contacts c
+     LEFT JOIN contact_phones p
+       ON p.id = c.primary_phone_id AND p.tenant_id = c.tenant_id
+     WHERE ${where.join(' AND ')}`,
+    params
+  );
+  return Number(row?.total ?? 0);
+}
+
+function withLiveAudienceInSettings(row, total) {
+  const settings = parseFiltersJSON(row.settings_json);
+  const nextSettings = {
+    ...(settings && typeof settings === 'object' && !Array.isArray(settings) ? settings : {}),
+    audience_estimate_total: total,
+    audience_estimate_at: new Date().toISOString(),
+  };
+  return {
+    ...row,
+    dynamic_audience_count: total,
+    settings_json: JSON.stringify(nextSettings),
+  };
+}
+
+async function hydrateDynamicAudienceCounts(tenantId, rows) {
+  const out = [];
+  for (const row of rows) {
+    if (row?.type !== 'filter') {
+      out.push(row);
+      continue;
+    }
+
+    try {
+      const total = await countDynamicCampaignAudience(tenantId, row.filters_json);
+      out.push(withLiveAudienceInSettings(row, total));
+    } catch {
+      out.push({ ...row, dynamic_audience_count: null });
+    }
+  }
+  return out;
+}
+
 /**
  * Paginated campaign list with search and filters (admin: full; manager/agent: scoped).
  */
@@ -267,9 +316,10 @@ async function listCampaignsAdmin(tenantId, q, includeArchived) {
      WHERE ${whereSql} ORDER BY c.created_at DESC ${limitOffsetClause(q)}`,
     params
   );
+  const hydratedRows = await hydrateDynamicAudienceCounts(tenantId, rows);
 
   return {
-    data: rows,
+    data: hydratedRows,
     pagination: {
       page: q.page,
       limit: q.limit,
@@ -328,9 +378,10 @@ async function listCampaignsManager(tenantId, user, q) {
      WHERE ${whereSql} ORDER BY c.created_at DESC ${limitOffsetClause(q)}`,
     params
   );
+  const hydratedRows = await hydrateDynamicAudienceCounts(tenantId, rows);
 
   return {
-    data: rows,
+    data: hydratedRows,
     pagination: {
       page: q.page,
       limit: q.limit,
@@ -386,9 +437,10 @@ async function listCampaignsAgent(tenantId, user, q) {
      WHERE ${whereSql} ORDER BY c.created_at DESC ${limitOffsetClause(q)}`,
     params
   );
+  const hydratedRows = await hydrateDynamicAudienceCounts(tenantId, rows);
 
   return {
-    data: rows,
+    data: hydratedRows,
     pagination: {
       page: q.page,
       limit: q.limit,

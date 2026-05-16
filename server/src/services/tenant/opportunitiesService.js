@@ -249,6 +249,25 @@ function parseOptionalCurrencyCode(v) {
   return u;
 }
 
+function pipelineCurrencyCode(deal) {
+  return String(deal?.currency_code || 'INR').trim().toUpperCase() || 'INR';
+}
+
+/** Opportunities must use the pipeline currency; omit or match — never a different code. */
+function resolveOpportunityAmountCurrency(deal, payloadCurrency) {
+  const pipelineCur = pipelineCurrencyCode(deal);
+  if (payloadCurrency === undefined || payloadCurrency === null || payloadCurrency === '') {
+    return pipelineCur;
+  }
+  const provided = parseOptionalCurrencyCode(payloadCurrency);
+  if (provided !== pipelineCur) {
+    const err = new Error(`Deal currency must match pipeline currency (${pipelineCur})`);
+    err.status = 400;
+    throw err;
+  }
+  return pipelineCur;
+}
+
 function normalizeTagsJsonPayload(payload) {
   if (payload?.tags_json !== undefined && payload.tags_json !== null) {
     if (typeof payload.tags_json === 'string') {
@@ -471,9 +490,7 @@ export async function createOpportunity(tenantId, user, payload) {
     }
     const tagNorm = normalizeTagsJsonPayload(payload);
     if (tagNorm !== undefined) tagsJson = tagNorm;
-    if (payload?.amount_currency !== undefined && payload?.amount_currency !== null && payload?.amount_currency !== '') {
-      amountCurrency = parseOptionalCurrencyCode(payload.amount_currency);
-    }
+    amountCurrency = resolveOpportunityAmountCurrency(deal, payload?.amount_currency);
     valueType = trimStr(payload?.value_type);
   }
 
@@ -853,13 +870,8 @@ export async function updateOpportunity(tenantId, user, opportunityId, payload, 
       sqlParams.push(tagNorm === undefined ? null : tagNorm);
     }
     if (payload.amount_currency !== undefined) {
-      if (payload.amount_currency === null || payload.amount_currency === '') {
-        updates.push('amount_currency = ?');
-        sqlParams.push(null);
-      } else {
-        updates.push('amount_currency = ?');
-        sqlParams.push(parseOptionalCurrencyCode(payload.amount_currency));
-      }
+      updates.push('amount_currency = ?');
+      sqlParams.push(resolveOpportunityAmountCurrency(deal, payload.amount_currency));
     }
     if (payload.value_type !== undefined) {
       updates.push('value_type = ?');

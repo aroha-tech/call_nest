@@ -229,7 +229,7 @@ const TENANT_ADMIN_NAV_ITEMS = [
         key: 'meetings-mail-settings',
         label: 'Meetings mail settings',
         path: '/settings/meetings-mail-settings',
-        permission: PERMISSIONS.SETTINGS_MANAGE,
+        permissions: [PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE],
       },
       {
         key: 'background-jobs',
@@ -286,6 +286,21 @@ const MANAGER_NAV_ITEMS = [
     label: 'Background tasks',
     path: '/settings/background-jobs',
     permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
+  },
+  {
+    key: 'settings',
+    label: 'Settings',
+    path: '/settings/meetings-mail-settings',
+    section: 'Workspace',
+    permissions: [PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE],
+    children: [
+      {
+        key: 'meetings-mail-settings',
+        label: 'Meetings mail settings',
+        path: '/settings/meetings-mail-settings',
+        permissions: [PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE],
+      },
+    ],
   },
   { key: 'deals', label: 'Deals', path: '/deals', permission: PERMISSIONS.PIPELINES_MANAGE },
   {
@@ -444,6 +459,21 @@ const AGENT_NAV_ITEMS = [
     label: 'Background tasks',
     path: '/settings/background-jobs',
     permissions: [PERMISSIONS.CONTACTS_READ, PERMISSIONS.LEADS_READ],
+  },
+  {
+    key: 'settings',
+    label: 'Settings',
+    path: '/settings/meetings-mail-settings',
+    section: 'Workspace',
+    permissions: [PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE],
+    children: [
+      {
+        key: 'meetings-mail-settings',
+        label: 'Meetings mail settings',
+        path: '/settings/meetings-mail-settings',
+        permissions: [PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE],
+      },
+    ],
   },
   {
     key: 'dialer',

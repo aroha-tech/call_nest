@@ -2960,7 +2960,8 @@ async function selectContactsAfterAssignChunked(tenantId, ids) {
 }
 
 export async function assignContacts(tenantId, user, payload) {
-  const { contactIds, manager_id, assigned_user_id, campaign_id } = payload || {};
+  const { manager_id, assigned_user_id, campaign_id } = payload || {};
+  const contactIds = payload?.contactIds ?? payload?.contact_ids;
 
   if (!Array.isArray(contactIds) || contactIds.length === 0) {
     const err = new Error('contactIds must be a non-empty array');

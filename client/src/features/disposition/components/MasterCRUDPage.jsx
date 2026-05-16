@@ -294,7 +294,7 @@ export function MasterCRUDPage({
         }
       >
         <form onSubmit={handleSubmit} className={styles.form}>
-          {submitError && <Alert variant="error">{submitError}</Alert>}
+          {submitError && <Alert variant="warning" display="inline">{submitError}</Alert>}
           {formFields.map((field) => {
             const isDisabled = field.disabled || (editingItem && field.readOnlyOnEdit);
             if (field.type === 'select' && field.options) {

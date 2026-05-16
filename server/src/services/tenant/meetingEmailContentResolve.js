@@ -155,6 +155,87 @@ export function resolveTemplateStrings(template, meeting) {
   return { subject, body_html, body_text };
 }
 
+function parseDt(raw) {
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw;
+  return parseMeetingInstantUtc(raw);
+}
+
+/** Plain merge fields for reminder/feedback emails (attendee + automation-specific keys). */
+export function buildAutomationPlainVars(meeting, feedbackLink = '') {
+  const base = buildPlainVars(meeting);
+  const start = parseDt(meeting.start_at);
+  const end = parseDt(meeting.end_at);
+  const tz = safeTimeZone(meeting.meeting_timezone || meeting.owner_datetime_timezone);
+  const fmtDate = (d) => new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone: tz }).format(d);
+  const fmtTime = (d) => new Intl.DateTimeFormat('en', { hour: '2-digit', minute: '2-digit', timeZone: tz }).format(d);
+  const startT = start ? fmtTime(start) : '';
+  const endT = end ? fmtTime(end) : '';
+  let meeting_time_range = '';
+  if (start) {
+    meeting_time_range =
+      end && end.getTime() !== start.getTime() && endT ? `${startT} - ${endT}` : startT || '';
+  }
+  return {
+    ...base,
+    meeting_date: start ? fmtDate(start) : '',
+    meeting_time: meeting_time_range,
+    meeting_end_time: end ? fmtTime(end) : '',
+    company_name: meeting.tenant_company_name || 'Your Company',
+    contact_name: meeting.contact_name || '',
+    feedback_link: feedbackLink,
+    feedback_url: feedbackLink,
+  };
+}
+
+/** HTML merge fields for reminder/feedback templates. */
+export function buildAutomationHtmlVars(meeting, feedbackLink = '') {
+  const plain = buildAutomationPlainVars(meeting, feedbackLink);
+  const htmlBase = buildHtmlVars(meeting);
+  const htmlKeys = new Set(Object.keys(htmlBase));
+  const extra = Object.fromEntries(
+    Object.entries(plain)
+      .filter(([k]) => !htmlKeys.has(k))
+      .map(([k, v]) => [k, escapeHtml(v)])
+  );
+  return { ...htmlBase, ...extra };
+}
+
+function ensureJoinDetailsInBodyHtml(bodyHtml, meeting) {
+  const html = String(bodyHtml || '');
+  const link = String(meeting?.meeting_link || '').trim();
+  if (!link) return html;
+  if (html.includes(link)) return html;
+  const platform = formatMeetingPlatformLabel(normalizeMeetingPlatform(meeting?.meeting_platform));
+  return `${html}<hr/><p><strong>${platform}</strong><br/><a href="${link}" target="_blank" rel="noopener noreferrer">${link}</a></p>`;
+}
+
+function ensureJoinDetailsInBodyText(bodyText, meeting) {
+  const text = String(bodyText || '');
+  const link = String(meeting?.meeting_link || '').trim();
+  if (!link) return text;
+  if (text.includes(link)) return text;
+  const platform = formatMeetingPlatformLabel(normalizeMeetingPlatform(meeting?.meeting_platform));
+  return `${text}\n\n${platform}\n${link}\n`;
+}
+
+/**
+ * Resolve reminder/feedback templates the same way as invitation mail (merge fields + join link).
+ * @param {{ subject?: string, body_html?: string|null, body_text?: string|null }} template
+ * @param {object} meeting
+ * @param {{ feedbackLink?: string }} [options]
+ */
+export function buildAutomationEmailBodies(template, meeting, options = {}) {
+  const feedbackLink = options.feedbackLink || '';
+  const plainVars = buildAutomationPlainVars(meeting, feedbackLink);
+  const htmlVars = buildAutomationHtmlVars(meeting, feedbackLink);
+  const subject = applyTemplateVariables(template?.subject, plainVars);
+  let body_text = template?.body_text ? applyTemplateVariables(template.body_text, plainVars) : '';
+  let body_html = template?.body_html ? applyTemplateVariables(template.body_html, htmlVars) : '';
+  body_html = ensureJoinDetailsInBodyHtml(body_html, meeting);
+  body_text = ensureJoinDetailsInBodyText(body_text, meeting);
+  return { subject, body_html, body_text };
+}
+
 /**
  * @param {number} tenantId
  * @param {number|null} userId
