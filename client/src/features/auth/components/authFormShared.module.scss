@@ -2,6 +2,7 @@
 
 /** Fluid shell — no card box; sits on auth atmosphere background */
 .shell {
+  position: relative;
   width: 100%;
 }
 
@@ -29,25 +30,14 @@
       0 0 0 3px rgba(var(--color-primary-rgb), 0.2),
       0 1px 0 rgba(255, 255, 255, 0.06) inset !important;
   }
-}
 
-:global(html[data-color-scheme='light']) {
-  .authInput {
-    background: rgba(255, 255, 255, 0.92) !important;
-    border: 1px solid rgba(15, 23, 42, 0.1) !important;
-
-    &:hover:not(:disabled):not(:focus) {
-      border-color: rgba(15, 23, 42, 0.16) !important;
-    }
-  }
-
-  .authSelect :global(.cn-select__control) {
-    background-color: rgba(255, 255, 255, 0.92);
-    border: 1px solid rgba(15, 23, 42, 0.1) !important;
-
-    &:hover {
-      background-color: #fff;
-    }
+  /* Auth shell is always dark; keep autofill from flashing light backgrounds */
+  &:-webkit-autofill,
+  &:-webkit-autofill:hover,
+  &:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #0a0a0a inset !important;
+    -webkit-text-fill-color: var(--color-text-primary) !important;
+    caret-color: var(--color-text-primary);
   }
 }
 

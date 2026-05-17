@@ -5,6 +5,7 @@ import { useTenant } from '../context/TenantContext';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { LoginPage } from '../features/auth/pages/LoginPage';
+import { ImpersonationLandingPage } from '../features/auth/pages/ImpersonationLandingPage';
 import { RegisterPage } from '../features/auth/pages/RegisterPage';
 import { HomePage } from '../pages/HomePage';
 import { TenantDashboardPage } from '../pages/TenantDashboardPage';
@@ -77,6 +78,9 @@ import { BillingPage } from '../pages/BillingPage';
 import { PlatformBillingPage } from '../pages/PlatformBillingPage';
 import { PlatformTenantTelephonyPage } from '../pages/PlatformTenantTelephonyPage';
 import { PlatformTenantTelephonyTenantPage } from '../pages/PlatformTenantTelephonyTenantPage';
+import { PlatformTelephonyPlansPage } from '../pages/PlatformTelephonyPlansPage';
+import { PlatformTelephonyPlanFormPage } from '../pages/PlatformTelephonyPlanFormPage';
+import { PlatformDefaultSettingsPage } from '../pages/PlatformDefaultSettingsPage';
 import { TenantTelephonyPage } from '../pages/TenantTelephonyPage';
 import { TenantDomainHostGate } from './TenantDomainHostGate';
 import { EmailModuleGate } from '../features/email/EmailModuleGate';
@@ -191,6 +195,7 @@ function TenantRoutes() {
             </PublicOnlyRoute>
           }
         />
+        <Route path="/auth/impersonate" element={<ImpersonationLandingPage />} />
       </Route>
       <Route
         path="/unauthorized"
@@ -958,6 +963,46 @@ function PlatformRoutes() {
           <ProtectedRoute>
             <AppShellLayout>
               <PlatformBillingPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/telephony-plans"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <PlatformTelephonyPlansPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/telephony-plans/:segment/new"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <PlatformTelephonyPlanFormPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/telephony-plans/:segment/:planId/edit"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <PlatformTelephonyPlanFormPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/settings/defaults"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <PlatformDefaultSettingsPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

@@ -51,6 +51,10 @@ export const platformDialerPhoneNumbersAPI = {
   remove: (id) => axiosInstance.delete(`${PLATFORM_DIALER_PHONES}/${id}`),
 };
 
+export const impersonationAPI = {
+  start: (userId) => axiosInstance.post('/api/admin/impersonate', { userId }),
+};
+
 export const usersAPI = {
   getAll: ({
     tenantId,

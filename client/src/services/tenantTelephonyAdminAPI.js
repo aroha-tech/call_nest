@@ -1,6 +1,7 @@
 import { axiosInstance } from './axiosInstance';
 
 const BASE = '/api/admin/tenant-telephony';
+const PLANS_BASE = '/api/admin/telephony-billing-plans';
 
 /**
  * Super-admin telephony billing API.
@@ -36,4 +37,16 @@ export const tenantTelephonyAdminAPI = {
     axiosInstance.post(`${BASE}/${tenantId}/accounts/${accountId}/rotate-webhook-token`),
   deleteAccount: (tenantId, accountId) =>
     axiosInstance.delete(`${BASE}/${tenantId}/accounts/${accountId}`),
+};
+
+/** Platform-wide telephony billing plan templates (credit & unlimited). */
+export const telephonyBillingPlansAdminAPI = {
+  list: (params = {}, config = {}) => axiosInstance.get(PLANS_BASE, { params, ...config }),
+  getOptions: (params = {}) => axiosInstance.get(`${PLANS_BASE}/options`, { params }),
+  getById: (id) => axiosInstance.get(`${PLANS_BASE}/${id}`),
+  create: (body) => axiosInstance.post(PLANS_BASE, body),
+  reorder: (body) => axiosInstance.post(`${PLANS_BASE}/reorder`, body),
+  update: (id, body) => axiosInstance.put(`${PLANS_BASE}/${id}`, body),
+  toggleActive: (id) => axiosInstance.post(`${PLANS_BASE}/${id}/toggle-active`),
+  delete: (id) => axiosInstance.delete(`${PLANS_BASE}/${id}`),
 };

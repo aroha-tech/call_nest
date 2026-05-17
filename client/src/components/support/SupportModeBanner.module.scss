@@ -1,0 +1,46 @@
+@use '../../styles/variables' as *;
+
+.banner {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.95), rgba(43, 108, 176, 0.95));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-3;
+  flex-wrap: wrap;
+  padding: $space-2 $space-4;
+  max-width: 100%;
+}
+
+.icon {
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.text {
+  font-size: $font-size-sm;
+  color: rgba(255, 255, 255, 0.95);
+  text-align: center;
+
+  strong {
+    font-weight: $font-weight-semibold;
+  }
+}
+
+.exitBtn {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  color: #fff !important;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.22) !important;
+  }
+}

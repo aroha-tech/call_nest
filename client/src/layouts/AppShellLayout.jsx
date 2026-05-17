@@ -8,6 +8,7 @@ import { NavIcon, NavChevron } from '../components/navigation/NavIcon';
 import { useColorScheme } from '../context/ColorSchemeContext';
 import { getBreadcrumbItems } from './breadcrumbUtils';
 import { NotificationBell } from '../features/notifications/NotificationBell';
+import { SupportModeBanner } from '../components/support/SupportModeBanner';
 import { useSiteEntryPermissions } from '../hooks/useSiteEntryPermissions';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
 import { PRODUCT_DISPLAY_NAME } from '../config/productBrand';
@@ -439,7 +440,10 @@ export function AppShellLayout({ children }) {
             </button>
           </div>
         </header>
-        <main className={styles.content}>{children}</main>
+        <main className={styles.content}>
+          <SupportModeBanner />
+          {children}
+        </main>
       </div>
     </div>
   );

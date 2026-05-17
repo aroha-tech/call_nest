@@ -6,7 +6,11 @@ const router = Router();
 router.use(tenantAuthMiddleware);
 
 const manage = requirePermission(['telephony.accounts.manage', 'settings.manage']);
-const view = requirePermission(['telephony.accounts.view', 'telephony.accounts.manage', 'settings.manage']);
+const view = requirePermission([
+  'telephony.accounts.view',
+  'telephony.accounts.manage',
+  'settings.manage',
+]);
 
 // Mode endpoints (account mode + billing mode) live alongside the account CRUD so the
 // frontend has a single section in Settings → Calling → Provider.

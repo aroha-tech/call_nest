@@ -1,0 +1,105 @@
+@use '../../../styles/variables' as *;
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: $space-4;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(6px);
+  border-radius: $radius-md;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.panel {
+  width: 100%;
+  max-width: 360px;
+  padding: $space-6 $space-5;
+  border-radius: $radius-lg;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0a0a0a;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 24px 48px rgba(0, 0, 0, 0.55);
+  text-align: center;
+  animation: slideUp 0.22s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.iconWrap {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto $space-4;
+  border-radius: $radius-md;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(43, 108, 176, 0.18);
+  color: #63b3ed;
+}
+
+.title {
+  margin: 0 0 $space-2;
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.message {
+  margin: 0 0 $space-5;
+  font-size: $font-size-sm;
+  line-height: $line-height-relaxed;
+  color: var(--color-text-secondary);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+}
+
+.actionBtn {
+  width: 100%;
+  min-height: 48px !important;
+  border-radius: $radius-md !important;
+  font-weight: $font-weight-medium !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: $space-2;
+}
+
+.cancelBtn {
+  width: 100%;
+  min-height: 44px !important;
+  border-radius: $radius-md !important;
+  color: var(--color-text-secondary) !important;
+
+  &:hover:not(:disabled) {
+    color: var(--color-text-primary) !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+  }
+}

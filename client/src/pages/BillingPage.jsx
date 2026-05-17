@@ -10,6 +10,11 @@ import { Pagination } from '../components/ui/Pagination';
 import { Badge } from '../components/ui/Badge';
 import { Skeleton } from '../components/ui/Skeleton';
 import { billingAPI } from '../services/billingAPI';
+import { tenantTelephonyAPI } from '../services/tenantTelephonyAPI';
+import { TenantTelephonyPlansPanel } from '../components/telephony/TenantTelephonyPlansPanel';
+import { useCreditPurchaseCheckout } from '../hooks/useCreditPurchaseCheckout';
+import { useTelephonySubscriptionCheckout } from '../hooks/useTelephonySubscriptionCheckout';
+import { formatPaiseAsInr } from '../utils/callCreditsDisplay';
 import { useAppSelector } from '../app/hooks';
 import { selectUser } from '../features/auth/authSelectors';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
@@ -111,33 +116,18 @@ function cycleBadgeMeta(timeline, subStatus) {
   return { label: 'Active', variant: 'success' };
 }
 
-function loadRazorpayScript() {
-  return new Promise((resolve, reject) => {
-    if (typeof window !== 'undefined' && window.Razorpay) {
-      resolve();
-      return;
-    }
-    const s = document.createElement('script');
-    s.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('Failed to load Razorpay'));
-    document.body.appendChild(s);
-  });
-}
-
 export function BillingPage() {
   const user = useAppSelector(selectUser);
   const { tenantSlug } = useTenant();
   const { formatDateTime } = useDateTimeDisplay();
   const [tab, setTab] = useState('plans');
   const [config, setConfig] = useState(null);
-  const [plans, setPlans] = useState([]);
+  const [plansView, setPlansView] = useState(null);
+  const [wallet, setWallet] = useState(null);
   const [current, setCurrent] = useState(null);
   const [recentPayments, setRecentPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [payError, setPayError] = useState(null);
-  const [payingId, setPayingId] = useState(null);
 
   const [payments, setPayments] = useState([]);
   const [payTotal, setPayTotal] = useState(0);
@@ -154,16 +144,32 @@ export function BillingPage() {
     setLoading(true);
     setError(null);
     try {
-      const [cfg, pl, cur, recentRes] = await Promise.all([
+      const [cfg, purchaseCfg, cur, recentRes] = await Promise.all([
         billingAPI.getConfig(),
-        billingAPI.listPlans(),
+        tenantTelephonyAPI.getPurchaseConfig().catch(() => ({ data: { data: {} } })),
         billingAPI.getCurrent(),
         billingAPI.listPayments({ page: 1, limit: 15 }),
       ]);
-      setConfig(cfg.data?.data ?? null);
-      setPlans(pl.data?.data ?? []);
+      const purchase = purchaseCfg.data?.data ?? {};
+      setConfig({
+        ...(cfg.data?.data ?? {}),
+        razorpayConfigured:
+          purchase.razorpayConfigured ?? cfg.data?.data?.razorpayConfigured ?? false,
+      });
+      setPlansView(purchase);
       setCurrent(cur.data?.data ?? null);
       setRecentPayments(recentRes.data?.data ?? []);
+
+      if (purchase.creditPurchaseEligible ?? purchase.eligible) {
+        try {
+          const w = await tenantTelephonyAPI.getPurchaseWallet();
+          setWallet(w.data?.data?.wallet ?? null);
+        } catch {
+          setWallet(null);
+        }
+      } else {
+        setWallet(null);
+      }
     } catch (e) {
       setError(e.response?.data?.error || e.message || 'Failed to load billing');
     } finally {
@@ -195,6 +201,41 @@ export function BillingPage() {
     }
   }, [subPage, subLimit]);
 
+  const handlePurchaseSuccess = useCallback(async () => {
+    await loadCore();
+    setTab('payments');
+    await loadPayments();
+  }, [loadCore, loadPayments]);
+
+  const { purchase: purchaseCredits, payingId, payError } = useCreditPurchaseCheckout({
+    userEmail: user?.email,
+    onSuccess: handlePurchaseSuccess,
+  });
+
+  const {
+    subscribe: subscribePlan,
+    payingId: subscribingId,
+    payError: subscribePayError,
+  } = useTelephonySubscriptionCheckout({
+    userEmail: user?.email,
+    onSuccess: handlePurchaseSuccess,
+  });
+
+  const onPurchaseCredits = useCallback(
+    (plan) => purchaseCredits(plan, { razorpayConfigured: config?.razorpayConfigured }),
+    [purchaseCredits, config?.razorpayConfigured]
+  );
+
+  const onSubscribePlan = useCallback(
+    (plan, { billingInterval = 'month' } = {}) =>
+      subscribePlan(plan, {
+        razorpayConfigured: config?.razorpayConfigured,
+        autoRenew: true,
+        billingInterval,
+      }),
+    [subscribePlan, config?.razorpayConfigured]
+  );
+
   useEffect(() => {
     loadCore();
   }, [loadCore]);
@@ -209,12 +250,6 @@ export function BillingPage() {
 
   const timeline = useMemo(() => subscriptionTimeline(current), [current]);
   const cycleBadge = useMemo(() => cycleBadgeMeta(timeline, current?.status), [timeline, current?.status]);
-
-  const featuredPlanIndex = useMemo(() => {
-    if (!plans.length) return -1;
-    if (plans.length === 1) return 0;
-    return Math.min(1, Math.floor(plans.length / 2));
-  }, [plans]);
 
   const lastCapturedPayment = useMemo(
     () => recentPayments.find((p) => String(p.status).toLowerCase() === 'captured'),
@@ -241,60 +276,6 @@ export function BillingPage() {
     return 'Review payment status in history.';
   }, [recentPayments.length, recentFailedCount, recentCapturedCount]);
 
-  const onSubscribe = async (plan) => {
-    setPayError(null);
-    if (!config?.razorpayConfigured) {
-      setPayError('Razorpay is not configured. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET on the API server.');
-      return;
-    }
-    setPayingId(plan.id);
-    try {
-      await loadRazorpayScript();
-      const orderRes = await billingAPI.createOrder(plan.id);
-      const data = orderRes.data?.data;
-      if (!data?.orderId) {
-        throw new Error('No order returned');
-      }
-      const options = {
-        key: data.keyId,
-        amount: data.amount,
-        currency: data.currency || 'INR',
-        name: PRODUCT_DISPLAY_NAME,
-        description: data.plan?.name || plan.name,
-        order_id: data.orderId,
-        handler: async (response) => {
-          try {
-            await billingAPI.verifyPayment({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            });
-            await loadCore();
-            setTab('payments');
-            await loadPayments();
-            await loadSubs();
-          } catch (e) {
-            setPayError(e.response?.data?.error || e.message || 'Verification failed');
-          } finally {
-            setPayingId(null);
-          }
-        },
-        modal: {
-          ondismiss: () => setPayingId(null),
-        },
-        prefill: {
-          email: user?.email || '',
-        },
-        theme: { color: '#4f46e5' },
-      };
-      const rzp = new window.Razorpay(options);
-      rzp.open();
-    } catch (e) {
-      setPayingId(null);
-      setPayError(e.response?.data?.error || e.message || 'Could not start checkout');
-    }
-  };
-
   const onDownloadInvoice = (row) => {
     downloadPaymentInvoiceHtml({
       payment: row,
@@ -311,7 +292,7 @@ export function BillingPage() {
     <div className={styles.page}>
       <PageHeader
         title="Plans & billing"
-        subtitle="Subscription, payment health, invoices, and Razorpay checkout — everything your workspace needs to stay current."
+        subtitle="Buy call credit packs, view payment history, and manage Razorpay checkout for your workspace."
       />
 
       {error && (
@@ -319,9 +300,9 @@ export function BillingPage() {
           {error}
         </Alert>
       )}
-      {payError && (
+      {(payError || subscribePayError) && (
         <Alert variant="error" className={styles.mb}>
-          {payError}
+          {payError || subscribePayError}
         </Alert>
       )}
 
@@ -340,8 +321,37 @@ export function BillingPage() {
             <div className={styles.heroGlow} aria-hidden />
             <div className={styles.heroInner}>
               <div className={styles.heroMain}>
-                <span className={styles.heroEyebrow}>Workspace subscription</span>
-                {current ? (
+                <span className={styles.heroEyebrow}>
+                  {plansView?.callBillingMode === 'credit' ? 'Call credit wallet' : 'Workspace billing'}
+                </span>
+                {plansView?.callBillingMode === 'credit' && wallet ? (
+                  <>
+                    <h2 className={styles.heroTitle}>Call credits</h2>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                      <Badge variant="success" size="md">
+                        {formatPaiseAsInr(wallet.balance_paise)} available
+                      </Badge>
+                    </div>
+                    <p className={listStyles.mutedSmall} style={{ margin: '12px 0 0', maxWidth: '520px', lineHeight: 1.55 }}>
+                      Top up your wallet with credit packs below. Credits are used for connected outbound minutes on
+                      platform calling.
+                    </p>
+                    <div className={styles.heroActions}>
+                      <Button type="button" variant="primary" size="sm" onClick={() => setTab('plans')}>
+                        Buy credits
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className={styles.heroLinkBtn}
+                        onClick={() => setTab('payments')}
+                      >
+                        Payment history
+                      </Button>
+                    </div>
+                  </>
+                ) : current ? (
                   <>
                     <h2 className={styles.heroTitle}>{current.plan_name}</h2>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
@@ -389,14 +399,15 @@ export function BillingPage() {
                   </>
                 ) : (
                   <>
-                    <h2 className={styles.heroTitle}>Unlock the full workspace</h2>
+                    <h2 className={styles.heroTitle}>Call credit packs</h2>
                     <p className={listStyles.mutedSmall} style={{ margin: 0, maxWidth: '520px', lineHeight: 1.55 }}>
-                      You do not have an active subscription. Pick a plan to enable billing-period tracking, invoices,
-                      and payment status — same checkout flow your team uses in production.
+                      {plansView?.creditPurchaseReason ??
+                        plansView?.eligibilityReason ??
+                        'Buy call credits with Razorpay when your workspace uses credit billing and platform calling.'}
                     </p>
                     <div className={styles.heroActions}>
                       <Button type="button" variant="primary" size="sm" onClick={() => setTab('plans')}>
-                        Compare plans
+                        View packs
                       </Button>
                     </div>
                   </>
@@ -478,57 +489,25 @@ export function BillingPage() {
 
               <TabPanel isActive={tab === 'plans'}>
                 <div className={styles.planSection}>
-                  <div className={styles.planGrid}>
-                    {plans.map((p, idx) => {
-                      const isFeatured = idx === featuredPlanIndex && plans.length > 1;
-                      const isCurrent = current?.plan_id === p.id;
-                      const cardClass = [
-                        styles.planCard,
-                        isFeatured && styles.planCardFeatured,
-                        isCurrent && styles.planCardCurrent,
-                      ]
-                        .filter(Boolean)
-                        .join(' ');
-                      return (
-                        <Card key={p.id} className={cardClass}>
-                          {(isFeatured || isCurrent) && (
-                            <div className={styles.planBadge}>
-                              {isCurrent ? (
-                                <Badge variant="success" size="sm">
-                                  Current
-                                </Badge>
-                              ) : (
-                                <Badge variant="primary" size="sm">
-                                  Popular
-                                </Badge>
-                              )}
-                            </div>
-                          )}
-                          <h3>{p.name}</h3>
-                          <p className={styles.planPrice}>{formatInr(p.amount_paise)}</p>
-                          <p className={styles.planInterval}>
-                            {p.billing_interval === 'year'
-                              ? `Billed every ${p.interval_count || 1} year(s)`
-                              : `Billed every ${p.interval_count || 1} month(s)`}
-                          </p>
-                          <p className={styles.planDesc}>{p.description}</p>
-                          <Button
-                            variant="primary"
-                            fullWidth
-                            disabled={payingId != null || !config?.razorpayConfigured || isCurrent}
-                            onClick={() => onSubscribe(p)}
-                          >
-                            {isCurrent
-                              ? 'Active plan'
-                              : payingId === p.id
-                                ? 'Opening checkout…'
-                                : 'Pay with Razorpay'}
-                          </Button>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                  {!plans.length && <p className={styles.empty}>No plans available for this workspace.</p>}
+                  <TenantTelephonyPlansPanel
+                    callBillingMode={plansView?.callBillingMode || 'credit'}
+                    tenantBillingPlans={plansView?.tenantBillingPlans ?? []}
+                    assignedBillingPlanId={
+                      plansView?.assignedBillingPlanId ?? plansView?.assignedBillingPlan?.id
+                    }
+                    creditPurchasePlans={plansView?.creditPurchasePlans ?? plansView?.plans ?? []}
+                    creditPurchaseEligible={
+                      plansView?.creditPurchaseEligible ?? plansView?.eligible
+                    }
+                    creditPurchaseReason={
+                      plansView?.creditPurchaseReason ?? plansView?.eligibilityReason
+                    }
+                    razorpayConfigured={config?.razorpayConfigured}
+                    payingId={payingId || subscribingId}
+                    onPurchase={onPurchaseCredits}
+                    onSubscribe={onSubscribePlan}
+                    subscribePayError={subscribePayError}
+                  />
                 </div>
               </TabPanel>
 

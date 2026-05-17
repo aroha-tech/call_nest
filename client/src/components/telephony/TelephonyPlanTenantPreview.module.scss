@@ -1,0 +1,157 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.sectionHead > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.previewCard {
+  padding: 20px 22px;
+}
+
+.emptyPreview {
+  padding: 32px 24px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.emptyIcon {
+  opacity: 0.5;
+  margin-bottom: 8px;
+}
+
+.previewNote {
+  margin: 0 0 12px;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.billingPreview {
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-2, rgba(99, 102, 241, 0.04));
+}
+
+.previewHero {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.previewTitle {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.previewSub {
+  margin: 4px 0 0;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.overviewItem {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.overviewLabel {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.overviewFoot {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.purchasePreview .planGrid {
+  display: flex;
+  justify-content: center;
+}
+
+.planCard {
+  position: relative;
+  max-width: 320px;
+  width: 100%;
+  padding: 20px 22px !important;
+  text-align: center;
+}
+
+.planBadge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.priceRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.originalPrice {
+  text-decoration: line-through;
+  opacity: 0.55;
+  font-size: 0.95rem;
+}
+
+.salePrice {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-primary-500, #6366f1);
+}
+
+.interval {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.walletCredit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  margin: 8px 0;
+}
+
+.planDesc {
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  margin: 0 0 14px;
+  min-height: 2.5em;
+}

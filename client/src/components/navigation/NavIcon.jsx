@@ -585,7 +585,9 @@ export const SHELL_NAV_ICON_ACCENTS = {
   'meetings-mail-settings': '#06b6d4',
   billing: '#22c55e',
   'telephony-billing': '#f59e0b',
+  'telephony-plans': '#8b5cf6',
   telephony: '#f59e0b',
+  'default-settings': '#64748b',
   'dialer-workspace': '#38bdf8',
 };
 
@@ -593,7 +595,9 @@ const NAV_ICON_MAP = {
   dashboard: IconDashboard,
   billing: IconCreditCard,
   'telephony-billing': IconCreditCard,
+  'telephony-plans': IconCreditCard,
   telephony: IconCreditCard,
+  'default-settings': IconSettings,
   tenants: IconBuilding,
   users: IconUsers,
   masters: IconLayers,

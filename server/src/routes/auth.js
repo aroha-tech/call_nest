@@ -10,6 +10,10 @@ router.post('/register', authController.register);
 router.get('/tenant-slug-status', authController.tenantSlugStatus);
 router.post('/login', authController.login);
 router.post('/refresh', authController.refresh);
+router.post('/impersonation/exchange', authController.impersonationExchange);
+router.post('/impersonation/refresh', authController.impersonationRefresh);
+router.post('/impersonation/end', authController.impersonationEnd);
+router.get('/session-pulse', authMiddleware, authController.sessionPulse);
 
 // Authenticated: update own profile (name, password); works for tenant users and platform admins
 router.patch('/me', authMiddleware, verifyTokenVersion, authController.updateMe);

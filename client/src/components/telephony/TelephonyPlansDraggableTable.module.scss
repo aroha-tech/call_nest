@@ -1,0 +1,60 @@
+.cellStack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.muted {
+  opacity: 0.75;
+  font-size: 0.85rem;
+}
+
+.rowActions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rowClickable {
+  cursor: pointer;
+}
+
+.rowClickable:hover {
+  background: var(--color-surface-2, rgba(99, 102, 241, 0.06));
+}
+
+.rowSelected {
+  cursor: pointer;
+  background: rgba(99, 102, 241, 0.1) !important;
+}
+
+.rowDragging {
+  opacity: 0.55;
+}
+
+.rowDragOver {
+  box-shadow: inset 0 0 0 2px var(--color-primary-400, #6366f1);
+}
+
+.dragHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  padding: 4px;
+  border-radius: 6px;
+  color: var(--color-text-muted);
+
+  &:hover {
+    background: var(--color-surface-2, rgba(99, 102, 241, 0.08));
+    color: var(--color-text-primary);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.headIcon {
+  opacity: 0.55;
+}

@@ -90,9 +90,12 @@ export async function findAll({
             t.email_communication_enabled, t.email_module_enabled, t.email_automation_enabled,
             t.reports_advanced_enabled,
             t.theme_json,
-            t.telephony_account_mode, t.call_billing_mode,
+            t.telephony_account_mode, t.call_billing_mode, t.telephony_billing_plan_id,
+            p.name AS telephony_plan_name, p.plan_type AS telephony_plan_type,
             ${TENANT_USER_COUNT_SQL} AS user_count
      FROM tenants t
+     LEFT JOIN telephony_billing_plans p
+       ON p.id = t.telephony_billing_plan_id AND p.deleted_at IS NULL
      ${whereSQL}
      ORDER BY t.name ASC
      LIMIT ${limitInt} OFFSET ${offsetInt}`,

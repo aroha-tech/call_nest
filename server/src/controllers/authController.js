@@ -1,4 +1,6 @@
 import * as authService from '../services/authService.js';
+import * as impersonationService from '../services/superAdmin/impersonationService.js';
+import { getTokenVersion } from '../services/rbacService.js';
 import { query } from '../config/db.js';
 import { syncContactsManagerForAgent } from '../services/tenant/contactsService.js';
 import {
@@ -96,7 +98,7 @@ export async function tenantSlugStatus(req, res, next) {
  */
 export async function login(req, res, next) {
   try {
-    const { email, password } = req.body;
+    const { email, password, takeOver } = req.body;
     
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
@@ -108,7 +110,8 @@ export async function login(req, res, next) {
       {
         tenantFromHost: req.tenant,
         isPlatformHost: Boolean(req.isPlatform),
-      }
+      },
+      { takeOver: Boolean(takeOver) }
     );
     
     res.json({
@@ -263,6 +266,95 @@ export async function getMe(req, res, next) {
 
     if (!row) return res.status(404).json({ error: 'User not found' });
     res.json({ data: row });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Lightweight session check for the client (detect sign-in elsewhere).
+ * GET /api/auth/session-pulse
+ */
+export async function sessionPulse(req, res, next) {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    if (req.user.isImpersonation) {
+      return res.json({ ok: true, impersonation: true });
+    }
+    const dbVersion = await getTokenVersion(req.user.id);
+    const jwtVersion = req.user.tokenVersion ?? 1;
+    if (dbVersion !== jwtVersion) {
+      return res.status(401).json({
+        error: 'Your session was ended because this account signed in elsewhere.',
+        code: 'TOKEN_VERSION_MISMATCH',
+      });
+    }
+    const tokenTenantId = req.user.isPlatformAdmin ? 1 : req.user.tenantId;
+    const activeElsewhere =
+      tokenTenantId != null
+        ? await authService.hasActiveRefreshSession(req.user.id, tokenTenantId)
+        : false;
+    res.json({ ok: true, token_version: dbVersion, session_active: activeElsewhere });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Exchange one-time code from super-admin "Open workspace as…"
+ * POST /api/auth/impersonation/exchange
+ */
+export async function impersonationExchange(req, res, next) {
+  try {
+    const { code } = req.body;
+    const payload = await impersonationService.exchangeImpersonationCode(code);
+    res.json({
+      access_token: payload.access_token,
+      refresh_token: payload.refresh_token,
+      expires_in: payload.expires_in,
+      tenant_slug: payload.tenant_slug,
+      tenant_name: payload.tenant_name,
+      target_user: payload.target_user,
+      impersonator_id: payload.impersonator_id,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Refresh impersonation access token (does not affect the real user's session).
+ * POST /api/auth/impersonation/refresh
+ */
+export async function impersonationRefresh(req, res, next) {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'refreshToken is required' });
+    }
+    const { accessToken, refreshToken: newRefreshToken, expiresIn } =
+      await impersonationService.refreshImpersonationToken(refreshToken);
+    res.json({
+      access_token: accessToken,
+      refresh_token: newRefreshToken,
+      expires_in: expiresIn,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * End impersonation session
+ * POST /api/auth/impersonation/end
+ */
+export async function impersonationEnd(req, res, next) {
+  try {
+    const { refreshToken } = req.body;
+    await impersonationService.endImpersonationSession(refreshToken);
+    res.json({ message: 'Support session ended' });
   } catch (err) {
     next(err);
   }

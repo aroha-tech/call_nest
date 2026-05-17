@@ -22,6 +22,10 @@ export function selectIsAuthenticated(state) {
   return state.auth?.isAuthenticated ?? false;
 }
 
+export function selectIsImpersonation(state) {
+  return state.auth?.isImpersonation ?? false;
+}
+
 export function selectAuthLoading(state) {
   return state.auth?.loading ?? false;
 }

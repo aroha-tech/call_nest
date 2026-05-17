@@ -30,6 +30,8 @@ import industryFieldDefinitionsRoutes from './routes/superAdmin/industryFieldDef
 import platformBillingRoutes from './routes/superAdmin/billing.js';
 import dialerPhoneNumbersAdminRoutes from './routes/superAdmin/dialerPhoneNumbers.js';
 import tenantTelephonyAdminRoutes from './routes/superAdmin/tenantTelephony.js';
+import telephonyBillingPlansAdminRoutes from './routes/superAdmin/telephonyBillingPlans.js';
+import impersonationAdminRoutes from './routes/superAdmin/impersonation.js';
 
 // Tenant routes
 import dialingSetsRoutes from './routes/tenant/dialingSets.js';
@@ -186,6 +188,8 @@ app.use('/api/admin/campaign-statuses', campaignStatusesMasterRoutes);
 app.use('/api/admin/billing', platformBillingRoutes);
 app.use('/api/admin/dialer-phone-numbers', dialerPhoneNumbersAdminRoutes);
 app.use('/api/admin/tenant-telephony', tenantTelephonyAdminRoutes);
+app.use('/api/admin/telephony-billing-plans', telephonyBillingPlansAdminRoutes);
+app.use('/api/admin/impersonate', impersonationAdminRoutes);
 
 // Tenant routes (tenant users only)
 app.use('/api/tenant/dialing-sets', dialingSetsRoutes);

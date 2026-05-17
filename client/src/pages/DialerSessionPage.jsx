@@ -49,6 +49,7 @@ import {
   civilDateTimeNowPlusMinutesInZone,
 } from '../utils/meetingTimezone';
 import { COMMON_TIMEZONE_OPTIONS } from '../utils/dateTimeDisplay';
+import { DialerCreditsBar } from '../components/dialer/DialerCreditsBar';
 import styles from './DialerSessionPage.module.scss';
 
 /** Display-only: maps `contact_phones.label` ENUM (and primary) to a short title. */
@@ -1457,6 +1458,10 @@ export function DialerSessionPage() {
 
       {showErrorOutside ? <Alert variant={errorAlertVariant}>{error}</Alert> : null}
 
+      {session && !sessionEnded && view === 'preflight' ? (
+        <DialerCreditsBar refreshIntervalMs={45000} />
+      ) : null}
+
       {loading && !session ? (
         <div className={styles.dialerShell} aria-busy="true" aria-label="Loading dialer workspace">
           <header className={styles.dialerChromeBar}>
@@ -1602,6 +1607,7 @@ export function DialerSessionPage() {
 
           {sessionEnded || !dialWorkspaceUnlocked ? null : (
           <div className={styles.dialerShell}>
+            <DialerCreditsBar variant="dark" compact refreshIntervalMs={45000} />
             <header className={styles.dialerChromeBar}>
               <div className={styles.dialerChromeLeft}>
                 <span className={styles.dialerChromeBadge}>Dial workspace</span>

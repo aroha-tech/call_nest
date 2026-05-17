@@ -11,6 +11,7 @@ import { dialerSessionsAPI } from '../services/dialerSessionsAPI';
 import { dialingSetsAPI, callScriptsAPI, dialingSetDispositionsAPI } from '../services/dispositionAPI';
 import { templateVariablesAPI } from '../services/templateVariablesAPI';
 import { renderScriptHtml } from '../utils/callScriptHtml';
+import { DialerCreditsBar } from '../components/dialer/DialerCreditsBar';
 import styles from './DialerSessionSetupPage.module.scss';
 
 function pickDefaultId(list, isDefaultKey = 'is_default') {
@@ -228,6 +229,8 @@ export function DialerSessionSetupPage() {
           Back to leads
         </Button>
       </header>
+
+      <DialerCreditsBar refreshIntervalMs={60000} />
 
       {error ? <Alert variant="error">{error}</Alert> : null}
 

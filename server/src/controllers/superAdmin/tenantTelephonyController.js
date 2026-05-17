@@ -2,6 +2,7 @@ import { query } from '../../config/db.js';
 import { env } from '../../config/env.js';
 import * as callCreditsService from '../../services/billing/callCreditsService.js';
 import * as platformSettingsService from '../../services/billing/platformSettingsService.js';
+import * as telephonyBillingPlansService from '../../services/superAdmin/telephonyBillingPlansService.js';
 import * as tenantTelephonyAccountsService from '../../services/tenant/telephony/tenantTelephonyAccountsService.js';
 
 function buildWebhookUrl(account) {
@@ -98,12 +99,18 @@ export async function getTenantBilling(req, res, next) {
   try {
     const tenantId = requireTenantId(req);
     const [tenant] = await query(
-      `SELECT id, name, slug, telephony_account_mode, call_billing_mode,
-              call_rate_paise_per_minute_override,
-              byo_platform_fee_paise_per_minute_override,
-              call_min_balance_paise_override,
-              unlimited_minutes_cap_per_month_override
-       FROM tenants WHERE id = ? AND is_deleted = 0 LIMIT 1`,
+      `SELECT t.id, t.name, t.slug, t.telephony_account_mode, t.call_billing_mode,
+              t.telephony_billing_plan_id,
+              t.call_rate_paise_per_minute_override,
+              t.byo_platform_fee_paise_per_minute_override,
+              t.call_min_balance_paise_override,
+              t.unlimited_minutes_cap_per_month_override,
+              p.id AS plan_id, p.code AS plan_code, p.name AS plan_name, p.plan_type AS plan_type
+       FROM tenants t
+       LEFT JOIN telephony_billing_plans p
+         ON p.id = t.telephony_billing_plan_id AND p.deleted_at IS NULL
+       WHERE t.id = ? AND t.is_deleted = 0
+       LIMIT 1`,
       [tenantId]
     );
     if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
@@ -133,6 +140,32 @@ export async function updateTenantBilling(req, res, next) {
       sets.push('telephony_account_mode = ?');
       params.push(v);
     }
+    let planAssignId = null;
+    let planClear = false;
+    if (body.telephony_billing_plan_id !== undefined) {
+      const raw = body.telephony_billing_plan_id;
+      if (raw === null || raw === '' || raw === 0 || raw === '0') {
+        planClear = true;
+        sets.push('telephony_billing_plan_id = NULL');
+      } else {
+        const planId = Number(raw);
+        if (!planId) {
+          return res.status(400).json({ error: 'telephony_billing_plan_id must be a valid plan id' });
+        }
+        const plan = await telephonyBillingPlansService.findById(planId);
+        if (!plan) {
+          return res.status(404).json({ error: 'Telephony billing plan not found' });
+        }
+        if (plan.is_active !== 1) {
+          return res.status(400).json({ error: 'Cannot assign an inactive telephony billing plan' });
+        }
+        planAssignId = planId;
+        if (body.call_billing_mode === undefined) {
+          sets.push('call_billing_mode = ?');
+          params.push(plan.plan_type);
+        }
+      }
+    }
     if (body.call_billing_mode !== undefined) {
       const v = String(body.call_billing_mode);
       if (!['credit', 'unlimited'].includes(v)) {
@@ -161,11 +194,27 @@ export async function updateTenantBilling(req, res, next) {
         }
       }
     }
-    if (!sets.length) {
+    if (!sets.length && !planAssignId) {
       return res.status(400).json({ error: 'No allowed fields in body' });
     }
-    params.push(tenantId);
-    await query(`UPDATE tenants SET ${sets.join(', ')} WHERE id = ?`, params);
+    if (sets.length) {
+      params.push(tenantId);
+      await query(`UPDATE tenants SET ${sets.join(', ')} WHERE id = ?`, params);
+    }
+    if (planAssignId) {
+      await telephonyBillingPlansService.applyPlanToTenant(
+        tenantId,
+        planAssignId,
+        req.user?.id ?? null
+      );
+    } else if (planClear) {
+      await query(
+        `UPDATE tenant_telephony_subscriptions
+         SET status = 'expired', updated_by = ?, updated_at = UTC_TIMESTAMP()
+         WHERE tenant_id = ? AND status = 'active' AND deleted_at IS NULL`,
+        [req.user?.id ?? null, tenantId]
+      );
+    }
     return getTenantBilling(req, res, next);
   } catch (err) {
     next(err);

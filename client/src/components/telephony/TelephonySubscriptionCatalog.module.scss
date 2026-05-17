@@ -1,0 +1,167 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sectionHead {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.sectionTitle {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.sectionSub {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.cycleToggle {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px;
+}
+
+.cycleBtn {
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-2, #f1f5f9);
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.cycleBtnActive {
+  background: var(--color-surface, #fff);
+  color: var(--color-primary-500, #6366f1);
+  border-color: color-mix(in srgb, var(--color-primary-500, #6366f1) 40%, transparent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 18px !important;
+}
+
+.cardEmpty {
+  opacity: 0.72;
+  border-style: dashed;
+}
+
+.cardCurrent {
+  border-color: color-mix(in srgb, var(--color-success-500, #22c55e) 50%, transparent);
+}
+
+.cardEnterprise {
+  border-color: color-mix(in srgb, #6366f1 35%, transparent);
+}
+
+.cardFree {
+  border-color: color-mix(in srgb, #22c55e 30%, transparent);
+}
+
+.badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.cardName {
+  margin: 4px 0 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding-right: 56px;
+}
+
+.priceBlock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.originalPrice {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+.salePrice {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.interval {
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.metaLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--color-text-secondary);
+}
+
+.desc,
+.featuresHtml {
+  font-size: 0.86rem;
+  color: var(--color-text-secondary);
+  flex: 1;
+}
+
+.featuresHtml ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.featuresList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+
+  li {
+    display: flex;
+    gap: 8px;
+    font-size: 0.86rem;
+    margin-bottom: 6px;
+  }
+}
+
+.emptySlot {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.empty {
+  text-align: center;
+  color: var(--color-text-muted);
+}

@@ -15,7 +15,16 @@ const PLATFORM_NAV_ITEMS = [
   { key: 'tenants', label: 'Tenants', path: '/admin/tenants' },
   { key: 'users', label: 'Users', path: '/admin/users' },
   { key: 'billing', label: 'Billing', path: '/admin/billing' },
-  { key: 'telephony-billing', label: 'Telephony & Credits', path: '/admin/telephony-billing' },
+  { key: 'telephony-plans', label: 'Telephony plans', path: '/admin/telephony-plans' },
+  { key: 'telephony-billing', label: 'Tenant telephony', path: '/admin/telephony-billing' },
+  {
+    key: 'settings',
+    label: 'Settings',
+    section: 'Settings',
+    children: [
+      { key: 'default-settings', label: 'Default settings', path: '/admin/settings/defaults' },
+    ],
+  },
   { key: 'workflow-map', label: 'Workflow', path: '/admin/workflow/map' },
   {
     key: 'masters',

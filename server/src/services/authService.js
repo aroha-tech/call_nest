@@ -5,7 +5,12 @@ import { env } from '../config/env.js';
 import { hashRefreshToken, generateRefreshToken } from '../utils/tokenHelper.js';
 import { parseExpiration } from '../utils/dateHelper.js';
 import { redis, isRedisAvailable, refreshTokenKey, userSessionsKey } from '../config/redis.js';
-import { getUserPermissions, createSystemRolesForTenant, getRoleByTenantAndName } from './rbacService.js';
+import {
+  getUserPermissions,
+  createSystemRolesForTenant,
+  getRoleByTenantAndName,
+  incrementTokenVersion,
+} from './rbacService.js';
 import { cloneDefaultsForTenant } from './dispositionCloneService.js';
 import { validateTenantSlugFormat } from '../utils/tenantSlugRules.js';
 import { themeForJwt, defaultTenantThemeJsonString } from '../utils/tenantTheme.js';
@@ -69,7 +74,7 @@ function ttlFromString(expiresIn) {
  * Manager name/email for agents (reporting line). Omitted for platform admins.
  * Always returns manager_id / manager_name / manager_email keys (nulls when not applicable).
  */
-async function managerClaimsForJwt(user) {
+export async function managerClaimsForJwt(user) {
   const empty = {
     manager_id: null,
     manager_name: null,
@@ -103,7 +108,7 @@ async function managerClaimsForJwt(user) {
 }
 
 /** Claims for workspace branding in the client (sidebar). Omitted for platform admins. */
-async function tenantClaimsForJwt(tenantId, isPlatformAdmin) {
+export async function tenantClaimsForJwt(tenantId, isPlatformAdmin) {
   if (isPlatformAdmin || tenantId == null) {
     return {};
   }
@@ -274,6 +279,20 @@ export async function registerTenantWithAdmin(tenantData, adminData) {
 }
 
 /**
+ * Whether the user has a non-revoked, unexpired refresh token (active sign-in elsewhere).
+ */
+export async function hasActiveRefreshSession(userId, tokenTenantId) {
+  const rows = await query(
+    `SELECT 1 AS active
+     FROM refresh_tokens
+     WHERE user_id = ? AND tenant_id = ? AND is_revoked = 0 AND is_deleted = 0 AND expires_at > NOW()
+     LIMIT 1`,
+    [userId, tokenTenantId]
+  );
+  return rows.length > 0;
+}
+
+/**
  * Login user
  * Returns JWT token and user info
  * JWT includes permissions array and token_version for RBAC
@@ -281,8 +300,11 @@ export async function registerTenantWithAdmin(tenantData, adminData) {
  * @param {object} [hostContext]
  * @param {object|null} [hostContext.tenantFromHost] - req.tenant when request is on a tenant subdomain
  * @param {boolean} [hostContext.isPlatformHost] - true when request is on the platform (admin) host
+ * @param {object} [options]
+ * @param {boolean} [options.takeOver] - revoke other sessions and sign in here
  */
-export async function login(email, password, hostContext = {}) {
+export async function login(email, password, hostContext = {}, options = {}) {
+  const { takeOver = false } = options;
   const { tenantFromHost, isPlatformHost } = hostContext;
 
   // Find user by email (tenantId derived from user record)
@@ -368,6 +390,26 @@ export async function login(email, password, hostContext = {}) {
     }
   }
   
+  const tokenTenantId = isPlatformAdmin ? 1 : user.tenant_id;
+  const hasActiveSession = await hasActiveRefreshSession(user.id, tokenTenantId);
+
+  if (hasActiveSession && !takeOver) {
+    const err = new Error('This account is already signed in on another device or browser.');
+    err.status = 409;
+    err.code = 'SESSION_ACTIVE';
+    throw err;
+  }
+
+  if (hasActiveSession && takeOver) {
+    await revokeAllUserTokens(tokenTenantId, user.id);
+    await incrementTokenVersion(user.id);
+    const [refreshed] = await query(
+      'SELECT token_version FROM users WHERE id = ? AND is_deleted = 0',
+      [user.id]
+    );
+    if (refreshed) user.token_version = refreshed.token_version;
+  }
+
   // Update last_login_at
   await query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id]);
   
@@ -414,8 +456,6 @@ export async function login(email, password, hostContext = {}) {
   );
   
   // Store refresh token in database (hashed only)
-  // For platform admins we still bind refresh token rows to the platform tenant (id=1)
-  const tokenTenantId = isPlatformAdmin ? 1 : user.tenant_id;
   await query(
     `INSERT INTO refresh_tokens (user_id, tenant_id, token_hash, expires_at)
      VALUES (?, ?, ?, ?)`,

@@ -47,7 +47,8 @@ export function userAndTenantFromToken(accessToken) {
     profilePhotoUrl: payload.profile_photo_url ?? null,
     role: payload.role,
     roleId: payload.role_id ?? null,
-    isPlatformAdmin: Boolean(payload.is_platform_admin),
+    isPlatformAdmin: Boolean(payload.is_platform_admin) && payload.session_type !== 'impersonation',
+    isImpersonation: payload.session_type === 'impersonation',
     datetimeDisplayMode:
       payload.datetime_display_mode === 'browser_local' ? 'browser_local' : 'ist_fixed',
     datetimeTimezone:

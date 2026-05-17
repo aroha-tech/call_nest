@@ -48,6 +48,45 @@
   gap: 14px 18px;
 }
 
+.plansToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px 18px;
+}
+
+.plansSearch {
+  flex: 1;
+  min-width: 200px;
+}
+
+.formCol {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cellStack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.planAssignBox {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
 .cardActions {
   display: flex;
   gap: 10px;

@@ -43,6 +43,12 @@ const TENANT_PATH_OVERRIDES = {
 const PLATFORM_PATH_OVERRIDES = {
   '/profile': 'Profile',
   '/admin': 'Admin',
+  '/admin/settings': 'Settings',
+  '/admin/settings/defaults': 'Default settings',
+  '/admin/telephony-plans': 'Telephony plans',
+  '/admin/telephony-plans/subscription/new': 'New subscription plan',
+  '/admin/telephony-plans/top-up/new': 'New top-up pack',
+  '/admin/telephony-billing': 'Tenant telephony',
   '/admin/masters': 'Masters',
   '/admin/workflow': 'Workflow',
   '/admin/dispositions': 'Dispositions',

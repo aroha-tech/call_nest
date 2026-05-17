@@ -20,17 +20,22 @@ import {
 } from '../components/ui/Table';
 import { Pagination } from '../components/ui/Pagination';
 import { tenantsAPI } from '../services/adminAPI';
-import { tenantTelephonyAdminAPI } from '../services/tenantTelephonyAdminAPI';
+import {
+  tenantTelephonyAdminAPI,
+  telephonyBillingPlansAdminAPI,
+} from '../services/tenantTelephonyAdminAPI';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
+import {
+  formatPaiseAsInr,
+  formatPaisePerMinHint,
+  formatRupeeAmount,
+  paiseToRupeeInput,
+  rupeeToPaise,
+  safePaisePerMin,
+} from '../utils/telephonyMoneyUtils';
 import styles from './PlatformTenantTelephonyPage.module.scss';
 
 const PAGE_SIZE = 20;
-
-function formatPaiseAsInr(paise) {
-  const n = Number(paise) / 100;
-  if (!Number.isFinite(n)) return '—';
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(n);
-}
 
 function formatMinutes(min) {
   const n = Number(min);
@@ -105,7 +110,7 @@ function PlatformDefaultsCard({ onError }) {
         default_byo_platform_fee_paise_per_minute: String(
           d.default_byo_platform_fee_paise_per_minute ?? ''
         ),
-        default_call_min_balance_paise: String(d.default_call_min_balance_paise ?? ''),
+        default_call_min_balance_paise: paiseToRupeeInput(d.default_call_min_balance_paise),
         default_unlimited_minutes_cap_per_month: String(
           d.default_unlimited_minutes_cap_per_month ?? ''
         ),
@@ -126,11 +131,11 @@ function PlatformDefaultsCard({ onError }) {
     setSaving(true);
     try {
       const body = {
-        default_call_rate_paise_per_minute: safeNumber(draft.default_call_rate_paise_per_minute),
-        default_byo_platform_fee_paise_per_minute: safeNumber(
+        default_call_rate_paise_per_minute: safePaisePerMin(draft.default_call_rate_paise_per_minute),
+        default_byo_platform_fee_paise_per_minute: safePaisePerMin(
           draft.default_byo_platform_fee_paise_per_minute
         ),
-        default_call_min_balance_paise: safeNumber(draft.default_call_min_balance_paise),
+        default_call_min_balance_paise: rupeeToPaise(draft.default_call_min_balance_paise),
         default_unlimited_minutes_cap_per_month: safeNumber(
           draft.default_unlimited_minutes_cap_per_month
         ),
@@ -148,9 +153,9 @@ function PlatformDefaultsCard({ onError }) {
 
   const equivalents = useMemo(
     () => ({
-      rate: formatPaiseAsInr(draft.default_call_rate_paise_per_minute),
-      byo: formatPaiseAsInr(draft.default_byo_platform_fee_paise_per_minute),
-      min: formatPaiseAsInr(draft.default_call_min_balance_paise),
+      rate: formatPaisePerMinHint(draft.default_call_rate_paise_per_minute),
+      byo: formatPaisePerMinHint(draft.default_byo_platform_fee_paise_per_minute),
+      min: formatRupeeAmount(draft.default_call_min_balance_paise),
     }),
     [draft]
   );
@@ -161,7 +166,7 @@ function PlatformDefaultsCard({ onError }) {
         <div>
           <h3 className={styles.cardTitle}>Platform defaults</h3>
           <p className={styles.cardSub}>
-            Applied to every tenant unless a per-tenant override is set. Amounts are in paise (₹1 = 100 paise).
+            Applied to every tenant unless a per-tenant override is set. Rates are paise/min; minimum balance is ₹.
           </p>
         </div>
         {saved ? (
@@ -181,7 +186,7 @@ function PlatformDefaultsCard({ onError }) {
           onChange={(e) =>
             setDraft((d) => ({ ...d, default_call_rate_paise_per_minute: e.target.value }))
           }
-          hint={`≈ ${equivalents.rate} / minute for default-account tenants on credit mode.`}
+          hint={equivalents.rate}
         />
         <Input
           label="BYO platform fee (paise / connected minute)"
@@ -195,18 +200,19 @@ function PlatformDefaultsCard({ onError }) {
               default_byo_platform_fee_paise_per_minute: e.target.value,
             }))
           }
-          hint={`≈ ${equivalents.byo} / minute for BYO tenants on credit mode.`}
+          hint={equivalents.byo}
         />
         <Input
-          label="Minimum balance to start a call (paise)"
+          label="Minimum balance to start a call (₹)"
           type="number"
           min={0}
+          step="0.01"
           value={draft.default_call_min_balance_paise}
           disabled={loading}
           onChange={(e) =>
             setDraft((d) => ({ ...d, default_call_min_balance_paise: e.target.value }))
           }
-          hint={`Calls are blocked when wallet balance falls below this. ≈ ${equivalents.min}.`}
+          hint={equivalents.min !== '—' ? `Calls blocked below ${equivalents.min}` : undefined}
         />
         <Input
           label="Default monthly cap for unlimited mode (minutes)"
@@ -253,13 +259,9 @@ function WalletOrUnlimitedStats({ data }) {
             <div className={styles.statLabel}>Wallet balance</div>
             <div className={styles.statValue}>
               {formatPaiseAsInr(wallet?.balance_paise || 0)}
-              <span className={styles.statUnit}>
-                {' '}
-                ({wallet?.balance_paise || 0} paise)
-              </span>
             </div>
             <div className={styles.statFoot}>
-              Applied rate {formatPaiseAsInr(cfg.ratePaisePerMinute)} / min
+              Applied rate {cfg.ratePaisePerMinute ?? '—'} paise/min
               {cfg.isBYO ? ' (BYO platform fee)' : ' (default account)'}
             </div>
           </div>
@@ -689,16 +691,19 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
 
   const [ledger, setLedger] = useState({ rows: [], page: 1, total: 0, limit: 10 });
   const [ledgerBusy, setLedgerBusy] = useState(false);
+  const [planOptions, setPlanOptions] = useState([]);
 
   const loadEverything = useCallback(async () => {
     if (!tenant?.id) return;
     setLoading(true);
     setError(null);
     try {
-      const [billRes, ledgerRes] = await Promise.all([
+      const [billRes, ledgerRes, plansRes] = await Promise.all([
         tenantTelephonyAdminAPI.getTenantBilling(tenant.id),
         tenantTelephonyAdminAPI.listLedger(tenant.id, { page: 1, limit: 10 }),
+        telephonyBillingPlansAdminAPI.getOptions().catch(() => ({ data: { data: [] } })),
       ]);
+      setPlanOptions(plansRes.data?.data || []);
       const billData = billRes.data?.data;
       setData(billData);
       if (billData?.tenant && onTenantMetaLoaded) {
@@ -709,6 +714,10 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
       }
       setDraft({
         telephony_account_mode: billData?.tenant?.telephony_account_mode || 'default_account',
+        telephony_billing_plan_id:
+          billData?.tenant?.telephony_billing_plan_id == null
+            ? ''
+            : String(billData.tenant.telephony_billing_plan_id),
         call_billing_mode: billData?.tenant?.call_billing_mode || 'credit',
         call_rate_paise_per_minute_override:
           billData?.tenant?.call_rate_paise_per_minute_override == null
@@ -721,7 +730,7 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
         call_min_balance_paise_override:
           billData?.tenant?.call_min_balance_paise_override == null
             ? ''
-            : String(billData.tenant.call_min_balance_paise_override),
+            : paiseToRupeeInput(billData.tenant.call_min_balance_paise_override),
         unlimited_minutes_cap_per_month_override:
           billData?.tenant?.unlimited_minutes_cap_per_month_override == null
             ? ''
@@ -783,19 +792,21 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
     try {
       const body = {
         telephony_account_mode: draft.telephony_account_mode,
+        telephony_billing_plan_id:
+          draft.telephony_billing_plan_id === '' ? null : Number(draft.telephony_billing_plan_id),
         call_billing_mode: draft.call_billing_mode,
         call_rate_paise_per_minute_override:
           draft.call_rate_paise_per_minute_override === ''
             ? null
-            : safeNumber(draft.call_rate_paise_per_minute_override),
+            : safePaisePerMin(draft.call_rate_paise_per_minute_override),
         byo_platform_fee_paise_per_minute_override:
           draft.byo_platform_fee_paise_per_minute_override === ''
             ? null
-            : safeNumber(draft.byo_platform_fee_paise_per_minute_override),
+            : safePaisePerMin(draft.byo_platform_fee_paise_per_minute_override),
         call_min_balance_paise_override:
           draft.call_min_balance_paise_override === ''
             ? null
-            : safeNumber(draft.call_min_balance_paise_override),
+            : rupeeToPaise(draft.call_min_balance_paise_override),
         unlimited_minutes_cap_per_month_override:
           draft.unlimited_minutes_cap_per_month_override === ''
             ? null
@@ -813,9 +824,9 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
 
   async function topup() {
     if (!tenant?.id) return;
-    const amt = safeNumber(topupAmount);
+    const amt = rupeeToPaise(topupAmount);
     if (!amt || amt <= 0) {
-      setError('Top-up amount must be a positive integer in paise');
+      setError('Top-up amount must be a positive amount in rupees');
       return;
     }
     setTopupBusy(true);
@@ -839,9 +850,9 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
 
   async function debit() {
     if (!tenant?.id) return;
-    const amt = safeNumber(debitAmount);
+    const amt = rupeeToPaise(debitAmount);
     if (!amt || amt <= 0) {
-      setError('Debit amount must be a positive integer in paise');
+      setError('Debit amount must be a positive amount in rupees');
       return;
     }
     setDebitBusy(true);
@@ -866,6 +877,21 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
   const isUnlimited = data?.config?.callBillingMode === 'unlimited';
   const totalPages = Math.max(1, Math.ceil((ledger.total || 0) / (ledger.limit || 10)));
 
+  const planSelectOptions = useMemo(
+    () => [
+      { value: '', label: 'None — manual overrides only' },
+      ...planOptions.map((p) => ({
+        value: String(p.id),
+        label: `${p.name} (${p.plan_type === 'unlimited' ? 'Unlimited' : 'Credit'})`,
+      })),
+    ],
+    [planOptions]
+  );
+
+  const selectedPlan = planOptions.find(
+    (p) => String(p.id) === String(draft?.telephony_billing_plan_id)
+  );
+
   return (
     <div className={styles.detailPage}>
       {error ? (
@@ -889,13 +915,49 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
           <SectionCard
             icon="tune"
             title="Modes & overrides"
-            description="Telephony account source (platform vs BYO), credit vs unlimited billing, and optional numeric overrides."
+            description="Assign a billing plan template or set manual overrides. Plan rates apply unless a per-tenant override is filled in below."
             actions={
               <Button onClick={saveBilling} disabled={saving}>
                 {saving ? 'Saving…' : 'Save tenant config'}
               </Button>
             }
           >
+            <div className={styles.formGrid}>
+              <Select
+                label="Billing plan"
+                value={draft.telephony_billing_plan_id}
+                options={planSelectOptions}
+                onChange={(e) => {
+                  const planId = e.target.value;
+                  const plan = planOptions.find((p) => String(p.id) === planId);
+                  setDraft((d) => ({
+                    ...d,
+                    telephony_billing_plan_id: planId,
+                    call_billing_mode: plan?.plan_type ?? d.call_billing_mode,
+                  }));
+                }}
+                hint="Templates from Billing plans above. Clearing uses manual mode and overrides only."
+              />
+            </div>
+            {selectedPlan ? (
+              <div className={styles.planAssignBox}>
+                <strong>{selectedPlan.name}</strong>
+                {' · '}
+                {selectedPlan.plan_type === 'credit' ? (
+                  <>
+                    {formatPaiseAsInr(selectedPlan.call_rate_paise_per_minute)}/min default · BYO{' '}
+                    {formatPaiseAsInr(selectedPlan.byo_platform_fee_paise_per_minute)}/min · min{' '}
+                    {formatPaiseAsInr(selectedPlan.call_min_balance_paise)}
+                  </>
+                ) : (
+                  <>
+                    {Number(selectedPlan.unlimited_minutes_cap_per_month) > 0
+                      ? `${selectedPlan.unlimited_minutes_cap_per_month} min / month cap`
+                      : 'No monthly cap'}
+                  </>
+                )}
+              </div>
+            ) : null}
             <div className={styles.formGrid}>
               <Select
                 label="Telephony account mode"
@@ -944,9 +1006,10 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
                     placeholder="Leave blank to use platform default"
                   />
                   <Input
-                    label="Minimum balance override (paise)"
+                    label="Minimum balance override (₹)"
                     type="number"
                     min={0}
+                    step="0.01"
                     value={draft.call_min_balance_paise_override}
                     onChange={(e) =>
                       setDraft((d) => ({
@@ -986,20 +1049,21 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
             <SectionCard
               icon="payments"
               title="Manual wallet operations"
-              description="Add credits or post a manual debit. Amounts are in paise (₹1 = 100 paise)."
+              description="Add credits or post a manual debit. Amounts are in rupees (₹)."
             >
               <div className={styles.opsGrid}>
                 <Card className={styles.opCard}>
                   <div className={styles.opTitle}>Add credits</div>
                   <div className={styles.opFormCol}>
                     <Input
-                      label="Amount (paise)"
+                      label="Amount (₹)"
                       type="number"
-                      min={1}
+                      min={0.01}
+                      step="0.01"
                       value={topupAmount}
                       onChange={(e) => setTopupAmount(e.target.value)}
-                      placeholder="e.g. 50000 = ₹500"
-                      hint={topupAmount ? `≈ ${formatPaiseAsInr(topupAmount)}` : undefined}
+                      placeholder="e.g. 500"
+                      hint={topupAmount ? formatRupeeAmount(topupAmount) : undefined}
                     />
                     <Select
                       label="Entry type"
@@ -1022,13 +1086,14 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
                   <div className={styles.opTitle}>Adjust debit</div>
                   <div className={styles.opFormCol}>
                     <Input
-                      label="Amount (paise)"
+                      label="Amount (₹)"
                       type="number"
-                      min={1}
+                      min={0.01}
+                      step="0.01"
                       value={debitAmount}
                       onChange={(e) => setDebitAmount(e.target.value)}
-                      placeholder="e.g. 5000 = ₹50"
-                      hint={debitAmount ? `≈ ${formatPaiseAsInr(debitAmount)}` : undefined}
+                      placeholder="e.g. 50"
+                      hint={debitAmount ? formatRupeeAmount(debitAmount) : undefined}
                     />
                     <Input
                       label="Note (optional)"
@@ -1185,6 +1250,7 @@ function TenantBillingList({ onOpenTenant }) {
             <TableHeaderCell>Tenant</TableHeaderCell>
             <TableHeaderCell>Account mode</TableHeaderCell>
             <TableHeaderCell>Billing mode</TableHeaderCell>
+            <TableHeaderCell>Plan</TableHeaderCell>
             <TableHeaderCell>Industry</TableHeaderCell>
             <TableHeaderCell>Created</TableHeaderCell>
             <TableHeaderCell aria-label="Open" />
@@ -1208,6 +1274,13 @@ function TenantBillingList({ onOpenTenant }) {
                 <Badge variant={t.call_billing_mode === 'unlimited' ? 'success' : 'warning'}>
                   {t.call_billing_mode || 'credit'}
                 </Badge>
+              </TableCell>
+              <TableCell>
+                {t.telephony_plan_name ? (
+                  <span className={styles.muted}>{t.telephony_plan_name}</span>
+                ) : (
+                  <span className={styles.muted}>Manual</span>
+                )}
               </TableCell>
               <TableCell>{t.industry_name || '—'}</TableCell>
               <TableCell>{t.created_at}</TableCell>
@@ -1243,13 +1316,11 @@ export function PlatformTenantTelephonyPage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        title="Telephony billing & credits"
-        subtitle="Manage platform-wide default rates, per-tenant telephony mode, billing mode (credit / unlimited with monthly cap), rate overrides, BYO provider accounts, and call credit wallets."
+        title="Tenant telephony & credits"
+        subtitle="Assign billing plans, manage per-tenant telephony mode, BYO accounts, and call credit wallets. Configure plans under Telephony plans; defaults under Settings → Default settings."
       />
 
       {error ? <Alert variant="error" className={styles.topAlert}>{error}</Alert> : null}
-
-      <PlatformDefaultsCard onError={setError} />
 
       <TenantBillingList
         onOpenTenant={(t) =>

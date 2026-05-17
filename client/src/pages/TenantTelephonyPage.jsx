@@ -7,6 +7,7 @@ import { Select } from '../components/ui/Select';
 import { Checkbox } from '../components/ui/Checkbox';
 import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
+import { MaterialSymbol } from '../components/ui/MaterialSymbol';
 import {
   Table,
   TableHead,
@@ -20,31 +21,15 @@ import { tenantTelephonyAPI } from '../services/tenantTelephonyAPI';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import { usePermissions } from '../hooks/usePermission';
 import { PERMISSIONS } from '../utils/permissionUtils';
+import { formatMinutes, formatPaiseAsInr } from '../utils/callCreditsDisplay';
+import { CreditPurchaseSection } from '../components/telephony/CreditPurchaseSection';
+import { useAppSelector } from '../app/hooks';
+import { selectUser } from '../features/auth/authSelectors';
 import styles from './TenantTelephonyPage.module.scss';
 
-function formatPaiseAsInr(paise) {
-  const n = Number(paise) / 100;
-  if (!Number.isFinite(n)) return '—';
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(n);
-}
-
-function formatMinutes(min) {
-  const n = Number(min);
-  if (!Number.isFinite(n)) return '0 min';
-  if (n < 60) return `${Math.round(n)} min`;
-  const h = Math.floor(n / 60);
-  const m = Math.round(n - h * 60);
-  return m === 0 ? `${h}h` : `${h}h ${m}m`;
-}
-
 const ACCOUNT_MODE_OPTIONS = [
-  { value: 'default_account', label: 'Default account (platform Exotel)' },
-  { value: 'byo_account', label: 'BYO account (your own Exotel)' },
-];
-
-const BILLING_MODE_OPTIONS = [
-  { value: 'credit', label: 'Credit (pay per connected minute)' },
-  { value: 'unlimited', label: 'Unlimited (subscription-covered)' },
+  { value: 'default_account', label: 'Platform Exotel (we manage the account)' },
+  { value: 'byo_account', label: 'Your Exotel account (bring your own)' },
 ];
 
 const BLANK_ACCOUNT_FORM = {
@@ -62,126 +47,293 @@ const BLANK_ACCOUNT_FORM = {
   },
 };
 
+function accountModeLabel(value) {
+  return value === 'byo_account'
+    ? 'Your Exotel account (BYO)'
+    : 'Platform Exotel (managed for you)';
+}
+
+function billingModeLabel(value) {
+  return value === 'unlimited'
+    ? 'Unlimited (included in subscription)'
+    : 'Pay per connected minute (credits)';
+}
+
 /* -------------------------------------------------------------------------- */
-/* Top status banner: shows credit balance OR unlimited cap + always usage    */
+/* Layout helpers                                                             */
 /* -------------------------------------------------------------------------- */
-function StatusBanner({ balance, usage }) {
-  if (!balance) return null;
-  const cfg = balance.config;
-  const wallet = balance.wallet;
-  const isCredit = cfg?.callBillingMode === 'credit';
-  const cap = usage?.unlimited_cap;
+function TelephonySection({ tone, icon, title, hint, headActions, children }) {
+  return (
+    <Card className={styles.sectionCard}>
+      <header className={styles.sectionHead}>
+        <div
+          className={`${styles.sectionIconWell} ${styles[`sectionIcon_${tone}`]}`.trim()}
+        >
+          <MaterialSymbol name={icon} className={styles.sectionIconGlyph} />
+        </div>
+        <div className={styles.sectionHeadText}>
+          <h2 className={styles.sectionTitle}>{title}</h2>
+          {hint ? <p className={styles.sectionHint}>{hint}</p> : null}
+        </div>
+        {headActions ? <div className={styles.sectionHeadActions}>{headActions}</div> : null}
+      </header>
+      <div className={styles.sectionBody}>{children}</div>
+    </Card>
+  );
+}
+
+function StatTile({ icon, label, value, foot, hero = false }) {
+  return (
+    <div className={`${styles.statTile} ${hero ? styles.statTileHero : ''}`.trim()}>
+      <div className={styles.statTileIcon} aria-hidden>
+        <MaterialSymbol name={icon} size="sm" />
+      </div>
+      <div className={styles.statTileContent}>
+        <p className={styles.statLabel}>{label}</p>
+        <div className={styles.statValue}>{value}</div>
+        {foot ? <div className={styles.statFoot}>{foot}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* At-a-glance setup summary                                                  */
+/* -------------------------------------------------------------------------- */
+function formatPlanCap(plan) {
+  if (!plan || plan.plan_type !== 'unlimited') return null;
+  const cap = Number(plan.unlimited_minutes_cap_per_month);
+  return cap > 0 ? `${cap.toLocaleString('en-IN')} min / month cap` : 'No monthly cap';
+}
+
+function SetupOverview({ mode, balance, canSelfTopUp }) {
+  if (!mode) return null;
+
+  const cfg = balance?.config;
+  const wallet = balance?.wallet;
+  const plan = mode?.billing_plan || cfg?.billingPlan || null;
+  const isCredit = (plan?.plan_type || mode.call_billing_mode) === 'credit';
+  const isBYO = mode.telephony_account_mode === 'byo_account';
+  const belowMin =
+    isCredit &&
+    cfg &&
+    Number(wallet?.balance_paise) < Number(cfg.minBalancePaise || 0);
 
   return (
-    <Card className={styles.bannerCard}>
-      <div className={styles.bannerGrid}>
-        {isCredit ? (
-          <>
-            <div className={`${styles.bannerCell} ${styles.bannerCellHero}`}>
-              <div className={styles.bannerLabel}>Wallet balance</div>
-              <div className={styles.bannerValue}>{formatPaiseAsInr(wallet?.balance_paise)}</div>
-              <div className={styles.bannerFoot}>
-                Applied rate {formatPaiseAsInr(cfg.ratePaisePerMinute)} / min
-                {cfg.isBYO ? ' (BYO platform fee)' : ''}
-                {Number(wallet?.balance_paise) < cfg.minBalancePaise ? (
-                  <span className={styles.warn}>
-                    {' '}· below minimum {formatPaiseAsInr(cfg.minBalancePaise)} — new calls blocked
-                  </span>
-                ) : null}
-              </div>
-            </div>
-            <div className={styles.bannerCell}>
-              <div className={styles.bannerLabel}>This month spend</div>
-              <div className={styles.bannerValue}>
-                {formatPaiseAsInr(usage?.this_month?.spend_paise || 0)}
-              </div>
-              <div className={styles.bannerFoot}>
-                {formatMinutes(usage?.this_month?.minutes || 0)} ·{' '}
-                {usage?.this_month?.calls || 0} calls
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className={`${styles.bannerCell} ${styles.bannerCellHero}`}>
-              <div className={styles.bannerLabel}>Plan</div>
-              <div className={styles.bannerValue}>
-                Unlimited calling
-                {cap?.enabled ? (
-                  <span className={styles.dim}>
-                    {' '}· cap {cap.cap_minutes_per_month} min / month
-                  </span>
-                ) : (
-                  <span className={styles.dim}> · no cap</span>
-                )}
-              </div>
-              {cap?.enabled ? (
-                <div className={styles.bannerFoot}>
-                  <span className={cap.exceeded ? styles.warn : ''}>
-                    {cap.used_minutes} / {cap.cap_minutes_per_month} min used (
-                    {cap.used_pct}%)
-                  </span>
-                  <div className={styles.capBar}>
-                    <div
-                      className={cap.exceeded ? styles.capBarFillOver : styles.capBarFill}
-                      style={{ width: `${Math.min(100, cap.used_pct || 0)}%` }}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className={styles.bannerFoot}>
-                  Usage is tracked but no monthly cap is configured.
-                </div>
-              )}
-            </div>
-            <div className={styles.bannerCell}>
-              <div className={styles.bannerLabel}>This month</div>
-              <div className={styles.bannerValue}>
-                {formatMinutes(usage?.this_month?.minutes || 0)}
-              </div>
-              <div className={styles.bannerFoot}>{usage?.this_month?.calls || 0} connected calls</div>
-            </div>
-          </>
-        )}
+    <Card className={styles.overviewCard}>
+      <h2 className={styles.overviewTitle}>Your setup at a glance</h2>
+      <div className={styles.overviewGrid}>
+        <div className={styles.overviewItem}>
+          <div className={`${styles.overviewIcon} ${styles.overviewIcon_route}`} aria-hidden>
+            <MaterialSymbol name="settings_phone" size="sm" />
+          </div>
+          <div className={styles.overviewItemText}>
+            <p className={styles.overviewLabel}>How calls connect</p>
+            <p className={styles.overviewValue}>{accountModeLabel(mode.telephony_account_mode)}</p>
+            <p className={styles.overviewFoot}>
+              {isBYO
+                ? 'Outbound calls use credentials you add below.'
+                : 'Outbound calls use the platform Exotel account — no setup needed.'}
+            </p>
+          </div>
+        </div>
 
-        <div className={styles.bannerCell}>
-          <div className={styles.bannerLabel}>Today</div>
-          <div className={styles.bannerValue}>
-            {formatMinutes(usage?.today?.minutes || 0)}
+        <div className={styles.overviewItem}>
+          <div className={`${styles.overviewIcon} ${styles.overviewIcon_billing}`} aria-hidden>
+            <MaterialSymbol name="payments" size="sm" />
           </div>
-          <div className={styles.bannerFoot}>{usage?.today?.calls || 0} connected calls</div>
-        </div>
-        <div className={styles.bannerCell}>
-          <div className={styles.bannerLabel}>Last 30 days</div>
-          <div className={styles.bannerValue}>
-            {formatMinutes(usage?.last_30d?.minutes || 0)}
+          <div className={styles.overviewItemText}>
+            <p className={styles.overviewLabel}>How you are billed</p>
+            <p className={styles.overviewValue}>
+              {plan?.name ? plan.name : billingModeLabel(mode.call_billing_mode)}
+            </p>
+            <p className={styles.overviewFoot}>
+              {plan
+                ? plan.plan_type === 'credit'
+                  ? `${billingModeLabel('credit')} · ${formatPaiseAsInr(cfg?.ratePaisePerMinute)} / min`
+                  : `${billingModeLabel('unlimited')}${formatPlanCap(plan) ? ` · ${formatPlanCap(plan)}` : ''}`
+                : 'Billing is configured by your platform administrator.'}
+            </p>
           </div>
-          <div className={styles.bannerFoot}>{usage?.last_30d?.calls || 0} connected calls</div>
         </div>
+
+        {isCredit && cfg ? (
+          <div className={styles.overviewItem}>
+            <div className={`${styles.overviewIcon} ${styles.overviewIcon_wallet}`} aria-hidden>
+              <MaterialSymbol name="account_balance_wallet" size="sm" />
+            </div>
+            <div className={styles.overviewItemText}>
+              <p className={styles.overviewLabel}>Call credit wallet</p>
+              <p className={styles.overviewValue}>{formatPaiseAsInr(wallet?.balance_paise)}</p>
+              <p className={styles.overviewFoot}>
+                {formatPaiseAsInr(cfg.ratePaisePerMinute)} per connected minute
+                {cfg.isBYO ? ' (BYO platform fee)' : ''}
+                {belowMin ? (
+                  <span className={styles.warn}>
+                    {' '}
+                    · Below minimum {formatPaiseAsInr(cfg.minBalancePaise)} — new calls blocked
+                  </span>
+                ) : canSelfTopUp ? (
+                  ' · Buy credit packs below or on Plans & billing'
+                ) : (
+                  ' · Top-ups are added by your platform administrator'
+                )}
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        {!isCredit ? (
+          <div className={styles.overviewItem}>
+            <div className={`${styles.overviewIcon} ${styles.overviewIcon_plan}`} aria-hidden>
+              <MaterialSymbol name="all_inclusive" size="sm" />
+            </div>
+            <div className={styles.overviewItemText}>
+              <p className={styles.overviewLabel}>Calling plan</p>
+              <p className={styles.overviewValue}>Unlimited connected minutes</p>
+              <p className={styles.overviewFoot}>Usage is tracked; monthly caps may apply.</p>
+            </div>
+          </div>
+        ) : null}
       </div>
     </Card>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/* Modes card                                                                 */
+/* Usage & spending                                                           */
 /* -------------------------------------------------------------------------- */
-function ModesCard({ mode, canManage, onSaved, onError }) {
+function UsageSection({ balance, usage }) {
+  if (!balance) return null;
+
+  const cfg = balance.config;
+  const wallet = balance.wallet;
+  const isCredit = cfg?.callBillingMode === 'credit';
+  const cap = usage?.unlimited_cap;
+
+  return (
+    <TelephonySection
+      tone="indigo"
+      icon="monitoring"
+      title="Usage & spending"
+      hint="Live numbers for your workspace. Credit mode shows wallet balance and spend; unlimited mode shows plan usage and caps."
+    >
+      <div className={styles.statsGrid}>
+        {isCredit ? (
+          <>
+            <StatTile
+              hero
+              icon="account_balance_wallet"
+              label="Wallet balance"
+              value={formatPaiseAsInr(wallet?.balance_paise)}
+              foot={
+                <>
+                  Rate {formatPaiseAsInr(cfg.ratePaisePerMinute)} / min
+                  {cfg.isBYO ? ' (BYO fee)' : ''}
+                  {Number(wallet?.balance_paise) < cfg.minBalancePaise ? (
+                    <span className={styles.warn}>
+                      {' '}
+                      · Below minimum {formatPaiseAsInr(cfg.minBalancePaise)} — calls blocked
+                    </span>
+                  ) : null}
+                </>
+              }
+            />
+            <StatTile
+              icon="calendar_month"
+              label="This month"
+              value={formatPaiseAsInr(usage?.this_month?.spend_paise || 0)}
+              foot={
+                <>
+                  {formatMinutes(usage?.this_month?.minutes || 0)} ·{' '}
+                  {usage?.this_month?.calls || 0} calls
+                </>
+              }
+            />
+          </>
+        ) : (
+          <>
+            <StatTile
+              hero
+              icon="all_inclusive"
+              label="Your plan"
+              value={
+                <>
+                  Unlimited calling
+                  {cap?.enabled ? (
+                    <span className={styles.dim}>
+                      {' '}
+                      · {cap.cap_minutes_per_month} min / month cap
+                    </span>
+                  ) : (
+                    <span className={styles.dim}> · no monthly cap</span>
+                  )}
+                </>
+              }
+              foot={
+                cap?.enabled ? (
+                  <>
+                    <span className={cap.exceeded ? styles.warn : ''}>
+                      {cap.used_minutes} / {cap.cap_minutes_per_month} min used ({cap.used_pct}
+                      %)
+                    </span>
+                    <div className={styles.capBar}>
+                      <div
+                        className={cap.exceeded ? styles.capBarFillOver : styles.capBarFill}
+                        style={{ width: `${Math.min(100, cap.used_pct || 0)}%` }}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  'Usage is tracked; no monthly cap is configured.'
+                )
+              }
+            />
+            <StatTile
+              icon="calendar_month"
+              label="This month"
+              value={formatMinutes(usage?.this_month?.minutes || 0)}
+              foot={`${usage?.this_month?.calls || 0} connected calls`}
+            />
+          </>
+        )}
+
+        <StatTile
+          icon="today"
+          label="Today"
+          value={formatMinutes(usage?.today?.minutes || 0)}
+          foot={`${usage?.today?.calls || 0} connected calls`}
+        />
+        <StatTile
+          icon="date_range"
+          label="Last 30 days"
+          value={formatMinutes(usage?.last_30d?.minutes || 0)}
+          foot={`${usage?.last_30d?.calls || 0} connected calls`}
+        />
+      </div>
+    </TelephonySection>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* How calls connect                                                          */
+/* -------------------------------------------------------------------------- */
+function ConnectionSection({ mode, canManageAccountMode, onSaved, onError }) {
   const [draft, setDraft] = useState(mode);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => setDraft(mode), [mode]);
 
   async function save() {
+    if (!canManageAccountMode) return;
     setSaving(true);
     try {
       await tenantTelephonyAPI.updateMode({
         telephony_account_mode: draft.telephony_account_mode,
-        call_billing_mode: draft.call_billing_mode,
       });
       onSaved?.();
     } catch (e) {
-      onError(e?.response?.data?.error || e.message || 'Failed to save modes');
+      onError(e?.response?.data?.error || e.message || 'Failed to save account mode');
     } finally {
       setSaving(false);
     }
@@ -189,50 +341,65 @@ function ModesCard({ mode, canManage, onSaved, onError }) {
 
   if (!draft) return null;
 
-  return (
-    <Card className={styles.card}>
-      <header className={styles.cardHead}>
-        <div>
-          <h3 className={styles.cardTitle}>Account &amp; billing mode</h3>
-          <p className={styles.cardSub}>
-            Choose whether calls use the platform's Exotel account or your own (BYO), and how you
-            want to pay. Switching to BYO requires at least one active provider account below.
-          </p>
-        </div>
-      </header>
+  const isBYO = draft.telephony_account_mode === 'byo_account';
 
+  return (
+    <TelephonySection
+      tone="violet"
+      icon="settings_phone"
+      title="How calls connect"
+      hint="Choose whether outbound calls use the platform’s shared Exotel account or your own Exotel credentials. Switching to BYO requires at least one active provider account in the section below."
+    >
       <div className={styles.formGrid}>
         <Select
-          label="Telephony account mode"
+          label="Call routing"
           value={draft.telephony_account_mode}
           options={ACCOUNT_MODE_OPTIONS}
-          disabled={!canManage}
+          disabled={!canManageAccountMode}
           onChange={(e) =>
             setDraft((d) => ({ ...d, telephony_account_mode: e.target.value }))
           }
         />
-        <Select
-          label="Call billing mode"
-          value={draft.call_billing_mode}
-          options={BILLING_MODE_OPTIONS}
-          disabled={!canManage}
-          onChange={(e) => setDraft((d) => ({ ...d, call_billing_mode: e.target.value }))}
-        />
       </div>
 
-      {canManage ? (
+      {isBYO ? (
+        <Alert variant="info">
+          BYO mode is selected. Add and activate at least one Exotel account below before placing
+          calls.
+        </Alert>
+      ) : (
+        <p className={styles.muted}>
+          Platform mode is the simplest option — no Exotel credentials are required on your side.
+        </p>
+      )}
+
+      <div className={styles.billingInfoBox}>
+        <div className={styles.billingInfoIcon} aria-hidden>
+          <MaterialSymbol name="admin_panel_settings" size="sm" />
+        </div>
+        <div>
+          <p className={styles.billingInfoTitle}>
+            Billing: {billingModeLabel(draft.call_billing_mode)}
+          </p>
+          <p className={styles.billingInfoDesc}>
+            Your platform administrator assigns the billing plan and rates. Contact them to change
+            plan or switch between credit and unlimited billing.
+          </p>
+        </div>
+      </div>
+
+      {canManageAccountMode ? (
         <div className={styles.cardActions}>
           <Button onClick={save} disabled={saving}>
-            {saving ? 'Saving…' : 'Save modes'}
+            {saving ? 'Saving…' : 'Save call routing'}
           </Button>
         </div>
       ) : (
         <p className={styles.muted}>
-          Read-only. Ask a super-admin to change these from the platform Telephony &amp; Credits
-          page.
+          Read-only. Ask an administrator with telephony settings access to change call routing.
         </p>
       )}
-    </Card>
+    </TelephonySection>
   );
 }
 
@@ -260,7 +427,7 @@ function CopyableUrl({ url }) {
   );
 }
 
-function ProviderAccountsCard({ canView, canManage, onChanged, onError }) {
+function ProviderAccountsSection({ canView, canManage, onChanged, onError }) {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -385,21 +552,22 @@ function ProviderAccountsCard({ canView, canManage, onChanged, onError }) {
   if (!canView) return null;
 
   return (
-    <Card className={styles.card}>
-      <header className={styles.cardHead}>
-        <div>
-          <h3 className={styles.cardTitle}>Provider accounts (BYO Exotel)</h3>
-          <p className={styles.cardSub}>
-            Plug in your own Exotel credentials so outbound calls go through your account. Required
-            when you switch to <strong>BYO</strong> mode.
-          </p>
-        </div>
-        {canManage ? <Button size="sm" onClick={openNew}>+ Add account</Button> : null}
-      </header>
-
+    <TelephonySection
+      tone="blue"
+      icon="hub"
+      title="Your Exotel accounts (BYO)"
+      hint="Only needed when call routing is set to your own Exotel. Add credentials so outbound calls and webhooks run through your Exotel workspace."
+      headActions={
+        canManage ? (
+          <Button size="sm" onClick={openNew}>
+            <MaterialSymbol name="add" size="sm" /> Add account
+          </Button>
+        ) : null
+      }
+    >
       {loading && !accounts.length ? (
-        <p className={styles.muted}>Loading…</p>
-      ) : (
+        <p className={styles.muted}>Loading accounts…</p>
+      ) : accounts.length ? (
         <Table>
           <TableHead>
             <TableRow>
@@ -418,7 +586,9 @@ function ProviderAccountsCard({ canView, canManage, onChanged, onError }) {
                 <TableCell>
                   <div className={styles.cellStack}>
                     <strong>{acc.label}</strong>
-                    <span className={styles.muted}>{acc.credentials_hint || acc.provider_code}</span>
+                    <span className={styles.muted}>
+                      {acc.credentials_hint || acc.provider_code}
+                    </span>
                   </div>
                 </TableCell>
                 <TableCell className={styles.mono}>{acc.account_sid || '—'}</TableCell>
@@ -454,18 +624,28 @@ function ProviderAccountsCard({ canView, canManage, onChanged, onError }) {
             ))}
           </TableBody>
         </Table>
+      ) : (
+        <div className={styles.emptyState}>
+          <div className={styles.emptyStateIcon} aria-hidden>
+            <MaterialSymbol name="cloud_off" size="md" />
+          </div>
+          <p className={styles.emptyStateTitle}>No Exotel accounts yet</p>
+          <p className={styles.emptyStateText}>
+            While you use platform call routing, you do not need BYO accounts. Add one here when
+            you switch to your own Exotel account.
+          </p>
+          {canManage ? (
+            <Button size="sm" onClick={openNew}>
+              Add your first account
+            </Button>
+          ) : null}
+        </div>
       )}
-      {!accounts.length && !loading ? (
-        <p className={styles.muted}>
-          No BYO provider accounts configured. While none are configured, your workspace uses the
-          platform Exotel account.
-        </p>
-      ) : null}
 
       {showForm && canManage ? (
-        <Card className={`${styles.opCard} ${styles.accountFormCard}`}>
+        <Card className={styles.opCard}>
           <div className={styles.opTitle}>
-            {editingId == null ? 'Add provider account' : `Edit account #${editingId}`}
+            {editingId == null ? 'Add Exotel account' : `Edit account #${editingId}`}
           </div>
           <div className={styles.formGrid}>
             <Input
@@ -564,14 +744,14 @@ function ProviderAccountsCard({ canView, canManage, onChanged, onError }) {
           </div>
         </Card>
       ) : null}
-    </Card>
+    </TelephonySection>
   );
 }
 
 /* -------------------------------------------------------------------------- */
 /* Ledger (read-only)                                                         */
 /* -------------------------------------------------------------------------- */
-function LedgerCard({ canView, onError }) {
+function LedgerSection({ canView, onError }) {
   const { formatDateTime } = useDateTimeDisplay();
   const [ledger, setLedger] = useState({ rows: [], page: 1, total: 0, limit: 10 });
   const [busy, setBusy] = useState(false);
@@ -606,62 +786,75 @@ function LedgerCard({ canView, onError }) {
   if (!canView) return null;
 
   return (
-    <Card className={styles.card}>
-      <header className={styles.cardHead}>
-        <div>
-          <h3 className={styles.cardTitle}>Wallet ledger</h3>
-          <p className={styles.cardSub}>
-            Every credit and debit on your call credit wallet. Top-ups are added by the platform
-            super-admin.
+    <TelephonySection
+      tone="amber"
+      icon="receipt_long"
+      title="Wallet transaction history"
+      hint="Every credit top-up and per-call debit on your call credit wallet. Top-ups are added by your platform administrator."
+    >
+      {ledger.rows.length ? (
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableHeaderCell>When</TableHeaderCell>
+              <TableHeaderCell>Type</TableHeaderCell>
+              <TableHeaderCell>Amount</TableHeaderCell>
+              <TableHeaderCell>Balance after</TableHeaderCell>
+              <TableHeaderCell>Call</TableHeaderCell>
+              <TableHeaderCell>Note</TableHeaderCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {ledger.rows.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell>{formatDateTime(row.created_at)}</TableCell>
+                <TableCell>
+                  <span className={styles.entryType}>{row.entry_type}</span>
+                </TableCell>
+                <TableCell
+                  className={Number(row.amount_paise) < 0 ? styles.amountNeg : styles.amountPos}
+                >
+                  {formatPaiseAsInr(row.amount_paise)}
+                  {row.unit_qty != null ? (
+                    <span className={styles.muted}>
+                      {' '}
+                      ({row.unit_qty} min × {row.unit_rate_paise}p)
+                    </span>
+                  ) : null}
+                </TableCell>
+                <TableCell>{formatPaiseAsInr(row.balance_after_paise)}</TableCell>
+                <TableCell>{row.call_attempt_id || '—'}</TableCell>
+                <TableCell>{row.note || '—'}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      ) : !busy ? (
+        <div className={styles.emptyState}>
+          <div className={styles.emptyStateIcon} aria-hidden>
+            <MaterialSymbol name="receipt_long" size="md" />
+          </div>
+          <p className={styles.emptyStateTitle}>No transactions yet</p>
+          <p className={styles.emptyStateText}>
+            Wallet entries appear here after top-ups or when connected calls are billed.
           </p>
         </div>
-      </header>
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableHeaderCell>When</TableHeaderCell>
-            <TableHeaderCell>Type</TableHeaderCell>
-            <TableHeaderCell>Amount</TableHeaderCell>
-            <TableHeaderCell>Balance after</TableHeaderCell>
-            <TableHeaderCell>Call</TableHeaderCell>
-            <TableHeaderCell>Note</TableHeaderCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {ledger.rows.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell>{formatDateTime(row.created_at)}</TableCell>
-              <TableCell>
-                <span className={styles.entryType}>{row.entry_type}</span>
-              </TableCell>
-              <TableCell
-                className={Number(row.amount_paise) < 0 ? styles.amountNeg : styles.amountPos}
-              >
-                {formatPaiseAsInr(row.amount_paise)}
-                {row.unit_qty != null ? (
-                  <span className={styles.muted}>
-                    {' '}
-                    ({row.unit_qty} min × {row.unit_rate_paise}p)
-                  </span>
-                ) : null}
-              </TableCell>
-              <TableCell>{formatPaiseAsInr(row.balance_after_paise)}</TableCell>
-              <TableCell>{row.call_attempt_id || '—'}</TableCell>
-              <TableCell>{row.note || '—'}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {!ledger.rows.length && !busy ? <p className={styles.muted}>No ledger entries yet.</p> : null}
-      <Pagination
-        page={ledger.page}
-        totalPages={totalPages}
-        total={ledger.total}
-        limit={ledger.limit}
-        onPageChange={(p) => { if (!busy) void load(p); }}
-        hidePageSize
-      />
-    </Card>
+      ) : (
+        <p className={styles.muted}>Loading…</p>
+      )}
+      {ledger.rows.length ? (
+        <Pagination
+          page={ledger.page}
+          totalPages={totalPages}
+          total={ledger.total}
+          limit={ledger.limit}
+          onPageChange={(p) => {
+            if (!busy) void load(p);
+          }}
+          hidePageSize
+        />
+      ) : null}
+    </TelephonySection>
   );
 }
 
@@ -669,14 +862,19 @@ function LedgerCard({ canView, onError }) {
 /* Page                                                                       */
 /* -------------------------------------------------------------------------- */
 export function TenantTelephonyPage() {
+  const user = useAppSelector(selectUser);
   const { can } = usePermissions();
-  const canManageAccounts = can(PERMISSIONS.TELEPHONY_ACCOUNTS_MANAGE) || can(PERMISSIONS.SETTINGS_MANAGE);
+  const canManageAccounts =
+    can(PERMISSIONS.TELEPHONY_ACCOUNTS_MANAGE) || can(PERMISSIONS.SETTINGS_MANAGE);
   const canViewAccounts =
     canManageAccounts || can(PERMISSIONS.TELEPHONY_ACCOUNTS_VIEW);
   const canViewCredits = can(PERMISSIONS.BILLING_CREDITS_VIEW) || can(PERMISSIONS.SETTINGS_MANAGE);
-  const canManageMode = can(PERMISSIONS.SETTINGS_MANAGE) || canManageAccounts;
+  const canManageAccountMode = canManageAccounts;
+  const canPurchaseCredits =
+    canViewCredits && can(PERMISSIONS.SETTINGS_MANAGE);
 
   const [error, setError] = useState(null);
+  const [purchaseEligible, setPurchaseEligible] = useState(false);
   const [mode, setMode] = useState(null);
   const [balance, setBalance] = useState(null);
   const [usage, setUsage] = useState(null);
@@ -692,10 +890,21 @@ export function TenantTelephonyPage() {
       if (modeRes?.data?.data) setMode(modeRes.data.data);
       if (balRes?.data?.data) setBalance(balRes.data.data);
       if (usageRes?.data?.data) setUsage(usageRes.data.data);
+
+      if (canPurchaseCredits) {
+        try {
+          const purchaseRes = await tenantTelephonyAPI.getPurchaseConfig();
+          setPurchaseEligible(!!purchaseRes.data?.data?.eligible);
+        } catch {
+          setPurchaseEligible(false);
+        }
+      } else {
+        setPurchaseEligible(false);
+      }
     } catch (e) {
       setError(e?.response?.data?.error || e.message || 'Failed to load telephony settings');
     }
-  }, [canViewCredits]);
+  }, [canViewCredits, canPurchaseCredits]);
 
   useEffect(() => {
     void loadAll();
@@ -705,7 +914,8 @@ export function TenantTelephonyPage() {
     <div className={styles.page}>
       <PageHeader
         title="Telephony & calls"
-        subtitle="Bring your own Exotel account, view your call credit wallet or unlimited-mode usage, and switch between billing modes."
+        titleIcon="call"
+        subtitle="Manage how outbound calls connect, view usage, and (when on credit billing) your call wallet."
       />
 
       {error ? (
@@ -714,18 +924,45 @@ export function TenantTelephonyPage() {
         </Alert>
       ) : null}
 
-      {canViewCredits ? <StatusBanner balance={balance} usage={usage} /> : null}
+      {mode ? (
+        <SetupOverview
+          mode={mode}
+          balance={balance}
+          canSelfTopUp={
+            purchaseEligible &&
+            mode.telephony_account_mode === 'default_account' &&
+            (mode.call_billing_mode === 'credit' || balance?.config?.callBillingMode === 'credit')
+          }
+        />
+      ) : null}
+
+      {canViewCredits ? <UsageSection balance={balance} usage={usage} /> : null}
+
+      {canViewCredits && mode ? (
+        <TelephonySection
+          tone="emerald"
+          icon="shopping_cart"
+          title="Plans & call credits"
+          hint="Your assigned billing plan (credit or unlimited). Credit workspaces can also buy wallet top-up packs below when using platform calling."
+        >
+          <CreditPurchaseSection
+            userEmail={user?.email}
+            onWalletUpdated={loadAll}
+            showBillingLink
+          />
+        </TelephonySection>
+      ) : null}
 
       {mode ? (
-        <ModesCard
+        <ConnectionSection
           mode={mode}
-          canManage={canManageMode}
+          canManageAccountMode={canManageAccountMode}
           onSaved={loadAll}
           onError={setError}
         />
       ) : null}
 
-      <ProviderAccountsCard
+      <ProviderAccountsSection
         canView={canViewAccounts}
         canManage={canManageAccounts}
         onChanged={loadAll}
@@ -733,7 +970,7 @@ export function TenantTelephonyPage() {
       />
 
       {canViewCredits && balance?.config?.callBillingMode === 'credit' ? (
-        <LedgerCard canView={canViewCredits} onError={setError} />
+        <LedgerSection canView={canViewCredits} onError={setError} />
       ) : null}
     </div>
   );

@@ -2,7 +2,14 @@ import { createSlice } from '@reduxjs/toolkit';
 import { getSubdomain } from '../../utils/tenantResolver';
 import { userAndTenantFromToken, decodeJwtPayload } from './utils/jwtUtils';
 
-const AUTH_STORAGE_KEY = 'call_nest_auth';
+import { AUTH_STORAGE_KEY } from './authConstants';
+import { clearSessionSupersededPending } from './sessionEnded';
+import {
+  clearImpersonationStorage,
+  isImpersonationStorageActive,
+  loadImpersonationStorage,
+  saveImpersonationStorage,
+} from './impersonationStorage';
 
 function isTokenExpired(token) {
   const payload = decodeJwtPayload(token);
@@ -58,20 +65,56 @@ function persistAuth(accessToken, refreshToken) {
   }
 }
 
-const persisted = loadPersistedAuth();
+function loadInitialAuth() {
+  if (isImpersonationStorageActive()) {
+    const imp = loadImpersonationStorage();
+    if (imp?.accessToken) {
+      const decoded = userAndTenantFromToken(imp.accessToken);
+      if (decoded?.user) {
+        return {
+          accessToken: imp.accessToken,
+          refreshToken: imp.refreshToken,
+          impersonatorId: imp.impersonatorId,
+          isImpersonation: true,
+          ...decoded,
+          user: { ...decoded.user, isImpersonation: true },
+        };
+      }
+    }
+  }
+  const persisted = loadPersistedAuth();
+  if (!persisted) return null;
+  return { ...persisted, isImpersonation: false, impersonatorId: null };
+}
+
+const boot = loadInitialAuth();
 
 const initialState = {
-  user: persisted?.user || null,
-  tenant: persisted?.tenant || null,
-  tenantSlug: persisted?.tenant?.slug || null,
-  accessToken: persisted?.accessToken || null,
-  refreshToken: persisted?.refreshToken || null,
-  isAuthenticated: !!persisted?.accessToken,
+  user: boot?.user || null,
+  tenant: boot?.tenant || null,
+  tenantSlug: boot?.tenant?.slug || null,
+  accessToken: boot?.accessToken || null,
+  refreshToken: boot?.refreshToken || null,
+  isAuthenticated: !!boot?.accessToken,
+  isImpersonation: Boolean(boot?.isImpersonation),
+  impersonatorId: boot?.impersonatorId ?? null,
   loading: false,
   error: null,
-  permissions: persisted?.permissions || [],
-  tokenVersion: persisted?.tokenVersion || null,
+  permissions: boot?.permissions || [],
+  tokenVersion: boot?.tokenVersion || null,
 };
+
+function persistSession(state) {
+  if (state.isImpersonation) {
+    saveImpersonationStorage({
+      accessToken: state.accessToken,
+      refreshToken: state.refreshToken,
+      impersonatorId: state.impersonatorId,
+    });
+  } else {
+    persistAuth(state.accessToken, state.refreshToken);
+  }
+}
 
 const authSlice = createSlice({
   name: 'auth',
@@ -94,27 +137,57 @@ const authSlice = createSlice({
       // RBAC fields from JWT
       state.permissions = permissions ?? [];
       state.tokenVersion = tokenVersion ?? null;
-      // Persist to localStorage
+      state.isImpersonation = false;
+      state.impersonatorId = null;
+      clearImpersonationStorage();
       persistAuth(accessToken, refreshToken ?? state.refreshToken);
+      clearSessionSupersededPending();
+    },
+    impersonationSessionStart(state, action) {
+      const { user, tenant, accessToken, refreshToken, permissions, tokenVersion, impersonatorId } =
+        action.payload;
+      state.user = user;
+      state.tenant = tenant;
+      state.tenantSlug = tenant?.slug ?? getSubdomain();
+      state.accessToken = accessToken;
+      state.refreshToken = refreshToken ?? null;
+      state.isAuthenticated = true;
+      state.isImpersonation = true;
+      state.impersonatorId = impersonatorId ?? null;
+      state.loading = false;
+      state.error = null;
+      state.permissions = permissions ?? [];
+      state.tokenVersion = tokenVersion ?? null;
+      persistSession(state);
+      clearSessionSupersededPending();
     },
     loginFailure(state, action) {
       state.loading = false;
       state.error = action.payload ?? 'Login failed';
     },
+    loginCancelled(state) {
+      state.loading = false;
+      state.error = null;
+    },
     logout(state) {
+      const wasImpersonation = state.isImpersonation;
       state.user = null;
       state.tenant = null;
       state.tenantSlug = null;
       state.accessToken = null;
       state.refreshToken = null;
       state.isAuthenticated = false;
+      state.isImpersonation = false;
+      state.impersonatorId = null;
       state.loading = false;
       state.error = null;
-      // Clear RBAC fields
       state.permissions = [];
       state.tokenVersion = null;
-      // Clear localStorage
-      persistAuth(null, null);
+      if (wasImpersonation) {
+        clearImpersonationStorage();
+      } else {
+        persistAuth(null, null);
+      }
     },
     registerStart(state) {
       state.loading = true;
@@ -140,8 +213,7 @@ const authSlice = createSlice({
         state.tenant = tenant;
         state.tenantSlug = tenant?.slug ?? state.tenantSlug;
       }
-      // Persist updated tokens
-      persistAuth(state.accessToken, state.refreshToken);
+      persistSession(state);
     },
     clearError(state) {
       state.error = null;
@@ -162,6 +234,7 @@ export const {
   loginStart,
   loginSuccess,
   loginFailure,
+  loginCancelled,
   logout,
   registerStart,
   registerSuccess,
@@ -169,6 +242,7 @@ export const {
   setTokens,
   clearError,
   workspaceCompanyUpdated,
+  impersonationSessionStart,
 } = authSlice.actions;
 
 export default authSlice.reducer;

@@ -16,6 +16,7 @@ import { campaignsAPI } from '../../services/campaignsAPI';
 import { tenantUsersAPI } from '../../services/tenantUsersAPI';
 import { getMe as getMeAPI } from '../auth/authAPI';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { DialerCreditsBar } from '../../components/dialer/DialerCreditsBar';
 import { Button } from '../../components/ui/Button';
 import { Table } from '../../components/ui/Table';
 import { ConfirmModal } from '../../components/ui/Modal';
@@ -1827,6 +1828,8 @@ export function ContactsPage({ type, mode = 'crm' }) {
           ) : null
         }
       />
+
+      {isDialer ? <DialerCreditsBar refreshIntervalMs={60000} /> : null}
 
       {contactsError && <Alert variant="error">{contactsError}</Alert>}
       {unassignError ? (

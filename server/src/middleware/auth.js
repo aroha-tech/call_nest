@@ -21,15 +21,19 @@ function buildUserFromPayload(payload) {
         ? payload.tenantId
         : null;
 
+  const isImpersonation = payload.session_type === 'impersonation';
+
   return {
     id: userId,
     email: payload.email,
     tenantId,
     role: payload.role,
     roleId: payload.role_id ?? null,
-    isPlatformAdmin: Boolean(payload.is_platform_admin),
+    isPlatformAdmin: isImpersonation ? false : Boolean(payload.is_platform_admin),
     permissions: payload.permissions || [],
     tokenVersion: payload.token_version ?? 1,
+    isImpersonation,
+    impersonatorId: isImpersonation ? payload.impersonator_id ?? null : null,
   };
 }
 
@@ -124,6 +128,16 @@ export async function tenantAuthMiddleware(req, res, next) {
     return res.status(400).json({ error: 'Tenant context is required' });
   }
 
+  if (req.user?.isImpersonation) {
+    if (req.user.tenantId == null) {
+      return res.status(403).json({ error: 'Invalid impersonation session' });
+    }
+    if (Number(req.user.tenantId) !== Number(req.tenant.id)) {
+      return res.status(403).json({ error: 'Cross-tenant access denied' });
+    }
+    return next();
+  }
+
   if (req.user?.isPlatformAdmin) {
     return res.status(403).json({ error: 'Platform admins cannot access tenant-scoped APIs' });
   }
@@ -147,6 +161,10 @@ export async function tenantAuthMiddleware(req, res, next) {
 export async function verifyTokenVersion(req, res, next) {
   if (!req.user) {
     return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  if (req.user.isImpersonation) {
+    return next();
   }
 
   try {

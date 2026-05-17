@@ -25,6 +25,8 @@ import { EmptyState } from '../components/ui/EmptyState';
 import listStyles from '../components/admin/adminDataList.module.scss';
 import { FilterBar } from '../components/admin/FilterBar';
 import { usersAPI, tenantsAPI } from '../services/adminAPI';
+import { openWorkspaceAsUser } from '../utils/openWorkspaceAsUser';
+import { MaterialSymbol } from '../components/ui/MaterialSymbol';
 import { useMutation } from '../hooks/useAsyncData';
 import { useTableLoadingState } from '../hooks/useTableLoadingState';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
@@ -71,6 +73,19 @@ export function UsersPage() {
     new_password: '',
   });
   const [formErrors, setFormErrors] = useState({});
+  const [openingUserId, setOpeningUserId] = useState(null);
+
+  const handleOpenWorkspace = async (u) => {
+    if (!u?.id || u.is_platform_admin) return;
+    setOpeningUserId(u.id);
+    try {
+      await openWorkspaceAsUser(u.id);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Could not open workspace');
+    } finally {
+      setOpeningUserId(null);
+    }
+  };
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -376,7 +391,7 @@ export function UsersPage() {
                 <TableHeaderCell width="90px">Status</TableHeaderCell>
                 <TableHeaderCell width="80px">Locked</TableHeaderCell>
                 <TableHeaderCell width="120px">Last login</TableHeaderCell>
-                <TableHeaderCell width="80px" align="right" />
+                <TableHeaderCell width="120px" align="right">Actions</TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -396,6 +411,16 @@ export function UsersPage() {
                   </TableCell>
                   <TableCell className={styles.dateCell}>{formatDateTime(u.last_login_at)}</TableCell>
                   <TableCell align="right">
+                    {!u.is_platform_admin && u.tenant_id ? (
+                      <IconButton
+                        title="Open workspace as this user"
+                        onClick={() => handleOpenWorkspace(u)}
+                        size="sm"
+                        disabled={openingUserId === u.id}
+                      >
+                        <MaterialSymbol name="open_in_new" size="sm" />
+                      </IconButton>
+                    ) : null}
                     <IconButton title="Edit" onClick={() => openEdit(u)} size="sm"><EditIcon /></IconButton>
                   </TableCell>
                 </TableRow>

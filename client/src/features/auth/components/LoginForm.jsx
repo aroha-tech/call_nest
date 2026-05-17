@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { selectAuthLoading, selectAuthError } from '../authSelectors';
-import { loginStart, loginSuccess, loginFailure } from '../authSlice';
+import { loginStart, loginSuccess, loginFailure, loginCancelled } from '../authSlice';
+import { broadcastAuthEvent } from '../../../services/authSync';
 import { login as loginAPI } from '../authAPI';
 import { userAndTenantFromToken } from '../utils/jwtUtils';
 import { getTenantWorkspaceHost, getTenantWorkspaceUrl } from '../../../config/tenantWorkspaceUrl';
@@ -12,6 +13,7 @@ import { Input } from '../../../components/ui/Input';
 import { Alert } from '../../../components/ui/Alert';
 import { MaterialSymbol } from '../../../components/ui/MaterialSymbol';
 import { PasswordField } from './PasswordField';
+import { LoginSessionConflictModal } from './LoginSessionConflictModal';
 import authUi from './authFormShared.module.scss';
 import styles from './LoginForm.module.scss';
 
@@ -41,6 +43,8 @@ export function LoginForm() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [sessionMessage, setSessionMessage] = useState(null);
   const [workspaceCopied, setWorkspaceCopied] = useState(false);
+  const [sessionConflictOpen, setSessionConflictOpen] = useState(false);
+  const [takeOverLoading, setTakeOverLoading] = useState(false);
 
   const copyWorkspaceUrl = useCallback(async () => {
     if (!workspaceUrl) return;
@@ -60,6 +64,54 @@ export function LoginForm() {
     }
   }, []);
 
+  const completeLogin = useCallback(
+    async (takeOver = false) => {
+      dispatch(loginStart());
+      try {
+        const data = await loginAPI(email, password, { takeOver });
+        const { user, tenant, permissions, tokenVersion } = userAndTenantFromToken(data.access_token);
+        setSessionConflictOpen(false);
+        dispatch(
+          loginSuccess({
+            user,
+            tenant,
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token ?? null,
+            permissions,
+            tokenVersion,
+          })
+        );
+        if (takeOver) {
+          broadcastAuthEvent('session-superseded');
+        }
+      } catch (err) {
+        const code = err.response?.data?.code;
+        if (code === 'SESSION_ACTIVE' && !takeOver) {
+          dispatch(loginCancelled());
+          setSessionConflictOpen(true);
+          return;
+        }
+        const apiMsg = err.response?.data?.error;
+        const transient =
+          err.code === 'ECONNRESET' ||
+          err.code === 'ECONNREFUSED' ||
+          err.code === 'ETIMEDOUT' ||
+          err.message === 'Network Error';
+        const message =
+          apiMsg ??
+          (transient
+            ? 'Could not reach the server. Check your connection and try again.'
+            : null) ??
+          err.message ??
+          'Login failed';
+        dispatch(loginFailure(message));
+      } finally {
+        setTakeOverLoading(false);
+      }
+    },
+    [dispatch, email, password]
+  );
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const errors = validate(email, password);
@@ -69,40 +121,28 @@ export function LoginForm() {
     }
     setFieldErrors({});
     setSessionMessage(null);
-    dispatch(loginStart());
-    try {
-      const data = await loginAPI(email, password);
-      const { user, tenant, permissions, tokenVersion } = userAndTenantFromToken(data.access_token);
-      dispatch(
-        loginSuccess({
-          user,
-          tenant,
-          accessToken: data.access_token,
-          refreshToken: data.refresh_token ?? null,
-          permissions,
-          tokenVersion,
-        })
-      );
-    } catch (err) {
-      const apiMsg = err.response?.data?.error;
-      const transient =
-        err.code === 'ECONNRESET' ||
-        err.code === 'ECONNREFUSED' ||
-        err.code === 'ETIMEDOUT' ||
-        err.message === 'Network Error';
-      const message =
-        apiMsg ??
-        (transient
-          ? 'Could not reach the server. Check your connection and try again.'
-          : null) ??
-        err.message ??
-        'Login failed';
-      dispatch(loginFailure(message));
-    }
+    setSessionConflictOpen(false);
+    await completeLogin(false);
+  };
+
+  const handleStayOnLoginPage = () => {
+    setSessionConflictOpen(false);
+    dispatch(loginCancelled());
+  };
+
+  const handleTakeOverSession = async () => {
+    setTakeOverLoading(true);
+    await completeLogin(true);
   };
 
   return (
     <div className={authUi.shell}>
+      <LoginSessionConflictModal
+        isOpen={sessionConflictOpen}
+        onStay={handleStayOnLoginPage}
+        onTakeOver={handleTakeOverSession}
+        loading={takeOverLoading}
+      />
       <form onSubmit={handleSubmit} className={styles.form} noValidate>
         <div className={styles.headerIcon}>
           <MaterialSymbol name="lock" size="md" />
@@ -151,7 +191,7 @@ export function LoginForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           error={fieldErrors.email}
-          disabled={loading}
+          disabled={loading || takeOverLoading}
           placeholder="Enter your email"
           inputClassName={authUi.authInput}
           suffix={<MaterialSymbol name="mail" size="sm" />}
@@ -161,7 +201,7 @@ export function LoginForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={fieldErrors.password}
-          disabled={loading}
+          disabled={loading || takeOverLoading}
           placeholder="Enter your password"
           inputClassName={authUi.authInput}
         />
@@ -174,7 +214,7 @@ export function LoginForm() {
           <Link to="#" className={styles.forgotPassword}>Forgot password?</Link>
         </div>
 
-        <Button type="submit" fullWidth loading={loading} className={`${styles.submit} ${authUi.authSubmit}`}>
+        <Button type="submit" fullWidth loading={loading || takeOverLoading} className={`${styles.submit} ${authUi.authSubmit}`}>
           Sign in
         </Button>
         

@@ -1,0 +1,30 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.footerLink {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+
+  a {
+    color: var(--color-primary-500, #6366f1);
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}

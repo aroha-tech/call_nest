@@ -2,7 +2,7 @@ import crypto from 'crypto';
 
 /**
  * @param {Date} start
- * @param {'month'|'year'} billingInterval
+ * @param {'month'|'quarter'|'semiannual'|'year'} billingInterval
  * @param {number} intervalCount
  */
 export function computePeriodEnd(start, billingInterval, intervalCount) {
@@ -10,9 +10,11 @@ export function computePeriodEnd(start, billingInterval, intervalCount) {
   const n = Math.max(1, Number(intervalCount) || 1);
   if (billingInterval === 'year') {
     d.setUTCFullYear(d.getUTCFullYear() + n);
-  } else {
-    d.setUTCMonth(d.getUTCMonth() + n);
+    return d;
   }
+  const monthsPerUnit =
+    billingInterval === 'quarter' ? 3 : billingInterval === 'semiannual' ? 6 : 1;
+  d.setUTCMonth(d.getUTCMonth() + monthsPerUnit * n);
   return d;
 }
 

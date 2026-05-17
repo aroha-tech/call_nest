@@ -30,4 +30,22 @@ export const tenantTelephonyAPI = {
   getBalance: () => axiosInstance.get(`${CREDITS}/balance`),
   getUsage: () => axiosInstance.get(`${CREDITS}/usage`),
   listLedger: (params = {}) => axiosInstance.get(`${CREDITS}/ledger`, { params }),
+
+  getPurchaseConfig: () => axiosInstance.get(`${CREDITS}/purchase/config`),
+  listPurchasePlans: () => axiosInstance.get(`${CREDITS}/purchase/plans`),
+  getPurchaseWallet: () => axiosInstance.get(`${CREDITS}/purchase/wallet`),
+  createPurchaseOrder: (planId) => axiosInstance.post(`${CREDITS}/purchase/orders`, { planId }),
+  verifyPurchasePayment: (payload) => axiosInstance.post(`${CREDITS}/purchase/verify`, payload),
+
+  getSubscriptionCurrent: () => axiosInstance.get(`${CREDITS}/subscription/current`),
+  listSubscriptionHistory: (params = {}) =>
+    axiosInstance.get(`${CREDITS}/subscription/history`, { params }),
+  createSubscriptionCheckout: (planId, { autoRenew = true, billingInterval = 'month' } = {}) =>
+    axiosInstance.post(`${CREDITS}/subscription/checkout`, {
+      planId,
+      autoRenew,
+      billingInterval,
+    }),
+  verifySubscriptionCheckout: (payload) =>
+    axiosInstance.post(`${CREDITS}/subscription/verify`, payload),
 };

@@ -6,8 +6,12 @@ const AUTH_BASE = '/api/auth';
  * Login with email and password.
  * Returns { access_token, refresh_token, expires_in }.
  */
-export async function login(email, password) {
-  const { data } = await axiosInstance.post(`${AUTH_BASE}/login`, { email, password });
+export async function login(email, password, { takeOver = false } = {}) {
+  const { data } = await axiosInstance.post(`${AUTH_BASE}/login`, {
+    email,
+    password,
+    takeOver: Boolean(takeOver),
+  });
   return data;
 }
 

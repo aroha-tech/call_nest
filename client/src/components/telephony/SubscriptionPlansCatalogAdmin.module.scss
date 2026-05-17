@@ -1,0 +1,81 @@
+.catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.blockHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.blockTitle {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.blockDesc {
+  margin: 0;
+  font-size: 0.86rem;
+  opacity: 0.78;
+  max-width: 640px;
+}
+
+.tierGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.tierCard {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-2, rgba(99, 102, 241, 0.03));
+}
+
+.tierName {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.tierTable {
+  width: 100%;
+}
+
+.muted {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.rowActions {
+  display: flex;
+  gap: 6px;
+}
+
+.rowClickable {
+  cursor: pointer;
+}
+
+.rowClickable:hover {
+  background: var(--color-surface-2, rgba(99, 102, 241, 0.06));
+}
+
+.rowSelected {
+  cursor: pointer;
+  background: rgba(99, 102, 241, 0.1) !important;
+}

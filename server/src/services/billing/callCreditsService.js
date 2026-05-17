@@ -1,10 +1,15 @@
 import { query, withConnection } from '../../config/db.js';
 import {
+  findById as findTelephonyBillingPlanById,
+  serializePlanForClient,
+} from '../superAdmin/telephonyBillingPlansService.js';
+import {
   getDefaultByoPlatformFeePaisePerMinute,
   getDefaultCallMinBalancePaise,
   getDefaultCallRatePaisePerMinute,
   getDefaultUnlimitedMinutesCapPerMonth,
 } from './platformSettingsService.js';
+import { assertActiveTelephonySubscription } from './telephonySubscriptionGuard.js';
 
 /**
  * Telephony call credits & billing.
@@ -28,6 +33,7 @@ async function fetchTenantBillingRow(tenantId) {
     `SELECT id,
             telephony_account_mode,
             call_billing_mode,
+            telephony_billing_plan_id,
             call_rate_paise_per_minute_override,
             byo_platform_fee_paise_per_minute_override,
             call_min_balance_paise_override,
@@ -53,20 +59,41 @@ export async function getTenantBillingConfig(tenantId) {
     getDefaultCallMinBalancePaise(),
     getDefaultUnlimitedMinutesCapPerMonth(),
   ]);
+
+  let plan = null;
+  if (tenant.telephony_billing_plan_id) {
+    plan = await findTelephonyBillingPlanById(tenant.telephony_billing_plan_id);
+  }
+
   const isBYO = String(tenant.telephony_account_mode) === 'byo_account';
+  const callBillingMode = plan?.plan_type
+    ? String(plan.plan_type)
+    : String(tenant.call_billing_mode || 'credit');
+
+  const planRate = plan?.call_rate_paise_per_minute;
+  const planByoFee = plan?.byo_platform_fee_paise_per_minute;
+  const planMinBal = plan?.call_min_balance_paise;
+  const planCap = plan?.unlimited_minutes_cap_per_month;
+
   const ratePaisePerMinute = isBYO
-    ? (tenant.byo_platform_fee_paise_per_minute_override ?? byoFee)
-    : (tenant.call_rate_paise_per_minute_override ?? defaultRate);
-  const minBalancePaise = tenant.call_min_balance_paise_override ?? defaultMinBal;
+    ? (tenant.byo_platform_fee_paise_per_minute_override ??
+      planByoFee ??
+      byoFee)
+    : (tenant.call_rate_paise_per_minute_override ?? planRate ?? defaultRate);
+  const minBalancePaise =
+    tenant.call_min_balance_paise_override ?? planMinBal ?? defaultMinBal;
   const unlimitedMinutesCapPerMonth =
-    tenant.unlimited_minutes_cap_per_month_override ?? defaultCap;
+    tenant.unlimited_minutes_cap_per_month_override ?? planCap ?? defaultCap;
+
   return {
     accountMode: String(tenant.telephony_account_mode || 'default_account'),
-    callBillingMode: String(tenant.call_billing_mode || 'credit'),
+    callBillingMode,
     ratePaisePerMinute: Math.max(0, Math.floor(Number(ratePaisePerMinute) || 0)),
     minBalancePaise: Math.max(0, Math.floor(Number(minBalancePaise) || 0)),
     unlimitedMinutesCapPerMonth: Math.max(0, Math.floor(Number(unlimitedMinutesCapPerMonth) || 0)),
     isBYO,
+    billingPlan: serializePlanForClient(plan),
+    billingSource: plan ? 'plan' : 'manual',
     defaults: {
       defaultRate,
       byoFee,
@@ -117,6 +144,7 @@ async function ensureWalletRowInTx(conn, tenantId) {
  *   - unlimited-mode tenant has consumed >= the monthly cap (cap > 0).
  */
 export async function assertCanStartCall(tenantId) {
+  await assertActiveTelephonySubscription(tenantId);
   const cfg = await getTenantBillingConfig(tenantId);
   if (cfg.callBillingMode === 'credit') {
     const wallet = await getWallet(tenantId);
@@ -337,7 +365,7 @@ export async function addCredits(tenantId, {
     err.status = 400;
     throw err;
   }
-  const allowed = new Set(['topup', 'adjustment_credit', 'refund']);
+  const allowed = new Set(['topup', 'adjustment_credit', 'refund', 'subscription_included']);
   if (!allowed.has(entryType)) {
     const err = new Error(`Invalid entry_type for credit: ${entryType}`);
     err.status = 400;

@@ -1,53 +1,311 @@
+@use '../styles/variables' as *;
+
 .page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: $space-5;
 }
 
 .topAlert {
   margin-bottom: 0;
 }
 
-.card {
-  padding: 20px 22px;
+/* ---------- setup overview strip ---------- */
+.overviewCard {
+  padding: $space-4 $space-5;
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.07) 0%,
+    rgba(168, 85, 247, 0.04) 55%,
+    transparent 100%
+  );
+  border-color: rgba(99, 102, 241, 0.18);
+}
+
+.overviewTitle {
+  margin: 0 0 $space-3;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: $space-3;
+}
+
+.overviewItem {
+  display: flex;
+  align-items: flex-start;
+  gap: $space-3;
+  padding: $space-3;
+  border-radius: 10px;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border-subtle, rgba(0, 0, 0, 0.06));
+}
+
+.overviewIcon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.overviewIcon_route {
+  background: linear-gradient(145deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+.overviewIcon_billing {
+  background: linear-gradient(145deg, #0d9488 0%, #14b8a6 100%);
+}
+
+.overviewIcon_wallet {
+  background: linear-gradient(145deg, #d97706 0%, #fbbf24 100%);
+}
+
+.overviewIcon_plan {
+  background: linear-gradient(145deg, #059669 0%, #34d399 100%);
+}
+
+.overviewItemText {
+  min-width: 0;
+}
+
+.overviewLabel {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.overviewValue {
+  margin: 2px 0 0;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  line-height: 1.35;
+}
+
+.overviewFoot {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* ---------- section shell (icon + title) ---------- */
+.sectionCard {
+  padding: $space-4 $space-5;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: $space-4;
 }
 
-.cardHead {
+.sectionHead {
   display: flex;
-  justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: $space-3;
+  padding-bottom: $space-3;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
-.cardTitle {
-  margin: 0;
-  font-size: 1.05rem;
-  font-weight: 600;
+.sectionHeadActions {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
-.cardSub {
-  margin: 4px 0 0;
-  font-size: 0.9rem;
-  opacity: 0.75;
-  max-width: 720px;
-}
-
-.subsectionTitle {
-  margin: 6px 0 4px;
-  font-size: 0.88rem;
-  font-weight: 600;
-  opacity: 0.85;
-}
-
-.cardActions {
+.sectionIconWell {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.22) inset,
+    0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.sectionIconGlyph {
+  font-size: 22px !important;
+  line-height: 1 !important;
+}
+
+.sectionIcon_indigo {
+  background: linear-gradient(145deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+.sectionIcon_teal {
+  background: linear-gradient(145deg, #0d9488 0%, #14b8a6 100%);
+}
+
+.sectionIcon_violet {
+  background: linear-gradient(145deg, #7c3aed 0%, #a78bfa 100%);
+}
+
+.sectionIcon_emerald {
+  background: linear-gradient(145deg, #059669 0%, #34d399 100%);
+}
+
+.sectionIcon_amber {
+  background: linear-gradient(145deg, #d97706 0%, #fbbf24 100%);
+}
+
+.sectionIcon_blue {
+  background: linear-gradient(145deg, #2563eb 0%, #38bdf8 100%);
+}
+
+.sectionHeadText {
+  min-width: 0;
+  flex: 1;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  line-height: 1.25;
+}
+
+.sectionHint {
+  margin: $space-1 0 0;
+  font-size: $font-size-sm;
+  color: var(--color-text-muted);
+  max-width: 720px;
+  line-height: 1.45;
+}
+
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+}
+
+/* ---------- usage stat tiles ---------- */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: $space-3;
+}
+
+.statTile {
+  display: flex;
+  align-items: flex-start;
+  gap: $space-3;
+  padding: $space-3 $space-4;
+  border-radius: 10px;
+  border: 1px solid var(--color-border-subtle, rgba(0, 0, 0, 0.06));
+  background: var(--color-surface-2, rgba(99, 102, 241, 0.04));
+}
+
+.statTileHero {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.06));
+  border-color: rgba(99, 102, 241, 0.22);
+}
+
+.statTileIcon {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--color-primary-500, #6366f1);
+}
+
+.statTileHero .statTileIcon {
+  background: rgba(99, 102, 241, 0.2);
+  color: #4f46e5;
+}
+
+.statTileContent {
+  min-width: 0;
+}
+
+.statLabel {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.statValue {
+  margin: 3px 0 0;
+  font-size: 1.05rem;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text-primary);
+  line-height: 1.2;
+}
+
+.statFoot {
+  margin: 5px 0 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.capBar {
+  margin-top: 8px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.capBarFill {
+  height: 100%;
+  background: var(--color-success, #10b981);
+}
+
+.capBarFillOver {
+  height: 100%;
+  background: var(--color-danger, #f43f5e);
+}
+
+/* ---------- billing read-only panel ---------- */
+.billingInfoBox {
+  display: flex;
+  align-items: flex-start;
+  gap: $space-3;
+  padding: $space-3 $space-4;
+  border-radius: 10px;
+  background: var(--color-surface-2, rgba(13, 148, 136, 0.06));
+  border: 1px solid rgba(13, 148, 136, 0.18);
+}
+
+.billingInfoIcon {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 148, 136, 0.14);
+  color: #0d9488;
+}
+
+.billingInfoTitle {
+  margin: 0;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+}
+
+.billingInfoDesc {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
 }
 
 .formGrid {
@@ -56,9 +314,19 @@
   gap: 14px 18px;
 }
 
+.cardActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding-top: $space-2;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
 .muted {
-  opacity: 0.65;
+  opacity: 0.75;
   font-size: 0.85rem;
+  line-height: 1.45;
 }
 
 .dim {
@@ -95,80 +363,60 @@
   gap: 6px;
 }
 
-/* ---------- top status banner ---------- */
-.bannerCard {
-  padding: 18px 20px;
-}
-
-.bannerGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px;
-}
-
-.bannerCell {
-  background: var(--color-surface-2, rgba(99, 102, 241, 0.06));
-  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.06));
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: $space-2;
+  padding: $space-5 $space-4;
   border-radius: 10px;
-  padding: 12px 14px;
+  border: 1px dashed var(--color-border-subtle);
+  background: var(--color-surface-2, rgba(99, 102, 241, 0.03));
 }
 
-.bannerCellHero {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(168, 85, 247, 0.08));
-  border-color: rgba(99, 102, 241, 0.3);
+.emptyStateIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--color-primary-500, #6366f1);
 }
 
-.bannerLabel {
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  opacity: 0.7;
+.emptyStateTitle {
+  margin: 0;
+  font-weight: $font-weight-semibold;
+  font-size: $font-size-sm;
 }
 
-.bannerValue {
-  font-size: 1.1rem;
+.emptyStateText {
+  margin: 0;
+  max-width: 420px;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.subsectionTitle {
+  margin: 6px 0 4px;
+  font-size: 0.88rem;
   font-weight: 600;
-  margin-top: 4px;
+  opacity: 0.85;
 }
 
-.bannerFoot {
-  margin-top: 6px;
-  font-size: 0.82rem;
-  opacity: 0.78;
-}
-
-.capBar {
-  margin-top: 8px;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.capBarFill {
-  height: 100%;
-  background: var(--color-success, #10b981);
-}
-
-.capBarFillOver {
-  height: 100%;
-  background: var(--color-danger, #f43f5e);
-}
-
-/* ---------- account add/edit form (inline inside card) ---------- */
 .opCard {
   padding: 14px 16px;
+  background: var(--color-surface-2, rgba(99, 102, 241, 0.04));
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
 }
 
 .opTitle {
   font-weight: 600;
   margin-bottom: 10px;
   font-size: 0.95rem;
-}
-
-.accountFormCard {
-  margin-top: 4px;
-  background: var(--color-surface-2, rgba(99, 102, 241, 0.04));
 }
 
 .toggleRow {
@@ -178,7 +426,6 @@
   margin-top: 8px;
 }
 
-/* ---------- webhook url + ledger amounts ---------- */
 .urlRow {
   display: flex;
   gap: 8px;

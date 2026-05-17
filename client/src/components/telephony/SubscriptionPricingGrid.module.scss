@@ -1,0 +1,190 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.singlePlan {
+  align-items: center;
+
+  .card {
+    width: 100%;
+    max-width: 340px;
+  }
+}
+
+.head {
+  text-align: center;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.title {
+  margin: 0 0 8px;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+}
+
+.toggle {
+  display: inline-flex;
+  align-self: center;
+  margin: 0 auto;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--color-surface-2, #f1f5f9);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.toggleBtn {
+  border: none;
+  background: transparent;
+  padding: 8px 20px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.toggleBtnActive {
+  background: var(--color-surface, #fff);
+  color: var(--color-text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px 20px !important;
+}
+
+.cardCurrent {
+  border-color: color-mix(in srgb, var(--color-success-500, #22c55e) 50%, transparent);
+}
+
+.cardEnterprise {
+  border-color: color-mix(in srgb, #6366f1 35%, transparent);
+}
+
+.cardFree {
+  border-color: color-mix(in srgb, #22c55e 30%, transparent);
+}
+
+.badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.cardName {
+  margin: 8px 0 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  padding-right: 64px;
+}
+
+.priceBlock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.originalPrice {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+.salePrice {
+  font-size: 1.65rem;
+  font-weight: 700;
+}
+
+.interval {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.metaLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--color-text-secondary);
+}
+
+.seats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.desc {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  flex: 1;
+}
+
+.featuresHtml {
+  flex: 1;
+  font-size: 0.88rem;
+  color: var(--color-text-secondary);
+  text-align: left;
+
+  ul {
+    margin: 0;
+    padding-left: 1.1rem;
+  }
+
+  li {
+    margin-bottom: 6px;
+  }
+}
+
+.featuresList {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  flex: 1;
+
+  li {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    font-size: 0.88rem;
+    margin-bottom: 6px;
+    color: var(--color-text-secondary);
+  }
+}
+
+.sectionLabel {
+  text-align: center;
+  margin: 8px 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.empty,
+.emptyInterval {
+  text-align: center;
+  color: var(--color-text-muted);
+}
