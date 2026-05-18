@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { MaterialSymbol } from '../ui/MaterialSymbol';
 import { IconButton } from '../ui/IconButton';
@@ -13,7 +13,10 @@ import {
 } from '../ui/Table';
 import { formatPaiseAsInr } from '../../utils/telephonyPlanFormUtils';
 import { resolvePlanCyclePrice, PLAN_BILLING_CYCLES } from '../../utils/planCyclePricing';
+import { PLAN_CATEGORY } from '../../constants/telephonyProductTypes';
 import styles from './TelephonyPlansDraggableTable.module.scss';
+
+const ROLE_LABEL = { admin: 'Admin', manager: 'Manager', agent: 'Agent' };
 
 function subscriptionPriceSummary(row) {
   if (row.is_free_trial === 1) {
@@ -50,17 +53,34 @@ export function TelephonyPlansDraggableTable({
   reorderBusy = false,
   onReorder,
 }) {
-  const isPurchase = category === 'credit_purchase';
+  const isTopUp = category === PLAN_CATEGORY.CREDIT_TOP_UP;
+  const isSeat = category === PLAN_CATEGORY.SEAT_ADD_ON;
+  const isSubscription = category === PLAN_CATEGORY.SUBSCRIPTION;
+  const [orderedPlans, setOrderedPlans] = useState(plans);
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
+  const isDraggingRef = useRef(false);
+
+  useEffect(() => {
+    setOrderedPlans(plans);
+  }, [plans]);
 
   const handleDragStart = useCallback((e, id) => {
-    e.dataTransfer.setData('text/plain', String(id));
+    if (!canReorder || reorderBusy) {
+      e.preventDefault();
+      return;
+    }
+    isDraggingRef.current = true;
+    e.stopPropagation();
+    const idStr = String(id);
+    e.dataTransfer.setData('text/plain', idStr);
+    e.dataTransfer.setData('application/x-telephony-plan-id', idStr);
     e.dataTransfer.effectAllowed = 'move';
     setDraggingId(id);
-  }, []);
+  }, [canReorder, reorderBusy]);
 
   const handleDragEnd = useCallback(() => {
+    isDraggingRef.current = false;
     setDraggingId(null);
     setDragOverId(null);
   }, []);
@@ -69,36 +89,59 @@ export function TelephonyPlansDraggableTable({
     (e, id) => {
       if (!canReorder || reorderBusy) return;
       e.preventDefault();
+      e.stopPropagation();
       e.dataTransfer.dropEffect = 'move';
       setDragOverId(id);
     },
     [canReorder, reorderBusy]
   );
 
-  const handleDragLeave = useCallback(() => {
+  const handleDragLeave = useCallback((e) => {
+    const related = e.relatedTarget;
+    if (related && e.currentTarget.contains(related)) return;
     setDragOverId(null);
   }, []);
 
   const handleDrop = useCallback(
     async (e, targetId) => {
       e.preventDefault();
+      e.stopPropagation();
       setDragOverId(null);
       setDraggingId(null);
+      isDraggingRef.current = false;
+
       if (!canReorder || reorderBusy || !onReorder) return;
 
-      const draggedId = e.dataTransfer.getData('text/plain');
+      const draggedId =
+        e.dataTransfer.getData('application/x-telephony-plan-id') ||
+        e.dataTransfer.getData('text/plain');
       if (!draggedId || String(draggedId) === String(targetId)) return;
 
-      const from = plans.findIndex((p) => String(p.id) === String(draggedId));
-      const to = plans.findIndex((p) => String(p.id) === String(targetId));
+      const from = orderedPlans.findIndex((p) => String(p.id) === String(draggedId));
+      const to = orderedPlans.findIndex((p) => String(p.id) === String(targetId));
       if (from < 0 || to < 0) return;
 
-      const next = [...plans];
+      const next = [...orderedPlans];
       const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
-      await onReorder(next);
+
+      const previous = orderedPlans;
+      setOrderedPlans(next);
+      try {
+        await onReorder(next);
+      } catch {
+        setOrderedPlans(previous);
+      }
     },
-    [canReorder, reorderBusy, onReorder, plans]
+    [canReorder, reorderBusy, onReorder, orderedPlans]
+  );
+
+  const handleRowClick = useCallback(
+    (row) => {
+      if (isDraggingRef.current) return;
+      onSelect(row);
+    },
+    [onSelect]
   );
 
   return (
@@ -111,16 +154,20 @@ export function TelephonyPlansDraggableTable({
             </TableHeaderCell>
           ) : null}
           <TableHeaderCell>Plan</TableHeaderCell>
-          {!isPurchase ? <TableHeaderCell>Mode</TableHeaderCell> : null}
-          <TableHeaderCell>{isPurchase ? 'Pricing' : 'Cycle prices'}</TableHeaderCell>
-          {!isPurchase ? <TableHeaderCell>Seats</TableHeaderCell> : null}
-          {isPurchase ? <TableHeaderCell>Wallet credit</TableHeaderCell> : null}
+          {isSubscription ? <TableHeaderCell>Mode</TableHeaderCell> : null}
+          {isSeat ? <TableHeaderCell>Role</TableHeaderCell> : null}
+          {isSeat ? <TableHeaderCell>Channel</TableHeaderCell> : null}
+          <TableHeaderCell>
+            {isTopUp ? 'Price' : isSeat ? 'Price / seat' : 'Cycle prices'}
+          </TableHeaderCell>
+          {isSubscription ? <TableHeaderCell>Seats (bundle)</TableHeaderCell> : null}
+          {isTopUp ? <TableHeaderCell>Wallet credit</TableHeaderCell> : null}
           <TableHeaderCell>Status</TableHeaderCell>
           <TableHeaderCell aria-label="Actions" />
         </TableRow>
       </TableHead>
       <TableBody>
-        {plans.map((row) => {
+        {orderedPlans.map((row) => {
           const isSelected = Number(selectedId) === Number(row.id);
           const isDragging = draggingId != null && String(draggingId) === String(row.id);
           const isDragOver = dragOverId != null && String(dragOverId) === String(row.id);
@@ -135,7 +182,7 @@ export function TelephonyPlansDraggableTable({
               ]
                 .filter(Boolean)
                 .join(' ')}
-              onClick={() => onSelect(row)}
+              onClick={() => handleRowClick(row)}
               onDragOver={canReorder ? (e) => handleDragOver(e, row.id) : undefined}
               onDragLeave={canReorder ? handleDragLeave : undefined}
               onDrop={canReorder ? (e) => handleDrop(e, row.id) : undefined}
@@ -162,35 +209,43 @@ export function TelephonyPlansDraggableTable({
                   <span className={styles.muted}>{row.code}</span>
                 </div>
               </TableCell>
-              {!isPurchase ? (
+              {isSubscription ? (
                 <TableCell>
                   <PlanTypeBadge type={row.plan_type} />
                 </TableCell>
               ) : null}
+              {isSeat ? (
+                <TableCell>{ROLE_LABEL[row.seat_role] || row.seat_role || '—'}</TableCell>
+              ) : null}
+              {isSeat ? (
+                <TableCell>{row.includes_unlimited_channels === 1 ? 'Yes' : 'No'}</TableCell>
+              ) : null}
               <TableCell className={styles.muted}>
-                {isPurchase ? (
+                {isTopUp || isSeat ? (
                   <>
-                    {formatPaiseAsInr(row.sale_price_paise)}{' '}
-                    {row.billing_interval === 'year'
-                      ? '/ yr'
-                      : row.billing_interval === 'one_time'
-                        ? ''
-                        : '/ mo'}
+                    {formatPaiseAsInr(row.sale_price_paise)}
+                    {isTopUp ? ' · one-time' : ''}
                     {row.discount_percent ? ` · ${row.discount_percent}% off` : ''}
                   </>
                 ) : (
                   subscriptionPriceSummary(row)
                 )}
               </TableCell>
-              {!isPurchase ? (
+              {isSubscription ? (
                 <TableCell className={styles.muted}>
-                  {[row.seat_limit_admins, row.seat_limit_managers, row.seat_limit_users]
-                    .filter((n) => n != null)
-                    .map((n, i) => ['A', 'M', 'U'][i] + ':' + n)
+                  {[
+                    row.seat_limit_admins != null ? `Adm:${row.seat_limit_admins}` : null,
+                    row.seat_limit_managers != null ? `Mgr:${row.seat_limit_managers}` : null,
+                    (row.seat_limit_agents ?? row.seat_limit_users) != null
+                      ? `Ag:${row.seat_limit_agents ?? row.seat_limit_users}`
+                      : null,
+                    row.seat_limit_channels != null ? `Ch:${row.seat_limit_channels}` : null,
+                  ]
+                    .filter(Boolean)
                     .join(' ') || '—'}
                 </TableCell>
               ) : null}
-              {isPurchase ? (
+              {isTopUp ? (
                 <TableCell>{formatPaiseAsInr(row.wallet_credit_paise)}</TableCell>
               ) : null}
               <TableCell>

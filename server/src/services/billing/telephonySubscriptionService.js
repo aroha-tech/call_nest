@@ -1,6 +1,6 @@
-import Razorpay from 'razorpay';
-import { env } from '../../config/env.js';
 import { query, withConnection } from '../../config/db.js';
+import { assertRazorpayConfigured, createRazorpaySdk } from './razorpayClient.js';
+import { isDevMockPayment } from './razorpayConfigService.js';
 import { computePeriodEnd, verifyRazorpayPaymentSignature } from './billingCore.js';
 import * as callCreditsService from './callCreditsService.js';
 import { grantIncludedWalletCredit } from './telephonyWalletGrantService.js';
@@ -8,28 +8,17 @@ import {
   findById as findTelephonyPlanById,
   serializePlanForClient,
 } from '../superAdmin/telephonyBillingPlansService.js';
-import { resolvePlanCyclePrice, PLAN_BILLING_CYCLES } from '../../utils/planCyclePricing.js';
+import {
+  resolvePlanCyclePrice,
+  resolvePlanCycleIncludedCredit,
+  PLAN_BILLING_CYCLES,
+} from '../../utils/planCyclePricing.js';
+import { computePlanChargePaise } from '../../utils/planTaxUtils.js';
 import {
   getActiveTelephonySubscription,
 } from './telephonySubscriptionGuard.js';
 
 export { getActiveTelephonySubscription, assertActiveTelephonySubscription } from './telephonySubscriptionGuard.js';
-
-function assertRazorpayConfigured() {
-  if (!env.razorpay?.keyId || !env.razorpay?.keySecret) {
-    const err = new Error('Razorpay is not configured on the server (set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET)');
-    err.status = 503;
-    throw err;
-  }
-}
-
-function getRazorpay() {
-  assertRazorpayConfigured();
-  return new Razorpay({
-    key_id: env.razorpay.keyId,
-    key_secret: env.razorpay.keySecret,
-  });
-}
 
 function formatMysqlUtc(d) {
   return d.toISOString().slice(0, 19).replace('T', ' ');
@@ -165,12 +154,13 @@ export async function activateTelephonySubscription(
       : `sub:${subscriptionId}:start:${formatMysqlUtc(start)}`);
 
   let grant = { granted: false, reason: 'no_included_credit' };
-  const amountPaise = Math.floor(Number(plan.included_wallet_credit_paise) || 0);
+  const amountPaise = resolvePlanCycleIncludedCredit(plan, cycleIv);
   if (amountPaise > 0) {
     grant = await grantIncludedWalletCredit(tid, plan, {
       grantSource,
       grantReference: ref,
       createdByUserId: uid,
+      billingInterval: cycleIv,
     });
   }
 
@@ -193,6 +183,7 @@ export async function activateFromAdminAssign(tenantId, planId, userId = null) {
         tenantId,
         plan,
         userId,
+        billingInterval: 'month',
         grantSource: 'admin_assign',
         grantReference: `admin:${plan.id}:${Date.now()}`,
       });
@@ -213,14 +204,15 @@ export async function ensureRazorpayPlan(plan) {
     err.status = 400;
     throw err;
   }
-  const rzp = getRazorpay();
+  const charge = computePlanChargePaise(plan, sale);
+  const rzp = await createRazorpaySdk();
   const period = plan.billing_interval === 'year' ? 'yearly' : 'monthly';
   const rzpPlan = await rzp.plans.create({
     period,
     interval: 1,
     item: {
       name: String(plan.name).slice(0, 128),
-      amount: sale,
+      amount: charge,
       currency: 'INR',
       description: plan.description ? String(plan.description).slice(0, 255) : undefined,
     },
@@ -266,9 +258,32 @@ export async function createSubscriptionCheckout(
     err.status = 400;
     throw err;
   }
+  const charge = computePlanChargePaise(plan, sale);
 
-  assertRazorpayConfigured();
-  const rzp = getRazorpay();
+  const cfg = await assertRazorpayConfigured();
+
+  if (cfg.devMock) {
+    const orderId = `dev_sub_${tid}_${plan.id}_${Date.now()}`;
+    await query(
+      `INSERT INTO tenant_telephony_subscription_orders (
+         tenant_id, telephony_billing_plan_id, billing_interval, razorpay_order_id,
+         amount_paise, auto_renew, currency, status, created_by, updated_by
+       ) VALUES (?, ?, ?, ?, ?, 0, 'INR', 'pending', ?, ?)`,
+      [tid, plan.id, iv, orderId, charge, uid, uid]
+    );
+    return {
+      checkoutType: 'dev_mock',
+      orderId,
+      amount: charge,
+      currency: 'INR',
+      keyId: cfg.keyId || 'dev_mock',
+      devMock: true,
+      plan: serializePlanForClient(plan),
+      autoRenew: false,
+    };
+  }
+
+  const rzp = await createRazorpaySdk();
 
   if (autoRenew && (iv === 'month' || iv === 'year')) {
     const rzpPlanId = await ensureRazorpayPlan(plan);
@@ -288,13 +303,13 @@ export async function createSubscriptionCheckout(
          tenant_id, telephony_billing_plan_id, billing_interval, razorpay_subscription_id,
          amount_paise, auto_renew, currency, status, created_by, updated_by
        ) VALUES (?, ?, ?, ?, ?, 1, 'INR', 'pending', ?, ?)`,
-      [tid, plan.id, iv, sub.id, sale, uid, uid]
+      [tid, plan.id, iv, sub.id, charge, uid, uid]
     );
 
     return {
       checkoutType: 'subscription',
       subscriptionId: sub.id,
-      keyId: env.razorpay.keyId,
+      keyId: cfg.keyId,
       plan: serializePlanForClient(plan),
       autoRenew: true,
     };
@@ -302,7 +317,7 @@ export async function createSubscriptionCheckout(
 
   const receipt = `s${tid}p${plan.id}${Date.now()}`.slice(0, 40);
   const order = await rzp.orders.create({
-    amount: sale,
+    amount: charge,
     currency: 'INR',
     receipt,
     notes: {
@@ -317,15 +332,15 @@ export async function createSubscriptionCheckout(
        tenant_id, telephony_billing_plan_id, billing_interval, razorpay_order_id,
        amount_paise, auto_renew, currency, status, created_by, updated_by
      ) VALUES (?, ?, ?, ?, ?, 0, 'INR', 'pending', ?, ?)`,
-    [tid, plan.id, iv, order.id, sale, uid, uid]
+    [tid, plan.id, iv, order.id, charge, uid, uid]
   );
 
   return {
     checkoutType: 'order',
     orderId: order.id,
-    amount: sale,
+    amount: charge,
     currency: order.currency || 'INR',
-    keyId: env.razorpay.keyId,
+    keyId: cfg.keyId,
     plan: serializePlanForClient(plan),
     autoRenew: false,
   };
@@ -413,7 +428,7 @@ async function finalizeSubscriptionOrder(conn, {
 }
 
 export async function verifySubscriptionCheckout(tenantId, userId, body) {
-  assertRazorpayConfigured();
+  await assertRazorpayConfigured();
   const tid = Number(tenantId);
   const uid = userId != null ? Number(userId) : null;
 
@@ -422,8 +437,40 @@ export async function verifySubscriptionCheckout(tenantId, userId, body) {
   const signature = body?.razorpay_signature || body?.signature;
   const subscriptionId = body?.razorpay_subscription_id || body?.subscription_id;
 
+  if (isDevMockPayment(body) && orderId && paymentId) {
+    const [orderRow] = await query(
+      `SELECT amount_paise FROM tenant_telephony_subscription_orders
+       WHERE razorpay_order_id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1`,
+      [orderId, tid]
+    );
+    if (!orderRow) {
+      const err = new Error('Checkout order not found');
+      err.status = 404;
+      throw err;
+    }
+    return withConnection(async (conn) => {
+      await conn.beginTransaction();
+      try {
+        const result = await finalizeSubscriptionOrder(conn, {
+          tenantId: tid,
+          razorpayOrderId: orderId,
+          razorpayPaymentId: paymentId,
+          amountPaise: orderRow.amount_paise,
+          userId: uid,
+        });
+        await conn.commit();
+        return result;
+      } catch (e) {
+        await conn.rollback();
+        throw e;
+      }
+    });
+  }
+
+  const cfg = await assertRazorpayConfigured();
+
   if (subscriptionId && paymentId && signature) {
-    const ok = verifyRazorpayPaymentSignature(paymentId, subscriptionId, env.razorpay.keySecret);
+    const ok = verifyRazorpayPaymentSignature(paymentId, subscriptionId, cfg.keySecret);
     if (!ok) {
       const err = new Error('Invalid payment signature');
       err.status = 400;
@@ -444,14 +491,14 @@ export async function verifySubscriptionCheckout(tenantId, userId, body) {
     throw err;
   }
 
-  const ok = verifyRazorpayPaymentSignature(orderId, paymentId, signature, env.razorpay.keySecret);
+  const ok = verifyRazorpayPaymentSignature(orderId, paymentId, signature, cfg.keySecret);
   if (!ok) {
     const err = new Error('Invalid payment signature');
     err.status = 400;
     throw err;
   }
 
-  const rzp = getRazorpay();
+  const rzp = await createRazorpaySdk();
   let payment;
   try {
     payment = await rzp.payments.fetch(paymentId);
@@ -552,11 +599,14 @@ export async function applySubscriptionCharged({
   const plan = await loadAssignablePlan(orderRow.telephony_billing_plan_id);
 
   const [existingSub] = await query(
-    `SELECT id FROM tenant_telephony_subscriptions
+    `SELECT id, billing_interval FROM tenant_telephony_subscriptions
      WHERE tenant_id = ? AND razorpay_subscription_id = ? AND deleted_at IS NULL
      LIMIT 1`,
     [tid, subId]
   );
+
+  const cycleIv =
+    PLAN_BILLING_CYCLES.includes(orderRow.billing_interval) ? orderRow.billing_interval : 'month';
 
   return withConnection(async (conn) => {
     await conn.beginTransaction();
@@ -566,6 +616,7 @@ export async function applySubscriptionCharged({
         result = await activateTelephonySubscription(conn, {
           tenantId: tid,
           plan,
+          billingInterval: cycleIv,
           autoRenew: true,
           razorpayPaymentId: payId || null,
           razorpaySubscriptionId: subId,
@@ -581,7 +632,10 @@ export async function applySubscriptionCharged({
         );
       } else {
         const now = new Date();
-        const end = computeSubscriptionPeriodEnd(now, plan);
+        const renewIv = PLAN_BILLING_CYCLES.includes(existingSub.billing_interval)
+          ? existingSub.billing_interval
+          : cycleIv;
+        const end = computeSubscriptionPeriodEnd(now, plan, renewIv);
         await expirePreviousSubscriptions(conn, tid, userId);
         await conn.execute(
           `UPDATE tenant_telephony_subscriptions
@@ -605,6 +659,7 @@ export async function applySubscriptionCharged({
               grantSource: 'subscription_renewal',
               grantReference: `sub:rzp:${subId}:renew:${payId}`,
               createdByUserId: userId,
+              billingInterval: renewIv,
             })
           : { granted: false, reason: 'no_payment_id' };
         result = {

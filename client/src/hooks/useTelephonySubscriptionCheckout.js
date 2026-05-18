@@ -50,6 +50,17 @@ export function useTelephonySubscriptionCheckout({ userEmail, onSuccess } = {}) 
           throw new Error('No checkout session returned');
         }
 
+        if (data.devMock && data.orderId) {
+          await tenantTelephonyAPI.verifySubscriptionCheckout({
+            razorpay_order_id: data.orderId,
+            razorpay_payment_id: `dev_pay_${Date.now()}`,
+            razorpay_signature: 'dev_mock',
+          });
+          await onSuccess?.();
+          setPayingId(null);
+          return;
+        }
+
         const baseOptions = {
           key: data.keyId,
           name: PRODUCT_DISPLAY_NAME,

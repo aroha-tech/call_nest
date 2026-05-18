@@ -1,8 +1,19 @@
 import React, { useMemo, useState } from 'react';
 import { Card } from '../ui/Card';
-import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { MaterialSymbol } from '../ui/MaterialSymbol';
+import { resolvePlanCycleIncludedCredit } from '../../utils/planCyclePricing';
+import {
+  PlanCardBody,
+  PlanCardFooter,
+  PlanCardHighlight,
+  PlanCardHighlights,
+  PlanCardPrice,
+  PlanCardTopRow,
+  PlanCardFeatures,
+  PlanTypeChip,
+  planCardStyles,
+} from './TelephonyPlanCardShared';
 import styles from './SubscriptionPricingGrid.module.scss';
 
 function formatPaiseAsInr(paise) {
@@ -21,33 +32,6 @@ function planDiscountPercent(plan) {
   return null;
 }
 
-function PlanFeatures({ plan }) {
-  if (plan.features_html) {
-    return (
-      <div
-        className={styles.featuresHtml}
-        dangerouslySetInnerHTML={{ __html: plan.features_html }}
-      />
-    );
-  }
-  const lines = Array.isArray(plan.features_json)
-    ? plan.features_json.map((x) => (typeof x === 'string' ? x : x?.text)).filter(Boolean)
-    : [];
-  if (!lines.length && plan.description) {
-    return <p className={styles.desc}>{plan.description}</p>;
-  }
-  return (
-    <ul className={styles.featuresList}>
-      {lines.map((line, i) => (
-        <li key={i}>
-          <MaterialSymbol name="check" size="sm" />
-          {line}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 function SeatSummary({ plan }) {
   const parts = [];
   if (plan.seat_limit_admins != null) parts.push(`${plan.seat_limit_admins} admin${plan.seat_limit_admins === 1 ? '' : 's'}`);
@@ -57,9 +41,9 @@ function SeatSummary({ plan }) {
   if (plan.seat_limit_users != null) parts.push(`${plan.seat_limit_users} user${plan.seat_limit_users === 1 ? '' : 's'}`);
   if (!parts.length) return null;
   return (
-    <p className={styles.seats}>
-      <MaterialSymbol name="group" size="sm" />
-      {parts.join(' · ')}
+    <p className={planCardStyles.seats}>
+      <MaterialSymbol name="group" size="xs" className={planCardStyles.seatsIcon} />
+      <span>{parts.join(' · ')}</span>
     </p>
   );
 }
@@ -72,6 +56,7 @@ function SubscriptionCard({
   payingId,
   onSubscribe,
   freePlanAdminOnly = false,
+  billingCycle = 'month',
 }) {
   const tier = plan.subscription_tier || 'standard';
   const isFree = tier === 'free';
@@ -81,6 +66,7 @@ function SubscriptionCard({
   const orig = Number(plan.original_price_paise);
   const sale = Number(plan.sale_price_paise);
   const showStrike = Number.isFinite(orig) && orig > sale && sale > 0;
+  const includedCreditPaise = resolvePlanCycleIncludedCredit(plan, billingCycle);
 
   let cta = 'Subscribe';
   if (isFree) cta = 'Start free trial';
@@ -90,68 +76,65 @@ function SubscriptionCard({
   return (
     <Card
       className={[
-        styles.card,
-        isCurrent && styles.cardCurrent,
-        isEnterprise && styles.cardEnterprise,
-        isFree && styles.cardFree,
+        planCardStyles.card,
+        isCurrent && planCardStyles.cardCurrent,
+        isEnterprise && planCardStyles.cardEnterprise,
+        isFree && planCardStyles.cardFree,
       ]
         .filter(Boolean)
         .join(' ')}
     >
-      {discount > 0 && !isFree ? (
-        <div className={styles.badge}>
-          <Badge variant="primary" size="sm">
-            {discount}% off
-          </Badge>
-        </div>
-      ) : null}
-      {isCurrent ? (
-        <div className={styles.badge}>
-          <Badge variant="success" size="sm">
-            Current
-          </Badge>
-        </div>
-      ) : null}
+      <div className={planCardStyles.inner}>
+      <PlanCardTopRow
+        name={plan.name}
+        discountPercent={!isFree ? discount : 0}
+        isCurrent={isCurrent}
+      />
+      <PlanTypeChip
+        variant={
+          isEnterprise
+            ? 'enterprise'
+            : isFree
+              ? 'free'
+              : plan.plan_type === 'unlimited'
+                ? 'unlimited'
+                : 'credit'
+        }
+      />
 
-      <h3 className={styles.cardName}>{plan.name}</h3>
-      <Badge variant={plan.plan_type === 'unlimited' ? 'success' : 'warning'} size="sm">
-        {plan.plan_type === 'unlimited' ? 'Unlimited calling' : 'Credit calling'}
-      </Badge>
-
-      <div className={styles.priceBlock}>
-        {isEnterprise ? (
-          <span className={styles.salePrice}>Custom</span>
-        ) : isFree ? (
-          <span className={styles.salePrice}>Free</span>
-        ) : (
-          <>
-            {showStrike ? <span className={styles.originalPrice}>{formatPaiseAsInr(orig)}</span> : null}
-            <span className={styles.salePrice}>{formatPaiseAsInr(sale)}</span>
-            <span className={styles.interval}>
-              / {plan.billing_interval === 'year' ? 'year' : 'month'}
-            </span>
-          </>
-        )}
-      </div>
-
-      {isFree && plan.trial_duration_days ? (
-        <p className={styles.metaLine}>{plan.trial_duration_days} day trial</p>
-      ) : null}
-      {plan.included_wallet_credit_paise > 0 ? (
-        <p className={styles.metaLine}>
-          <MaterialSymbol name="account_balance_wallet" size="sm" />
-          {formatPaiseAsInr(plan.included_wallet_credit_paise)} call credits included
-        </p>
-      ) : null}
-      {plan.plan_type === 'unlimited' && Number(plan.unlimited_minutes_cap_per_month) > 0 ? (
-        <p className={styles.metaLine}>
-          {Number(plan.unlimited_minutes_cap_per_month).toLocaleString('en-IN')} min / month
-        </p>
-      ) : null}
-
-      <SeatSummary plan={plan} />
-      <PlanFeatures plan={plan} />
-
+      <PlanCardPrice
+        isEnterprise={isEnterprise}
+        isFree={isFree}
+        showStrike={showStrike}
+        originalFormatted={formatPaiseAsInr(orig)}
+        salePaise={sale}
+        plan={plan}
+        intervalSuffix={
+          !isFree && !isEnterprise
+            ? `/ ${plan.billing_interval === 'year' ? 'year' : 'month'}`
+            : null
+        }
+      />
+      <PlanCardHighlights>
+        {isFree && plan.trial_duration_days ? (
+          <PlanCardHighlight icon="schedule">{plan.trial_duration_days} day trial</PlanCardHighlight>
+        ) : null}
+        {includedCreditPaise > 0 ? (
+          <PlanCardHighlight icon="account_balance_wallet">
+            {formatPaiseAsInr(includedCreditPaise)} call credits included
+          </PlanCardHighlight>
+        ) : null}
+        {plan.plan_type === 'unlimited' && Number(plan.unlimited_minutes_cap_per_month) > 0 ? (
+          <PlanCardHighlight icon="timer">
+            {Number(plan.unlimited_minutes_cap_per_month).toLocaleString('en-IN')} min / month
+          </PlanCardHighlight>
+        ) : null}
+      </PlanCardHighlights>
+      <PlanCardBody>
+        <SeatSummary plan={plan} />
+        <PlanCardFeatures plan={plan} />
+      </PlanCardBody>
+      <PlanCardFooter>
       <Button
         variant={isEnterprise ? 'secondary' : 'primary'}
         fullWidth
@@ -175,6 +158,8 @@ function SubscriptionCard({
                 ? 'Payments unavailable'
                 : cta}
       </Button>
+      </PlanCardFooter>
+      </div>
     </Card>
   );
 }
@@ -211,6 +196,7 @@ function StandardPlanGrid({
           <SubscriptionCard
             key={plan.id}
             plan={plan}
+            billingCycle={interval}
             isCurrent={assignedPlanId != null && Number(plan.id) === Number(assignedPlanId)}
             preview={preview}
             razorpayConfigured={razorpayConfigured}
@@ -372,6 +358,7 @@ export function SubscriptionPricingGrid({
             <SubscriptionCard
               key={plan.id}
               plan={plan}
+              billingCycle={interval}
               isCurrent={assignedPlanId != null && Number(plan.id) === Number(assignedPlanId)}
               preview={preview}
               razorpayConfigured={razorpayConfigured}

@@ -38,6 +38,18 @@ export function useCreditPurchaseCheckout({ userEmail, onSuccess } = {}) {
         if (!data?.orderId) {
           throw new Error('No order returned');
         }
+
+        if (data.devMock) {
+          await tenantTelephonyAPI.verifyPurchasePayment({
+            razorpay_order_id: data.orderId,
+            razorpay_payment_id: `dev_pay_${Date.now()}`,
+            razorpay_signature: 'dev_mock',
+          });
+          await onSuccess?.();
+          setPayingId(null);
+          return;
+        }
+
         const options = {
           key: data.keyId,
           amount: data.amount,

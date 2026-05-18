@@ -3,15 +3,21 @@ import { telephonyBillingPlansAdminAPI } from '../services/tenantTelephonyAdminA
 import { EMPTY_PLANS } from '../constants/emptyCollections';
 
 /**
- * Loads telephony billing plans once per param change (no useCallback/load identity loops).
+ * Loads telephony billing plans once per param change.
+ * Keeps previous rows visible while refreshing to avoid layout jumps.
  */
-export function useTelephonyBillingPlansList(params, { enabled = true } = {}) {
+export function useTelephonyBillingPlansList(
+  params,
+  { enabled = true, keepStaleWhenDisabled = false } = {}
+) {
   const [plans, setPlans] = useState(EMPTY_PLANS);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const requestIdRef = useRef(0);
+  const hasLoadedRef = useRef(false);
 
   const reload = useCallback(() => {
     setRefreshToken((t) => t + 1);
@@ -28,18 +34,27 @@ export function useTelephonyBillingPlansList(params, { enabled = true } = {}) {
 
   useEffect(() => {
     if (!enabled || !planCategory) {
-      setPlans(EMPTY_PLANS);
-      setTotal(0);
+      if (!keepStaleWhenDisabled) {
+        setPlans(EMPTY_PLANS);
+        setTotal(0);
+        hasLoadedRef.current = false;
+      }
       setLoading(false);
+      setRefreshing(false);
       return undefined;
     }
 
     const requestId = ++requestIdRef.current;
     const controller = new AbortController();
     let cancelled = false;
+    const isRefresh = hasLoadedRef.current;
 
     (async () => {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
       try {
         const res = await telephonyBillingPlansAdminAPI.list(
@@ -56,15 +71,19 @@ export function useTelephonyBillingPlansList(params, { enabled = true } = {}) {
         if (cancelled || requestId !== requestIdRef.current) return;
         setPlans(res.data?.data || EMPTY_PLANS);
         setTotal(res.data?.pagination?.total || 0);
+        hasLoadedRef.current = true;
       } catch (e) {
         if (cancelled || requestId !== requestIdRef.current) return;
         if (e?.code === 'ERR_CANCELED' || e?.name === 'CanceledError') return;
         setError(e?.response?.data?.error || e.message || 'Failed to load plans');
-        setPlans(EMPTY_PLANS);
-        setTotal(0);
+        if (!isRefresh) {
+          setPlans(EMPTY_PLANS);
+          setTotal(0);
+        }
       } finally {
         if (!cancelled && requestId === requestIdRef.current) {
           setLoading(false);
+          setRefreshing(false);
         }
       }
     })();
@@ -73,7 +92,26 @@ export function useTelephonyBillingPlansList(params, { enabled = true } = {}) {
       cancelled = true;
       controller.abort();
     };
-  }, [enabled, planCategory, planType, search, includeInactive, page, limit, refreshToken]);
+  }, [
+    enabled,
+    keepStaleWhenDisabled,
+    planCategory,
+    planType,
+    search,
+    includeInactive,
+    page,
+    limit,
+    refreshToken,
+  ]);
 
-  return { plans, total, loading, error, setError, reload };
+  return {
+    plans,
+    total,
+    loading,
+    refreshing,
+    error,
+    setError,
+    reload,
+    hasLoaded: hasLoadedRef.current,
+  };
 }

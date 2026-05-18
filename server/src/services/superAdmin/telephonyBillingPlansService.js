@@ -1,11 +1,13 @@
 import { query } from '../../config/db.js';
 import {
   PLAN_BILLING_CYCLES,
+  CYCLE_INCLUDED_CREDIT_DB_KEYS,
   planHasAnySalePrice,
 } from '../../utils/planCyclePricing.js';
 
 const PLAN_TYPES = ['credit', 'unlimited'];
-const PLAN_CATEGORIES = ['tenant_billing', 'credit_purchase'];
+const PLAN_CATEGORIES = ['tenant_billing', 'credit_purchase', 'seat_purchase'];
+const SEAT_ROLES = ['admin', 'manager', 'agent'];
 const BILLING_INTERVALS = [...PLAN_BILLING_CYCLES, 'one_time'];
 
 const CYCLE_PRICE_DB_KEYS = [];
@@ -82,7 +84,7 @@ function validatePlanPayload(data, { partial = false } = {}) {
   if (has('plan_category')) {
     const cat = String(data.plan_category);
     if (!PLAN_CATEGORIES.includes(cat)) {
-      const err = new Error('plan_category must be tenant_billing or credit_purchase');
+      const err = new Error('plan_category must be tenant_billing, credit_purchase, or seat_purchase');
       err.status = 400;
       throw err;
     }
@@ -167,13 +169,40 @@ function validatePlanPayload(data, { partial = false } = {}) {
     out.trial_duration_days = parseNonNegInt(data.trial_duration_days, 'trial_duration_days');
   }
 
-  for (const key of ['included_wallet_credit_paise']) {
+  for (const key of ['included_wallet_credit_paise', ...CYCLE_INCLUDED_CREDIT_DB_KEYS]) {
     if (has(key)) {
       out[key] = parseNonNegInt(data[key], key);
     }
   }
 
-  for (const key of ['seat_limit_admins', 'seat_limit_managers', 'seat_limit_users']) {
+  if (has('seat_role')) {
+    const role = data.seat_role;
+    if (role == null || role === '') {
+      out.seat_role = null;
+    } else if (!SEAT_ROLES.includes(String(role))) {
+      const err = new Error('seat_role must be admin, manager, or agent');
+      err.status = 400;
+      throw err;
+    } else {
+      out.seat_role = String(role);
+    }
+  }
+
+  if (has('includes_unlimited_channels')) {
+    out.includes_unlimited_channels =
+      data.includes_unlimited_channels === true ||
+      data.includes_unlimited_channels === 1 ||
+      data.includes_unlimited_channels === '1'
+        ? 1
+        : 0;
+  }
+
+  for (const key of [
+    'seat_limit_admins',
+    'seat_limit_managers',
+    'seat_limit_agents',
+    'seat_limit_channels',
+  ]) {
     if (has(key)) {
       const v = data[key];
       if (v === null || v === '') {
@@ -237,6 +266,34 @@ function validatePlanPayload(data, { partial = false } = {}) {
     out.is_active = data.is_active === true || data.is_active === 1 || data.is_active === '1' ? 1 : 0;
   }
 
+  if (has('gst_percent')) {
+    const gp = data.gst_percent;
+    if (gp === null || gp === '') {
+      out.gst_percent = null;
+    } else {
+      const n = Number(gp);
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        const err = new Error('gst_percent must be between 0 and 100');
+        err.status = 400;
+        throw err;
+      }
+      out.gst_percent = Math.floor(n);
+    }
+  } else if (!partial) {
+    out.gst_percent = 18;
+  }
+
+  if (has('prices_include_gst')) {
+    out.prices_include_gst =
+      data.prices_include_gst === true ||
+      data.prices_include_gst === 1 ||
+      data.prices_include_gst === '1'
+        ? 1
+        : 0;
+  } else if (!partial) {
+    out.prices_include_gst = 1;
+  }
+
   if (has('call_rate_paise_per_minute')) {
     out.call_rate_paise_per_minute = parseNonNegInt(
       data.call_rate_paise_per_minute,
@@ -260,19 +317,15 @@ function validatePlanPayload(data, { partial = false } = {}) {
   }
 
   if (category === 'credit_purchase') {
+    out.billing_interval = 'one_time';
     if (!partial) {
-      if (!out.billing_interval && !data.billing_interval) {
-        const err = new Error('billing_interval is required for credit purchase plans');
-        err.status = 400;
-        throw err;
-      }
       if (out.sale_price_paise === undefined && data.sale_price_paise === undefined) {
-        const err = new Error('sale_price_paise is required for credit purchase plans');
+        const err = new Error('sale_price_paise is required for credit top-up packs');
         err.status = 400;
         throw err;
       }
       if (out.wallet_credit_paise === undefined && data.wallet_credit_paise === undefined) {
-        const err = new Error('wallet_credit_paise is required for credit purchase plans');
+        const err = new Error('wallet_credit_paise is required for credit top-up packs');
         err.status = 400;
         throw err;
       }
@@ -282,6 +335,30 @@ function validatePlanPayload(data, { partial = false } = {}) {
     out.call_rate_paise_per_minute = null;
     out.byo_platform_fee_paise_per_minute = null;
     out.call_min_balance_paise = null;
+    out.seat_role = null;
+    out.includes_unlimited_channels = 0;
+  } else if (category === 'seat_purchase') {
+    out.billing_interval = 'one_time';
+    out.plan_type = 'credit';
+    if (!partial) {
+      if (!out.seat_role && !data.seat_role) {
+        const err = new Error('seat_role is required for seat add-on plans');
+        err.status = 400;
+        throw err;
+      }
+      if (out.sale_price_paise === undefined && data.sale_price_paise === undefined) {
+        const err = new Error('sale_price_paise is required for seat add-on plans');
+        err.status = 400;
+        throw err;
+      }
+    }
+    out.wallet_credit_paise = null;
+    out.unlimited_minutes_cap_per_month = null;
+    out.call_rate_paise_per_minute = null;
+    out.byo_platform_fee_paise_per_minute = null;
+    out.call_min_balance_paise = null;
+    out.is_free_trial = 0;
+    out.is_contact_sales = 0;
   } else {
     const isFree =
       out.is_free_trial === 1 ||
@@ -351,6 +428,13 @@ function validatePlanPayload(data, { partial = false } = {}) {
 
   if (out.original_price_paise != null && out.sale_price_paise != null && out.discount_percent == null) {
     out.discount_percent = computeDiscountPercent(out.original_price_paise, out.sale_price_paise);
+  }
+
+  if (
+    out.included_wallet_credit_month_paise != null &&
+    out.included_wallet_credit_paise === undefined
+  ) {
+    out.included_wallet_credit_paise = out.included_wallet_credit_month_paise;
   }
 
   return out;
@@ -572,10 +656,15 @@ export async function create(data, userId) {
        price_quarter_original_paise, price_quarter_sale_paise, price_quarter_discount_percent,
        price_semiannual_original_paise, price_semiannual_sale_paise, price_semiannual_discount_percent,
        price_year_original_paise, price_year_sale_paise, price_year_discount_percent,
-       included_wallet_credit_paise, seat_limit_admins, seat_limit_managers, seat_limit_users,
+       included_wallet_credit_paise,
+       included_wallet_credit_month_paise, included_wallet_credit_quarter_paise,
+       included_wallet_credit_semiannual_paise, included_wallet_credit_year_paise,
+       seat_limit_admins, seat_limit_managers, seat_limit_agents, seat_limit_channels,
+       seat_role, includes_unlimited_channels,
        features_html, features_json, is_contact_sales,
+       gst_percent, prices_include_gst,
        sort_order, is_active, created_by, updated_by
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       body.code,
       body.name,
@@ -607,12 +696,21 @@ export async function create(data, userId) {
       body.price_year_sale_paise ?? null,
       body.price_year_discount_percent ?? null,
       body.included_wallet_credit_paise ?? null,
+      body.included_wallet_credit_month_paise ?? null,
+      body.included_wallet_credit_quarter_paise ?? null,
+      body.included_wallet_credit_semiannual_paise ?? null,
+      body.included_wallet_credit_year_paise ?? null,
       body.seat_limit_admins ?? null,
       body.seat_limit_managers ?? null,
-      body.seat_limit_users ?? null,
+      body.seat_limit_agents ?? body.seat_limit_users ?? null,
+      body.seat_limit_channels ?? null,
+      body.seat_role ?? null,
+      body.includes_unlimited_channels ?? 0,
       body.features_html ?? null,
       body.features_json ?? null,
       body.is_contact_sales ?? 0,
+      body.gst_percent ?? 18,
+      body.prices_include_gst ?? 1,
       body.sort_order ?? 0,
       body.is_active ?? 1,
       userId,
@@ -636,6 +734,15 @@ export async function update(id, data, userId) {
 
   if (mergedCategory === 'credit_purchase') {
     body.plan_type = 'credit';
+    body.billing_interval = 'one_time';
+    body.unlimited_minutes_cap_per_month = null;
+    body.call_rate_paise_per_minute = null;
+    body.byo_platform_fee_paise_per_minute = null;
+    body.call_min_balance_paise = null;
+  } else if (mergedCategory === 'seat_purchase') {
+    body.plan_type = 'credit';
+    body.billing_interval = 'one_time';
+    body.wallet_credit_paise = null;
     body.unlimited_minutes_cap_per_month = null;
     body.call_rate_paise_per_minute = null;
     body.byo_platform_fee_paise_per_minute = null;
@@ -685,12 +792,18 @@ export async function update(id, data, userId) {
     'discount_percent',
     'wallet_credit_paise',
     'included_wallet_credit_paise',
+    ...CYCLE_INCLUDED_CREDIT_DB_KEYS,
     'seat_limit_admins',
     'seat_limit_managers',
-    'seat_limit_users',
+    'seat_limit_agents',
+    'seat_limit_channels',
+    'seat_role',
+    'includes_unlimited_channels',
     'features_html',
     'features_json',
     'is_contact_sales',
+    'gst_percent',
+    'prices_include_gst',
     'sort_order',
     'is_active',
   ]) {
@@ -826,12 +939,21 @@ export function serializePlanForClient(plan) {
     discount_percent: plan.discount_percent,
     wallet_credit_paise: plan.wallet_credit_paise,
     included_wallet_credit_paise: plan.included_wallet_credit_paise,
+    included_wallet_credit_month_paise: plan.included_wallet_credit_month_paise,
+    included_wallet_credit_quarter_paise: plan.included_wallet_credit_quarter_paise,
+    included_wallet_credit_semiannual_paise: plan.included_wallet_credit_semiannual_paise,
+    included_wallet_credit_year_paise: plan.included_wallet_credit_year_paise,
     seat_limit_admins: plan.seat_limit_admins,
     seat_limit_managers: plan.seat_limit_managers,
-    seat_limit_users: plan.seat_limit_users,
+    seat_limit_agents: plan.seat_limit_agents ?? plan.seat_limit_users,
+    seat_limit_channels: plan.seat_limit_channels,
+    seat_role: plan.seat_role,
+    includes_unlimited_channels: plan.includes_unlimited_channels === 1 ? 1 : 0,
     features_html: plan.features_html,
     features_json: parseFeaturesJson(plan.features_json),
     is_contact_sales: plan.is_contact_sales,
+    gst_percent: plan.gst_percent == null ? 18 : plan.gst_percent,
+    prices_include_gst: plan.prices_include_gst === 0 ? 0 : 1,
     sort_order: plan.sort_order,
     is_active: plan.is_active,
   };

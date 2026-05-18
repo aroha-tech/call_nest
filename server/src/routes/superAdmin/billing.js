@@ -8,5 +8,7 @@ router.use(platformAuthMiddleware);
 router.get('/plans', platformBillingController.listPlans);
 router.get('/payments', platformBillingController.listPayments);
 router.get('/subscriptions', platformBillingController.listSubscriptions);
+router.get('/razorpay-settings', platformBillingController.getRazorpaySettings);
+router.patch('/razorpay-settings', platformBillingController.patchRazorpaySettings);
 
 export default router;

@@ -1,0 +1,30 @@
+.card {
+  max-width: 320px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.name {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.price {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.meta {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.desc {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--color-text-muted);
+}

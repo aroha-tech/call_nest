@@ -29,11 +29,12 @@ export function TableBody({ children }) {
   return <tbody className={styles.tbody}>{children}</tbody>;
 }
 
-export function TableRow({ children, onClick, className = '' }) {
+export function TableRow({ children, onClick, className = '', ...rest }) {
   return (
-    <tr 
+    <tr
       className={`${styles.row} ${onClick ? styles.clickable : ''} ${className}`}
       onClick={onClick}
+      {...rest}
     >
       {children}
     </tr>
@@ -48,6 +49,7 @@ export function TableCell({
   noTruncate = false,
   colSpan,
   rowSpan,
+  ...rest
 }) {
   return (
     <td
@@ -55,6 +57,7 @@ export function TableCell({
       style={width ? { width } : undefined}
       colSpan={colSpan}
       rowSpan={rowSpan}
+      {...rest}
     >
       {children}
     </td>

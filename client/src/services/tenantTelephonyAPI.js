@@ -37,6 +37,12 @@ export const tenantTelephonyAPI = {
   createPurchaseOrder: (planId) => axiosInstance.post(`${CREDITS}/purchase/orders`, { planId }),
   verifyPurchasePayment: (payload) => axiosInstance.post(`${CREDITS}/purchase/verify`, payload),
 
+  getSeatLimits: () => axiosInstance.get(`${CREDITS}/seats/limits`),
+  listSeatPurchasePlans: () => axiosInstance.get(`${CREDITS}/seats/plans`),
+  createSeatPurchaseOrder: (planId, quantity = 1) =>
+    axiosInstance.post(`${CREDITS}/seats/orders`, { planId, quantity }),
+  verifySeatPurchasePayment: (payload) => axiosInstance.post(`${CREDITS}/seats/verify`, payload),
+
   getSubscriptionCurrent: () => axiosInstance.get(`${CREDITS}/subscription/current`),
   listSubscriptionHistory: (params = {}) =>
     axiosInstance.get(`${CREDITS}/subscription/history`, { params }),

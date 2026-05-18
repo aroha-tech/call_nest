@@ -18,4 +18,6 @@ export const platformBillingAPI = {
   listPlans: () => axiosInstance.get(`${ADMIN_BASE}/plans`),
   listPayments: (params = {}) => axiosInstance.get(`${ADMIN_BASE}/payments`, { params }),
   listSubscriptions: (params = {}) => axiosInstance.get(`${ADMIN_BASE}/subscriptions`, { params }),
+  getRazorpaySettings: () => axiosInstance.get(`${ADMIN_BASE}/razorpay-settings`),
+  updateRazorpaySettings: (body) => axiosInstance.patch(`${ADMIN_BASE}/razorpay-settings`, body),
 };

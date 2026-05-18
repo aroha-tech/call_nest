@@ -1,27 +1,12 @@
-import Razorpay from 'razorpay';
-import { env } from '../../config/env.js';
 import { query, withConnection } from '../../config/db.js';
+import { assertRazorpayConfigured, createRazorpaySdk } from '../billing/razorpayClient.js';
+import { getClientRazorpayConfig, isDevMockPayment } from '../billing/razorpayConfigService.js';
 import {
   computePeriodEnd,
   verifyRazorpayPaymentSignature,
   shortReceiptId,
 } from '../billing/billingCore.js';
 
-function assertBillingConfigured() {
-  if (!env.razorpay?.keyId || !env.razorpay?.keySecret) {
-    const err = new Error('Razorpay is not configured on the server (set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET)');
-    err.status = 503;
-    throw err;
-  }
-}
-
-function getRazorpay() {
-  assertBillingConfigured();
-  return new Razorpay({
-    key_id: env.razorpay.keyId,
-    key_secret: env.razorpay.keySecret,
-  });
-}
 
 export async function listPlansForTenant(tenantId) {
   const tid = Number(tenantId);
@@ -36,11 +21,8 @@ export async function listPlansForTenant(tenantId) {
   return rows;
 }
 
-export function getClientBillingConfig() {
-  return {
-    razorpayKeyId: env.razorpay?.keyId || '',
-    razorpayConfigured: Boolean(env.razorpay?.keyId && env.razorpay?.keySecret),
-  };
+export async function getClientBillingConfig() {
+  return getClientRazorpayConfig();
 }
 
 export async function createCheckoutOrder(tenantId, userId, planId) {
@@ -72,9 +54,33 @@ export async function createCheckoutOrder(tenantId, userId, planId) {
     throw err;
   }
 
-  assertBillingConfigured();
-  const rzp = getRazorpay();
+  const cfg = await assertRazorpayConfigured();
   const amount = Number(plan.amount_paise);
+
+  if (cfg.devMock) {
+    const orderId = `dev_bill_${tid}_${pid}_${Date.now()}`;
+    await query(
+      `INSERT INTO tenant_billing_orders (
+         tenant_id, plan_id, razorpay_order_id, amount_paise, currency, status, created_by, updated_by
+       ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      [tid, pid, orderId, amount, plan.currency || 'INR', uid, uid]
+    );
+    return {
+      orderId,
+      amount,
+      currency: plan.currency || 'INR',
+      keyId: cfg.keyId || 'dev_mock',
+      devMock: true,
+      plan: {
+        id: plan.id,
+        name: plan.name,
+        code: plan.code,
+        billing_interval: plan.billing_interval,
+      },
+    };
+  }
+
+  const rzp = await createRazorpaySdk();
   const receipt = shortReceiptId(tid, pid);
 
   const order = await rzp.orders.create({
@@ -98,7 +104,7 @@ export async function createCheckoutOrder(tenantId, userId, planId) {
     orderId: order.id,
     amount,
     currency: order.currency || plan.currency || 'INR',
-    keyId: env.razorpay.keyId,
+    keyId: cfg.keyId,
     plan: {
       id: plan.id,
       name: plan.name,
@@ -222,7 +228,7 @@ async function finalizePaidOrder(conn, {
 }
 
 export async function verifyPaymentAndActivate(tenantId, userId, body) {
-  assertBillingConfigured();
+  await assertRazorpayConfigured();
   const tid = Number(tenantId);
   const orderId = body?.razorpay_order_id || body?.order_id;
   const paymentId = body?.razorpay_payment_id || body?.payment_id;
@@ -235,14 +241,48 @@ export async function verifyPaymentAndActivate(tenantId, userId, body) {
     throw err;
   }
 
-  const ok = verifyRazorpayPaymentSignature(orderId, paymentId, signature, env.razorpay.keySecret);
+  if (isDevMockPayment(body)) {
+    const [orderRow] = await query(
+      `SELECT amount_paise, currency FROM tenant_billing_orders
+       WHERE razorpay_order_id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1`,
+      [orderId, tid]
+    );
+    if (!orderRow) {
+      const err = new Error('Checkout order not found');
+      err.status = 404;
+      throw err;
+    }
+    return withConnection(async (conn) => {
+      await conn.beginTransaction();
+      try {
+        const result = await finalizePaidOrder(conn, {
+          tenantId: tid,
+          razorpayOrderId: orderId,
+          razorpayPaymentId: paymentId,
+          amountPaise: orderRow.amount_paise,
+          currency: orderRow.currency,
+          userId: uid,
+          paymentMethod: 'dev_mock',
+          rawPayload: { dev_mock: true },
+        });
+        await conn.commit();
+        return result;
+      } catch (e) {
+        await conn.rollback();
+        throw e;
+      }
+    });
+  }
+
+  const cfg = await assertRazorpayConfigured();
+  const ok = verifyRazorpayPaymentSignature(orderId, paymentId, signature, cfg.keySecret);
   if (!ok) {
     const err = new Error('Invalid payment signature');
     err.status = 400;
     throw err;
   }
 
-  const rzp = getRazorpay();
+  const rzp = await createRazorpaySdk();
   let payment;
   try {
     payment = await rzp.payments.fetch(paymentId);

@@ -1,0 +1,361 @@
+/* Shared telephony plan / pack pricing cards (tenant catalog + admin preview). */
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 0 !important;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--color-primary-500) 28%, var(--color-border-subtle));
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--color-primary-500) 8%, transparent);
+  }
+}
+
+.cardFeatured {
+  border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
+  box-shadow: 0 10px 32px color-mix(in srgb, var(--color-primary-500) 14%, transparent);
+}
+
+.cardCurrent {
+  border-color: color-mix(in srgb, var(--color-success-500, #22c55e) 45%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-success-500, #22c55e) 20%, transparent);
+}
+
+.cardEnterprise {
+  border-color: color-mix(in srgb, var(--color-primary-500) 35%, transparent);
+}
+
+.cardFree {
+  border-color: color-mix(in srgb, var(--color-success-500, #22c55e) 28%, transparent);
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100%;
+  padding: 20px 18px 18px;
+  gap: 0;
+}
+
+.topRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  min-height: 28px;
+}
+
+.cardName {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--color-text-primary);
+  flex: 1;
+  min-width: 0;
+}
+
+.topBadges {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.discountPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-primary-600, #4f46e5);
+  background: color-mix(in srgb, var(--color-primary-500) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary-500) 28%, transparent);
+}
+
+.popularPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, #d97706 95%, var(--color-text-primary));
+  background: color-mix(in srgb, #f59e0b 14%, transparent);
+  border: 1px solid color-mix(in srgb, #f59e0b 30%, transparent);
+}
+
+.currentPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-success-600, #16a34a);
+  background: color-mix(in srgb, var(--color-success-500, #22c55e) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-success-500, #22c55e) 30%, transparent);
+}
+
+/* Compact plan-type chip (replaces full-width warning/success badge). */
+.typeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  margin-bottom: 14px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
+.typeChipIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  font-size: 14px !important;
+  line-height: 1;
+  opacity: 0.95;
+}
+
+.chipCredit {
+  color: color-mix(in srgb, #4f46e5 88%, var(--color-text-primary));
+  background: color-mix(in srgb, #6366f1 9%, var(--color-bg-elevated));
+  border: 1px solid color-mix(in srgb, #6366f1 18%, transparent);
+}
+
+.chipUnlimited {
+  color: color-mix(in srgb, #059669 90%, var(--color-text-primary));
+  background: color-mix(in srgb, #10b981 9%, var(--color-bg-elevated));
+  border: 1px solid color-mix(in srgb, #10b981 20%, transparent);
+}
+
+.chipPack {
+  color: color-mix(in srgb, #d97706 92%, var(--color-text-primary));
+  background: color-mix(in srgb, #f59e0b 10%, var(--color-bg-elevated));
+  border: 1px solid color-mix(in srgb, #f59e0b 22%, transparent);
+}
+
+.chipSeat {
+  color: color-mix(in srgb, #7c3aed 90%, var(--color-text-primary));
+  background: color-mix(in srgb, #8b5cf6 10%, var(--color-bg-elevated));
+  border: 1px solid color-mix(in srgb, #8b5cf6 22%, transparent);
+}
+
+.chipEnterprise {
+  color: color-mix(in srgb, var(--color-primary-600) 90%, var(--color-text-primary));
+  background: color-mix(in srgb, var(--color-primary-500) 10%, var(--color-bg-elevated));
+  border: 1px solid color-mix(in srgb, var(--color-primary-500) 22%, transparent);
+}
+
+.chipFree {
+  color: color-mix(in srgb, #059669 90%, var(--color-text-primary));
+  background: color-mix(in srgb, #10b981 10%, var(--color-bg-elevated));
+  border: 1px solid color-mix(in srgb, #10b981 22%, transparent);
+}
+
+.priceSection {
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.priceRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
+}
+
+.originalPrice {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: line-through;
+  color: var(--color-text-muted);
+  opacity: 0.75;
+}
+
+.salePrice {
+  font-size: 1.625rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--color-text-primary);
+}
+
+.priceCustom {
+  font-size: 1.625rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--color-text-primary);
+}
+
+.interval {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.taxWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.taxLine {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+.highlights {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--color-surface-2, color-mix(in srgb, var(--color-primary-500) 4%, transparent));
+  border: 1px solid var(--color-border-subtle);
+}
+
+.highlightRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  min-height: 20px;
+}
+
+.highlightIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  font-size: 14px !important;
+  line-height: 1;
+  color: var(--color-primary-500, #6366f1);
+}
+
+.highlightText {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--color-text-secondary);
+}
+
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.desc,
+.featuresHtml {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.featuresHtml ul {
+  margin: 0;
+  padding-left: 1.15rem;
+}
+
+.featuresHtml li {
+  margin-bottom: 6px;
+}
+
+.featuresList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    color: var(--color-text-secondary);
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
+.featureCheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  font-size: 14px !important;
+  line-height: 1;
+  color: var(--color-success-500, #22c55e) !important;
+}
+
+.footer {
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+.seats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+}
+
+.seatsIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  font-size: 14px !important;
+  line-height: 1;
+  color: var(--color-text-muted);
+}

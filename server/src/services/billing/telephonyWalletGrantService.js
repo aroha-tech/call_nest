@@ -1,14 +1,15 @@
 import { query } from '../../config/db.js';
 import * as callCreditsService from './callCreditsService.js';
 import { serializePlanForClient } from '../superAdmin/telephonyBillingPlansService.js';
+import { resolvePlanCycleIncludedCredit } from '../../utils/planCyclePricing.js';
 
 /**
- * Idempotent grant of telephony_billing_plans.included_wallet_credit_paise to the tenant wallet.
+ * Idempotent grant of included call wallet credit for the plan's billing cycle.
  */
 export async function grantIncludedWalletCredit(
   tenantId,
   plan,
-  { grantSource, grantReference, createdByUserId = null } = {}
+  { grantSource, grantReference, createdByUserId = null, billingInterval = 'month' } = {}
 ) {
   const tid = Number(tenantId);
   const planId = Number(plan?.id);
@@ -18,7 +19,7 @@ export async function grantIncludedWalletCredit(
     throw err;
   }
 
-  const amountPaise = Math.floor(Number(plan.included_wallet_credit_paise) || 0);
+  const amountPaise = resolvePlanCycleIncludedCredit(plan, billingInterval);
   if (amountPaise < 1) {
     return { granted: false, reason: 'no_included_credit', amount_paise: 0 };
   }

@@ -5,6 +5,10 @@ import { getRoleByTenantAndName } from '../rbacService.js';
 import { normalizeTelephonyNullable } from '../../utils/telephonyNumberInput.js';
 import { syncContactsManagerForAgent } from './contactsService.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
+import {
+  assertCanAddUser,
+  assertCanAddChannel,
+} from '../billing/seatEntitlementService.js';
 
 const USER_SELECT = `u.id, u.tenant_id, u.email, u.name, u.role, u.role_id, u.manager_id,
             u.agent_can_delete_leads, u.agent_can_delete_contacts,
@@ -188,6 +192,12 @@ export async function create(
 
   assertTelephonyFieldLengths({ telephony_caller_id_e164, telephony_agent_leg_e164 });
 
+  await assertCanAddUser(tenantId, role);
+  const leg = normalizeTelephonyNullable(telephony_agent_leg_e164);
+  if (role === 'agent' && leg) {
+    await assertCanAddChannel(tenantId);
+  }
+
   const user = await registerUser(email, password, name, tenantId, role);
 
   if (role === 'agent') {
@@ -367,8 +377,27 @@ export async function update(id, tenantId, actingUser, payload) {
     params.push(normalizeTelephonyNullable(telephony_caller_id_e164) ?? null);
   }
   if (telephony_agent_leg_e164 !== undefined) {
+    const nextLeg = normalizeTelephonyNullable(telephony_agent_leg_e164) ?? null;
+    const hadLeg =
+      existing.telephony_agent_leg_e164 != null &&
+      String(existing.telephony_agent_leg_e164).trim() !== '';
+    const addsLeg = nextLeg != null && String(nextLeg).trim() !== '';
+    if (effectiveRole === 'agent' && addsLeg && !hadLeg) {
+      await assertCanAddChannel(tenantId);
+    }
     updates.push('telephony_agent_leg_e164 = ?');
-    params.push(normalizeTelephonyNullable(telephony_agent_leg_e164) ?? null);
+    params.push(nextLeg);
+  }
+
+  if (is_enabled === true && !existing.is_enabled) {
+    await assertCanAddUser(tenantId, effectiveRole);
+    const legNow =
+      telephony_agent_leg_e164 !== undefined
+        ? normalizeTelephonyNullable(telephony_agent_leg_e164)
+        : existing.telephony_agent_leg_e164;
+    if (effectiveRole === 'agent' && legNow != null && String(legNow).trim() !== '') {
+      await assertCanAddChannel(tenantId);
+    }
   }
 
   if (updates.length === 0) return existing;

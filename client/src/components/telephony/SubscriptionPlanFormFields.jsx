@@ -3,7 +3,11 @@ import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Checkbox } from '../ui/Checkbox';
 import { SubscriptionCyclePricingFields } from './SubscriptionCyclePricingFields';
-import { formatPaisePerMinHint, formatRupeeAmount } from '../../utils/telephonyPlanFormUtils';
+import {
+  FEATURES_FORMAT,
+  formatPaisePerMinHint,
+  formatRupeeAmount,
+} from '../../utils/telephonyPlanFormUtils';
 import styles from './SubscriptionPlanFormFields.module.scss';
 
 const BILLING_TYPE_OPTIONS = [
@@ -14,6 +18,10 @@ const BILLING_TYPE_OPTIONS = [
 export function SubscriptionPlanFormFields({ form, setForm, editing }) {
   const isFree = !!form.is_free_trial;
   const isEnterprise = !!form.is_contact_sales;
+
+  const featuresFormat =
+    form.features_format === FEATURES_FORMAT.JSON ? FEATURES_FORMAT.JSON : FEATURES_FORMAT.HTML;
+  const useHtmlFeatures = featuresFormat === FEATURES_FORMAT.HTML;
 
   const hints = useMemo(
     () => ({
@@ -49,6 +57,11 @@ export function SubscriptionPlanFormFields({ form, setForm, editing }) {
           hint="Not shown to tenants; use Plan name for display"
         />
       </div>
+
+      <p className={styles.bundleNote}>
+        Subscription bundle: CRM + telephony + role access (admins, managers, agents) + optional
+        unlimited-calling channels. Billing cycles and included wallet credit are configured below.
+      </p>
 
       <Input
         label="Short description"
@@ -101,23 +114,18 @@ export function SubscriptionPlanFormFields({ form, setForm, editing }) {
           />
         </div>
       ) : !isEnterprise ? (
-        <SubscriptionCyclePricingFields form={form} setForm={setForm} />
-      ) : null}
-
-      {!isEnterprise && form.plan_type === 'credit' && !isFree ? (
-        <Input
-          label="Included wallet credit per billing period (₹)"
-          type="number"
-          min={0}
-          step="0.01"
-          value={form.included_wallet_credit_paise}
-          onChange={(e) => setForm((f) => ({ ...f, included_wallet_credit_paise: e.target.value }))}
-          hint={hints.included !== '—' ? `Granted on subscribe: ${hints.included}` : undefined}
+        <SubscriptionCyclePricingFields
+          form={form}
+          setForm={setForm}
+          showIncludedCredit={form.plan_type === 'credit'}
         />
       ) : null}
 
       <fieldset className={styles.fieldset}>
-        <legend>Seat limits (included in plan)</legend>
+        <legend>Seats included in subscription (bundle)</legend>
+        <p className={styles.fieldHint}>
+          Caps for this plan. Extra seats are sold under Seat &amp; channel add-ons. Agent = dialer user.
+        </p>
         <div className={styles.grid}>
           <Input
             label="Admins"
@@ -134,11 +142,19 @@ export function SubscriptionPlanFormFields({ form, setForm, editing }) {
             onChange={(e) => setForm((f) => ({ ...f, seat_limit_managers: e.target.value }))}
           />
           <Input
-            label="Users"
+            label="Agents"
             type="number"
             min={0}
-            value={form.seat_limit_users}
-            onChange={(e) => setForm((f) => ({ ...f, seat_limit_users: e.target.value }))}
+            value={form.seat_limit_agents}
+            onChange={(e) => setForm((f) => ({ ...f, seat_limit_agents: e.target.value }))}
+          />
+          <Input
+            label="Unlimited channels"
+            type="number"
+            min={0}
+            value={form.seat_limit_channels}
+            onChange={(e) => setForm((f) => ({ ...f, seat_limit_channels: e.target.value }))}
+            hint="Channel = unlimited calling seat"
           />
         </div>
       </fieldset>
@@ -192,27 +208,59 @@ export function SubscriptionPlanFormFields({ form, setForm, editing }) {
         />
       )}
 
-      <label className={styles.textareaLabel}>
-        Features (HTML)
-        <textarea
-          className={styles.textarea}
-          rows={6}
-          value={form.features_html}
-          onChange={(e) => setForm((f) => ({ ...f, features_html: e.target.value }))}
-          placeholder='<ul><li>Feature one</li></ul>'
-        />
-      </label>
+      <fieldset className={styles.featuresFieldset}>
+        <legend>Plan features (tenant catalog)</legend>
+        <p className={styles.fieldHint}>
+          Choose one format. Only the selected option is saved and shown to tenants.
+        </p>
+        <div className={styles.formatToggle} role="radiogroup" aria-label="Features format">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={useHtmlFeatures}
+            className={`${styles.formatOption} ${useHtmlFeatures ? styles.formatOptionActive : ''}`}
+            onClick={() => setForm((f) => ({ ...f, features_format: FEATURES_FORMAT.HTML }))}
+          >
+            HTML
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!useHtmlFeatures}
+            className={`${styles.formatOption} ${!useHtmlFeatures ? styles.formatOptionActive : ''}`}
+            onClick={() => setForm((f) => ({ ...f, features_format: FEATURES_FORMAT.JSON }))}
+          >
+            JSON list
+          </button>
+        </div>
 
-      <label className={styles.textareaLabel}>
-        Features (JSON fallback)
-        <textarea
-          className={styles.textarea}
-          rows={4}
-          value={form.features_json}
-          onChange={(e) => setForm((f) => ({ ...f, features_json: e.target.value }))}
-          placeholder='["Feature one"]'
-        />
-      </label>
+        {useHtmlFeatures ? (
+          <label className={styles.textareaLabel}>
+            Features (HTML)
+            <textarea
+              className={styles.textarea}
+              rows={6}
+              value={form.features_html}
+              onChange={(e) => setForm((f) => ({ ...f, features_html: e.target.value }))}
+              placeholder='<ul><li>1 admin · 2 agents</li><li>Credit packs for top-up</li></ul>'
+            />
+          </label>
+        ) : (
+          <label className={styles.textareaLabel}>
+            Features (JSON)
+            <textarea
+              className={styles.textarea}
+              rows={6}
+              value={form.features_json}
+              onChange={(e) => setForm((f) => ({ ...f, features_json: e.target.value }))}
+              placeholder={`[\n  "1 admin · 1 manager · 2 agents",\n  "Credit packs available for top-up"\n]`}
+            />
+            <span className={styles.textareaHint}>
+              JSON array of strings, e.g. <code>["Feature one", "Feature two"]</code>
+            </span>
+          </label>
+        )}
+      </fieldset>
 
       <Checkbox
         label="Active"

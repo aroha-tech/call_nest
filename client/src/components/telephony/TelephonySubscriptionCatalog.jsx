@@ -1,50 +1,32 @@
 import React, { useMemo, useState } from 'react';
-import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import { MaterialSymbol } from '../ui/MaterialSymbol';
 import {
   PLAN_BILLING_CYCLES,
   availableBillingCycles,
-  billingIntervalLabel,
   billingIntervalPriceSuffix,
   isContactSalesPlan,
   isFreePlan,
   resolvePlanCyclePrice,
+  resolvePlanCycleIncludedCredit,
 } from '../../utils/planCyclePricing';
+import {
+  PlanCardBody,
+  PlanCardFooter,
+  PlanCardHighlight,
+  PlanCardHighlights,
+  PlanCardPrice,
+  PlanCardTopRow,
+  PlanCardFeatures,
+  PlanTypeChip,
+  planCardStyles,
+} from './TelephonyPlanCardShared';
 import styles from './TelephonySubscriptionCatalog.module.scss';
 
 function formatPaiseAsInr(paise) {
   const n = Number(paise) / 100;
   if (!Number.isFinite(n)) return '—';
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(n);
-}
-
-function PlanFeatures({ plan }) {
-  if (plan?.features_html) {
-    return (
-      <div
-        className={styles.featuresHtml}
-        dangerouslySetInnerHTML={{ __html: plan.features_html }}
-      />
-    );
-  }
-  const lines = Array.isArray(plan?.features_json)
-    ? plan.features_json.map((x) => (typeof x === 'string' ? x : x?.text)).filter(Boolean)
-    : [];
-  if (!lines.length && plan?.description) {
-    return <p className={styles.desc}>{plan.description}</p>;
-  }
-  return (
-    <ul className={styles.featuresList}>
-      {lines.map((line, i) => (
-        <li key={i}>
-          <MaterialSymbol name="check" size="sm" />
-          {line}
-        </li>
-      ))}
-    </ul>
-  );
 }
 
 function SubscriptionPlanCard({
@@ -65,96 +47,100 @@ function SubscriptionPlanCard({
   const sale = Number(price?.sale_price_paise);
   const discount = price?.discount_percent;
   const showStrike = Number.isFinite(orig) && orig > sale && sale > 0;
+  const includedCreditPaise = resolvePlanCycleIncludedCredit(plan, billingCycle);
 
-  let cta = 'Subscribe';
+  let cta = razorpayConfigured ? 'Pay & subscribe' : 'Subscribe';
   if (isFree) cta = 'Start free trial';
   if (isEnterprise) cta = 'Contact sales';
   if (isCurrent) cta = 'Current plan';
 
+  const typeVariant = isEnterprise
+    ? 'enterprise'
+    : isFree
+      ? 'free'
+      : plan.plan_type === 'unlimited'
+        ? 'unlimited'
+        : 'credit';
+
+  const highlights = [];
+  if (isFree && plan.trial_duration_days) {
+    highlights.push(
+      <PlanCardHighlight key="trial" icon="schedule">
+        {plan.trial_duration_days} day trial
+      </PlanCardHighlight>
+    );
+  }
+  if (includedCreditPaise > 0) {
+    highlights.push(
+      <PlanCardHighlight key="credit" icon="account_balance_wallet">
+        {formatPaiseAsInr(includedCreditPaise)} call credits included
+      </PlanCardHighlight>
+    );
+  }
+  if (plan.plan_type === 'unlimited' && Number(plan.unlimited_minutes_cap_per_month) > 0) {
+    highlights.push(
+      <PlanCardHighlight key="mins" icon="timer">
+        {Number(plan.unlimited_minutes_cap_per_month).toLocaleString('en-IN')} min / month
+      </PlanCardHighlight>
+    );
+  }
+
   return (
     <Card
       className={[
-        styles.card,
-        isCurrent && styles.cardCurrent,
-        isEnterprise && styles.cardEnterprise,
-        isFree && styles.cardFree,
+        planCardStyles.card,
+        isCurrent && planCardStyles.cardCurrent,
+        isEnterprise && planCardStyles.cardEnterprise,
+        isFree && planCardStyles.cardFree,
       ]
         .filter(Boolean)
         .join(' ')}
     >
-      {discount > 0 && !isFree ? (
-        <div className={styles.badge}>
-          <Badge variant="primary" size="sm">
-            {discount}% off
-          </Badge>
-        </div>
-      ) : null}
-      {isCurrent ? (
-        <div className={styles.badge}>
-          <Badge variant="success" size="sm">
-            Current
-          </Badge>
-        </div>
-      ) : null}
-
-      <h3 className={styles.cardName}>{plan.name}</h3>
-      <Badge variant={plan.plan_type === 'unlimited' ? 'success' : 'warning'} size="sm">
-        {plan.plan_type === 'unlimited' ? 'Unlimited calling' : 'Credit calling'}
-      </Badge>
-
-      <div className={styles.priceBlock}>
-        {isEnterprise ? (
-          <span className={styles.salePrice}>Custom</span>
-        ) : isFree ? (
-          <span className={styles.salePrice}>Free</span>
-        ) : (
-          <>
-            {showStrike ? <span className={styles.originalPrice}>{formatPaiseAsInr(orig)}</span> : null}
-            <span className={styles.salePrice}>{formatPaiseAsInr(sale)}</span>
-            <span className={styles.interval}>/{billingIntervalPriceSuffix(billingCycle)}</span>
-          </>
-        )}
+      <div className={planCardStyles.inner}>
+        <PlanCardTopRow
+          name={plan.name}
+          discountPercent={discount}
+          isCurrent={isCurrent}
+        />
+        <PlanTypeChip variant={typeVariant} />
+        <PlanCardPrice
+          isEnterprise={isEnterprise}
+          isFree={isFree}
+          showStrike={showStrike}
+          originalFormatted={formatPaiseAsInr(orig)}
+          salePaise={sale}
+          plan={plan}
+          intervalSuffix={!isFree && !isEnterprise ? `/${billingIntervalPriceSuffix(billingCycle)}` : null}
+        />
+        {highlights.length > 0 ? <PlanCardHighlights>{highlights}</PlanCardHighlights> : null}
+        <PlanCardBody>
+          <PlanCardFeatures plan={plan} />
+        </PlanCardBody>
+        <PlanCardFooter>
+          <Button
+            variant={isEnterprise ? 'secondary' : 'primary'}
+            fullWidth
+            disabled={
+              preview ||
+              isCurrent ||
+              payingId != null ||
+              freeDisabled ||
+              (!isEnterprise && !isFree && !razorpayConfigured)
+            }
+            onClick={() => onSubscribe?.(plan, { billingInterval: billingCycle })}
+          >
+            {preview
+              ? cta
+              : freeDisabled
+                ? 'Assigned by admin'
+                : payingId === plan.id
+                  ? 'Opening checkout…'
+                  : !razorpayConfigured && !isFree && !isEnterprise
+                    ? 'Payments unavailable'
+                    : cta}
+          </Button>
+        </PlanCardFooter>
       </div>
-
-      {isFree && plan.trial_duration_days ? (
-        <p className={styles.metaLine}>{plan.trial_duration_days} day trial</p>
-      ) : null}
-      {plan.included_wallet_credit_paise > 0 ? (
-        <p className={styles.metaLine}>
-          <MaterialSymbol name="account_balance_wallet" size="sm" />
-          {formatPaiseAsInr(plan.included_wallet_credit_paise)} call credits included
-        </p>
-      ) : null}
-      {plan.plan_type === 'unlimited' && Number(plan.unlimited_minutes_cap_per_month) > 0 ? (
-        <p className={styles.metaLine}>
-          {Number(plan.unlimited_minutes_cap_per_month).toLocaleString('en-IN')} min / month
-        </p>
-      ) : null}
-
-      <PlanFeatures plan={plan} />
-
-      <Button
-        variant={isEnterprise ? 'secondary' : 'primary'}
-        fullWidth
-        disabled={
-          preview ||
-          isCurrent ||
-          payingId != null ||
-          freeDisabled ||
-          (!isEnterprise && !isFree && !razorpayConfigured)
-        }
-        onClick={() => onSubscribe?.(plan, { billingInterval: billingCycle })}
-      >
-        {preview
-          ? cta
-          : freeDisabled
-            ? 'Assigned by admin'
-            : payingId === plan.id
-              ? 'Opening checkout…'
-              : !razorpayConfigured && !isFree && !isEnterprise
-                ? 'Payments unavailable'
-                : cta}
-      </Button>
     </Card>
   );
 }

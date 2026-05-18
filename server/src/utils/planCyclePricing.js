@@ -9,6 +9,17 @@ const CYCLE_PREFIX = {
   year: 'price_year',
 };
 
+const CYCLE_INCLUDED_CREDIT_PREFIX = {
+  month: 'included_wallet_credit_month',
+  quarter: 'included_wallet_credit_quarter',
+  semiannual: 'included_wallet_credit_semiannual',
+  year: 'included_wallet_credit_year',
+};
+
+export const CYCLE_INCLUDED_CREDIT_DB_KEYS = PLAN_BILLING_CYCLES.map(
+  (iv) => `${CYCLE_INCLUDED_CREDIT_PREFIX[iv]}_paise`
+);
+
 export function resolvePlanCyclePrice(plan, interval = 'month') {
   if (!plan) return null;
   const iv = PLAN_BILLING_CYCLES.includes(interval) ? interval : 'month';
@@ -50,4 +61,20 @@ export function availableBillingCycles(plan) {
     const p = resolvePlanCyclePrice(plan, iv);
     return p?.sale_price_paise != null && Number(p.sale_price_paise) > 0;
   });
+}
+
+/** Included call wallet credit (paise) for the chosen billing cycle. */
+export function resolvePlanCycleIncludedCredit(plan, interval = 'month') {
+  if (!plan) return 0;
+  const iv = PLAN_BILLING_CYCLES.includes(interval) ? interval : 'month';
+  const key = `${CYCLE_INCLUDED_CREDIT_PREFIX[iv]}_paise`;
+  const cycleVal = plan[key];
+  if (cycleVal != null && Number(cycleVal) >= 0) {
+    return Math.floor(Number(cycleVal));
+  }
+  if (iv === 'month' || iv === (plan.billing_interval || 'month')) {
+    const legacy = Number(plan.included_wallet_credit_paise);
+    if (Number.isFinite(legacy) && legacy >= 0) return Math.floor(legacy);
+  }
+  return 0;
 }

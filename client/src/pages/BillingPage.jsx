@@ -11,8 +11,12 @@ import { Badge } from '../components/ui/Badge';
 import { Skeleton } from '../components/ui/Skeleton';
 import { billingAPI } from '../services/billingAPI';
 import { tenantTelephonyAPI } from '../services/tenantTelephonyAPI';
-import { TenantTelephonyPlansPanel } from '../components/telephony/TenantTelephonyPlansPanel';
+import {
+  TenantTelephonyPlansPanel,
+  TENANT_PLANS_SECTIONS,
+} from '../components/telephony/TenantTelephonyPlansPanel';
 import { useCreditPurchaseCheckout } from '../hooks/useCreditPurchaseCheckout';
+import { useSeatPurchaseCheckout } from '../hooks/useSeatPurchaseCheckout';
 import { useTelephonySubscriptionCheckout } from '../hooks/useTelephonySubscriptionCheckout';
 import { formatPaiseAsInr } from '../utils/callCreditsDisplay';
 import { useAppSelector } from '../app/hooks';
@@ -121,6 +125,7 @@ export function BillingPage() {
   const { tenantSlug } = useTenant();
   const { formatDateTime } = useDateTimeDisplay();
   const [tab, setTab] = useState('plans');
+  const [plansSection, setPlansSection] = useState(TENANT_PLANS_SECTIONS.subscriptions);
   const [config, setConfig] = useState(null);
   const [plansView, setPlansView] = useState(null);
   const [wallet, setWallet] = useState(null);
@@ -207,7 +212,16 @@ export function BillingPage() {
     await loadPayments();
   }, [loadCore, loadPayments]);
 
-  const { purchase: purchaseCredits, payingId, payError } = useCreditPurchaseCheckout({
+  const { purchase: purchaseCredits, payingId: creditPayingId, payError } = useCreditPurchaseCheckout({
+    userEmail: user?.email,
+    onSuccess: handlePurchaseSuccess,
+  });
+
+  const {
+    purchase: purchaseSeats,
+    payingId: seatPayingId,
+    payError: seatPayError,
+  } = useSeatPurchaseCheckout({
     userEmail: user?.email,
     onSuccess: handlePurchaseSuccess,
   });
@@ -224,6 +238,12 @@ export function BillingPage() {
   const onPurchaseCredits = useCallback(
     (plan) => purchaseCredits(plan, { razorpayConfigured: config?.razorpayConfigured }),
     [purchaseCredits, config?.razorpayConfigured]
+  );
+
+  const onPurchaseSeats = useCallback(
+    (plan, quantity) =>
+      purchaseSeats(plan, quantity, { razorpayConfigured: config?.razorpayConfigured }),
+    [purchaseSeats, config?.razorpayConfigured]
   );
 
   const onSubscribePlan = useCallback(
@@ -292,7 +312,7 @@ export function BillingPage() {
     <div className={styles.page}>
       <PageHeader
         title="Plans & billing"
-        subtitle="Buy call credit packs, view payment history, and manage Razorpay checkout for your workspace."
+        subtitle="Subscribe to credit-based or unlimited plans, top up call credits, buy seat add-ons, and pay securely with Razorpay."
       />
 
       {error && (
@@ -300,9 +320,9 @@ export function BillingPage() {
           {error}
         </Alert>
       )}
-      {(payError || subscribePayError) && (
+      {(payError || seatPayError || subscribePayError) && (
         <Alert variant="error" className={styles.mb}>
-          {payError || subscribePayError}
+          {payError || seatPayError || subscribePayError}
         </Alert>
       )}
 
@@ -312,8 +332,8 @@ export function BillingPage() {
         <>
           {!config?.razorpayConfigured && (
             <div className={styles.configBanner}>
-              Payments are disabled until Razorpay keys are configured on the server. You can still review plans and
-              history.
+              Payments are disabled until Razorpay keys are configured (server .env or Platform billing → Razorpay).
+              For local dev, set RAZORPAY_DEV_MOCK=1 in server .env and restart the API.
             </div>
           )}
 
@@ -337,7 +357,15 @@ export function BillingPage() {
                       platform calling.
                     </p>
                     <div className={styles.heroActions}>
-                      <Button type="button" variant="primary" size="sm" onClick={() => setTab('plans')}>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        onClick={() => {
+                          setTab('plans');
+                          setPlansSection(TENANT_PLANS_SECTIONS.credits);
+                        }}
+                      >
                         Buy credits
                       </Button>
                       <Button
@@ -383,7 +411,15 @@ export function BillingPage() {
                       )}
                     </div>
                     <div className={styles.heroActions}>
-                      <Button type="button" variant="primary" size="sm" onClick={() => setTab('plans')}>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        onClick={() => {
+                          setTab('plans');
+                          setPlansSection(TENANT_PLANS_SECTIONS.subscriptions);
+                        }}
+                      >
                         Change plan
                       </Button>
                       <Button
@@ -495,6 +531,10 @@ export function BillingPage() {
                     assignedBillingPlanId={
                       plansView?.assignedBillingPlanId ?? plansView?.assignedBillingPlan?.id
                     }
+                    subscriptionAssignedPlanId={plansView?.subscriptionAssignedPlanId}
+                    telephonySubscription={plansView?.telephonySubscription}
+                    activeSection={plansSection}
+                    onSectionChange={setPlansSection}
                     creditPurchasePlans={plansView?.creditPurchasePlans ?? plansView?.plans ?? []}
                     creditPurchaseEligible={
                       plansView?.creditPurchaseEligible ?? plansView?.eligible
@@ -503,8 +543,13 @@ export function BillingPage() {
                       plansView?.creditPurchaseReason ?? plansView?.eligibilityReason
                     }
                     razorpayConfigured={config?.razorpayConfigured}
-                    payingId={payingId || subscribingId}
+                    payingId={creditPayingId || seatPayingId || subscribingId}
                     onPurchase={onPurchaseCredits}
+                    onPurchaseSeats={onPurchaseSeats}
+                    seatPurchasePlans={plansView?.seatPurchasePlans ?? []}
+                    seatPurchaseEligible={plansView?.seatPurchaseEligible}
+                    seatPurchaseReason={plansView?.seatPurchaseReason}
+                    seatLimits={plansView?.seatLimits}
                     onSubscribe={onSubscribePlan}
                     subscribePayError={subscribePayError}
                   />

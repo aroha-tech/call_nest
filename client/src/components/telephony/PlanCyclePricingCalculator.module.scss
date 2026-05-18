@@ -1,0 +1,144 @@
+.panel {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-surface-elevated, rgba(255, 255, 255, 0.03));
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.titleRow {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.toggleBtn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 6px;
+  background: var(--color-surface-2, transparent);
+  color: var(--color-text-muted);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-text-primary);
+    border-color: var(--color-border);
+    background: var(--color-surface-2, rgba(99, 102, 241, 0.06));
+  }
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  margin-bottom: 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  background: var(--color-surface-1, transparent);
+}
+
+.table {
+  width: 100%;
+  min-width: 780px;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+
+  th,
+  td {
+    padding: 10px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border-subtle);
+    vertical-align: middle;
+  }
+
+  th {
+    font-weight: 600;
+    color: var(--color-text-muted);
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    background: var(--color-surface-2, rgba(99, 102, 241, 0.04));
+  }
+
+  tbody tr:hover td {
+    background: var(--color-surface-2, rgba(99, 102, 241, 0.03));
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+}
+
+.cycleLabel {
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--color-text-primary);
+}
+
+.monthsCol {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cellInput {
+  width: 100%;
+  min-width: 72px;
+  max-width: 120px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--color-input-border);
+  border-radius: 6px;
+  background-color: var(--color-input-bg);
+  color: var(--color-text-primary);
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &:hover:not(:focus) {
+    border-color: var(--color-input-border-hover);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-input-border-focus);
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+  }
+
+  &::placeholder {
+    color: var(--color-input-placeholder);
+    opacity: 1;
+  }
+}
+
+.discountInput {
+  max-width: 72px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

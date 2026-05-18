@@ -1,7 +1,46 @@
+.previewShell {
+  position: relative;
+  min-height: 200px;
+}
+
+.previewSkeleton {
+  display: block;
+  border-radius: 12px;
+}
+
+.previewContentDimmed {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.previewOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 0.86rem;
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-bg-surface, #0f0f12) 50%, transparent);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
 .section {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 0;
+}
+
+.section .previewCard {
+  border: none;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .sectionHead {

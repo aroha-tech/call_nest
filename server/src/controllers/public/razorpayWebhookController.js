@@ -3,6 +3,7 @@ import { query } from '../../config/db.js';
 import { verifyRazorpayWebhookSignature } from '../../services/billing/billingCore.js';
 import * as billingService from '../../services/tenant/billingService.js';
 import * as creditPurchaseService from '../../services/tenant/creditPurchaseService.js';
+import * as seatPurchaseService from '../../services/tenant/seatPurchaseService.js';
 import * as telephonySubscriptionService from '../../services/billing/telephonySubscriptionService.js';
 
 async function resolveTenantForOrder(orderId) {
@@ -13,6 +14,15 @@ async function resolveTenantForOrder(orderId) {
   );
   if (creditPack) {
     return { tenantId: Number(creditPack.tenant_id), type: 'credit_pack' };
+  }
+
+  const [seatPack] = await query(
+    `SELECT tenant_id, status FROM tenant_seat_purchase_orders
+     WHERE razorpay_order_id = ? AND deleted_at IS NULL LIMIT 1`,
+    [orderId]
+  );
+  if (seatPack) {
+    return { tenantId: Number(seatPack.tenant_id), type: 'seat_pack' };
   }
 
   const [telephonySub] = await query(
@@ -130,6 +140,13 @@ export async function handleRazorpayWebhook(req, res, next) {
 
     if (type === 'credit_pack') {
       await creditPurchaseService.applyWebhookPaymentCaptured({
+        tenantId,
+        razorpayOrderId: orderId,
+        razorpayPaymentId: paymentId,
+        amountPaise: amount,
+      });
+    } else if (type === 'seat_pack') {
+      await seatPurchaseService.applyWebhookPaymentCaptured({
         tenantId,
         razorpayOrderId: orderId,
         razorpayPaymentId: paymentId,

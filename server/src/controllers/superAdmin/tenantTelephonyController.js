@@ -3,6 +3,7 @@ import { env } from '../../config/env.js';
 import * as callCreditsService from '../../services/billing/callCreditsService.js';
 import * as platformSettingsService from '../../services/billing/platformSettingsService.js';
 import * as telephonyBillingPlansService from '../../services/superAdmin/telephonyBillingPlansService.js';
+import * as seatEntitlementService from '../../services/billing/seatEntitlementService.js';
 import * as tenantTelephonyAccountsService from '../../services/tenant/telephony/tenantTelephonyAccountsService.js';
 
 function buildWebhookUrl(account) {
@@ -105,6 +106,8 @@ export async function getTenantBilling(req, res, next) {
               t.byo_platform_fee_paise_per_minute_override,
               t.call_min_balance_paise_override,
               t.unlimited_minutes_cap_per_month_override,
+              t.seat_limit_admins_override, t.seat_limit_managers_override,
+              t.seat_limit_agents_override, t.seat_limit_channels_override,
               p.id AS plan_id, p.code AS plan_code, p.name AS plan_name, p.plan_type AS plan_type
        FROM tenants t
        LEFT JOIN telephony_billing_plans p
@@ -114,12 +117,13 @@ export async function getTenantBilling(req, res, next) {
       [tenantId]
     );
     if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
-    const [wallet, cfg, usage] = await Promise.all([
+    const [wallet, cfg, usage, seatLimits] = await Promise.all([
       callCreditsService.getWallet(tenantId),
       callCreditsService.getTenantBillingConfig(tenantId),
       callCreditsService.getUsageSummary(tenantId),
+      seatEntitlementService.getSeatLimitsSummary(tenantId),
     ]);
-    res.json({ data: { tenant, wallet, config: cfg, usage } });
+    res.json({ data: { tenant, wallet, config: cfg, usage, seatLimits } });
   } catch (err) {
     next(err);
   }
@@ -179,6 +183,10 @@ export async function updateTenantBilling(req, res, next) {
       'byo_platform_fee_paise_per_minute_override',
       'call_min_balance_paise_override',
       'unlimited_minutes_cap_per_month_override',
+      'seat_limit_admins_override',
+      'seat_limit_managers_override',
+      'seat_limit_agents_override',
+      'seat_limit_channels_override',
     ]) {
       if (body[key] !== undefined) {
         const v = body[key];
@@ -194,13 +202,35 @@ export async function updateTenantBilling(req, res, next) {
         }
       }
     }
-    if (!sets.length && !planAssignId) {
+
+    const seatPurchasedKeys = [
+      'seat_purchased_admins',
+      'seat_purchased_managers',
+      'seat_purchased_agents',
+      'seat_purchased_channels',
+    ];
+    const hasSeatPurchased = seatPurchasedKeys.some((k) => body[k] !== undefined);
+
+    if (!sets.length && !planAssignId && !hasSeatPurchased) {
       return res.status(400).json({ error: 'No allowed fields in body' });
     }
     if (sets.length) {
       params.push(tenantId);
       await query(`UPDATE tenants SET ${sets.join(', ')} WHERE id = ?`, params);
     }
+    if (hasSeatPurchased) {
+      await seatEntitlementService.setPurchasedEntitlements(
+        tenantId,
+        {
+          admins: body.seat_purchased_admins,
+          managers: body.seat_purchased_managers,
+          agents: body.seat_purchased_agents,
+          channels: body.seat_purchased_channels,
+        },
+        req.user?.id ?? null
+      );
+    }
+
     if (planAssignId) {
       await telephonyBillingPlansService.applyPlanToTenant(
         tenantId,

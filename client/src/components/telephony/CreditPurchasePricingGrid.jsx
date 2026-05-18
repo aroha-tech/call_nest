@@ -1,27 +1,19 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Card } from '../ui/Card';
-import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { MaterialSymbol } from '../ui/MaterialSymbol';
+import { formatPaiseAsInr } from '../../utils/telephonyPlanFormUtils';
+import {
+  PlanCardBody,
+  PlanCardFooter,
+  PlanCardHighlight,
+  PlanCardHighlights,
+  PlanCardPrice,
+  PlanCardTopRow,
+  PlanCardFeatures,
+  PlanTypeChip,
+  planCardStyles,
+} from './TelephonyPlanCardShared';
 import styles from './CreditPurchasePricingGrid.module.scss';
-
-function formatPaiseAsInr(paise) {
-  const n = Number(paise) / 100;
-  if (!Number.isFinite(n)) return '—';
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(n);
-}
-
-function intervalLabel(interval) {
-  if (interval === 'year') return 'per year';
-  if (interval === 'one_time') return 'one-time';
-  return 'per month';
-}
-
-function billingCycleLabel(interval, count = 1) {
-  if (interval === 'year') return `Billed every ${count} year(s)`;
-  if (interval === 'one_time') return 'One-time purchase';
-  return `Billed every ${count} month(s)`;
-}
 
 function planDiscountPercent(plan) {
   const orig = Number(plan.original_price_paise);
@@ -33,77 +25,68 @@ function planDiscountPercent(plan) {
   return null;
 }
 
-/**
- * SaaS-style pricing grid for call credit purchase packs (tenant + super-admin preview).
- */
 function CreditPackCard({ plan, preview, razorpayConfigured, payingId, onPurchase, featured = false }) {
   const discount = planDiscountPercent(plan);
   const orig = Number(plan.original_price_paise);
   const sale = Number(plan.sale_price_paise);
   const showStrike = Number.isFinite(orig) && orig > sale;
-  const isOneTime = plan.billing_interval === 'one_time';
+
+  const extraBadge =
+    featured && !(discount > 0) ? (
+      <span className={planCardStyles.popularPill}>Popular</span>
+    ) : null;
 
   return (
-    <Card className={[styles.card, featured && styles.cardFeatured].filter(Boolean).join(' ')}>
-      {(featured || discount > 0) && (
-        <div className={styles.cardBadge}>
-          {discount > 0 ? (
-            <Badge variant="primary" size="sm">
-              {discount}% off
-            </Badge>
-          ) : featured ? (
-            <Badge variant="primary" size="sm">
-              Popular
-            </Badge>
-          ) : null}
-        </div>
-      )}
-      <h3 className={styles.cardName}>{plan.name}</h3>
-      <div className={styles.priceBlock}>
-        {showStrike ? <span className={styles.originalPrice}>{formatPaiseAsInr(orig)}</span> : null}
-        <span className={styles.salePrice}>{formatPaiseAsInr(sale)}</span>
-        {!isOneTime ? (
-          <span className={styles.interval}>{intervalLabel(plan.billing_interval)}</span>
-        ) : null}
+    <Card
+      className={[planCardStyles.card, featured && planCardStyles.cardFeatured]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      <div className={planCardStyles.inner}>
+        <PlanCardTopRow
+          name={plan.name}
+          discountPercent={discount}
+          extraBadge={extraBadge}
+        />
+        <PlanTypeChip variant="credit_pack" />
+        <PlanCardPrice
+          showStrike={showStrike}
+          originalFormatted={formatPaiseAsInr(orig)}
+          salePaise={sale}
+          plan={plan}
+          intervalSuffix="one-time"
+        />
+        <PlanCardHighlights>
+          <PlanCardHighlight icon="account_balance_wallet">
+            Wallet credit: <strong>{formatPaiseAsInr(plan.wallet_credit_paise)}</strong>
+          </PlanCardHighlight>
+        </PlanCardHighlights>
+        <PlanCardBody>
+          {plan.description ? <p className={planCardStyles.desc}>{plan.description}</p> : null}
+          <PlanCardFeatures plan={plan} />
+        </PlanCardBody>
+        <PlanCardFooter>
+          <Button
+            variant={featured ? 'primary' : 'secondary'}
+            fullWidth
+            disabled={preview || payingId != null || !razorpayConfigured}
+            onClick={() => onPurchase?.(plan)}
+          >
+            {preview
+              ? 'Buy credits'
+              : payingId === plan.id
+                ? 'Opening checkout…'
+                : !razorpayConfigured
+                  ? 'Payments unavailable'
+                  : 'Pay with Razorpay'}
+          </Button>
+        </PlanCardFooter>
       </div>
-      {!isOneTime ? <p className={styles.cycle}>{billingCycleLabel(plan.billing_interval)}</p> : null}
-      <p className={styles.walletLine}>
-        <MaterialSymbol name="account_balance_wallet" size="sm" />
-        <span>
-          Wallet credit: <strong>{formatPaiseAsInr(plan.wallet_credit_paise)}</strong>
-        </span>
-      </p>
-      {plan.description ? <p className={styles.desc}>{plan.description}</p> : null}
-      {!isOneTime ? (
-        <ul className={styles.features}>
-          <li>
-            <MaterialSymbol name="check" size="sm" />
-            Instant credit to your call wallet
-          </li>
-          <li>
-            <MaterialSymbol name="check" size="sm" />
-            Pay per connected minute after top-up
-          </li>
-        </ul>
-      ) : null}
-      <Button
-        variant={featured ? 'primary' : 'secondary'}
-        fullWidth
-        disabled={preview || payingId != null || !razorpayConfigured}
-        onClick={() => onPurchase?.(plan)}
-      >
-        {preview
-          ? 'Buy credits'
-          : payingId === plan.id
-            ? 'Opening checkout…'
-            : !razorpayConfigured
-              ? 'Payments unavailable'
-              : 'Pay with Razorpay'}
-      </Button>
     </Card>
   );
 }
 
+/** One-time credit top-up packs only (no monthly/yearly subscription). */
 export function CreditPurchasePricingGrid({
   plans = [],
   preview = false,
@@ -112,44 +95,28 @@ export function CreditPurchasePricingGrid({
   payingId = null,
   onPurchase,
   featuredIndex,
-  emptyMessage = 'No credit packs are available yet. Ask your platform admin to add packs under Telephony plans.',
+  emptyMessage = 'No credit top-up packs yet. Your platform admin can add them under Telephony plans → Credit top-up.',
 }) {
-  const [interval, setInterval] = useState('month');
-
   const oneTimePlans = useMemo(
-    () => plans.filter((p) => p.billing_interval === 'one_time'),
-    [plans]
-  );
-
-  const intervalPlans = useMemo(() => {
-    return plans.filter((p) => {
-      if (p.billing_interval === 'one_time') return false;
-      if (interval === 'year') return p.billing_interval === 'year';
-      return p.billing_interval === 'month' || !p.billing_interval;
-    });
-  }, [plans, interval]);
-
-  const hasYearly = useMemo(() => plans.some((p) => p.billing_interval === 'year'), [plans]);
-  const hasMonthly = useMemo(
-    () => plans.some((p) => p.billing_interval === 'month' || !p.billing_interval),
+    () => plans.filter((p) => p.billing_interval === 'one_time' || !p.billing_interval),
     [plans]
   );
 
   const featuredIdx = useMemo(() => {
     if (featuredIndex != null) return featuredIndex;
-    if (intervalPlans.length <= 1) return 0;
-    return Math.min(1, Math.floor(intervalPlans.length / 2));
-  }, [featuredIndex, intervalPlans.length]);
+    if (oneTimePlans.length <= 1) return 0;
+    return Math.min(1, Math.floor(oneTimePlans.length / 2));
+  }, [featuredIndex, oneTimePlans.length]);
 
-  if (!plans.length) {
+  if (!oneTimePlans.length) {
     return <p className={styles.empty}>{emptyMessage}</p>;
   }
 
-  if (singlePlan && plans.length > 0) {
+  if (singlePlan && oneTimePlans.length > 0) {
     return (
       <div className={`${styles.wrap} ${styles.singlePlan}`}>
         <CreditPackCard
-          plan={plans[0]}
+          plan={oneTimePlans[0]}
           preview={preview}
           razorpayConfigured={razorpayConfigured}
           payingId={payingId}
@@ -162,161 +129,27 @@ export function CreditPurchasePricingGrid({
   return (
     <div className={styles.wrap}>
       <div className={styles.head}>
-        <h2 className={styles.title}>{preview ? 'Credit pack preview' : 'Call credit packs'}</h2>
+        <h2 className={styles.title}>{preview ? 'Credit top-up preview' : 'Call credit top-up'}</h2>
         <p className={styles.subtitle}>
           {preview
-            ? 'Nested under the billing plan when the tenant uses credit + platform calling.'
-            : 'Top up your call wallet (monthly, yearly, or one-time). Prices are set by your platform administrator.'}
+            ? 'One-time wallet packs for credit subscribers — not a subscription.'
+            : 'Add call wallet balance anytime. One-time purchase only.'}
         </p>
       </div>
 
-      {(hasMonthly || hasYearly) && (
-        <div className={styles.toggle} role="group" aria-label="Billing cycle">
-          {hasMonthly ? (
-            <button
-              type="button"
-              className={`${styles.toggleBtn} ${interval === 'month' ? styles.toggleBtnActive : ''}`}
-              onClick={() => setInterval('month')}
-            >
-              Monthly
-            </button>
-          ) : null}
-          {hasYearly ? (
-            <button
-              type="button"
-              className={`${styles.toggleBtn} ${interval === 'year' ? styles.toggleBtnActive : ''}`}
-              onClick={() => setInterval('year')}
-            >
-              Yearly
-            </button>
-          ) : null}
-        </div>
-      )}
-
-      {intervalPlans.length > 0 ? (
-        <div className={styles.grid}>
-          {intervalPlans.map((plan, idx) => {
-            const isFeatured = idx === featuredIdx && intervalPlans.length > 1;
-            const discount = planDiscountPercent(plan);
-            const orig = Number(plan.original_price_paise);
-            const sale = Number(plan.sale_price_paise);
-            const showStrike = Number.isFinite(orig) && orig > sale;
-
-            return (
-              <Card
-                key={plan.id}
-                className={[styles.card, isFeatured && styles.cardFeatured].filter(Boolean).join(' ')}
-              >
-                {(isFeatured || discount > 0) && (
-                  <div className={styles.cardBadge}>
-                    {discount > 0 ? (
-                      <Badge variant="primary" size="sm">
-                        {discount}% off
-                      </Badge>
-                    ) : isFeatured ? (
-                      <Badge variant="primary" size="sm">
-                        Popular
-                      </Badge>
-                    ) : null}
-                  </div>
-                )}
-                <h3 className={styles.cardName}>{plan.name}</h3>
-                <div className={styles.priceBlock}>
-                  {showStrike ? (
-                    <span className={styles.originalPrice}>{formatPaiseAsInr(orig)}</span>
-                  ) : null}
-                  <span className={styles.salePrice}>{formatPaiseAsInr(sale)}</span>
-                  <span className={styles.interval}>{intervalLabel(plan.billing_interval)}</span>
-                </div>
-                <p className={styles.cycle}>{billingCycleLabel(plan.billing_interval)}</p>
-                <p className={styles.walletLine}>
-                  <MaterialSymbol name="account_balance_wallet" size="sm" />
-                  <span>
-                    Wallet credit: <strong>{formatPaiseAsInr(plan.wallet_credit_paise)}</strong>
-                  </span>
-                </p>
-                {plan.description ? <p className={styles.desc}>{plan.description}</p> : null}
-                <ul className={styles.features}>
-                  <li>
-                    <MaterialSymbol name="check" size="sm" />
-                    Instant credit to your call wallet
-                  </li>
-                  <li>
-                    <MaterialSymbol name="check" size="sm" />
-                    Pay per connected minute after top-up
-                  </li>
-                </ul>
-                <Button
-                  variant={isFeatured ? 'primary' : 'secondary'}
-                  fullWidth
-                  disabled={preview || payingId != null || !razorpayConfigured}
-                  onClick={() => onPurchase?.(plan)}
-                >
-                  {preview
-                    ? 'Buy credits'
-                    : payingId === plan.id
-                      ? 'Opening checkout…'
-                      : !razorpayConfigured
-                        ? 'Payments unavailable'
-                        : 'Pay with Razorpay'}
-                </Button>
-              </Card>
-            );
-          })}
-        </div>
-      ) : (
-        <p className={styles.emptyInterval}>
-          No {interval === 'year' ? 'yearly' : 'monthly'} packs yet. Try the other billing cycle or ask your admin to
-          add plans.
-        </p>
-      )}
-
-      {oneTimePlans.length > 0 ? (
-        <>
-          <h3 className={styles.oneTimeHead}>One-time packs</h3>
-          <div className={styles.grid}>
-            {oneTimePlans.map((plan) => {
-              const discount = planDiscountPercent(plan);
-              const orig = Number(plan.original_price_paise);
-              const sale = Number(plan.sale_price_paise);
-              const showStrike = Number.isFinite(orig) && orig > sale;
-              return (
-                <Card key={plan.id} className={styles.card}>
-                  {discount > 0 ? (
-                    <div className={styles.cardBadge}>
-                      <Badge variant="primary" size="sm">
-                        {discount}% off
-                      </Badge>
-                    </div>
-                  ) : null}
-                  <h3 className={styles.cardName}>{plan.name}</h3>
-                  <div className={styles.priceBlock}>
-                    {showStrike ? (
-                      <span className={styles.originalPrice}>{formatPaiseAsInr(orig)}</span>
-                    ) : null}
-                    <span className={styles.salePrice}>{formatPaiseAsInr(sale)}</span>
-                  </div>
-                  <p className={styles.walletLine}>
-                    <MaterialSymbol name="account_balance_wallet" size="sm" />
-                    <span>
-                      Wallet credit: <strong>{formatPaiseAsInr(plan.wallet_credit_paise)}</strong>
-                    </span>
-                  </p>
-                  {plan.description ? <p className={styles.desc}>{plan.description}</p> : null}
-                  <Button
-                    variant="secondary"
-                    fullWidth
-                    disabled={preview || payingId != null || !razorpayConfigured}
-                    onClick={() => onPurchase?.(plan)}
-                  >
-                    {preview ? 'Buy credits' : payingId === plan.id ? 'Opening checkout…' : 'Pay with Razorpay'}
-                  </Button>
-                </Card>
-              );
-            })}
-          </div>
-        </>
-      ) : null}
+      <div className={styles.grid}>
+        {oneTimePlans.map((plan, idx) => (
+          <CreditPackCard
+            key={plan.id}
+            plan={plan}
+            preview={preview}
+            razorpayConfigured={razorpayConfigured}
+            payingId={payingId}
+            onPurchase={onPurchase}
+            featured={idx === featuredIdx && oneTimePlans.length > 1}
+          />
+        ))}
+      </div>
     </div>
   );
 }

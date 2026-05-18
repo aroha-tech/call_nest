@@ -8,6 +8,7 @@ import { SearchInput } from '../components/ui/SearchInput';
 import { Input } from '../components/ui/Input';
 import { Pagination } from '../components/ui/Pagination';
 import { platformBillingAPI } from '../services/billingAPI';
+import { PlatformRazorpaySettingsForm } from '../components/billing/PlatformRazorpaySettingsForm';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import pageStyles from '../features/disposition/components/MasterCRUDPage.module.scss';
 import listStyles from '../components/admin/adminDataList.module.scss';
@@ -152,6 +153,9 @@ export function PlatformBillingPage() {
 
       <Tabs>
         <TabList>
+          <Tab isActive={tab === 'razorpay'} onClick={() => setTab('razorpay')}>
+            Razorpay
+          </Tab>
           <Tab isActive={tab === 'payments'} onClick={() => setTab('payments')}>
             All payments
           </Tab>
@@ -159,6 +163,10 @@ export function PlatformBillingPage() {
             All subscriptions
           </Tab>
         </TabList>
+
+        <TabPanel isActive={tab === 'razorpay'}>
+          <PlatformRazorpaySettingsForm onError={setError} />
+        </TabPanel>
 
         <TabPanel isActive={tab === 'payments'}>
           <div className={listStyles.tableCard}>

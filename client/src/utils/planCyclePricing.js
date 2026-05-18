@@ -16,6 +16,13 @@ const CYCLE_PREFIX = {
   year: 'price_year',
 };
 
+const CYCLE_INCLUDED_CREDIT_PREFIX = {
+  month: 'included_wallet_credit_month',
+  quarter: 'included_wallet_credit_quarter',
+  semiannual: 'included_wallet_credit_semiannual',
+  year: 'included_wallet_credit_year',
+};
+
 export function billingIntervalLabel(interval) {
   return PLAN_BILLING_CYCLES.find((c) => c.value === interval)?.label || interval || '—';
 }
@@ -76,10 +83,12 @@ export function isContactSalesPlan(plan) {
 /** Form field keys for one cycle (values in rupees in the form). */
 export function cycleFormKeys(interval) {
   const p = CYCLE_PREFIX[interval] || CYCLE_PREFIX.month;
+  const ic = CYCLE_INCLUDED_CREDIT_PREFIX[interval] || CYCLE_INCLUDED_CREDIT_PREFIX.month;
   return {
     original: `${p}_original_paise`,
     sale: `${p}_sale_paise`,
     discount: `${p}_discount_percent`,
+    includedCredit: `${ic}_paise`,
   };
 }
 
@@ -90,6 +99,23 @@ export function blankCyclePricingForm() {
     out[k.original] = '';
     out[k.sale] = '';
     out[k.discount] = '';
+    out[k.includedCredit] = '';
   }
   return out;
+}
+
+/** Included call wallet credit (paise) for the chosen billing cycle. */
+export function resolvePlanCycleIncludedCredit(plan, interval = 'month') {
+  if (!plan) return 0;
+  const iv = CYCLE_VALUES.includes(interval) ? interval : 'month';
+  const key = `${CYCLE_INCLUDED_CREDIT_PREFIX[iv]}_paise`;
+  const cycleVal = plan[key];
+  if (cycleVal != null && Number(cycleVal) >= 0) {
+    return Math.floor(Number(cycleVal));
+  }
+  if (iv === 'month' || iv === (plan.billing_interval || 'month')) {
+    const legacy = Number(plan.included_wallet_credit_paise);
+    if (Number.isFinite(legacy) && legacy >= 0) return Math.floor(legacy);
+  }
+  return 0;
 }

@@ -1,0 +1,36 @@
+.card {
+  padding: 20px;
+}
+
+.intro {
+  margin: 0 0 16px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+.alert {
+  margin-bottom: 12px;
+}
+
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.formGrid {
+  display: grid;
+  gap: 14px;
+  max-width: 480px;
+}
+
+.actions {
+  margin-top: 16px;
+}

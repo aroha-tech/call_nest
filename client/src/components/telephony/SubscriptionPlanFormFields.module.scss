@@ -36,10 +36,91 @@
   min-height: 100px;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid var(--color-border-subtle);
+  border: 1px solid var(--color-input-border);
+  background-color: var(--color-input-bg);
+  color: var(--color-text-primary);
   font-family: inherit;
   font-size: 0.9rem;
   resize: vertical;
+
+  &::placeholder {
+    color: var(--color-input-placeholder);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-input-border-focus);
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+  }
+}
+
+.featuresFieldset {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  legend {
+    padding: 0 6px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+}
+
+.formatToggle {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-2, rgba(99, 102, 241, 0.04));
+}
+
+.formatOption {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+
+  &:hover {
+    color: var(--color-text-primary);
+  }
+}
+
+.formatOptionActive {
+  background: var(--color-primary-600, #6366f1);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+
+  &:hover {
+    color: #fff;
+  }
+}
+
+.textareaHint {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+
+  code {
+    font-size: 0.76rem;
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: var(--color-surface-2, rgba(99, 102, 241, 0.08));
+  }
 }
 
 .hint {
@@ -52,6 +133,17 @@
   margin: 0 0 10px;
   font-size: 0.82rem;
   color: var(--color-text-muted);
+}
+
+.bundleNote {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  background: var(--color-surface-elevated, rgba(255, 255, 255, 0.03));
 }
 
 .flags {

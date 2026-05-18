@@ -13,7 +13,8 @@ function tenantIdFromReq(req) {
 export async function getConfig(req, res, next) {
   try {
     tenantIdFromReq(req);
-    return res.json({ data: billingService.getClientBillingConfig() });
+    const data = await billingService.getClientBillingConfig();
+    return res.json({ data });
   } catch (err) {
     return next(err);
   }

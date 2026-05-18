@@ -7,6 +7,8 @@ import { Alert } from '../components/ui/Alert';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
 import { SubscriptionPlanFormFields } from '../components/telephony/SubscriptionPlanFormFields';
 import { CreditPackFormFields } from '../components/telephony/CreditPackFormFields';
+import { SeatPlanFormFields } from '../components/telephony/SeatPlanFormFields';
+import { PLAN_CATEGORY, PRODUCT_COPY } from '../constants/telephonyProductTypes';
 import { TelephonyPlanSinglePreview } from '../components/telephony/TelephonyPlanSinglePreview';
 import { telephonyBillingPlansAdminAPI } from '../services/tenantTelephonyAdminAPI';
 import {
@@ -21,7 +23,9 @@ import styles from './PlatformTelephonyPlanFormPage.module.scss';
 const LIST_PATH = '/admin/telephony-plans';
 
 function segmentLabel(segment) {
-  return segment === 'top-up' ? 'Credit top-up pack' : 'Subscription plan';
+  if (segment === 'top-up') return PRODUCT_COPY[PLAN_CATEGORY.CREDIT_TOP_UP].shortTitle;
+  if (segment === 'seat-plans') return PRODUCT_COPY[PLAN_CATEGORY.SEAT_ADD_ON].shortTitle;
+  return PRODUCT_COPY[PLAN_CATEGORY.SUBSCRIPTION].shortTitle;
 }
 
 export function PlatformTelephonyPlanFormPage() {
@@ -32,13 +36,15 @@ export function PlatformTelephonyPlanFormPage() {
   const isEdit = Boolean(planId);
 
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(() => blankForm(category || 'tenant_billing'));
+  const [form, setForm] = useState(() => blankForm(category || PLAN_CATEGORY.SUBSCRIPTION));
   const [loadError, setLoadError] = useState(null);
   const [loadingPlan, setLoadingPlan] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
-  const isSubscription = category === 'tenant_billing';
+  const isSubscription = category === PLAN_CATEGORY.SUBSCRIPTION;
+  const isSeatPlan = category === PLAN_CATEGORY.SEAT_ADD_ON;
+  const isTopUp = category === PLAN_CATEGORY.CREDIT_TOP_UP;
 
   useEffect(() => {
     if (!category) {
@@ -49,7 +55,7 @@ export function PlatformTelephonyPlanFormPage() {
   useEffect(() => {
     if (!isEdit && category) {
       const base = blankForm(category);
-      if (category === 'tenant_billing') {
+      if (category === PLAN_CATEGORY.SUBSCRIPTION) {
         const planType = searchParams.get('plan_type');
         if (planType === 'credit' || planType === 'unlimited') base.plan_type = planType;
       }
@@ -102,7 +108,9 @@ export function PlatformTelephonyPlanFormPage() {
         await telephonyBillingPlansAdminAPI.create(body);
       }
       navigate(LIST_PATH, {
-        state: { tab: isSubscription ? 'billing' : 'purchase' },
+        state: {
+          tab: isSubscription ? 'billing' : isSeatPlan ? 'seats' : 'purchase',
+        },
       });
     } catch (e) {
       setSubmitError(e?.response?.data?.error || e.message || 'Save failed');
@@ -115,8 +123,10 @@ export function PlatformTelephonyPlanFormPage() {
 
   const title = isEdit ? 'Edit plan' : 'Create plan';
   const hint = isSubscription
-    ? 'Main subscription plan (website / tenant purchase)'
-    : 'Wallet top-up pack (credit subscribers only)';
+    ? PRODUCT_COPY[PLAN_CATEGORY.SUBSCRIPTION].description
+    : isSeatPlan
+      ? PRODUCT_COPY[PLAN_CATEGORY.SEAT_ADD_ON].description
+      : PRODUCT_COPY[PLAN_CATEGORY.CREDIT_TOP_UP].description;
 
   return (
     <div className={styles.page}>
@@ -139,13 +149,10 @@ export function PlatformTelephonyPlanFormPage() {
                 {submitError ? <Alert variant="warning">{submitError}</Alert> : null}
                 {isSubscription ? (
                   <SubscriptionPlanFormFields form={form} setForm={setForm} editing={editing} />
+                ) : isSeatPlan ? (
+                  <SeatPlanFormFields form={form} setForm={setForm} editing={editing} />
                 ) : (
-                  <CreditPackFormFields
-                    form={form}
-                    setForm={setForm}
-                    editing={editing}
-                    category={category}
-                  />
+                  <CreditPackFormFields form={form} setForm={setForm} editing={editing} />
                 )}
               </form>
               <footer className={styles.formFooter}>

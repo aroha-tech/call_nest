@@ -33,6 +33,7 @@ import {
   rupeeToPaise,
   safePaisePerMin,
 } from '../utils/telephonyMoneyUtils';
+import { SeatLimitsSummary } from '../components/telephony/SeatLimitsSummary';
 import styles from './PlatformTenantTelephonyPage.module.scss';
 
 const PAGE_SIZE = 20;
@@ -735,6 +736,38 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
           billData?.tenant?.unlimited_minutes_cap_per_month_override == null
             ? ''
             : String(billData.tenant.unlimited_minutes_cap_per_month_override),
+        seat_purchased_admins:
+          billData?.seatLimits?.purchased?.admins == null
+            ? ''
+            : String(billData.seatLimits.purchased.admins),
+        seat_purchased_managers:
+          billData?.seatLimits?.purchased?.managers == null
+            ? ''
+            : String(billData.seatLimits.purchased.managers),
+        seat_purchased_agents:
+          billData?.seatLimits?.purchased?.agents == null
+            ? ''
+            : String(billData.seatLimits.purchased.agents),
+        seat_purchased_channels:
+          billData?.seatLimits?.purchased?.channels == null
+            ? ''
+            : String(billData.seatLimits.purchased.channels),
+        seat_limit_admins_override:
+          billData?.tenant?.seat_limit_admins_override == null
+            ? ''
+            : String(billData.tenant.seat_limit_admins_override),
+        seat_limit_managers_override:
+          billData?.tenant?.seat_limit_managers_override == null
+            ? ''
+            : String(billData.tenant.seat_limit_managers_override),
+        seat_limit_agents_override:
+          billData?.tenant?.seat_limit_agents_override == null
+            ? ''
+            : String(billData.tenant.seat_limit_agents_override),
+        seat_limit_channels_override:
+          billData?.tenant?.seat_limit_channels_override == null
+            ? ''
+            : String(billData.tenant.seat_limit_channels_override),
       });
       setLedger({
         rows: ledgerRes.data?.data?.rows || [],
@@ -811,6 +844,26 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
           draft.unlimited_minutes_cap_per_month_override === ''
             ? null
             : safeNumber(draft.unlimited_minutes_cap_per_month_override),
+        seat_purchased_admins:
+          draft.seat_purchased_admins === '' ? 0 : safeNumber(draft.seat_purchased_admins),
+        seat_purchased_managers:
+          draft.seat_purchased_managers === '' ? 0 : safeNumber(draft.seat_purchased_managers),
+        seat_purchased_agents:
+          draft.seat_purchased_agents === '' ? 0 : safeNumber(draft.seat_purchased_agents),
+        seat_purchased_channels:
+          draft.seat_purchased_channels === '' ? 0 : safeNumber(draft.seat_purchased_channels),
+        seat_limit_admins_override:
+          draft.seat_limit_admins_override === '' ? null : safeNumber(draft.seat_limit_admins_override),
+        seat_limit_managers_override:
+          draft.seat_limit_managers_override === ''
+            ? null
+            : safeNumber(draft.seat_limit_managers_override),
+        seat_limit_agents_override:
+          draft.seat_limit_agents_override === '' ? null : safeNumber(draft.seat_limit_agents_override),
+        seat_limit_channels_override:
+          draft.seat_limit_channels_override === ''
+            ? null
+            : safeNumber(draft.seat_limit_channels_override),
       };
       const res = await tenantTelephonyAdminAPI.updateTenantBilling(tenant.id, body);
       setData(res.data?.data);
@@ -1036,6 +1089,99 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
                   hint="When the tenant hits this many connected minutes in a calendar month, new calls are blocked."
                 />
               )}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            icon="groups"
+            title="Seat limits"
+            description="Bundle seats from the assigned plan, purchased add-ons, and optional super-admin caps. Override sets a fixed total; leave blank to use plan + purchased."
+            actions={
+              <Button onClick={saveBilling} disabled={saving}>
+                {saving ? 'Saving…' : 'Save seat limits'}
+              </Button>
+            }
+          >
+            {data.seatLimits ? <SeatLimitsSummary seatLimits={data.seatLimits} /> : null}
+            <div className={styles.formGrid}>
+              <Input
+                label="Purchased admins"
+                type="number"
+                min={0}
+                value={draft.seat_purchased_admins}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, seat_purchased_admins: e.target.value }))
+                }
+                hint="Paid or manually granted admin seats (adds to plan bundle)."
+              />
+              <Input
+                label="Purchased managers"
+                type="number"
+                min={0}
+                value={draft.seat_purchased_managers}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, seat_purchased_managers: e.target.value }))
+                }
+              />
+              <Input
+                label="Purchased agents"
+                type="number"
+                min={0}
+                value={draft.seat_purchased_agents}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, seat_purchased_agents: e.target.value }))
+                }
+              />
+              <Input
+                label="Purchased channels"
+                type="number"
+                min={0}
+                value={draft.seat_purchased_channels}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, seat_purchased_channels: e.target.value }))
+                }
+                hint="Unlimited-calling channel seats."
+              />
+              <Input
+                label="Total admins override"
+                type="number"
+                min={0}
+                value={draft.seat_limit_admins_override}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, seat_limit_admins_override: e.target.value }))
+                }
+                placeholder="Blank = plan + purchased"
+              />
+              <Input
+                label="Total managers override"
+                type="number"
+                min={0}
+                value={draft.seat_limit_managers_override}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, seat_limit_managers_override: e.target.value }))
+                }
+                placeholder="Blank = plan + purchased"
+              />
+              <Input
+                label="Total agents override"
+                type="number"
+                min={0}
+                value={draft.seat_limit_agents_override}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, seat_limit_agents_override: e.target.value }))
+                }
+                placeholder="Blank = plan + purchased"
+              />
+              <Input
+                label="Total channels override"
+                type="number"
+                min={0}
+                value={draft.seat_limit_channels_override}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, seat_limit_channels_override: e.target.value }))
+                }
+                placeholder="Blank = plan + purchased"
+              />
             </div>
           </SectionCard>
 

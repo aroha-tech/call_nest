@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
 import { tenantTelephonyAPI } from '../../services/tenantTelephonyAPI';
 import { useCreditPurchaseCheckout } from '../../hooks/useCreditPurchaseCheckout';
+import { useSeatPurchaseCheckout } from '../../hooks/useSeatPurchaseCheckout';
 import { TenantTelephonyPlansPanel } from './TenantTelephonyPlansPanel';
 import styles from './CreditPurchaseSection.module.scss';
 
@@ -41,7 +42,20 @@ export function CreditPurchaseSection({
     void load();
   }, [load]);
 
-  const { purchase, payingId, payError, setPayError } = useCreditPurchaseCheckout({
+  const { purchase, payingId: creditPayingId, payError, setPayError } = useCreditPurchaseCheckout({
+    userEmail,
+    onSuccess: async () => {
+      await load();
+      await onWalletUpdated?.();
+    },
+  });
+
+  const {
+    purchase: purchaseSeats,
+    payingId: seatPayingId,
+    payError: seatPayError,
+    setPayError: setSeatPayError,
+  } = useSeatPurchaseCheckout({
     userEmail,
     onSuccess: async () => {
       await load();
@@ -59,10 +73,18 @@ export function CreditPurchaseSection({
 
   return (
     <div className={styles.wrap}>
-      {payError ? (
+      {payError || seatPayError ? (
         <Alert variant="error" className={styles.alert}>
-          {payError}
-          <Button type="button" variant="ghost" size="sm" onClick={() => setPayError(null)}>
+          {payError || seatPayError}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setPayError(null);
+              setSeatPayError(null);
+            }}
+          >
             Dismiss
           </Button>
         </Alert>
@@ -83,8 +105,15 @@ export function CreditPurchaseSection({
         creditPurchaseEligible={view.creditPurchaseEligible ?? view.eligible}
         creditPurchaseReason={view.creditPurchaseReason ?? view.eligibilityReason}
         razorpayConfigured={view.razorpayConfigured}
-        payingId={payingId}
+        payingId={creditPayingId || seatPayingId}
         onPurchase={(plan) => purchase(plan, { razorpayConfigured: view.razorpayConfigured })}
+        onPurchaseSeats={(plan, qty) =>
+          purchaseSeats(plan, qty, { razorpayConfigured: view.razorpayConfigured })
+        }
+        seatPurchasePlans={view.seatPurchasePlans ?? []}
+        seatPurchaseEligible={view.seatPurchaseEligible}
+        seatPurchaseReason={view.seatPurchaseReason}
+        seatLimits={view.seatLimits}
       />
 
       {showBillingLink ? (

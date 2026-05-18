@@ -1,0 +1,24 @@
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -4px 0 10px;
+}
+
+.qtyInput {
+  margin-bottom: 12px;
+}
+
+.totalLine {
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+}
+
+.limitsHint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}

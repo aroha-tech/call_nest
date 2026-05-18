@@ -1,38 +1,52 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 28px;
-}
-
-.nestedSection {
-  display: flex;
-  flex-direction: column;
   gap: 20px;
-  padding: 24px 20px 8px;
-  margin-top: 4px;
-  border-radius: 14px;
-  background: var(--color-surface-2, rgba(99, 102, 241, 0.04));
-  border: 1px dashed var(--color-border-subtle);
 }
 
-.nestedDivider {
-  height: 0;
-}
-
-.nestedTitle {
+.paymentBanner {
   margin: 0;
-  text-align: center;
+}
+
+.sectionTabs {
+  margin-bottom: 4px;
+}
+
+.tabIcon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.tabCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 6px;
+  margin-left: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 999px;
+  background: var(--color-primary-muted, rgba(99, 102, 241, 0.2));
+  color: var(--color-primary, #6366f1);
+}
+
+.sectionIntro {
+  margin-bottom: 16px;
+}
+
+.sectionTitle {
+  margin: 0 0 6px;
   font-size: 1.05rem;
   font-weight: 600;
 }
 
-.nestedHint {
-  margin: 0 0 12px;
-  text-align: center;
+.sectionHint {
+  margin: 0;
+  max-width: 640px;
   font-size: 0.88rem;
+  line-height: 1.55;
   color: var(--color-text-muted);
-}
-
-.unlimitedNote {
-  margin-top: 8px;
 }

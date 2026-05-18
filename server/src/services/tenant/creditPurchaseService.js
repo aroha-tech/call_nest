@@ -1,35 +1,22 @@
-import Razorpay from 'razorpay';
-import { env } from '../../config/env.js';
 import { query, withConnection } from '../../config/db.js';
 import { verifyRazorpayPaymentSignature, shortReceiptId } from '../billing/billingCore.js';
+import { assertRazorpayConfigured, createRazorpaySdk } from '../billing/razorpayClient.js';
+import {
+  getClientRazorpayConfig,
+  isDevMockPayment,
+} from '../billing/razorpayConfigService.js';
 import * as callCreditsService from '../billing/callCreditsService.js';
 import { getCurrentTelephonySubscription } from '../billing/telephonySubscriptionService.js';
 import {
   findById as findTelephonyPlanById,
   serializePlanForClient,
 } from '../superAdmin/telephonyBillingPlansService.js';
+import { computePlanChargePaise } from '../../utils/planTaxUtils.js';
+import { getSeatLimitsSummary } from '../billing/seatEntitlementService.js';
+import { listSeatPlansForTenant } from './seatPurchaseService.js';
 
-function assertRazorpayConfigured() {
-  if (!env.razorpay?.keyId || !env.razorpay?.keySecret) {
-    const err = new Error('Razorpay is not configured on the server (set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET)');
-    err.status = 503;
-    throw err;
-  }
-}
-
-function getRazorpay() {
-  assertRazorpayConfigured();
-  return new Razorpay({
-    key_id: env.razorpay.keyId,
-    key_secret: env.razorpay.keySecret,
-  });
-}
-
-export function getPurchaseClientConfig() {
-  return {
-    razorpayKeyId: env.razorpay?.keyId || '',
-    razorpayConfigured: Boolean(env.razorpay?.keyId && env.razorpay?.keySecret),
-  };
+export async function getPurchaseClientConfig() {
+  return getClientRazorpayConfig();
 }
 
 /** Tenant must use credit billing with platform default calling account. */
@@ -68,6 +55,7 @@ export async function listPurchasePlansForTenant(tenantId) {
     `SELECT *
      FROM telephony_billing_plans
      WHERE deleted_at IS NULL AND is_active = 1 AND plan_category = 'credit_purchase'
+       AND billing_interval = 'one_time'
      ORDER BY sort_order ASC, name ASC`
   );
 
@@ -117,29 +105,45 @@ export async function listTenantBillingPlansForTenant(tenantId) {
     }
   }
 
+  const serialized = rows.map(serializePlanForClient);
+  const plansForMode = serialized.filter((p) => {
+    if (mode === 'unlimited') return p.plan_type === 'unlimited';
+    return p.plan_type === 'credit';
+  });
+
   return {
     callBillingMode: mode,
     telephonyAccountMode: String(tenant.telephony_account_mode || 'default_account'),
     assignedPlanId: assignedId,
     assignedPlan,
-    plans: rows.map(serializePlanForClient),
+    plans: plansForMode,
+    allPlans: serialized,
   };
 }
 
 /** Full tenant-facing plans view: billing templates for current mode + optional credit top-up packs. */
 export async function getTenantPlansView(tenantId) {
-  const [billing, purchase, telephonySubscription] = await Promise.all([
+  const [billing, purchase, seatPurchase, telephonySubscription, seatLimits] = await Promise.all([
     listTenantBillingPlansForTenant(tenantId),
     listPurchasePlansForTenant(tenantId),
+    listSeatPlansForTenant(tenantId),
     getCurrentTelephonySubscription(tenantId),
+    getSeatLimitsSummary(tenantId).catch(() => null),
   ]);
 
+  const subscriptionPlanId =
+    telephonySubscription?.plan_id != null ? Number(telephonySubscription.plan_id) : null;
+
+  const purchaseConfig = await getPurchaseClientConfig();
+
   return {
-    ...getPurchaseClientConfig(),
+    ...purchaseConfig,
     callBillingMode: billing.callBillingMode,
     telephonyAccountMode: billing.telephonyAccountMode,
     assignedBillingPlan: billing.assignedPlan,
     assignedBillingPlanId: billing.assignedPlanId,
+    /** Active paid subscription plan (for “Current” badge on catalog cards). */
+    subscriptionAssignedPlanId: subscriptionPlanId,
     tenantBillingPlans: billing.plans,
     telephonySubscription: telephonySubscription || null,
     creditPurchaseEligible: purchase.eligible,
@@ -149,6 +153,10 @@ export async function getTenantPlansView(tenantId) {
     eligibilityReason: purchase.reason,
     plans: purchase.plans,
     creditPurchasePlans: purchase.plans,
+    seatPurchaseEligible: seatPurchase.eligible,
+    seatPurchaseReason: seatPurchase.reason,
+    seatPurchasePlans: seatPurchase.plans,
+    seatLimits,
   };
 }
 
@@ -197,10 +205,30 @@ export async function createPurchaseOrder(tenantId, userId, planId) {
   }
 
   const plan = await loadActivePurchasePlan(pid);
-  assertRazorpayConfigured();
+  const cfg = await assertRazorpayConfigured();
 
-  const amount = Number(plan.sale_price_paise);
-  const rzp = getRazorpay();
+  const amount = computePlanChargePaise(plan, plan.sale_price_paise);
+
+  if (cfg.devMock) {
+    const orderId = `dev_cr_${tid}_${pid}_${Date.now()}`;
+    await query(
+      `INSERT INTO tenant_credit_purchase_orders (
+         tenant_id, telephony_billing_plan_id, razorpay_order_id, amount_paise,
+         wallet_credit_paise, currency, status, created_by, updated_by
+       ) VALUES (?, ?, ?, ?, ?, 'INR', 'pending', ?, ?)`,
+      [tid, pid, orderId, amount, Number(plan.wallet_credit_paise), uid, uid]
+    );
+    return {
+      orderId,
+      amount,
+      currency: 'INR',
+      keyId: cfg.keyId || 'dev_mock',
+      devMock: true,
+      plan: serializePlanForClient(plan),
+    };
+  }
+
+  const rzp = await createRazorpaySdk();
   const receipt = `c${tid}p${pid}${Date.now()}`.slice(0, 40);
 
   const order = await rzp.orders.create({
@@ -226,7 +254,7 @@ export async function createPurchaseOrder(tenantId, userId, planId) {
     orderId: order.id,
     amount,
     currency: order.currency || 'INR',
-    keyId: env.razorpay.keyId,
+    keyId: cfg.keyId,
     plan: serializePlanForClient(plan),
   };
 }
@@ -335,7 +363,7 @@ async function finalizeCreditPurchase(conn, {
 }
 
 export async function verifyPurchasePayment(tenantId, userId, body) {
-  assertRazorpayConfigured();
+  await assertRazorpayConfigured();
   const tid = Number(tenantId);
   const orderId = body?.razorpay_order_id || body?.order_id;
   const paymentId = body?.razorpay_payment_id || body?.payment_id;
@@ -348,14 +376,45 @@ export async function verifyPurchasePayment(tenantId, userId, body) {
     throw err;
   }
 
-  const ok = verifyRazorpayPaymentSignature(orderId, paymentId, signature, env.razorpay.keySecret);
+  if (isDevMockPayment(body)) {
+    const [orderRow] = await query(
+      `SELECT amount_paise FROM tenant_credit_purchase_orders
+       WHERE razorpay_order_id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1`,
+      [orderId, tid]
+    );
+    if (!orderRow) {
+      const err = new Error('Checkout order not found');
+      err.status = 404;
+      throw err;
+    }
+    return withConnection(async (conn) => {
+      await conn.beginTransaction();
+      try {
+        const result = await finalizeCreditPurchase(conn, {
+          tenantId: tid,
+          razorpayOrderId: orderId,
+          razorpayPaymentId: paymentId,
+          amountPaise: orderRow.amount_paise,
+          userId: uid,
+        });
+        await conn.commit();
+        return result;
+      } catch (e) {
+        await conn.rollback();
+        throw e;
+      }
+    });
+  }
+
+  const cfg = await assertRazorpayConfigured();
+  const ok = verifyRazorpayPaymentSignature(orderId, paymentId, signature, cfg.keySecret);
   if (!ok) {
     const err = new Error('Invalid payment signature');
     err.status = 400;
     throw err;
   }
 
-  const rzp = getRazorpay();
+  const rzp = await createRazorpaySdk();
   let payment;
   try {
     payment = await rzp.payments.fetch(paymentId);
