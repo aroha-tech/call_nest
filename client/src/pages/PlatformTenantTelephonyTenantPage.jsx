@@ -38,16 +38,16 @@ export function PlatformTenantTelephonyTenantPage() {
   }, [valid, idNum, location.state]);
 
   const title = useMemo(() => {
-    if (!valid) return 'Tenant telephony billing';
+    if (!valid) return 'Tenant billing';
     const name = resolvedName || tenant?.name || tenant?.slug;
-    return name ? `Telephony billing — ${name}` : `Telephony billing — tenant #${idNum}`;
+    return name ? `Tenant billing — ${name}` : `Tenant billing — tenant #${idNum}`;
   }, [valid, resolvedName, tenant?.name, tenant?.slug, idNum]);
 
   if (!valid) {
     return (
       <div className={styles.page}>
         <Alert variant="error">Invalid tenant id.</Alert>
-        <Button variant="secondary" onClick={() => navigate('/admin/telephony-billing')}>
+        <Button variant="secondary" onClick={() => navigate('/admin/billing')}>
           Back to list
         </Button>
       </div>
@@ -61,7 +61,7 @@ export function PlatformTenantTelephonyTenantPage() {
         subtitle={`tenant #${idNum}`}
         titleIcon="call"
         actions={
-          <Button variant="secondary" onClick={() => navigate('/admin/telephony-billing')}>
+          <Button variant="secondary" onClick={() => navigate('/admin/billing')}>
             Back to tenants
           </Button>
         }

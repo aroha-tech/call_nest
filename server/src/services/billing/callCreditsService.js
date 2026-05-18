@@ -346,13 +346,10 @@ export async function settleCallAttempt(attemptId) {
 }
 
 /**
- * Add credits to a tenant's wallet. Used by:
- *   - super-admin manual adjustments (entry_type = 'adjustment_credit')
- *   - top-up flow (entry_type = 'topup')
- *
- * Returns the new wallet snapshot.
+ * Add credits on an existing connection (caller owns the transaction).
+ * Used inside subscription activation / verify flows to avoid cross-connection lock waits.
  */
-export async function addCredits(tenantId, {
+export async function addCreditsInTx(conn, tenantId, {
   amountPaise,
   entryType = 'topup',
   note = null,
@@ -371,37 +368,62 @@ export async function addCredits(tenantId, {
     err.status = 400;
     throw err;
   }
+
+  await ensureWalletRowInTx(conn, tenantId);
+  const [walletRows] = await conn.execute(
+    `SELECT balance_paise, lifetime_topup_paise FROM tenant_call_credit_wallet
+     WHERE tenant_id = ? FOR UPDATE`,
+    [tenantId]
+  );
+  const wallet = walletRows[0];
+  const newBalance = Number(wallet.balance_paise) + amt;
+  const newTopup =
+    entryType === 'topup'
+      ? Number(wallet.lifetime_topup_paise) + amt
+      : Number(wallet.lifetime_topup_paise);
+  await conn.execute(
+    `UPDATE tenant_call_credit_wallet
+     SET balance_paise = ?, lifetime_topup_paise = ?, last_topup_at = CASE WHEN ? = 'topup' THEN UTC_TIMESTAMP() ELSE last_topup_at END
+     WHERE tenant_id = ?`,
+    [newBalance, newTopup, entryType, tenantId]
+  );
+  await conn.execute(
+    `INSERT INTO tenant_call_credit_ledger
+       (tenant_id, call_attempt_id, entry_type, amount_paise, balance_after_paise, note, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      tenantId,
+      callAttemptId ?? null,
+      entryType,
+      amt,
+      newBalance,
+      note ? String(note).slice(0, 255) : null,
+      createdByUserId ?? null,
+    ]
+  );
+  return { tenant_id: tenantId, balance_paise: newBalance, last_added_paise: amt, entry_type: entryType };
+}
+
+/**
+ * Add credits to a tenant's wallet. Used by:
+ *   - super-admin manual adjustments (entry_type = 'adjustment_credit')
+ *   - top-up flow (entry_type = 'topup')
+ *
+ * Returns the new wallet snapshot.
+ */
+export async function addCredits(tenantId, options = {}) {
   return withConnection(async (conn) => {
     await conn.beginTransaction();
     try {
-      await ensureWalletRowInTx(conn, tenantId);
-      const [walletRows] = await conn.execute(
-        `SELECT balance_paise, lifetime_topup_paise FROM tenant_call_credit_wallet
-         WHERE tenant_id = ? FOR UPDATE`,
-        [tenantId]
-      );
-      const wallet = walletRows[0];
-      const newBalance = Number(wallet.balance_paise) + amt;
-      const newTopup =
-        entryType === 'topup'
-          ? Number(wallet.lifetime_topup_paise) + amt
-          : Number(wallet.lifetime_topup_paise);
-      await conn.execute(
-        `UPDATE tenant_call_credit_wallet
-         SET balance_paise = ?, lifetime_topup_paise = ?, last_topup_at = CASE WHEN ? = 'topup' THEN UTC_TIMESTAMP() ELSE last_topup_at END
-         WHERE tenant_id = ?`,
-        [newBalance, newTopup, entryType, tenantId]
-      );
-      await conn.execute(
-        `INSERT INTO tenant_call_credit_ledger
-           (tenant_id, call_attempt_id, entry_type, amount_paise, balance_after_paise, note, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [tenantId, callAttemptId ?? null, entryType, amt, newBalance, note ? String(note).slice(0, 255) : null, createdByUserId ?? null]
-      );
+      const result = await addCreditsInTx(conn, tenantId, options);
       await conn.commit();
-      return { tenant_id: tenantId, balance_paise: newBalance, last_added_paise: amt, entry_type: entryType };
+      return result;
     } catch (err) {
-      try { await conn.rollback(); } catch (_) { /* ignore */ }
+      try {
+        await conn.rollback();
+      } catch (_) {
+        /* ignore */
+      }
       throw err;
     }
   });
@@ -450,22 +472,43 @@ export async function adjustDebit(tenantId, {
   });
 }
 
-export async function listLedger(tenantId, { page = 1, limit = 25 } = {}) {
+export async function listLedger(
+  tenantId,
+  { page = 1, limit = 25, search = '', entryType = '' } = {}
+) {
   const pageNum = Math.max(1, Math.floor(Number(page) || 1));
   const limitNum = Math.min(100, Math.max(1, Math.floor(Number(limit) || 25)));
   const offset = (pageNum - 1) * limitNum;
+  const q = String(search || '').trim();
+  const typeFilter = String(entryType || '').trim();
+
+  const filters = ['tenant_id = ?'];
+  const params = [tenantId];
+  if (typeFilter) {
+    filters.push('entry_type = ?');
+    params.push(typeFilter);
+  }
+  if (q) {
+    filters.push(
+      '(entry_type LIKE ? OR note LIKE ? OR CAST(call_attempt_id AS CHAR) LIKE ? OR CAST(id AS CHAR) LIKE ?)'
+    );
+    const like = `%${q}%`;
+    params.push(like, like, like, like);
+  }
+  const where = filters.join(' AND ');
+
   const rows = await query(
     `SELECT id, tenant_id, call_attempt_id, entry_type, amount_paise, balance_after_paise,
             unit_qty, unit_rate_paise, note, created_by, created_at
      FROM tenant_call_credit_ledger
-     WHERE tenant_id = ?
+     WHERE ${where}
      ORDER BY id DESC
      LIMIT ${limitNum} OFFSET ${offset}`,
-    [tenantId]
+    params
   );
   const [countRow] = await query(
-    `SELECT COUNT(*) AS total FROM tenant_call_credit_ledger WHERE tenant_id = ?`,
-    [tenantId]
+    `SELECT COUNT(*) AS total FROM tenant_call_credit_ledger WHERE ${where}`,
+    params
   );
   return {
     page: pageNum,

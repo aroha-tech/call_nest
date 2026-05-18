@@ -61,6 +61,7 @@ function SubscriptionCard({
   const tier = plan.subscription_tier || 'standard';
   const isFree = tier === 'free';
   const isEnterprise = tier === 'enterprise' || plan.is_contact_sales === 1;
+  const salesDisabled = isEnterprise && !preview;
   const freeDisabled = isFree && freePlanAdminOnly && !preview;
   const discount = planDiscountPercent(plan);
   const orig = Number(plan.original_price_paise);
@@ -143,10 +144,20 @@ function SubscriptionCard({
           isCurrent ||
           payingId != null ||
           freeDisabled ||
+          salesDisabled ||
           (!isEnterprise && !isFree && !razorpayConfigured)
         }
-        onClick={() => onSubscribe?.(plan)}
-        title={freeDisabled ? 'Free trial is assigned by your platform administrator' : undefined}
+        onClick={() => {
+          if (salesDisabled) return;
+          onSubscribe?.(plan, { billingInterval: billingCycle });
+        }}
+        title={
+          salesDisabled
+            ? 'Contact your platform administrator for enterprise pricing'
+            : freeDisabled
+              ? 'Free trial is assigned by your platform administrator'
+              : undefined
+        }
       >
         {preview
           ? cta
@@ -255,7 +266,7 @@ export function SubscriptionPricingGrid({
   if (!plans.length) {
     return (
       <p className={styles.empty}>
-        No subscription plans configured. Add plans under Admin → Telephony plans → Subscription plans.
+        No subscription plans configured. Add plans under Admin → Product plans → Subscription.
       </p>
     );
   }

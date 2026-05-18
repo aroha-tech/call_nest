@@ -1,0 +1,34 @@
+.card {
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+  background: var(--surface-elevated, rgba(255, 255, 255, 0.03));
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.headMain {
+  flex: 1;
+  min-width: 12rem;
+}
+
+.hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  color: var(--text-muted, #888);
+}
+
+.saved {
+  margin-bottom: 0.75rem;
+}
+
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+}

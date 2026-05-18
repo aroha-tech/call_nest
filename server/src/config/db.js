@@ -76,6 +76,8 @@ function isTransientDbError(err) {
     return true;
   }
   if (msg.includes('lost connection') || msg.includes('connection closed')) return true;
+  // TiDB / Vitess: cross-connection lock wait during nested pool usage
+  if (errno === 9004 || msg.includes('resolve lock timeout')) return true;
   return false;
 }
 

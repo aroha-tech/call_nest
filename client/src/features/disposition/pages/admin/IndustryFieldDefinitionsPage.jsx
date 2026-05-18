@@ -23,6 +23,7 @@ import listStyles from '../../../../components/admin/adminDataList.module.scss';
 import { TableDataRegion } from '../../../../components/admin/TableDataRegion';
 import { useTableLoadingState } from '../../../../hooks/useTableLoadingState';
 import styles from './IndustryFieldDefinitionsPage.module.scss';
+import masterCrudStyles from '../../components/MasterCRUDPage.module.scss';
 
 const FIELD_TYPE_OPTIONS = [
   { value: 'text', label: 'Text' },
@@ -211,9 +212,9 @@ export function IndustryFieldDefinitionsView({ industryId }) {
                   <TableHeaderCell>Label</TableHeaderCell>
                   <TableHeaderCell width="88px">Sort</TableHeaderCell>
                   <TableHeaderCell>Type</TableHeaderCell>
-                  <TableHeaderCell>Required</TableHeaderCell>
-                  <TableHeaderCell>Optional pack</TableHeaderCell>
-                  <TableHeaderCell>Active</TableHeaderCell>
+                  <TableHeaderCell align="center">Required</TableHeaderCell>
+                  <TableHeaderCell align="center">Optional pack</TableHeaderCell>
+                  <TableHeaderCell align="center">Active</TableHeaderCell>
                   <TableHeaderCell width="100px" align="center">
                     Actions
                   </TableHeaderCell>
@@ -226,9 +227,33 @@ export function IndustryFieldDefinitionsView({ industryId }) {
                     <TableCell>{row.label}</TableCell>
                     <TableCell>{row.sort_order ?? 0}</TableCell>
                     <TableCell>{FIELD_TYPE_OPTIONS.find((o) => o.value === row.type)?.label || row.type}</TableCell>
-                    <TableCell>{row.is_required ? 'Yes' : 'No'}</TableCell>
-                    <TableCell>{row.is_optional ? 'Yes' : 'No'}</TableCell>
-                    <TableCell>{row.is_active ? 'Yes' : 'No'}</TableCell>
+                    <TableCell align="center">
+                      <Checkbox
+                        checked={!!row.is_required}
+                        readOnly
+                        variant="table"
+                        aria-label={row.is_required ? 'Required' : 'Not required'}
+                        className={masterCrudStyles.tableCheckboxCell}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Checkbox
+                        checked={!!row.is_optional}
+                        readOnly
+                        variant="table"
+                        aria-label={row.is_optional ? 'Optional pack' : 'Not optional pack'}
+                        className={masterCrudStyles.tableCheckboxCell}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Checkbox
+                        checked={!!row.is_active}
+                        readOnly
+                        variant="table"
+                        aria-label={row.is_active ? 'Active' : 'Inactive'}
+                        className={masterCrudStyles.tableCheckboxCell}
+                      />
+                    </TableCell>
                     <TableCell align="center">
                       <IconButton title="Edit" onClick={() => openEdit(row)}>
                         <EditIcon />

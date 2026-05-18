@@ -132,7 +132,7 @@ export function PlatformTelephonyPlanFormPage() {
     <div className={styles.page}>
       <Link to={LIST_PATH} className={styles.backLink}>
         <MaterialSymbol name="arrow_back" size="sm" />
-        Telephony plans
+        Product plans
       </Link>
 
       <PageHeader title={title} subtitle={`${segmentLabel(segment)} · ${hint}`} />

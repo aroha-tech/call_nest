@@ -102,7 +102,9 @@ export function DialerSessionCallHistoryPanel({ dialerSessionId }) {
     setCallHistoryColumnFilters((prev) => {
       const rest = prev.filter((r) => r.field !== col.id);
       if (!filter || !filter.op || filter.op === 'none') return rest;
-      return [...rest, { field: col.id, op: filter.op, value: filter.value || '' }];
+      const next = { field: col.id, op: filter.op, value: filter.value || '' };
+      if (filter.value2) next.value2 = filter.value2;
+      return [...rest, next];
     });
     setPage(1);
   }, []);

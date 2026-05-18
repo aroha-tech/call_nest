@@ -521,6 +521,13 @@ export function ContactsPage({ type, mode = 'crm' }) {
       })),
     [industryFieldDefs]
   );
+  const industryFieldTypesByColumnId = useMemo(() => {
+    const m = {};
+    for (const d of industryFieldDefs || []) {
+      m[industryFieldColumnId(d.field_key)] = d.type;
+    }
+    return m;
+  }, [industryFieldDefs]);
   const leadApplicableColumns = useMemo(
     () =>
       type === 'lead'
@@ -1261,7 +1268,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
         label: u.name || u.email || '—',
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-    return [{ value: 'unassigned', label: 'No manager' }, ...managers];
+    return [{ value: 'unassigned', label: 'All managers' }, ...managers];
   }, [tenantUsers]);
 
   const agentFilterOptionsForModal = useMemo(() => {
@@ -1294,7 +1301,11 @@ export function ContactsPage({ type, mode = 'crm' }) {
         label: u.name || u.email || '—',
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-    return [{ value: 'unassigned', label: 'No agent' }, ...opts];
+    return [
+      { value: '', label: 'All agents' },
+      { value: 'unassigned', label: 'Unassigned' },
+      ...opts,
+    ];
   }, [tenantUsers, role, user?.id, appliedManagerFilter, appliedAdminManagersMulti]);
 
   useEffect(() => {
@@ -1657,7 +1668,9 @@ export function ContactsPage({ type, mode = 'crm' }) {
       setLeadColumnFilters((prev) => {
         const rest = prev.filter((r) => r.field !== col.id);
         if (!filter || !filter.op) return rest;
-        return [...rest, { field: col.id, op: filter.op, value: filter.value || '' }];
+        const next = { field: col.id, op: filter.op, value: filter.value || '' };
+        if (filter.value2) next.value2 = filter.value2;
+        return [...rest, next];
       });
       setPage(1);
       clearSelection();
@@ -1679,7 +1692,9 @@ export function ContactsPage({ type, mode = 'crm' }) {
       setContactColumnFilters((prev) => {
         const rest = prev.filter((r) => r.field !== col.id);
         if (!filter || !filter.op) return rest;
-        return [...rest, { field: col.id, op: filter.op, value: filter.value || '' }];
+        const next = { field: col.id, op: filter.op, value: filter.value || '' };
+        if (filter.value2) next.value2 = filter.value2;
+        return [...rest, next];
       });
       setPage(1);
       clearSelection();
@@ -2421,6 +2436,7 @@ export function ContactsPage({ type, mode = 'crm' }) {
               filterModalBasicsFromSnapshot?.initialLastCalledPreset ?? lastCalledPreset
             }
             industryFieldRuleOptions={industryFieldRuleOptions}
+            industryFieldTypesByColumnId={industryFieldTypesByColumnId}
             existingSavedFilters={savedFilters.map((f) => ({ id: f.id, name: f.name }))}
             applyButtonLabel={openedEditorFromAppliedButton ? 'Change' : 'Apply'}
             showResetButton={openedEditorFromAppliedButton}

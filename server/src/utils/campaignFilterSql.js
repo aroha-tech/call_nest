@@ -25,7 +25,7 @@ const OPS_BY_KIND = {
   id: ['eq', 'ne', 'in', 'is_blank', 'is_not_blank'],
   tag: ['eq', 'ne', 'in', 'is_blank', 'is_not_blank'],
   enum: ['eq', 'ne', 'in'],
-  datetime: ['eq', 'ne', 'lt', 'gt', 'lte', 'gte', 'is_blank', 'is_not_blank'],
+  datetime: ['eq', 'ne', 'lt', 'gt', 'lte', 'gte', 'between', 'is_blank', 'is_not_blank'],
 };
 
 function parseFiltersInput(filtersJson) {
@@ -49,7 +49,12 @@ export function normalizeFiltersToRules(filtersJson) {
     return parsed.rules
       .filter((r) => r && typeof r.property === 'string' && typeof r.op === 'string')
       .filter((r) => r.property.trim() !== 'tag')
-      .map((r) => ({ property: r.property.trim(), op: String(r.op).trim(), value: r.value }));
+      .map((r) => ({
+        property: r.property.trim(),
+        op: String(r.op).trim(),
+        value: r.value,
+        ...(r.value2 != null && r.value2 !== '' ? { value2: r.value2 } : {}),
+      }));
   }
 
   const legacy = [];
@@ -235,10 +240,21 @@ function pushRule(whereClauses, params, rule) {
 
   if (meta.kind === 'datetime') {
     const v = value == null ? '' : String(value).trim();
-    if (!v) {
+    if (!v && op !== 'between') {
       const err = new Error(`Value required for ${property} with operator ${op}`);
       err.status = 400;
       throw err;
+    }
+    if (op === 'between') {
+      const v2 = rule.value2 == null ? '' : String(rule.value2).trim();
+      if (!v || !v2) {
+        const err = new Error(`Start and end values required for ${property} with operator between`);
+        err.status = 400;
+        throw err;
+      }
+      whereClauses.push(`(${col} >= ? AND ${col} <= ?)`);
+      params.push(v, v2);
+      return;
     }
     const cmp = { lt: '<', gt: '>', lte: '<=', gte: '>=', eq: '=', ne: '!=' }[op];
     if (!cmp) {

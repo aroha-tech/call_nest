@@ -266,6 +266,22 @@ function validatePlanPayload(data, { partial = false } = {}) {
     out.is_active = data.is_active === true || data.is_active === 1 || data.is_active === '1' ? 1 : 0;
   }
 
+  if (has('visible_on_website')) {
+    out.visible_on_website =
+      data.visible_on_website === true || data.visible_on_website === 1 || data.visible_on_website === '1'
+        ? 1
+        : 0;
+  } else if (!partial) {
+    out.visible_on_website = 1;
+  }
+
+  if (has('visible_on_panel')) {
+    out.visible_on_panel =
+      data.visible_on_panel === true || data.visible_on_panel === 1 || data.visible_on_panel === '1' ? 1 : 0;
+  } else if (!partial) {
+    out.visible_on_panel = 1;
+  }
+
   if (has('gst_percent')) {
     const gp = data.gst_percent;
     if (gp === null || gp === '') {
@@ -663,8 +679,8 @@ export async function create(data, userId) {
        seat_role, includes_unlimited_channels,
        features_html, features_json, is_contact_sales,
        gst_percent, prices_include_gst,
-       sort_order, is_active, created_by, updated_by
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       sort_order, is_active, visible_on_website, visible_on_panel, created_by, updated_by
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       body.code,
       body.name,
@@ -713,6 +729,8 @@ export async function create(data, userId) {
       body.prices_include_gst ?? 1,
       body.sort_order ?? 0,
       body.is_active ?? 1,
+      body.visible_on_website ?? 1,
+      body.visible_on_panel ?? 1,
       userId,
       userId,
     ]
@@ -806,6 +824,8 @@ export async function update(id, data, userId) {
     'prices_include_gst',
     'sort_order',
     'is_active',
+    'visible_on_website',
+    'visible_on_panel',
   ]) {
     if (body[key] !== undefined) {
       sets.push(`${key} = ?`);
@@ -956,5 +976,7 @@ export function serializePlanForClient(plan) {
     prices_include_gst: plan.prices_include_gst === 0 ? 0 : 1,
     sort_order: plan.sort_order,
     is_active: plan.is_active,
+    visible_on_website: plan.visible_on_website === 0 ? 0 : 1,
+    visible_on_panel: plan.visible_on_panel === 0 ? 0 : 1,
   };
 }

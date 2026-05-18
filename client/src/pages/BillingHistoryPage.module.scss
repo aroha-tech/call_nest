@@ -1,0 +1,10 @@
+@use '../styles/variables' as *;
+
+.page {
+  width: 100%;
+  max-width: none;
+}
+
+.mb {
+  margin-bottom: $space-4;
+}

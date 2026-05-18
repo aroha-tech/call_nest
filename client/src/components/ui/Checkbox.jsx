@@ -18,21 +18,29 @@ export function Checkbox({
   checked = false,
   onChange,
   disabled = false,
+  readOnly = false,
+  /** `table` — high-contrast box for admin list cells (light + dark themes). */
+  variant = 'default',
   className = '',
   labelClassName = '',
   required = false,
 }) {
   const { text: labelText, hasInlineRequiredMark } = parseLabel(label);
   const showRequiredMark = required || hasInlineRequiredMark;
+  const isDisabled = disabled && !readOnly;
+  const isTableVariant = variant === 'table';
 
   return (
-    <label className={`${styles.checkbox} ${disabled ? styles.disabled : ''} ${className}`}>
+    <label
+      className={`${styles.checkbox} ${isDisabled ? styles.disabled : ''} ${readOnly ? styles.readOnly : ''} ${isTableVariant ? styles.tableVariant : ''} ${className}`.trim()}
+    >
       <input
         type="checkbox"
         id={id}
         checked={checked}
         onChange={onChange}
-        disabled={disabled}
+        disabled={isDisabled}
+        readOnly={readOnly}
         className={styles.input}
       />
       <span className={styles.checkmark} />

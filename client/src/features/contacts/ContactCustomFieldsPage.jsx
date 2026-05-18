@@ -1,5 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { MasterCRUDPage } from '../disposition/components/MasterCRUDPage.jsx';
+import masterCrudStyles from '../disposition/components/MasterCRUDPage.module.scss';
+import { Checkbox } from '../../components/ui/Checkbox';
 import { useAsyncData, useMutation } from '../../hooks/useAsyncData';
 import { contactCustomFieldsAPI } from '../../services/contactCustomFieldsAPI';
 
@@ -47,7 +49,24 @@ export function ContactCustomFieldsPage() {
   const activateMutation = useMutation((id) => contactCustomFieldsAPI.activate(id));
   const deactivateMutation = useMutation((id) => contactCustomFieldsAPI.deactivate(id));
 
-  const columns = [
+  const [requiredToggleId, setRequiredToggleId] = useState(null);
+
+  const handleRequiredToggle = useCallback(
+    async (item, nextChecked) => {
+      const id = item.id ?? item.field_id;
+      if (!id) return;
+      setRequiredToggleId(id);
+      try {
+        const result = await updateMutation.mutate(id, { is_required: nextChecked });
+        if (result?.success) refetch();
+      } finally {
+        setRequiredToggleId(null);
+      }
+    },
+    [updateMutation, refetch]
+  );
+
+  const columns = useMemo(() => [
     { key: 'name', label: 'Key', width: '20%' },
     { key: 'label', label: 'Label', width: '25%' },
     {
@@ -63,7 +82,24 @@ export function ContactCustomFieldsPage() {
       key: 'is_required',
       label: 'Required',
       width: '10%',
-      render: (val) => (val ? 'Yes' : 'No'),
+      align: 'center',
+      render: (val, item) => {
+        const id = item.id ?? item.field_id;
+        const busy = requiredToggleId === id;
+        return (
+          <Checkbox
+            checked={!!val}
+            variant="table"
+            disabled={busy}
+            onChange={(e) => {
+              e.stopPropagation();
+              handleRequiredToggle(item, e.target.checked);
+            }}
+            aria-label={val ? 'Required — click to make optional' : 'Not required — click to make required'}
+            className={masterCrudStyles.tableCheckboxCell}
+          />
+        );
+      },
     },
     {
       key: 'options_json',
@@ -87,7 +123,7 @@ export function ContactCustomFieldsPage() {
         }
       },
     },
-  ];
+  ], [handleRequiredToggle, requiredToggleId]);
 
   const formFields = [
     {
@@ -119,8 +155,9 @@ export function ContactCustomFieldsPage() {
     },
     {
       name: 'is_required',
-      label: 'Required?',
-      placeholder: '0 or 1',
+      label: 'Required on contact forms',
+      type: 'checkbox',
+      defaultValue: false,
     },
   ];
 
@@ -146,7 +183,7 @@ export function ContactCustomFieldsPage() {
     })
     .map((item) => ({
       ...item,
-      is_required: item.is_required ? 1 : 0,
+      is_required: !!(item.is_required === 1 || item.is_required === true || item.is_required === '1'),
     }));
 
   return (

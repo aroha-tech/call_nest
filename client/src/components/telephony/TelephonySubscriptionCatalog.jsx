@@ -5,8 +5,10 @@ import {
   PLAN_BILLING_CYCLES,
   availableBillingCycles,
   billingIntervalPriceSuffix,
+  filterBillingCyclesByVisibility,
   isContactSalesPlan,
   isFreePlan,
+  normalizeSubscriptionCyclesVisible,
   resolvePlanCyclePrice,
   resolvePlanCycleIncludedCredit,
 } from '../../utils/planCyclePricing';
@@ -41,6 +43,7 @@ function SubscriptionPlanCard({
 }) {
   const isFree = isFreePlan(plan);
   const isEnterprise = isContactSalesPlan(plan);
+  const salesDisabled = isEnterprise && !preview;
   const freeDisabled = isFree && freePlanAdminOnly && !preview;
   const price = isFree || isEnterprise ? null : resolvePlanCyclePrice(plan, billingCycle);
   const orig = Number(price?.original_price_paise);
@@ -125,9 +128,20 @@ function SubscriptionPlanCard({
               isCurrent ||
               payingId != null ||
               freeDisabled ||
+              salesDisabled ||
               (!isEnterprise && !isFree && !razorpayConfigured)
             }
-            onClick={() => onSubscribe?.(plan, { billingInterval: billingCycle })}
+            onClick={() => {
+              if (salesDisabled) return;
+              onSubscribe?.(plan, { billingInterval: billingCycle });
+            }}
+            title={
+              salesDisabled
+                ? 'Contact your platform administrator for enterprise pricing'
+                : freeDisabled
+                  ? 'Free trial is assigned by your platform administrator'
+                  : undefined
+            }
           >
             {preview
               ? cta
@@ -155,16 +169,22 @@ function PlanSection({
   payingId,
   onSubscribe,
   freePlanAdminOnly,
+  subscriptionCyclesVisible = null,
 }) {
   const [cycle, setCycle] = useState('month');
+  const cyclesVisible = useMemo(
+    () => normalizeSubscriptionCyclesVisible(subscriptionCyclesVisible),
+    [subscriptionCyclesVisible]
+  );
   const cycles = useMemo(() => {
     const set = new Set();
     for (const p of plans) {
       for (const iv of availableBillingCycles(p)) set.add(iv);
     }
     if (!set.size) set.add('month');
-    return PLAN_BILLING_CYCLES.filter((c) => set.has(c.value));
-  }, [plans]);
+    const fromPlans = PLAN_BILLING_CYCLES.filter((c) => set.has(c.value));
+    return filterBillingCyclesByVisibility(fromPlans, cyclesVisible);
+  }, [plans, cyclesVisible]);
 
   const visible = useMemo(() => {
     if (!cycles.some((c) => c.value === cycle)) return cycles[0]?.value || 'month';
@@ -221,14 +241,22 @@ export function TelephonySubscriptionCatalog({
   payingId = null,
   onSubscribe,
   freePlanAdminOnly = true,
+  subscriptionCyclesVisible = null,
 }) {
-  const creditPlans = useMemo(() => plans.filter((p) => p.plan_type === 'credit'), [plans]);
-  const unlimitedPlans = useMemo(() => plans.filter((p) => p.plan_type === 'unlimited'), [plans]);
+  const creditPlans = useMemo(
+    () => plans.filter((p) => p.plan_type === 'credit' && !isContactSalesPlan(p)),
+    [plans]
+  );
+  const unlimitedPlans = useMemo(
+    () => plans.filter((p) => p.plan_type === 'unlimited' && !isContactSalesPlan(p)),
+    [plans]
+  );
+  const contactSalesPlans = useMemo(() => plans.filter((p) => isContactSalesPlan(p)), [plans]);
 
   if (!plans.length) {
     return (
       <p className={styles.empty}>
-        No subscription plans configured. Add plans under Admin → Telephony plans.
+        No subscription plans configured. Add plans under Admin → Product plans.
       </p>
     );
   }
@@ -246,6 +274,7 @@ export function TelephonySubscriptionCatalog({
           payingId={payingId}
           onSubscribe={onSubscribe}
           freePlanAdminOnly={freePlanAdminOnly}
+          subscriptionCyclesVisible={subscriptionCyclesVisible}
         />
       ) : null}
       {unlimitedPlans.length > 0 ? (
@@ -259,8 +288,24 @@ export function TelephonySubscriptionCatalog({
           payingId={payingId}
           onSubscribe={onSubscribe}
           freePlanAdminOnly={freePlanAdminOnly}
+          subscriptionCyclesVisible={subscriptionCyclesVisible}
+        />
+      ) : null}
+      {contactSalesPlans.length > 0 ? (
+        <PlanSection
+          title="Enterprise & custom"
+          subtitle="Sales-assisted plans — checkout is not available online. Contact your platform administrator."
+          plans={contactSalesPlans}
+          assignedPlanId={assignedPlanId}
+          preview={preview}
+          razorpayConfigured={razorpayConfigured}
+          payingId={payingId}
+          onSubscribe={onSubscribe}
+          freePlanAdminOnly={freePlanAdminOnly}
+          subscriptionCyclesVisible={subscriptionCyclesVisible}
         />
       ) : null}
     </div>
   );
 }
+

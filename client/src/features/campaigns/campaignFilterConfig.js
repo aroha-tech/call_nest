@@ -7,6 +7,7 @@ export const OPERATOR_LABELS = {
   gt: 'Greater than',
   lte: 'Less or equal',
   gte: 'Greater or equal',
+  between: 'Between',
   contains: 'Contains',
   not_contains: 'Does not contain',
   is_blank: 'Is blank',
@@ -33,7 +34,12 @@ export const CAMPAIGN_FILTER_PROPERTIES = [
   { id: 'manager_id', label: 'Manager', operators: ['eq', 'ne', 'in', 'is_blank', 'is_not_blank'], valueType: 'manager' },
   { id: 'assigned_user_id', label: 'Assigned agent', operators: ['eq', 'ne', 'in', 'is_blank', 'is_not_blank'], valueType: 'agent' },
   { id: 'campaign_id', label: 'Static campaign', operators: ['eq', 'ne', 'in', 'is_blank', 'is_not_blank'], valueType: 'campaign' },
-  { id: 'created_at', label: 'Created date', operators: ['eq', 'ne', 'lt', 'gt', 'lte', 'gte', 'is_blank', 'is_not_blank'], valueType: 'datetime' },
+  {
+    id: 'created_at',
+    label: 'Created date',
+    operators: ['eq', 'ne', 'lt', 'gt', 'lte', 'gte', 'between', 'is_blank', 'is_not_blank'],
+    valueType: 'datetime',
+  },
 ];
 
 const RECORD_TYPE_OPTIONS = [
@@ -85,7 +91,11 @@ export function coerceRuleForProperty(propertyId, prev) {
   } else {
     value = Array.isArray(prevVal) ? (prevVal[0] != null ? String(prevVal[0]) : '') : prevVal != null ? String(prevVal) : '';
   }
-  return { property: meta.id, op, value };
+  const out = { property: meta.id, op, value };
+  if (meta.valueType === 'datetime' && op === 'between') {
+    out.value2 = switched ? '' : typeof prev?.value2 === 'string' ? prev.value2 : '';
+  }
+  return out;
 }
 
 export function getEnumOptions(propertyId) {
@@ -95,6 +105,10 @@ export function getEnumOptions(propertyId) {
 
 export function ruleNeedsValue(op) {
   return op !== 'is_blank' && op !== 'is_not_blank';
+}
+
+export function ruleNeedsSecondValue(op) {
+  return op === 'between';
 }
 
 /** Strict enough for filter eq/ne; not full RFC parser. */
@@ -116,7 +130,13 @@ export function validateRulesForSave(rules) {
         return `Row ${i + 1}: choose at least one value for "Is any of".`;
       }
     } else if (meta.valueType === 'datetime') {
-      if (!String(r.value || '').trim()) return `Row ${i + 1}: date/time is required.`;
+      if (r.op === 'between') {
+        if (!String(r.value || '').trim() || !String(r.value2 || '').trim()) {
+          return `Row ${i + 1}: start and end date/time are required for Between.`;
+        }
+      } else if (!String(r.value || '').trim()) {
+        return `Row ${i + 1}: date/time is required.`;
+      }
     } else if (r.value === undefined || r.value === null || String(r.value).trim() === '') {
       return `Row ${i + 1}: value is required for this operator.`;
     } else if (r.property === 'email' && (r.op === 'eq' || r.op === 'ne') && !isValidEmailForFilter(r.value)) {

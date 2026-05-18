@@ -9,7 +9,7 @@ import { resolvePlanCycleIncludedCredit } from '../../utils/planCyclePricing.js'
 export async function grantIncludedWalletCredit(
   tenantId,
   plan,
-  { grantSource, grantReference, createdByUserId = null, billingInterval = 'month' } = {}
+  { grantSource, grantReference, createdByUserId = null, billingInterval = 'month', conn = null } = {}
 ) {
   const tid = Number(tenantId);
   const planId = Number(plan?.id);
@@ -39,13 +39,17 @@ export async function grantIncludedWalletCredit(
     throw err;
   }
 
-  try {
-    await query(
-      `INSERT INTO tenant_telephony_wallet_grants
+  const insertGrantSql = `INSERT INTO tenant_telephony_wallet_grants
          (tenant_id, telephony_billing_plan_id, grant_source, grant_reference, amount_paise, created_by)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [tid, planId, source, reference, amountPaise, createdByUserId ?? null]
-    );
+       VALUES (?, ?, ?, ?, ?, ?)`;
+  const insertGrantParams = [tid, planId, source, reference, amountPaise, createdByUserId ?? null];
+
+  try {
+    if (conn) {
+      await conn.execute(insertGrantSql, insertGrantParams);
+    } else {
+      await query(insertGrantSql, insertGrantParams);
+    }
   } catch (e) {
     if (e?.code === 'ER_DUP_ENTRY') {
       return { granted: false, reason: 'already_granted', amount_paise: amountPaise, grant_reference: reference };
@@ -54,12 +58,15 @@ export async function grantIncludedWalletCredit(
   }
 
   const planLabel = plan.name || plan.code || `plan #${planId}`;
-  const wallet = await callCreditsService.addCredits(tid, {
+  const creditOpts = {
     amountPaise,
     entryType: 'subscription_included',
     note: `Included credits: ${planLabel} (${reference})`.slice(0, 255),
     createdByUserId,
-  });
+  };
+  const wallet = conn
+    ? await callCreditsService.addCreditsInTx(conn, tid, creditOpts)
+    : await callCreditsService.addCredits(tid, creditOpts);
 
   return {
     granted: true,

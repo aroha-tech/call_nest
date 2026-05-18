@@ -87,6 +87,11 @@ export async function updatePlatformSettings(req, res, next) {
         )
       );
     }
+    if (body.subscription_cycles_visible !== undefined) {
+      writes.push(
+        platformSettingsService.setSubscriptionCyclesVisible(body.subscription_cycles_visible, userId)
+      );
+    }
     await Promise.all(writes);
     const data = await platformSettingsService.getAllTelephonySettings();
     res.json({ data });
@@ -290,6 +295,8 @@ export async function getLedger(req, res, next) {
     const data = await callCreditsService.listLedger(tenantId, {
       page: req.query.page,
       limit: req.query.limit,
+      search: req.query.search,
+      entryType: req.query.entry_type ?? req.query.entryType,
     });
     res.json({ data });
   } catch (err) {

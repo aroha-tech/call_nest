@@ -161,6 +161,7 @@ export function TelephonyPlansDraggableTable({
             {isTopUp ? 'Price' : isSeat ? 'Price / seat' : 'Cycle prices'}
           </TableHeaderCell>
           {isSubscription ? <TableHeaderCell>Seats (bundle)</TableHeaderCell> : null}
+          {isSubscription ? <TableHeaderCell>Visibility</TableHeaderCell> : null}
           {isTopUp ? <TableHeaderCell>Wallet credit</TableHeaderCell> : null}
           <TableHeaderCell>Status</TableHeaderCell>
           <TableHeaderCell aria-label="Actions" />
@@ -243,6 +244,16 @@ export function TelephonyPlansDraggableTable({
                   ]
                     .filter(Boolean)
                     .join(' ') || '—'}
+                </TableCell>
+              ) : null}
+              {isSubscription ? (
+                <TableCell className={styles.muted}>
+                  {[
+                    row.visible_on_website !== 0 ? 'Web' : null,
+                    row.visible_on_panel !== 0 ? 'Panel' : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || 'Hidden'}
                 </TableCell>
               ) : null}
               {isTopUp ? (

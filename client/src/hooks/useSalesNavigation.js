@@ -15,8 +15,7 @@ const PLATFORM_NAV_ITEMS = [
   { key: 'tenants', label: 'Tenants', path: '/admin/tenants' },
   { key: 'users', label: 'Users', path: '/admin/users' },
   { key: 'billing', label: 'Billing', path: '/admin/billing' },
-  { key: 'telephony-plans', label: 'Telephony plans', path: '/admin/telephony-plans' },
-  { key: 'telephony-billing', label: 'Tenant telephony', path: '/admin/telephony-billing' },
+  { key: 'telephony-plans', label: 'Product plans', path: '/admin/telephony-plans' },
   {
     key: 'settings',
     label: 'Settings',
@@ -249,7 +248,7 @@ const TENANT_ADMIN_NAV_ITEMS = [
       { key: 'billing', label: 'Billing & plans', path: '/settings/billing', permission: PERMISSIONS.SETTINGS_MANAGE },
       {
         key: 'telephony',
-        label: 'Telephony & calls',
+        label: 'Calling setup',
         path: '/settings/telephony',
         permissions: [
           PERMISSIONS.SETTINGS_MANAGE,

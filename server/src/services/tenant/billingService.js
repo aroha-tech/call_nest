@@ -6,6 +6,10 @@ import {
   verifyRazorpayPaymentSignature,
   shortReceiptId,
 } from '../billing/billingCore.js';
+import {
+  getCurrentTelephonySubscription,
+  listSubscriptionHistory,
+} from '../billing/telephonySubscriptionService.js';
 
 
 export async function listPlansForTenant(tenantId) {
@@ -410,15 +414,33 @@ export async function listPayments(tenantId, { page = 1, limit = 20, search = ''
   return { data: rows, total, page: p, limit: lim };
 }
 
-export async function listSubscriptions(tenantId, { page = 1, limit = 20 } = {}) {
+export async function listSubscriptions(tenantId, opts = {}) {
+  const telephony = await listSubscriptionHistory(tenantId, opts);
+  if (telephony.total > 0) {
+    return telephony;
+  }
+
   const tid = Number(tenantId);
-  const p = Math.max(1, Number(page) || 1);
-  const lim = Math.min(100, Math.max(1, Number(limit) || 20));
+  const p = Math.max(1, Number(opts.page) || 1);
+  const lim = Math.min(100, Math.max(1, Number(opts.limit) || 20));
   const offset = (p - 1) * lim;
+  const q = String(opts.search || '').trim();
+
+  const filters = ['ts.tenant_id = ?', 'ts.deleted_at IS NULL'];
+  const params = [tid];
+  if (q) {
+    filters.push('(sp.name LIKE ? OR sp.code LIKE ? OR ts.razorpay_payment_id LIKE ?)');
+    const like = `%${q}%`;
+    params.push(like, like, like);
+  }
+  const where = filters.join(' AND ');
 
   const countRows = await query(
-    `SELECT COUNT(*) AS c FROM tenant_subscriptions WHERE tenant_id = ? AND deleted_at IS NULL`,
-    [tid]
+    `SELECT COUNT(*) AS c
+     FROM tenant_subscriptions ts
+     JOIN subscription_plans sp ON sp.id = ts.plan_id
+     WHERE ${where}`,
+    params
   );
   const total = Number(countRows?.[0]?.c || 0);
 
@@ -430,16 +452,21 @@ export async function listSubscriptions(tenantId, { page = 1, limit = 20 } = {})
             sp.name AS plan_name, sp.code AS plan_code, sp.billing_interval
      FROM tenant_subscriptions ts
      JOIN subscription_plans sp ON sp.id = ts.plan_id
-     WHERE ts.tenant_id = ? AND ts.deleted_at IS NULL
+     WHERE ${where}
      ORDER BY ts.created_at DESC
      LIMIT ${limN} OFFSET ${offN}`,
-    [tid]
+    params
   );
 
   return { data: rows, total, page: p, limit: lim };
 }
 
 export async function getCurrentSubscription(tenantId) {
+  const telephony = await getCurrentTelephonySubscription(tenantId);
+  if (telephony) {
+    return telephony;
+  }
+
   const tid = Number(tenantId);
   const rows = await query(
     `SELECT ts.id, ts.status, ts.current_period_start, ts.current_period_end,

@@ -12,6 +12,62 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
+
+  &.readOnly {
+    cursor: default;
+    pointer-events: none;
+
+    .checkmark {
+      opacity: 1;
+      border-color: var(--color-input-border);
+      background: var(--color-bg-elevated, var(--color-input-bg));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+    }
+
+    .input:checked + .checkmark {
+      background: var(--color-primary-600);
+      border-color: var(--color-primary-500);
+      box-shadow: 0 1px 0 color-mix(in srgb, #ffffff 18%, transparent) inset;
+
+      &::after {
+        display: block;
+      }
+    }
+  }
+
+  &.tableVariant {
+    .checkmark {
+      width: 18px;
+      height: 18px;
+      border-width: 2px;
+      border-color: color-mix(in srgb, var(--color-text-primary) 32%, var(--color-border, #94a3b8));
+      background: var(--color-bg-elevated, #ffffff);
+    }
+
+    .input:checked + .checkmark {
+      background: var(--color-primary-600);
+      border-color: var(--color-primary-500);
+
+      &::after {
+        display: block;
+        left: 6px;
+        top: 2px;
+        width: 4px;
+        height: 8px;
+      }
+    }
+
+    &.readOnly .checkmark {
+      border-color: color-mix(in srgb, var(--color-text-primary) 36%, var(--color-border, #94a3b8));
+      background: var(--color-bg-elevated, #ffffff);
+      box-shadow: none;
+    }
+
+    &.readOnly .input:checked + .checkmark {
+      background: var(--color-primary-600);
+      border-color: var(--color-primary-600);
+    }
+  }
 }
 
 .input {
@@ -80,6 +136,7 @@
     background: color-mix(in srgb, var(--color-primary-600) 55%, var(--color-bg-subtle));
     border-color: color-mix(in srgb, var(--color-primary-500) 45%, var(--color-border-subtle));
   }
+
 }
 
 .label {

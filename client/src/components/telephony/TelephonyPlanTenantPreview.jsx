@@ -51,14 +51,17 @@ export function TelephonyPlanTenantPreview({
   loading = false,
   refreshing = false,
   fullCatalog = false,
+  subscriptionCyclesVisible = null,
 }) {
   const cat = category || plan?.plan_category || PLAN_CATEGORY.SUBSCRIPTION;
   const focusId = highlightPlanId ?? plan?.id ?? null;
 
   const subscriptionCatalog = useMemo(() => {
-    const filtered = billingPlanTypeFilter
+    const panelVisible = (p) => p.visible_on_panel !== 0 && p.visible_on_panel !== false;
+    const filtered = (billingPlanTypeFilter
       ? subscriptionPlans.filter((p) => p.plan_type === billingPlanTypeFilter)
-      : subscriptionPlans;
+      : subscriptionPlans
+    ).filter(panelVisible);
 
     if (cat !== PLAN_CATEGORY.SUBSCRIPTION || !plan) {
       return filtered;
@@ -122,6 +125,7 @@ export function TelephonyPlanTenantPreview({
             seatPurchaseEligible={seatPlans.length > 0}
             razorpayConfigured
             freePlanAdminOnly={false}
+            subscriptionCyclesVisible={subscriptionCyclesVisible}
           />
         </Card>
       </PreviewShell>
@@ -160,6 +164,7 @@ export function TelephonyPlanTenantPreview({
               preview
               razorpayConfigured
               freePlanAdminOnly={false}
+              subscriptionCyclesVisible={subscriptionCyclesVisible}
             />
           </Card>
         </section>

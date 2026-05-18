@@ -8,6 +8,8 @@ import {
   findById as findTelephonyPlanById,
   serializePlanForClient,
 } from '../superAdmin/telephonyBillingPlansService.js';
+import { getSubscriptionCyclesVisible } from './platformSettingsService.js';
+import { isSubscriptionCycleEnabled } from '../../utils/subscriptionCatalogSettings.js';
 import {
   resolvePlanCyclePrice,
   resolvePlanCycleIncludedCredit,
@@ -161,6 +163,7 @@ export async function activateTelephonySubscription(
       grantReference: ref,
       createdByUserId: uid,
       billingInterval: cycleIv,
+      conn,
     });
   }
 
@@ -196,17 +199,22 @@ export async function activateFromAdminAssign(tenantId, planId, userId = null) {
   });
 }
 
-export async function ensureRazorpayPlan(plan) {
-  if (plan.razorpay_plan_id) return String(plan.razorpay_plan_id).trim();
-  const sale = Number(plan.sale_price_paise);
+export async function ensureRazorpayPlan(plan, billingInterval = 'month') {
+  const iv = PLAN_BILLING_CYCLES.includes(billingInterval) ? billingInterval : 'month';
+  if (plan.razorpay_plan_id && iv === (plan.billing_interval || 'month')) {
+    return String(plan.razorpay_plan_id).trim();
+  }
+
+  const cyclePrice = resolvePlanCyclePrice(plan, iv);
+  const sale = Number(cyclePrice?.sale_price_paise ?? plan.sale_price_paise);
   if (!Number.isFinite(sale) || sale < 1) {
-    const err = new Error('Plan has no sale price for recurring billing');
+    const err = new Error(`Plan has no sale price for ${iv} recurring billing`);
     err.status = 400;
     throw err;
   }
   const charge = computePlanChargePaise(plan, sale);
   const rzp = await createRazorpaySdk();
-  const period = plan.billing_interval === 'year' ? 'yearly' : 'monthly';
+  const period = iv === 'year' ? 'yearly' : 'monthly';
   const rzpPlan = await rzp.plans.create({
     period,
     interval: 1,
@@ -232,7 +240,7 @@ export async function createSubscriptionCheckout(
   tenantId,
   userId,
   planId,
-  { autoRenew = false, billingInterval = 'month' } = {}
+  { autoRenew = false, billingInterval = 'month' } = {} // one-time Razorpay order by default (same as credit top-up)
 ) {
   const tid = Number(tenantId);
   const uid = userId != null ? Number(userId) : null;
@@ -249,8 +257,19 @@ export async function createSubscriptionCheckout(
     err.status = 400;
     throw err;
   }
+  if (plan.visible_on_panel === 0) {
+    const err = new Error('This plan is not available for self-serve checkout.');
+    err.status = 403;
+    throw err;
+  }
 
   const iv = PLAN_BILLING_CYCLES.includes(billingInterval) ? billingInterval : 'month';
+  const cyclesVisible = await getSubscriptionCyclesVisible();
+  if (!isSubscriptionCycleEnabled(cyclesVisible, iv)) {
+    const err = new Error(`Billing cycle "${iv}" is not available.`);
+    err.status = 400;
+    throw err;
+  }
   const cyclePrice = resolvePlanCyclePrice(plan, iv);
   const sale = Number(cyclePrice?.sale_price_paise);
   if (!Number.isFinite(sale) || sale < 1) {
@@ -286,7 +305,7 @@ export async function createSubscriptionCheckout(
   const rzp = await createRazorpaySdk();
 
   if (autoRenew && (iv === 'month' || iv === 'year')) {
-    const rzpPlanId = await ensureRazorpayPlan(plan);
+    const rzpPlanId = await ensureRazorpayPlan(plan, iv);
     const sub = await rzp.subscriptions.create({
       plan_id: rzpPlanId,
       total_count: 120,
@@ -660,6 +679,7 @@ export async function applySubscriptionCharged({
               grantReference: `sub:rzp:${subId}:renew:${payId}`,
               createdByUserId: userId,
               billingInterval: renewIv,
+              conn,
             })
           : { granted: false, reason: 'no_payment_id' };
         result = {
@@ -732,15 +752,30 @@ export async function applyWebhookPaymentCaptured({
   });
 }
 
-export async function listSubscriptionHistory(tenantId, { page = 1, limit = 20 } = {}) {
+export async function listSubscriptionHistory(tenantId, { page = 1, limit = 20, search = '' } = {}) {
   const tid = Number(tenantId);
   const p = Math.max(1, Number(page) || 1);
   const lim = Math.min(100, Math.max(1, Number(limit) || 20));
   const offset = (p - 1) * lim;
+  const q = String(search || '').trim();
+
+  const filters = ['ts.tenant_id = ?', 'ts.deleted_at IS NULL'];
+  const params = [tid];
+  if (q) {
+    filters.push(
+      '(p.name LIKE ? OR p.code LIKE ? OR ts.razorpay_payment_id LIKE ? OR ts.razorpay_order_id LIKE ?)'
+    );
+    const like = `%${q}%`;
+    params.push(like, like, like, like);
+  }
+  const where = filters.join(' AND ');
 
   const [countRow] = await query(
-    `SELECT COUNT(*) AS c FROM tenant_telephony_subscriptions WHERE tenant_id = ? AND deleted_at IS NULL`,
-    [tid]
+    `SELECT COUNT(*) AS c
+     FROM tenant_telephony_subscriptions ts
+     JOIN telephony_billing_plans p ON p.id = ts.telephony_billing_plan_id AND p.deleted_at IS NULL
+     WHERE ${where}`,
+    params
   );
   const total = Number(countRow?.c || 0);
   const limN = Math.trunc(lim);
@@ -748,14 +783,14 @@ export async function listSubscriptionHistory(tenantId, { page = 1, limit = 20 }
 
   const rows = await query(
     `SELECT ts.id, ts.status, ts.current_period_start, ts.current_period_end, ts.auto_renew,
-            ts.razorpay_payment_id, ts.created_at,
+            ts.razorpay_payment_id, ts.razorpay_order_id, ts.created_at,
             p.name AS plan_name, p.code AS plan_code, p.billing_interval, p.subscription_tier
      FROM tenant_telephony_subscriptions ts
      JOIN telephony_billing_plans p ON p.id = ts.telephony_billing_plan_id AND p.deleted_at IS NULL
-     WHERE ts.tenant_id = ? AND ts.deleted_at IS NULL
+     WHERE ${where}
      ORDER BY ts.created_at DESC
      LIMIT ${limN} OFFSET ${offN}`,
-    [tid]
+    params
   );
 
   return { data: rows, total, page: p, limit: lim };

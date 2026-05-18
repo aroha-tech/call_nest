@@ -6,7 +6,7 @@ import { useToast } from '../context/ToastContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
+import { IconButton } from '../components/ui/IconButton';
 import { Alert } from '../components/ui/Alert';
 import { Spinner } from '../components/ui/Spinner';
 import { MaterialSymbol } from '../components/ui/MaterialSymbol';
@@ -456,24 +456,33 @@ export function LeadImportAssignmentSettingsPage() {
                         </td>
                         <td className={styles.tdManager}>{managerDisplayForAgent(agentUser)}</td>
                         <td className={styles.tdPct}>
-                          <Input
-                            type="number"
-                            min={0}
-                            max={100}
-                            step={1}
-                            id={`lead-import-pct-${uid}`}
-                            aria-label="Percent for this agent. All selected agents must total 100%."
-                            className={styles.agentPctInput}
-                            inputClassName={styles.agentPctInputField}
-                            value={String(clampPct(row.weight))}
-                            onChange={(e) => updatePct(uid, e.target.value)}
-                          />
+                          <div className={styles.pctCell}>
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={1}
+                              id={`lead-import-pct-${uid}`}
+                              aria-label="Percent for this agent. All selected agents must total 100%."
+                              className={styles.agentPctInputField}
+                              value={String(clampPct(row.weight))}
+                              onChange={(e) => updatePct(uid, e.target.value)}
+                            />
+                            <span className={styles.pctSuffix} aria-hidden>
+                              %
+                            </span>
+                          </div>
                         </td>
                         <td className={styles.tdActions}>
-                          <Button type="button" variant="secondary" onClick={() => removeAgent(uid)}>
+                          <IconButton
+                            type="button"
+                            variant="subtle"
+                            size="md"
+                            title="Remove from selected list"
+                            onClick={() => removeAgent(uid)}
+                          >
                             <MaterialSymbol name="close" size="sm" aria-hidden />
-                            Remove
-                          </Button>
+                          </IconButton>
                         </td>
                       </tr>
                     );

@@ -64,21 +64,67 @@ export async function listAllSubscriptions({ tenantId, page = 1, limit = 20, sea
     params.push(tid);
   }
   if (q) {
-    filters.push('(t.name LIKE ? OR t.slug LIKE ? OR sp.code LIKE ? OR sp.name LIKE ?)');
+    filters.push(
+      '(t.name LIKE ? OR t.slug LIKE ? OR p.code LIKE ? OR p.name LIKE ? OR ts.razorpay_payment_id LIKE ?)'
+    );
     const like = `%${q}%`;
-    params.push(like, like, like, like);
+    params.push(like, like, like, like, like);
   }
   const where = filters.join(' AND ');
 
   const countRows = await query(
     `SELECT COUNT(*) AS c
-     FROM tenant_subscriptions ts
+     FROM tenant_telephony_subscriptions ts
      LEFT JOIN tenants t ON t.id = ts.tenant_id AND t.is_deleted = 0
-     LEFT JOIN subscription_plans sp ON sp.id = ts.plan_id
+     LEFT JOIN telephony_billing_plans p ON p.id = ts.telephony_billing_plan_id AND p.deleted_at IS NULL
      WHERE ${where}`,
     params
   );
-  const total = Number(countRows?.[0]?.c || 0);
+  const telephonyTotal = Number(countRows?.[0]?.c || 0);
+
+  if (telephonyTotal > 0 || !q) {
+    const limN = Math.trunc(lim);
+    const offN = Math.trunc(offset);
+    const rows = await query(
+      `SELECT ts.id, ts.tenant_id, t.name AS tenant_name, t.slug AS tenant_slug,
+              ts.status, ts.current_period_start, ts.current_period_end,
+              ts.razorpay_order_id, ts.razorpay_payment_id, ts.created_at,
+              p.name AS plan_name, p.code AS plan_code, p.billing_interval
+       FROM tenant_telephony_subscriptions ts
+       LEFT JOIN tenants t ON t.id = ts.tenant_id AND t.is_deleted = 0
+       LEFT JOIN telephony_billing_plans p ON p.id = ts.telephony_billing_plan_id AND p.deleted_at IS NULL
+       WHERE ${where}
+       ORDER BY ts.created_at DESC
+       LIMIT ${limN} OFFSET ${offN}`,
+      params
+    );
+    if (telephonyTotal > 0 || rows.length > 0) {
+      return { data: rows, total: telephonyTotal, page: p, limit: lim };
+    }
+  }
+
+  const legacyFilters = ['ts.deleted_at IS NULL'];
+  const legacyParams = [];
+  if (Number.isFinite(tid) && tid > 0) {
+    legacyFilters.push('ts.tenant_id = ?');
+    legacyParams.push(tid);
+  }
+  if (q) {
+    legacyFilters.push('(t.name LIKE ? OR t.slug LIKE ? OR sp.code LIKE ? OR sp.name LIKE ?)');
+    const like = `%${q}%`;
+    legacyParams.push(like, like, like, like);
+  }
+  const legacyWhere = legacyFilters.join(' AND ');
+
+  const legacyCountRows = await query(
+    `SELECT COUNT(*) AS c
+     FROM tenant_subscriptions ts
+     LEFT JOIN tenants t ON t.id = ts.tenant_id AND t.is_deleted = 0
+     LEFT JOIN subscription_plans sp ON sp.id = ts.plan_id
+     WHERE ${legacyWhere}`,
+    legacyParams
+  );
+  const total = Number(legacyCountRows?.[0]?.c || 0);
 
   const limN = Math.trunc(lim);
   const offN = Math.trunc(offset);
@@ -90,10 +136,10 @@ export async function listAllSubscriptions({ tenantId, page = 1, limit = 20, sea
      FROM tenant_subscriptions ts
      LEFT JOIN tenants t ON t.id = ts.tenant_id AND t.is_deleted = 0
      LEFT JOIN subscription_plans sp ON sp.id = ts.plan_id
-     WHERE ${where}
+     WHERE ${legacyWhere}
      ORDER BY ts.created_at DESC
      LIMIT ${limN} OFFSET ${offN}`,
-    params
+    legacyParams
   );
 
   return { data: rows, total, page: p, limit: lim };

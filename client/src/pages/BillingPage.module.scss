@@ -3,8 +3,8 @@
 
 .page {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
 }
 
 .hero {
@@ -303,6 +303,10 @@
 
 .planSection {
   padding: $space-6 $space-5 $space-8;
+}
+
+.historyPreviewSection {
+  padding: $space-4 $space-5 $space-5;
 }
 
 .planGrid {

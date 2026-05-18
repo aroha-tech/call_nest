@@ -40,6 +40,8 @@ export async function getLedger(req, res, next) {
     const data = await callCreditsService.listLedger(tenantId, {
       page: req.query.page,
       limit: req.query.limit,
+      search: req.query.search,
+      entryType: req.query.entry_type ?? req.query.entryType,
     });
     res.json({ data });
   } catch (err) {

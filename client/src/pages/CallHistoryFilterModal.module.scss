@@ -332,6 +332,12 @@
   min-width: 0;
 }
 
+.valRange {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
 .valueInputControl {
   height: 40px !important;
 }

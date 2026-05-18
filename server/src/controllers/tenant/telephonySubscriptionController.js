@@ -60,6 +60,7 @@ export async function listHistory(req, res, next) {
     const result = await telephonySubscriptionService.listSubscriptionHistory(tenantId, {
       page,
       limit,
+      search: req.query.search,
     });
     res.json(result);
   } catch (err) {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -133,7 +133,7 @@ function SetupOverview({ mode, balance, canSelfTopUp }) {
             <p className={styles.overviewFoot}>
               {isBYO
                 ? 'Outbound calls use credentials you add below.'
-                : 'Outbound calls use the platform Exotel account — no setup needed.'}
+                : 'Outbound calls use the platform Exotel account â€” no setup needed.'}
             </p>
           </div>
         </div>
@@ -150,8 +150,8 @@ function SetupOverview({ mode, balance, canSelfTopUp }) {
             <p className={styles.overviewFoot}>
               {plan
                 ? plan.plan_type === 'credit'
-                  ? `${billingModeLabel('credit')} · ${formatPaiseAsInr(cfg?.ratePaisePerMinute)} / min`
-                  : `${billingModeLabel('unlimited')}${formatPlanCap(plan) ? ` · ${formatPlanCap(plan)}` : ''}`
+                  ? `${billingModeLabel('credit')} Â· ${formatPaiseAsInr(cfg?.ratePaisePerMinute)} / min`
+                  : `${billingModeLabel('unlimited')}${formatPlanCap(plan) ? ` Â· ${formatPlanCap(plan)}` : ''}`
                 : 'Billing is configured by your platform administrator.'}
             </p>
           </div>
@@ -171,12 +171,12 @@ function SetupOverview({ mode, balance, canSelfTopUp }) {
                 {belowMin ? (
                   <span className={styles.warn}>
                     {' '}
-                    · Below minimum {formatPaiseAsInr(cfg.minBalancePaise)} — new calls blocked
+                    Â· Below minimum {formatPaiseAsInr(cfg.minBalancePaise)} â€” new calls blocked
                   </span>
                 ) : canSelfTopUp ? (
-                  ' · Buy credit packs below or on Plans & billing'
+                  ' Â· Buy credit packs below or on Plans & billing'
                 ) : (
-                  ' · Top-ups are added by your platform administrator'
+                  ' Â· Top-ups are added by your platform administrator'
                 )}
               </p>
             </div>
@@ -233,7 +233,7 @@ function UsageSection({ balance, usage }) {
                   {Number(wallet?.balance_paise) < cfg.minBalancePaise ? (
                     <span className={styles.warn}>
                       {' '}
-                      · Below minimum {formatPaiseAsInr(cfg.minBalancePaise)} — calls blocked
+                      Â· Below minimum {formatPaiseAsInr(cfg.minBalancePaise)} â€” calls blocked
                     </span>
                   ) : null}
                 </>
@@ -245,7 +245,7 @@ function UsageSection({ balance, usage }) {
               value={formatPaiseAsInr(usage?.this_month?.spend_paise || 0)}
               foot={
                 <>
-                  {formatMinutes(usage?.this_month?.minutes || 0)} ·{' '}
+                  {formatMinutes(usage?.this_month?.minutes || 0)} Â·{' '}
                   {usage?.this_month?.calls || 0} calls
                 </>
               }
@@ -263,10 +263,10 @@ function UsageSection({ balance, usage }) {
                   {cap?.enabled ? (
                     <span className={styles.dim}>
                       {' '}
-                      · {cap.cap_minutes_per_month} min / month cap
+                      Â· {cap.cap_minutes_per_month} min / month cap
                     </span>
                   ) : (
-                    <span className={styles.dim}> · no monthly cap</span>
+                    <span className={styles.dim}> Â· no monthly cap</span>
                   )}
                 </>
               }
@@ -348,7 +348,7 @@ function ConnectionSection({ mode, canManageAccountMode, onSaved, onError }) {
       tone="violet"
       icon="settings_phone"
       title="How calls connect"
-      hint="Choose whether outbound calls use the platform’s shared Exotel account or your own Exotel credentials. Switching to BYO requires at least one active provider account in the section below."
+      hint="Choose whether outbound calls use the platformâ€™s shared Exotel account or your own Exotel credentials. Switching to BYO requires at least one active provider account in the section below."
     >
       <div className={styles.formGrid}>
         <Select
@@ -369,7 +369,7 @@ function ConnectionSection({ mode, canManageAccountMode, onSaved, onError }) {
         </Alert>
       ) : (
         <p className={styles.muted}>
-          Platform mode is the simplest option — no Exotel credentials are required on your side.
+          Platform mode is the simplest option â€” no Exotel credentials are required on your side.
         </p>
       )}
 
@@ -391,7 +391,7 @@ function ConnectionSection({ mode, canManageAccountMode, onSaved, onError }) {
       {canManageAccountMode ? (
         <div className={styles.cardActions}>
           <Button onClick={save} disabled={saving}>
-            {saving ? 'Saving…' : 'Save call routing'}
+            {saving ? 'Savingâ€¦' : 'Save call routing'}
           </Button>
         </div>
       ) : (
@@ -566,7 +566,7 @@ function ProviderAccountsSection({ canView, canManage, onChanged, onError }) {
       }
     >
       {loading && !accounts.length ? (
-        <p className={styles.muted}>Loading accounts…</p>
+        <p className={styles.muted}>Loading accountsâ€¦</p>
       ) : accounts.length ? (
         <Table>
           <TableHead>
@@ -591,9 +591,9 @@ function ProviderAccountsSection({ canView, canManage, onChanged, onError }) {
                     </span>
                   </div>
                 </TableCell>
-                <TableCell className={styles.mono}>{acc.account_sid || '—'}</TableCell>
-                <TableCell className={styles.mono}>{acc.caller_id_e164 || '—'}</TableCell>
-                <TableCell className={styles.mono}>{acc.agent_leg_e164 || '—'}</TableCell>
+                <TableCell className={styles.mono}>{acc.account_sid || 'â€”'}</TableCell>
+                <TableCell className={styles.mono}>{acc.caller_id_e164 || 'â€”'}</TableCell>
+                <TableCell className={styles.mono}>{acc.agent_leg_e164 || 'â€”'}</TableCell>
                 <TableCell>
                   <CopyableUrl url={acc.webhook_url} />
                 </TableCell>
@@ -739,7 +739,7 @@ function ProviderAccountsSection({ canView, canManage, onChanged, onError }) {
               Cancel
             </Button>
             <Button onClick={save} disabled={saving}>
-              {saving ? 'Saving…' : editingId == null ? 'Create account' : 'Save changes'}
+              {saving ? 'Savingâ€¦' : editingId == null ? 'Create account' : 'Save changes'}
             </Button>
           </div>
         </Card>
@@ -748,119 +748,6 @@ function ProviderAccountsSection({ canView, canManage, onChanged, onError }) {
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* Ledger (read-only)                                                         */
-/* -------------------------------------------------------------------------- */
-function LedgerSection({ canView, onError }) {
-  const { formatDateTime } = useDateTimeDisplay();
-  const [ledger, setLedger] = useState({ rows: [], page: 1, total: 0, limit: 10 });
-  const [busy, setBusy] = useState(false);
-
-  const load = useCallback(
-    async (page = 1) => {
-      if (!canView) return;
-      setBusy(true);
-      try {
-        const res = await tenantTelephonyAPI.listLedger({ page, limit: 10 });
-        setLedger({
-          rows: res.data?.data?.rows || [],
-          page: res.data?.data?.page || page,
-          total: res.data?.data?.total || 0,
-          limit: res.data?.data?.limit || 10,
-        });
-      } catch (e) {
-        onError(e?.response?.data?.error || e.message || 'Failed to load ledger');
-      } finally {
-        setBusy(false);
-      }
-    },
-    [canView, onError]
-  );
-
-  useEffect(() => {
-    void load(1);
-  }, [load]);
-
-  const totalPages = Math.max(1, Math.ceil((ledger.total || 0) / (ledger.limit || 10)));
-
-  if (!canView) return null;
-
-  return (
-    <TelephonySection
-      tone="amber"
-      icon="receipt_long"
-      title="Wallet transaction history"
-      hint="Every credit top-up and per-call debit on your call credit wallet. Top-ups are added by your platform administrator."
-    >
-      {ledger.rows.length ? (
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>When</TableHeaderCell>
-              <TableHeaderCell>Type</TableHeaderCell>
-              <TableHeaderCell>Amount</TableHeaderCell>
-              <TableHeaderCell>Balance after</TableHeaderCell>
-              <TableHeaderCell>Call</TableHeaderCell>
-              <TableHeaderCell>Note</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {ledger.rows.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell>{formatDateTime(row.created_at)}</TableCell>
-                <TableCell>
-                  <span className={styles.entryType}>{row.entry_type}</span>
-                </TableCell>
-                <TableCell
-                  className={Number(row.amount_paise) < 0 ? styles.amountNeg : styles.amountPos}
-                >
-                  {formatPaiseAsInr(row.amount_paise)}
-                  {row.unit_qty != null ? (
-                    <span className={styles.muted}>
-                      {' '}
-                      ({row.unit_qty} min × {row.unit_rate_paise}p)
-                    </span>
-                  ) : null}
-                </TableCell>
-                <TableCell>{formatPaiseAsInr(row.balance_after_paise)}</TableCell>
-                <TableCell>{row.call_attempt_id || '—'}</TableCell>
-                <TableCell>{row.note || '—'}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      ) : !busy ? (
-        <div className={styles.emptyState}>
-          <div className={styles.emptyStateIcon} aria-hidden>
-            <MaterialSymbol name="receipt_long" size="md" />
-          </div>
-          <p className={styles.emptyStateTitle}>No transactions yet</p>
-          <p className={styles.emptyStateText}>
-            Wallet entries appear here after top-ups or when connected calls are billed.
-          </p>
-        </div>
-      ) : (
-        <p className={styles.muted}>Loading…</p>
-      )}
-      {ledger.rows.length ? (
-        <Pagination
-          page={ledger.page}
-          totalPages={totalPages}
-          total={ledger.total}
-          limit={ledger.limit}
-          onPageChange={(p) => {
-            if (!busy) void load(p);
-          }}
-          hidePageSize
-        />
-      ) : null}
-    </TelephonySection>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Page                                                                       */
-/* -------------------------------------------------------------------------- */
 export function TenantTelephonyPage() {
   const user = useAppSelector(selectUser);
   const { can } = usePermissions();
@@ -913,9 +800,9 @@ export function TenantTelephonyPage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        title="Telephony & calls"
+        title="Calling setup"
         titleIcon="call"
-        subtitle="Manage how outbound calls connect, view usage, and (when on credit billing) your call wallet."
+        subtitle="Manage how outbound calls connect and view usage. Wallet history and plans are under Billing & plans."
       />
 
       {error ? (
@@ -969,9 +856,6 @@ export function TenantTelephonyPage() {
         onError={setError}
       />
 
-      {canViewCredits && balance?.config?.callBillingMode === 'credit' ? (
-        <LedgerSection canView={canViewCredits} onError={setError} />
-      ) : null}
     </div>
   );
 }

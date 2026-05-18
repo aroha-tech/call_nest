@@ -1,5 +1,23 @@
 /** Shared formatting and usage-level helpers for call credit / telephony UI. */
 
+export const LEDGER_ENTRY_TYPES = [
+  { value: '', label: 'All types' },
+  { value: 'topup', label: 'Top-up' },
+  { value: 'subscription_included', label: 'Plan included credits' },
+  { value: 'debit_call', label: 'Call debit' },
+  { value: 'adjustment_credit', label: 'Credit adjustment' },
+  { value: 'adjustment_debit', label: 'Debit adjustment' },
+  { value: 'refund', label: 'Refund' },
+];
+
+export function ledgerEntryTypeLabel(entryType) {
+  const key = String(entryType || '').trim();
+  const found = LEDGER_ENTRY_TYPES.find((o) => o.value === key);
+  if (found) return found.label;
+  if (!key) return '—';
+  return key.replace(/_/g, ' ');
+}
+
 export function formatPaiseAsInr(paise) {
   const n = Number(paise) / 100;
   if (!Number.isFinite(n)) return '—';

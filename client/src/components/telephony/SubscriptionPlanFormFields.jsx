@@ -94,6 +94,19 @@ export function SubscriptionPlanFormFields({ form, setForm, editing }) {
         />
       </div>
 
+      <div className={styles.flags}>
+        <Checkbox
+          label="Show on marketing website"
+          checked={form.visible_on_website !== false}
+          onChange={(e) => setForm((f) => ({ ...f, visible_on_website: e.target.checked }))}
+        />
+        <Checkbox
+          label="Show in tenant billing panel"
+          checked={form.visible_on_panel !== false}
+          onChange={(e) => setForm((f) => ({ ...f, visible_on_panel: e.target.checked }))}
+        />
+      </div>
+
       {isFree ? (
         <div className={styles.grid}>
           <Input

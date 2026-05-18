@@ -1,25 +1,17 @@
 import { useCallback, useState } from 'react';
 import { tenantTelephonyAPI } from '../services/tenantTelephonyAPI';
 import { PRODUCT_DISPLAY_NAME } from '../config/productBrand';
-
-function loadRazorpayScript() {
-  return new Promise((resolve, reject) => {
-    if (typeof window !== 'undefined' && window.Razorpay) {
-      resolve();
-      return;
-    }
-    const s = document.createElement('script');
-    s.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('Failed to load Razorpay'));
-    document.body.appendChild(s);
-  });
-}
+import { buildPaymentResult, PAYMENT_PURCHASE_KIND } from '../utils/paymentResult';
+import {
+  loadRazorpayScript,
+  openRazorpayCheckout,
+  razorpayFailureMessage,
+} from '../utils/razorpayCheckout';
 
 /**
  * Razorpay checkout for seat & channel add-on plans.
  */
-export function useSeatPurchaseCheckout({ userEmail, onSuccess } = {}) {
+export function useSeatPurchaseCheckout({ userEmail, onSuccess, onResult } = {}) {
   const [payingId, setPayingId] = useState(null);
   const [payError, setPayError] = useState(null);
 
@@ -27,7 +19,7 @@ export function useSeatPurchaseCheckout({ userEmail, onSuccess } = {}) {
     async (plan, quantity = 1, { razorpayConfigured = true } = {}) => {
       setPayError(null);
       if (!razorpayConfigured) {
-        setPayError('Razorpay is not configured. Contact your platform administrator.');
+        setPayError('Online payments are not configured. Contact your platform administrator.');
         return;
       }
       const qty = Math.min(50, Math.max(1, Math.floor(Number(quantity) || 1)));
@@ -40,54 +32,113 @@ export function useSeatPurchaseCheckout({ userEmail, onSuccess } = {}) {
           throw new Error('No order returned');
         }
 
+        const emit = (payload) => onResult?.(payload);
+        const planLabel = `${data.plan?.name || plan.name}${qty > 1 ? ` × ${qty}` : ''}`;
+
         if (data.devMock) {
           await tenantTelephonyAPI.verifySeatPurchasePayment({
             razorpay_order_id: data.orderId,
             razorpay_payment_id: `dev_pay_${Date.now()}`,
             razorpay_signature: 'dev_mock',
           });
+          emit(
+            buildPaymentResult({
+              status: 'success',
+              plan: { ...plan, name: planLabel },
+              amountPaise: data.amount,
+              purchaseKind: PAYMENT_PURCHASE_KIND.SEAT,
+            })
+          );
           await onSuccess?.();
           setPayingId(null);
           return;
         }
 
-        const options = {
-          key: data.keyId,
-          amount: data.amount,
-          currency: data.currency || 'INR',
-          name: PRODUCT_DISPLAY_NAME,
-          description: `${data.plan?.name || plan.name}${qty > 1 ? ` × ${qty}` : ''}`,
-          order_id: data.orderId,
-          handler: async (response) => {
+        openRazorpayCheckout({
+          options: {
+            key: data.keyId,
+            amount: data.amount,
+            currency: data.currency || 'INR',
+            name: PRODUCT_DISPLAY_NAME,
+            description: planLabel,
+            order_id: data.orderId,
+            prefill: { email: userEmail || '' },
+            theme: { color: '#4f46e5' },
+            modal: { ondismiss: () => setPayingId(null) },
+          },
+          onPaid: async (response) => {
             try {
               await tenantTelephonyAPI.verifySeatPurchasePayment({
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
               });
+              emit(
+                buildPaymentResult({
+                  status: 'success',
+                  plan: { ...plan, name: planLabel },
+                  amountPaise: data.amount,
+                  purchaseKind: PAYMENT_PURCHASE_KIND.SEAT,
+                })
+              );
               await onSuccess?.();
             } catch (e) {
-              setPayError(e.response?.data?.error || e.message || 'Verification failed');
+              const msg = e.response?.data?.error || e.message || 'Verification failed';
+              setPayError(msg);
+              emit(
+                buildPaymentResult({
+                  status: 'failed',
+                  plan: { ...plan, name: planLabel },
+                  amountPaise: data.amount,
+                  purchaseKind: PAYMENT_PURCHASE_KIND.SEAT,
+                  errorMessage: msg,
+                })
+              );
             } finally {
               setPayingId(null);
             }
           },
-          modal: {
-            ondismiss: () => setPayingId(null),
+          onFailed: (response) => {
+            setPayingId(null);
+            const msg = razorpayFailureMessage(response);
+            setPayError(msg);
+            emit(
+              buildPaymentResult({
+                status: 'failed',
+                plan: { ...plan, name: planLabel },
+                amountPaise: data.amount,
+                purchaseKind: PAYMENT_PURCHASE_KIND.SEAT,
+                errorMessage: msg,
+              })
+            );
           },
-          prefill: {
-            email: userEmail || '',
+          onDismiss: () => {
+            setPayingId(null);
+            emit(
+              buildPaymentResult({
+                status: 'cancelled',
+                plan: { ...plan, name: planLabel },
+                amountPaise: data.amount,
+                purchaseKind: PAYMENT_PURCHASE_KIND.SEAT,
+              })
+            );
           },
-          theme: { color: '#4f46e5' },
-        };
-        const rzp = new window.Razorpay(options);
-        rzp.open();
+        });
       } catch (e) {
         setPayingId(null);
-        setPayError(e.response?.data?.error || e.message || 'Could not start checkout');
+        const msg = e.response?.data?.error || e.message || 'Could not start checkout';
+        setPayError(msg);
+        onResult?.(
+          buildPaymentResult({
+            status: 'failed',
+            plan,
+            purchaseKind: PAYMENT_PURCHASE_KIND.SEAT,
+            errorMessage: msg,
+          })
+        );
       }
     },
-    [userEmail, onSuccess]
+    [userEmail, onSuccess, onResult]
   );
 
   return { purchase, payingId, payError, setPayError };

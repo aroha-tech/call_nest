@@ -5,6 +5,7 @@ import {
   cancelJobByUser,
   createJob,
   dismissTerminalBackgroundJobsForTenant,
+  ensureJobDir,
   getJobById,
   jobArtifactDir,
   JOB_STATUS_STAGING,
@@ -303,8 +304,7 @@ export async function enqueueImportCsv(req, res, next) {
       }
     }
 
-    const payload = {
-      memoryImport: true,
+    const basePayload = {
       type,
       mode,
       created_source,
@@ -318,17 +318,40 @@ export async function enqueueImportCsv(req, res, next) {
 
     const jobId = await createJob(tenantId, req.user?.id, {
       jobType: JOB_TYPES.CONTACTS_IMPORT_CSV,
-      payload,
+      payload: basePayload,
       initialStatus: JOB_STATUS_STAGING,
     });
 
     try {
+      const dir = await ensureJobDir(tenantId, jobId);
+      const orig = file.originalname || 'import.csv';
+      const ext = path.extname(orig) || '.csv';
+      const inputPath = path.join(dir, `upload${ext}`);
+      await fs.writeFile(inputPath, file.buffer);
       stashBackgroundImportBuffer(jobId, file.buffer);
+
+      const payload = {
+        ...basePayload,
+        memoryImport: true,
+        inputPath,
+      };
+
       const upd = await query(
         `UPDATE tenant_background_jobs
-         SET status = 'pending', updated_at = NOW(), updated_by = ?
+         SET status = 'pending',
+             payload_json = CAST(? AS JSON),
+             artifact_path = ?,
+             updated_at = NOW(),
+             updated_by = ?
          WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL AND status = ?`,
-        [req.user?.id || null, jobId, tenantId, JOB_STATUS_STAGING]
+        [
+          JSON.stringify(payload),
+          inputPath,
+          req.user?.id || null,
+          jobId,
+          tenantId,
+          JOB_STATUS_STAGING,
+        ]
       );
       if (Number(upd?.affectedRows ?? 0) !== 1) {
         throw new Error('Import job could not be activated');

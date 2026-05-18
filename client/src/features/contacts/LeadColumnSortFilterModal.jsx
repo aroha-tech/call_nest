@@ -3,20 +3,19 @@ import { Modal, ModalFooter } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { DateTimePickerField } from '../../components/ui/DateTimePickerField';
 import { InfoHelpIcon } from '../../components/ui/InfoHelpIcon';
+import {
+  FILTER_VALUE_TYPE,
+  OPERATOR_LABELS,
+  coerceOperatorForValueType,
+  formatOperatorLabel,
+  getColumnFilterValueType,
+  getOperatorOptionsForValueType,
+  ruleNeedsFilterValue,
+  ruleNeedsSecondFilterValue,
+} from '../../utils/columnFilterOperators';
 import styles from './LeadColumnSortFilterModal.module.scss';
-
-const FILTER_OPS = [
-  { value: 'none', label: 'No filter on this column' },
-  { value: 'empty', label: 'Is empty' },
-  { value: 'not_empty', label: 'Is not empty' },
-  { value: 'contains', label: 'Contains' },
-  { value: 'not_contains', label: 'Does not contain' },
-  { value: 'starts_with', label: 'Starts with' },
-  { value: 'ends_with', label: 'Ends with' },
-];
-
-const FILTER_SELECT_OPTIONS = FILTER_OPS.map(({ value, label }) => ({ value, label }));
 
 function IconSortArrows() {
   return (
@@ -164,7 +163,9 @@ function getSortCopy(sortKey) {
   };
 }
 
-function filterPlaceholderForColumn(sortKey) {
+function filterPlaceholderForColumn(sortKey, valueType) {
+  if (valueType === FILTER_VALUE_TYPE.DATE) return 'Select date';
+  if (valueType === FILTER_VALUE_TYPE.NUMBER) return 'Enter number';
   const map = {
     email: 'e.g. @gmail.com or partial address',
     primary_phone: 'Digits or partial number',
@@ -198,6 +199,13 @@ function filterPlaceholderForColumn(sortKey) {
   return map[sortKey] || 'Text to match';
 }
 
+function columnFilterMeta(column) {
+  return {
+    customFieldType: column?.customFieldType,
+    industryFieldType: column?.industryFieldType,
+  };
+}
+
 export function LeadColumnSortFilterModal({
   isOpen,
   onClose,
@@ -214,10 +222,24 @@ export function LeadColumnSortFilterModal({
   const [sortMode, setSortMode] = useState('default');
   const [filterOp, setFilterOp] = useState('none');
   const [filterValue, setFilterValue] = useState('');
+  const [filterValue2, setFilterValue2] = useState('');
   const [applyError, setApplyError] = useState(null);
 
   const sortKey = column?.sortKey;
   const sortCopy = useMemo(() => getSortCopy(sortKey), [sortKey]);
+
+  const columnValueType = useMemo(
+    () => getColumnFilterValueType(sortKey, columnFilterMeta(column)),
+    [sortKey, column]
+  );
+
+  const filterSelectOptions = useMemo(
+    () => [
+      { value: 'none', label: OPERATOR_LABELS.none },
+      ...getOperatorOptionsForValueType(columnValueType),
+    ],
+    [columnValueType]
+  );
 
   useEffect(() => {
     if (!isOpen || !column || !sortKey) return;
@@ -231,26 +253,34 @@ export function LeadColumnSortFilterModal({
     }
     const fr = filterRule && filterRule.field === column.id ? filterRule : null;
     if (fr && fr.op) {
-      setFilterOp(fr.op);
+      setFilterOp(coerceOperatorForValueType(fr.op, columnValueType));
       setFilterValue(fr.value || '');
+      setFilterValue2(fr.value2 || '');
     } else {
       setFilterOp('none');
       setFilterValue('');
+      setFilterValue2('');
     }
-  }, [isOpen, column, sortBy, sortDir, sortKey, filterRule, filterOnly]);
+  }, [isOpen, column, sortBy, sortDir, sortKey, filterRule, filterOnly, columnValueType]);
 
   const needsValue = useMemo(
-    () => ['contains', 'not_contains', 'starts_with', 'ends_with'].includes(filterOp),
+    () => filterOp !== 'none' && ruleNeedsFilterValue(filterOp),
     [filterOp]
   );
+
+  const needsSecond = useMemo(() => ruleNeedsSecondFilterValue(filterOp), [filterOp]);
 
   const activeFilterSummary = useMemo(() => {
     if (!column || !filterRule || filterRule.field !== column.id || !filterRule.op || filterRule.op === 'none') {
       return null;
     }
-    const op = FILTER_OPS.find((o) => o.value === filterRule.op);
-    const v = filterRule.value ? ` “${String(filterRule.value).slice(0, 40)}${String(filterRule.value).length > 40 ? '…' : ''}”` : '';
-    return `Filter: ${op?.label || filterRule.op}${v}`;
+    const v = filterRule.value
+      ? ` “${String(filterRule.value).slice(0, 40)}${String(filterRule.value).length > 40 ? '…' : ''}”`
+      : '';
+    const v2 = filterRule.value2
+      ? ` – “${String(filterRule.value2).slice(0, 40)}${String(filterRule.value2).length > 40 ? '…' : ''}”`
+      : '';
+    return `Filter: ${formatOperatorLabel(filterRule.op)}${v}${v2}`;
   }, [column, filterRule]);
 
   const handleApply = () => {
@@ -264,11 +294,21 @@ export function LeadColumnSortFilterModal({
 
     let filter = null;
     if (filterOp && filterOp !== 'none') {
-      if (needsValue && !String(filterValue).trim()) {
+      const v1 = String(filterValue).trim();
+      const v2 = String(filterValue2).trim();
+      if (needsValue && !v1) {
         setApplyError('Enter a value for this condition, or choose “No filter”.');
         return;
       }
-      filter = { op: filterOp, value: needsValue ? String(filterValue).trim() : '' };
+      if (needsSecond && !v2) {
+        setApplyError('Enter the end value for “Between”, or choose a different condition.');
+        return;
+      }
+      filter = {
+        op: filterOp,
+        ...(needsValue ? { value: v1 } : {}),
+        ...(needsSecond ? { value2: v2 } : {}),
+      };
     }
 
     onApply({ sort, filter });
@@ -280,6 +320,17 @@ export function LeadColumnSortFilterModal({
     if (!column || !sortKey) return;
     onApply({ sort: 'default', filter: null });
     onClose();
+  };
+
+  const handleFilterOpChange = (nextOp) => {
+    setFilterOp(nextOp);
+    setApplyError(null);
+    if (!ruleNeedsFilterValue(nextOp)) {
+      setFilterValue('');
+      setFilterValue2('');
+    } else if (!ruleNeedsSecondFilterValue(nextOp)) {
+      setFilterValue2('');
+    }
   };
 
   if (!column || !sortKey) return null;
@@ -295,6 +346,8 @@ export function LeadColumnSortFilterModal({
       <span>{column.label}</span>
     </span>
   );
+
+  const valuePlaceholder = filterPlaceholderForColumn(sortKey, columnValueType);
 
   return (
     <Modal
@@ -421,26 +474,70 @@ export function LeadColumnSortFilterModal({
               id="leadColFilterOp"
               label="Condition"
               value={filterOp}
-              onChange={(e) => {
-                setFilterOp(e.target.value);
-                setApplyError(null);
-              }}
-              options={FILTER_SELECT_OPTIONS}
+              onChange={(e) => handleFilterOpChange(e.target.value)}
+              options={filterSelectOptions}
               placeholder="Choose…"
             />
             {needsValue ? (
-              <Input
-                label="Value"
-                value={filterValue}
-                onChange={(e) => {
-                  setFilterValue(e.target.value);
-                  setApplyError(null);
-                }}
-                placeholder={filterPlaceholderForColumn(sortKey)}
-                maxLength={200}
-                error={applyError}
-                hint={`Matches against “${column.label}”. Max 200 characters.`}
-              />
+              <div className={needsSecond ? styles.filterValueRange : undefined}>
+                {columnValueType === FILTER_VALUE_TYPE.DATE ? (
+                  <DateTimePickerField
+                    label={needsSecond ? 'Start date' : 'Value'}
+                    mode="date"
+                    value={filterValue}
+                    onChange={(v) => {
+                      setFilterValue(v);
+                      setApplyError(null);
+                    }}
+                    placeholder={valuePlaceholder}
+                    error={applyError && !needsSecond ? applyError : undefined}
+                  />
+                ) : (
+                  <Input
+                    label={needsSecond ? 'Start value' : 'Value'}
+                    type={columnValueType === FILTER_VALUE_TYPE.NUMBER ? 'number' : 'text'}
+                    value={filterValue}
+                    onChange={(e) => {
+                      setFilterValue(e.target.value);
+                      setApplyError(null);
+                    }}
+                    placeholder={valuePlaceholder}
+                    maxLength={200}
+                    inputMode={columnValueType === FILTER_VALUE_TYPE.NUMBER ? 'numeric' : undefined}
+                    error={applyError && !needsSecond ? applyError : undefined}
+                    hint={`Matches against “${column.label}”. Max 200 characters.`}
+                  />
+                )}
+                {needsSecond ? (
+                  columnValueType === FILTER_VALUE_TYPE.DATE ? (
+                    <DateTimePickerField
+                      label="End date"
+                      mode="date"
+                      value={filterValue2}
+                      onChange={(v) => {
+                        setFilterValue2(v);
+                        setApplyError(null);
+                      }}
+                      placeholder="End date"
+                      error={applyError}
+                    />
+                  ) : (
+                    <Input
+                      label="End value"
+                      type={columnValueType === FILTER_VALUE_TYPE.NUMBER ? 'number' : 'text'}
+                      value={filterValue2}
+                      onChange={(e) => {
+                        setFilterValue2(e.target.value);
+                        setApplyError(null);
+                      }}
+                      placeholder={columnValueType === FILTER_VALUE_TYPE.NUMBER ? 'End number' : 'End value'}
+                      maxLength={200}
+                      inputMode={columnValueType === FILTER_VALUE_TYPE.NUMBER ? 'numeric' : undefined}
+                      error={applyError}
+                    />
+                  )
+                ) : null}
+              </div>
             ) : null}
           </div>
         </section>

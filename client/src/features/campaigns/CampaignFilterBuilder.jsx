@@ -138,6 +138,28 @@ function RuleValue({
   }
 
   if (meta.valueType === 'datetime') {
+    if (op === 'between') {
+      return (
+        <div className={styles.valueRange}>
+          <DateTimePickerField
+            mode="datetime"
+            label="Start"
+            value={rule.value || ''}
+            onChange={(v) => onPatch({ value: v })}
+            className={styles.valueInput}
+            aria-label="Filter start value"
+          />
+          <DateTimePickerField
+            mode="datetime"
+            label="End"
+            value={rule.value2 || ''}
+            onChange={(v) => onPatch({ value2: v })}
+            className={styles.valueInput}
+            aria-label="Filter end value"
+          />
+        </div>
+      );
+    }
     return (
       <DateTimePickerField
         mode="datetime"
@@ -280,11 +302,7 @@ export function CampaignFilterBuilder({
                 onChange={(e) => {
                   const op = e.target.value;
                   const base = { ...rule, op };
-                  if (op === 'in') {
-                    setRow(index, coerceRuleForProperty(rule.property, base));
-                  } else {
-                    setRow(index, coerceRuleForProperty(rule.property, { ...base, value: '' }));
-                  }
+                  setRow(index, coerceRuleForProperty(rule.property, op === 'in' ? base : { ...base, value: '' }));
                 }}
                 options={opOptions}
                 className={styles.colOp}

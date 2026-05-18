@@ -196,6 +196,12 @@
 
 .fieldSel,
 .opSel,
+.valRange {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
 .valInp {
   min-width: 0;
 }

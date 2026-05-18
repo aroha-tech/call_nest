@@ -42,6 +42,12 @@ import { createAndDispatchNotification } from './notificationService.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
 import * as tenantIndustryFieldsService from './tenantIndustryFieldsService.js';
 import * as leadImportDistributionService from './leadImportDistributionService.js';
+import {
+  COLUMN_FILTER_OPS,
+  appendComparableColumnFilter,
+  appendTextColumnFilter,
+  isComparableColumnOp,
+} from '../../utils/columnFilterSqlHelpers.js';
 
 function assertUniquePhoneLabels(phones) {
   if (!Array.isArray(phones)) return;
@@ -483,8 +489,6 @@ function parseIndustryProfileListFilterField(field) {
   return key;
 }
 
-const COLUMN_FILTER_OPS = new Set(['empty', 'not_empty', 'contains', 'not_contains', 'starts_with', 'ends_with']);
-
 /**
  * @param {unknown} raw
  * @param {Set<string>|undefined} allowedIndustryFieldKeys — when a Set, only these `field_key`s accept `ind:` rules (from tenant effective industry fields).
@@ -512,7 +516,18 @@ export function normalizeContactListColumnFilters(raw, allowedIndustryFieldKeys)
     }
     if (!COLUMN_FILTER_OPS.has(op)) continue;
     const value = item.value == null ? '' : String(item.value).trim();
-    if (value.length > 200) continue;
+    const value2 = item.value2 == null ? '' : String(item.value2).trim();
+    if (value.length > 200 || value2.length > 200) continue;
+    if (op === 'between') {
+      if (!value || !value2) continue;
+      byField.set(field, { field, op, value, value2 });
+      continue;
+    }
+    if (isComparableColumnOp(op)) {
+      if (!value) continue;
+      byField.set(field, { field, op, value });
+      continue;
+    }
     if (['contains', 'not_contains', 'starts_with', 'ends_with'].includes(op) && value === '') continue;
     byField.set(field, { field, op, value });
   }
@@ -526,11 +541,28 @@ export function normalizeContactListColumnFilters(raw, allowedIndustryFieldKeys)
  * @param {string} op
  * @param {string} value
  */
-function applyIndustryProfileColumnFilter(whereClauses, params, fieldKey, op, value) {
+function applyIndustryProfileColumnFilter(whereClauses, params, fieldKey, op, value, value2) {
   const path = `$.${fieldKey}`;
   const likeWord = (v) => `%${v}%`;
   const starts = (v) => `${v}%`;
   const ends = (v) => `%${v}`;
+
+  if (['eq', 'lt', 'lte', 'gt', 'gte', 'between'].includes(op)) {
+    const valExpr = `JSON_UNQUOTE(JSON_EXTRACT(c.industry_profile, ?))`;
+    whereClauses.push(
+      `(c.industry_profile IS NOT NULL AND JSON_CONTAINS_PATH(c.industry_profile, 'one', ?))`
+    );
+    params.push(path);
+    if (op === 'between') {
+      whereClauses.push(`(${valExpr} >= ? AND ${valExpr} <= ?)`);
+      params.push(path, value, path, value2);
+      return;
+    }
+    const cmp = { eq: '=', lt: '<', lte: '<=', gt: '>', gte: '>=' }[op];
+    whereClauses.push(`(${valExpr} ${cmp} ?)`);
+    params.push(path, value);
+    return;
+  }
 
   if (op === 'empty') {
     whereClauses.push(
@@ -615,10 +647,10 @@ function applyContactListColumnFilters(whereClauses, params, rules) {
   const starts = (v) => `${v}%`;
   const ends = (v) => `%${v}`;
 
-  for (const { field, op, value } of rules) {
+  for (const { field, op, value, value2 } of rules) {
     const indKey = parseIndustryProfileListFilterField(field);
     if (indKey) {
-      applyIndustryProfileColumnFilter(whereClauses, params, indKey, op, value);
+      applyIndustryProfileColumnFilter(whereClauses, params, indKey, op, value, value2);
       continue;
     }
     switch (field) {
@@ -899,41 +931,21 @@ function applyContactListColumnFilters(whereClauses, params, rules) {
         break;
       }
       case 'date_of_birth':
-        if (op === 'empty') {
-          whereClauses.push(`(c.date_of_birth IS NULL)`);
-        } else if (op === 'not_empty') {
-          whereClauses.push(`(c.date_of_birth IS NOT NULL)`);
-        } else if (op === 'contains') {
-          whereClauses.push(`(CAST(c.date_of_birth AS CHAR) LIKE ?)`);
-          params.push(likeWord(value));
-        } else if (op === 'not_contains') {
-          whereClauses.push(`(c.date_of_birth IS NULL OR CAST(c.date_of_birth AS CHAR) NOT LIKE ?)`);
-          params.push(likeWord(value));
-        } else if (op === 'starts_with') {
-          whereClauses.push(`(CAST(c.date_of_birth AS CHAR) LIKE ?)`);
-          params.push(starts(value));
-        } else if (op === 'ends_with') {
-          whereClauses.push(`(CAST(c.date_of_birth AS CHAR) LIKE ?)`);
-          params.push(ends(value));
+        if (isComparableColumnOp(op) || op === 'empty' || op === 'not_empty') {
+          appendComparableColumnFilter(whereClauses, params, 'c.date_of_birth', op, value, value2, {
+            useDateOnly: true,
+          });
+        } else {
+          appendTextColumnFilter(whereClauses, params, 'c.date_of_birth', op, value);
         }
         break;
       case 'created_at':
-        if (op === 'empty') {
-          whereClauses.push(`(c.created_at IS NULL)`);
-        } else if (op === 'not_empty') {
-          whereClauses.push(`(c.created_at IS NOT NULL)`);
-        } else if (op === 'contains') {
-          whereClauses.push(`(CAST(c.created_at AS CHAR) LIKE ?)`);
-          params.push(likeWord(value));
-        } else if (op === 'not_contains') {
-          whereClauses.push(`(c.created_at IS NULL OR CAST(c.created_at AS CHAR) NOT LIKE ?)`);
-          params.push(likeWord(value));
-        } else if (op === 'starts_with') {
-          whereClauses.push(`(CAST(c.created_at AS CHAR) LIKE ?)`);
-          params.push(starts(value));
-        } else if (op === 'ends_with') {
-          whereClauses.push(`(CAST(c.created_at AS CHAR) LIKE ?)`);
-          params.push(ends(value));
+        if (isComparableColumnOp(op) || op === 'empty' || op === 'not_empty') {
+          appendComparableColumnFilter(whereClauses, params, 'c.created_at', op, value, value2, {
+            useDateOnly: true,
+          });
+        } else {
+          appendTextColumnFilter(whereClauses, params, 'c.created_at', op, value);
         }
         break;
       default:

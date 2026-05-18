@@ -19,6 +19,20 @@ import { Select } from '../../../components/ui/Select';
 import styles from './MasterCRUDPage.module.scss';
 import listStyles from '../../../components/admin/adminDataList.module.scss';
 
+function isTruthyFlag(v) {
+  return v === 1 || v === true || v === '1';
+}
+
+function defaultValueForField(field) {
+  if (field.type === 'checkbox') return field.defaultValue ?? false;
+  return field.defaultValue ?? '';
+}
+
+function valueFromItemForField(field, item) {
+  if (field.type === 'checkbox') return isTruthyFlag(item[field.name]);
+  return item[field.name] ?? '';
+}
+
 export function MasterCRUDPage({
   title,
   description,
@@ -65,7 +79,7 @@ export function MasterCRUDPage({
 
   const openCreateModal = () => {
     setEditingItem(null);
-    setFormData(formFields.reduce((acc, f) => ({ ...acc, [f.name]: f.defaultValue ?? '' }), {}));
+    setFormData(formFields.reduce((acc, f) => ({ ...acc, [f.name]: defaultValueForField(f) }), {}));
     setFormErrors({});
     setSubmitError(null);
     setShowModal(true);
@@ -73,7 +87,7 @@ export function MasterCRUDPage({
 
   const openEditModal = (item) => {
     setEditingItem(item);
-    setFormData(formFields.reduce((acc, f) => ({ ...acc, [f.name]: item[f.name] ?? '' }), {}));
+    setFormData(formFields.reduce((acc, f) => ({ ...acc, [f.name]: valueFromItemForField(f, item) }), {}));
     setFormErrors({});
     setSubmitError(null);
     setShowModal(true);
@@ -85,6 +99,7 @@ export function MasterCRUDPage({
 
     const errors = {};
     formFields.forEach((f) => {
+      if (f.type === 'checkbox') return;
       if (f.required && !formData[f.name] && !(editingItem && f.readOnlyOnEdit)) {
         errors[f.name] = `${f.label} is required`;
       }
@@ -96,6 +111,11 @@ export function MasterCRUDPage({
     }
 
     const submitData = { ...formData };
+    formFields.forEach((f) => {
+      if (f.type === 'checkbox') {
+        submitData[f.name] = !!submitData[f.name];
+      }
+    });
     if (editingItem) {
       formFields.forEach((f) => {
         if (f.readOnlyOnEdit) {
@@ -217,7 +237,12 @@ export function MasterCRUDPage({
               <TableHead>
                 <TableRow>
                   {columnsForTable.map((col) => (
-                    <TableHeaderCell key={col.key} width={col.width} noTruncate={!!col.noTruncate}>
+                    <TableHeaderCell
+                      key={col.key}
+                      width={col.width}
+                      noTruncate={!!col.noTruncate}
+                      align={col.align || 'left'}
+                    >
                       {col.label}
                     </TableHeaderCell>
                   ))}
@@ -228,7 +253,12 @@ export function MasterCRUDPage({
                 {data.map((item) => (
                   <TableRow key={item.id}>
                     {columnsForTable.map((col) => (
-                      <TableCell key={col.key} width={col.width} noTruncate={!!col.noTruncate}>
+                      <TableCell
+                        key={col.key}
+                        width={col.width}
+                        noTruncate={!!col.noTruncate}
+                        align={col.align || 'left'}
+                      >
                         {col.render ? col.render(item[col.key], item) : item[col.key]}
                       </TableCell>
                     ))}
@@ -310,6 +340,24 @@ export function MasterCRUDPage({
                   error={formErrors[field.name]}
                   required={!!field.required}
                 />
+              );
+            }
+            if (field.type === 'checkbox') {
+              return (
+                <div key={field.name} className={styles.formCheckboxField}>
+                  <Checkbox
+                    label={field.label}
+                    checked={!!formData[field.name]}
+                    disabled={isDisabled}
+                    onChange={(e) => setFormData({ ...formData, [field.name]: e.target.checked })}
+                  />
+                  {field.hint ? <p className={styles.formCheckboxHint}>{field.hint}</p> : null}
+                  {formErrors[field.name] ? (
+                    <p className={styles.formCheckboxError} role="alert">
+                      {formErrors[field.name]}
+                    </p>
+                  ) : null}
+                </div>
               );
             }
             return (

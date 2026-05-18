@@ -6,6 +6,14 @@ import { DateTimePickerField } from '../../components/ui/DateTimePickerField';
 import { Select } from '../../components/ui/Select';
 import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown';
 import { normalizeListFilterAll } from '../../utils/listFilterNarrowing';
+import {
+  coerceOperatorForValueType,
+  defaultOperatorForValueType,
+  getColumnFilterValueType,
+  getOperatorOptionsForValueType,
+  ruleNeedsFilterValue,
+  ruleNeedsSecondFilterValue,
+} from '../../utils/columnFilterOperators';
 import styles from './ContactAdvancedFilterModal.module.scss';
 
 function IconSliders() {
@@ -124,31 +132,17 @@ const FIELD_OPTIONS = [
   { value: 'created_at', label: 'Created at' },
 ];
 
-const OP_OPTIONS = [
-  { value: 'contains', label: 'Contains' },
-  { value: 'not_contains', label: 'Does not contain' },
-  { value: 'starts_with', label: 'Starts with' },
-  { value: 'ends_with', label: 'Ends with' },
-  { value: 'empty', label: 'Is empty' },
-  { value: 'not_empty', label: 'Is not empty' },
-];
-
-function propertyInputConfig(fieldKey) {
-  const key = String(fieldKey || '').toLowerCase();
-  if (key === 'date_of_birth') {
-    return { type: 'date', placeholder: 'Select date', inputMode: undefined };
+function propertyInputConfig(fieldKey, industryFieldTypesByColumnId = {}) {
+  const valueType = getColumnFilterValueType(fieldKey, {
+    industryFieldType: industryFieldTypesByColumnId[fieldKey],
+  });
+  if (valueType === 'date') {
+    return { valueType, type: 'date', placeholder: 'Select date', inputMode: undefined };
   }
-  if (key.endsWith('_at') || key.endsWith('_datetime')) {
-    return { type: 'date', placeholder: 'Select date', inputMode: undefined };
+  if (valueType === 'number') {
+    return { valueType, type: 'number', placeholder: 'Enter number', inputMode: 'numeric' };
   }
-  if (key.endsWith('_count') || key.startsWith('num_') || key.includes('_number')) {
-    return { type: 'number', placeholder: 'Enter number', inputMode: 'numeric' };
-  }
-  return { type: 'text', placeholder: 'Text to match', inputMode: undefined };
-}
-
-function needsValue(op) {
-  return ['contains', 'not_contains', 'starts_with', 'ends_with'].includes(op);
+  return { valueType, type: 'text', placeholder: 'Text to match', inputMode: undefined };
 }
 
 function normalizeRows(rows) {
@@ -158,8 +152,14 @@ function normalizeRows(rows) {
     const op = String(r.op || '').trim();
     if (!field || !op) continue;
     const value = r.value == null ? '' : String(r.value).trim();
-    if (needsValue(op) && !value) continue;
-    byField.set(field, { field, op, ...(needsValue(op) ? { value } : {}) });
+    const value2 = r.value2 == null ? '' : String(r.value2).trim();
+    if (ruleNeedsSecondFilterValue(op)) {
+      if (!value || !value2) continue;
+      byField.set(field, { field, op, value, value2 });
+      continue;
+    }
+    if (ruleNeedsFilterValue(op) && !value) continue;
+    byField.set(field, { field, op, ...(ruleNeedsFilterValue(op) ? { value } : {}) });
   }
   return [...byField.values()].slice(0, 12);
 }
@@ -177,6 +177,7 @@ function dedupeInitialRules(rules) {
       field,
       op: r.op || 'contains',
       value: r.value ?? '',
+      value2: r.value2 ?? '',
     });
   }
   return out.length ? out : [{ field: 'display_name', op: 'contains', value: '' }];
@@ -237,6 +238,8 @@ export function ContactAdvancedFilterModal({
   existingSavedFilters = [],
   /** `{ value: 'ind:field_key', label }[]` — tenant industry profile fields */
   industryFieldRuleOptions = [],
+  /** `{ [ind:field_key]: 'date'|'number'|... }` */
+  industryFieldTypesByColumnId = {},
   applyButtonLabel = 'Apply',
   showResetButton = false,
   onReset,
@@ -348,7 +351,11 @@ export function ContactAdvancedFilterModal({
     setRows((prev) => {
       const nextField = firstUnusedFieldKey(prev, allFieldOptions);
       if (!nextField || prev.length >= 12) return prev;
-      return [...prev, { field: nextField, op: 'contains', value: '' }];
+      const cfg = propertyInputConfig(nextField, industryFieldTypesByColumnId);
+      return [
+        ...prev,
+        { field: nextField, op: defaultOperatorForValueType(cfg.valueType), value: '', value2: '' },
+      ];
     });
   };
 
@@ -357,7 +364,27 @@ export function ContactAdvancedFilterModal({
   };
 
   const patchRow = (idx, patch) => {
-    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+    setRows((prev) =>
+      prev.map((r, i) => {
+        if (i !== idx) return r;
+        const next = { ...r, ...patch };
+        if (patch.field != null && patch.field !== r.field) {
+          const cfg = propertyInputConfig(patch.field, industryFieldTypesByColumnId);
+          next.op = defaultOperatorForValueType(cfg.valueType);
+          next.value = '';
+          next.value2 = '';
+        }
+        if (patch.op != null && patch.op !== r.op) {
+          if (!ruleNeedsFilterValue(patch.op)) {
+            next.value = '';
+            next.value2 = '';
+          } else if (!ruleNeedsSecondFilterValue(patch.op)) {
+            next.value2 = '';
+          }
+        }
+        return next;
+      })
+    );
   };
 
   const handleApply = () => {
@@ -568,7 +595,10 @@ export function ContactAdvancedFilterModal({
               <span className={styles.propertyGridHeaderAction} />
             </div>
             {rows.map((row, idx) => {
-              const inputCfg = propertyInputConfig(row.field);
+              const inputCfg = propertyInputConfig(row.field, industryFieldTypesByColumnId);
+              const opOptions = getOperatorOptionsForValueType(inputCfg.valueType);
+              const needsVal = ruleNeedsFilterValue(row.op);
+              const needsSecond = ruleNeedsSecondFilterValue(row.op);
               return (
               <div key={idx} className={styles.row}>
                 <Select
@@ -584,35 +614,64 @@ export function ContactAdvancedFilterModal({
                   aria-label={`Property operator, row ${idx + 1}`}
                   value={row.op}
                   onChange={(e) => patchRow(idx, { op: e.target.value })}
-                  options={OP_OPTIONS}
+                  options={opOptions}
                   className={styles.opSel}
                 />
-                {inputCfg.type === 'date' ? (
-                  <DateTimePickerField
-                    label=""
-                    mode="date"
-                    aria-label={`Property value, row ${idx + 1}`}
-                    value={row.value}
-                    onChange={(v) => patchRow(idx, { value: v })}
-                    placeholder={needsValue(row.op) ? inputCfg.placeholder : '—'}
-                    disabled={!needsValue(row.op)}
-                    className={styles.valInp}
-                    inputClassName={styles.valueInputControl}
-                  />
-                ) : (
-                  <Input
-                    label=""
-                    aria-label={`Property value, row ${idx + 1}`}
-                    type={inputCfg.type}
-                    value={row.value}
-                    onChange={(e) => patchRow(idx, { value: e.target.value })}
-                    placeholder={needsValue(row.op) ? inputCfg.placeholder : '—'}
-                    disabled={!needsValue(row.op)}
-                    inputMode={inputCfg.inputMode}
-                    className={styles.valInp}
-                    inputClassName={styles.valueInputControl}
-                  />
-                )}
+                <div className={`${styles.valInp} ${needsSecond ? styles.valRange : ''}`.trim()}>
+                  {inputCfg.type === 'date' ? (
+                    <>
+                      <DateTimePickerField
+                        label=""
+                        mode="date"
+                        aria-label={`Property value, row ${idx + 1}`}
+                        value={row.value}
+                        onChange={(v) => patchRow(idx, { value: v })}
+                        placeholder={needsVal ? inputCfg.placeholder : '—'}
+                        disabled={!needsVal}
+                        inputClassName={styles.valueInputControl}
+                      />
+                      {needsSecond ? (
+                        <DateTimePickerField
+                          label=""
+                          mode="date"
+                          aria-label={`Property end value, row ${idx + 1}`}
+                          value={row.value2 || ''}
+                          onChange={(v) => patchRow(idx, { value2: v })}
+                          placeholder="End date"
+                          disabled={!needsVal}
+                          inputClassName={styles.valueInputControl}
+                        />
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <Input
+                        label=""
+                        aria-label={`Property value, row ${idx + 1}`}
+                        type={inputCfg.type}
+                        value={row.value}
+                        onChange={(e) => patchRow(idx, { value: e.target.value })}
+                        placeholder={needsVal ? inputCfg.placeholder : '—'}
+                        disabled={!needsVal}
+                        inputMode={inputCfg.inputMode}
+                        inputClassName={styles.valueInputControl}
+                      />
+                      {needsSecond ? (
+                        <Input
+                          label=""
+                          aria-label={`Property end value, row ${idx + 1}`}
+                          type={inputCfg.type}
+                          value={row.value2 || ''}
+                          onChange={(e) => patchRow(idx, { value2: e.target.value })}
+                          placeholder={inputCfg.type === 'number' ? 'End number' : 'End value'}
+                          disabled={!needsVal}
+                          inputMode={inputCfg.inputMode}
+                          inputClassName={styles.valueInputControl}
+                        />
+                      ) : null}
+                    </>
+                  )}
+                </div>
                 <button
                   type="button"
                   className={styles.removeRowBtn}

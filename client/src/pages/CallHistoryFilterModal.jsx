@@ -7,6 +7,13 @@ import { MultiSelectDropdown } from '../components/ui/MultiSelectDropdown';
 import { Select } from '../components/ui/Select';
 import { DateRangePresetControl } from '../components/ui/DateRangePresetControl';
 import { TIME_RANGE_PRESET } from '../utils/dateRangePresets';
+import {
+  defaultOperatorForValueType,
+  getColumnFilterValueType,
+  getOperatorOptionsForValueType,
+  ruleNeedsFilterValue,
+  ruleNeedsSecondFilterValue,
+} from '../utils/columnFilterOperators';
 import { ALL_CALL_HISTORY_COLUMNS } from './callHistoryTableConfig';
 import styles from './CallHistoryFilterModal.module.scss';
 
@@ -113,28 +120,15 @@ function FieldLabel({ kind, text }) {
 
 const CH_PROPERTY_FIELD_OPTIONS = ALL_CALL_HISTORY_COLUMNS.map((c) => ({ value: c.id, label: c.label }));
 
-const OP_OPTIONS = [
-  { value: 'contains', label: 'Contains' },
-  { value: 'not_contains', label: 'Does not contain' },
-  { value: 'starts_with', label: 'Starts with' },
-  { value: 'ends_with', label: 'Ends with' },
-  { value: 'empty', label: 'Is empty' },
-  { value: 'not_empty', label: 'Is not empty' },
-];
-
 function propertyInputConfig(fieldKey) {
-  const key = String(fieldKey || '').toLowerCase();
-  if (key === 'duration_sec') {
-    return { type: 'number', placeholder: 'Enter duration in seconds', inputMode: 'numeric' };
+  const valueType = getColumnFilterValueType(fieldKey);
+  if (valueType === 'date') {
+    return { valueType, type: 'date', placeholder: 'Select date', inputMode: undefined };
   }
-  if (key.endsWith('_at') || key.includes('date')) {
-    return { type: 'date', placeholder: 'Select date', inputMode: undefined };
+  if (valueType === 'number') {
+    return { valueType, type: 'number', placeholder: 'Enter number', inputMode: 'numeric' };
   }
-  return { type: 'text', placeholder: 'Text to match', inputMode: undefined };
-}
-
-function needsValue(op) {
-  return ['contains', 'not_contains', 'starts_with', 'ends_with'].includes(op);
+  return { valueType, type: 'text', placeholder: 'Text to match', inputMode: undefined };
 }
 
 function normalizeColumnRules(rows) {
@@ -144,8 +138,14 @@ function normalizeColumnRules(rows) {
     const op = String(r.op || '').trim();
     if (!field || !op) continue;
     const value = r.value == null ? '' : String(r.value).trim();
-    if (needsValue(op) && !value) continue;
-    byField.set(field, { field, op, ...(needsValue(op) ? { value } : {}) });
+    const value2 = r.value2 == null ? '' : String(r.value2).trim();
+    if (ruleNeedsSecondFilterValue(op)) {
+      if (!value || !value2) continue;
+      byField.set(field, { field, op, value, value2 });
+      continue;
+    }
+    if (ruleNeedsFilterValue(op) && !value) continue;
+    byField.set(field, { field, op, ...(ruleNeedsFilterValue(op) ? { value } : {}) });
   }
   return [...byField.values()].slice(0, 12);
 }
@@ -162,6 +162,7 @@ function dedupeInitialRules(rules) {
       field,
       op: r.op || 'contains',
       value: r.value ?? '',
+      value2: r.value2 ?? '',
     });
   }
   return out.length ? out : [{ field: 'contact', op: 'contains', value: '' }];
@@ -298,7 +299,11 @@ export function CallHistoryFilterModal({
     setRows((prev) => {
       const nextField = firstUnusedFieldKey(prev, allFieldOptions);
       if (!nextField || prev.length >= 12) return prev;
-      return [...prev, { field: nextField, op: 'contains', value: '' }];
+      const cfg = propertyInputConfig(nextField);
+      return [
+        ...prev,
+        { field: nextField, op: defaultOperatorForValueType(cfg.valueType), value: '', value2: '' },
+      ];
     });
   };
 
@@ -307,7 +312,27 @@ export function CallHistoryFilterModal({
   };
 
   const patchRow = (idx, patch) => {
-    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+    setRows((prev) =>
+      prev.map((r, i) => {
+        if (i !== idx) return r;
+        const next = { ...r, ...patch };
+        if (patch.field != null && patch.field !== r.field) {
+          const cfg = propertyInputConfig(patch.field);
+          next.op = defaultOperatorForValueType(cfg.valueType);
+          next.value = '';
+          next.value2 = '';
+        }
+        if (patch.op != null && patch.op !== r.op) {
+          if (!ruleNeedsFilterValue(patch.op)) {
+            next.value = '';
+            next.value2 = '';
+          } else if (!ruleNeedsSecondFilterValue(patch.op)) {
+            next.value2 = '';
+          }
+        }
+        return next;
+      })
+    );
   };
 
   return (
@@ -422,6 +447,9 @@ export function CallHistoryFilterModal({
             </div>
             {rows.map((row, idx) => {
               const inputCfg = propertyInputConfig(row.field);
+              const opOptions = getOperatorOptionsForValueType(inputCfg.valueType);
+              const needsVal = ruleNeedsFilterValue(row.op);
+              const needsSecond = ruleNeedsSecondFilterValue(row.op);
               return (
               <div key={idx} className={styles.row}>
                 <Select
@@ -437,35 +465,64 @@ export function CallHistoryFilterModal({
                   aria-label={`Property operator, row ${idx + 1}`}
                   value={row.op}
                   onChange={(e) => patchRow(idx, { op: e.target.value })}
-                  options={OP_OPTIONS}
+                  options={opOptions}
                   className={styles.opSel}
                 />
-                {inputCfg.type === 'date' ? (
-                  <DateTimePickerField
-                    label=""
-                    mode="date"
-                    aria-label={`Property value, row ${idx + 1}`}
-                    value={row.value}
-                    onChange={(v) => patchRow(idx, { value: v })}
-                    placeholder={needsValue(row.op) ? inputCfg.placeholder : '—'}
-                    disabled={!needsValue(row.op)}
-                    className={styles.valInp}
-                    inputClassName={styles.valueInputControl}
-                  />
-                ) : (
-                  <Input
-                    label=""
-                    aria-label={`Property value, row ${idx + 1}`}
-                    type={inputCfg.type}
-                    value={row.value}
-                    onChange={(e) => patchRow(idx, { value: e.target.value })}
-                    placeholder={needsValue(row.op) ? inputCfg.placeholder : '—'}
-                    disabled={!needsValue(row.op)}
-                    inputMode={inputCfg.inputMode}
-                    className={styles.valInp}
-                    inputClassName={styles.valueInputControl}
-                  />
-                )}
+                <div className={`${styles.valInp} ${needsSecond ? styles.valRange : ''}`.trim()}>
+                  {inputCfg.type === 'date' ? (
+                    <>
+                      <DateTimePickerField
+                        label=""
+                        mode="date"
+                        aria-label={`Property value, row ${idx + 1}`}
+                        value={row.value}
+                        onChange={(v) => patchRow(idx, { value: v })}
+                        placeholder={needsVal ? inputCfg.placeholder : '—'}
+                        disabled={!needsVal}
+                        inputClassName={styles.valueInputControl}
+                      />
+                      {needsSecond ? (
+                        <DateTimePickerField
+                          label=""
+                          mode="date"
+                          aria-label={`Property end value, row ${idx + 1}`}
+                          value={row.value2 || ''}
+                          onChange={(v) => patchRow(idx, { value2: v })}
+                          placeholder="End date"
+                          disabled={!needsVal}
+                          inputClassName={styles.valueInputControl}
+                        />
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <Input
+                        label=""
+                        aria-label={`Property value, row ${idx + 1}`}
+                        type={inputCfg.type}
+                        value={row.value}
+                        onChange={(e) => patchRow(idx, { value: e.target.value })}
+                        placeholder={needsVal ? inputCfg.placeholder : '—'}
+                        disabled={!needsVal}
+                        inputMode={inputCfg.inputMode}
+                        inputClassName={styles.valueInputControl}
+                      />
+                      {needsSecond ? (
+                        <Input
+                          label=""
+                          aria-label={`Property end value, row ${idx + 1}`}
+                          type={inputCfg.type}
+                          value={row.value2 || ''}
+                          onChange={(e) => patchRow(idx, { value2: e.target.value })}
+                          placeholder={inputCfg.type === 'number' ? 'End number' : 'End value'}
+                          disabled={!needsVal}
+                          inputMode={inputCfg.inputMode}
+                          inputClassName={styles.valueInputControl}
+                        />
+                      ) : null}
+                    </>
+                  )}
+                </div>
                 <button
                   type="button"
                   className={styles.removeRowBtn}

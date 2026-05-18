@@ -7,6 +7,30 @@ export const PLAN_BILLING_CYCLES = [
   { value: 'year', label: 'Yearly' },
 ];
 
+export const DEFAULT_SUBSCRIPTION_CYCLES_VISIBLE = {
+  month: true,
+  quarter: true,
+  semiannual: true,
+  year: true,
+};
+
+/** Super-admin catalog: which billing cycles appear on website and tenant panel. */
+export function normalizeSubscriptionCyclesVisible(raw) {
+  const out = { ...DEFAULT_SUBSCRIPTION_CYCLES_VISIBLE };
+  if (!raw || typeof raw !== 'object') return out;
+  for (const { value } of PLAN_BILLING_CYCLES) {
+    if (raw[value] === false || raw[value] === 0 || raw[value] === '0') out[value] = false;
+    else if (raw[value] === true || raw[value] === 1 || raw[value] === '1') out[value] = true;
+  }
+  return out;
+}
+
+export function filterBillingCyclesByVisibility(cycles, visible) {
+  if (!visible) return cycles;
+  const normalized = normalizeSubscriptionCyclesVisible(visible);
+  return cycles.filter((c) => normalized[c.value] !== false);
+}
+
 const CYCLE_VALUES = PLAN_BILLING_CYCLES.map((c) => c.value);
 
 const CYCLE_PREFIX = {

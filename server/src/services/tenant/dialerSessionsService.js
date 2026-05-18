@@ -6,6 +6,12 @@ import {
   getDefaultTelephonyProviderCode,
   resolveProviderForTenant,
 } from './telephony/telephonyProviderRegistry.js';
+import {
+  COLUMN_FILTER_OPS,
+  appendComparableColumnFilter,
+  appendTextColumnFilter,
+  isComparableColumnOp,
+} from '../../utils/columnFilterSqlHelpers.js';
 
 /**
  * Resolve the provider code we should record on a dialer_sessions row.
@@ -272,14 +278,7 @@ function parseMultiDialerStatus(raw) {
 
 const DIAL_SESSION_STATUS = new Set(['ready', 'active', 'paused', 'completed', 'cancelled']);
 
-const DS_COLUMN_FILTER_OPS = new Set([
-  'empty',
-  'not_empty',
-  'contains',
-  'not_contains',
-  'starts_with',
-  'ends_with',
-]);
+const DS_COLUMN_FILTER_OPS = COLUMN_FILTER_OPS;
 
 const DS_FILTER_FIELD_ALIASES = {
   session_no: 'user_session_no',
@@ -392,18 +391,51 @@ function normalizeDialSessionsColumnFilters(raw) {
     if (!DS_FILTER_FIELDS.has(field)) continue;
     if (!DS_COLUMN_FILTER_OPS.has(op)) continue;
     const value = item.value == null ? '' : String(item.value).trim();
-    if (value.length > 200) continue;
+    const value2 = item.value2 == null ? '' : String(item.value2).trim();
+    if (value.length > 200 || value2.length > 200) continue;
+    if (op === 'between') {
+      if (!value || !value2) continue;
+      byField.set(field, { field, op, value, value2 });
+      continue;
+    }
+    if (isComparableColumnOp(op)) {
+      if (!value) continue;
+      byField.set(field, { field, op, value });
+      continue;
+    }
     if (['contains', 'not_contains', 'starts_with', 'ends_with'].includes(op) && value === '') continue;
     byField.set(field, { field, op, value });
   }
   return [...byField.values()].slice(0, 12);
 }
 
+const DS_COMPARABLE_COLS = {
+  created_at: { sql: 'ds.created_at', useDateOnly: true },
+  started_at: { sql: 'ds.started_at', useDateOnly: true },
+  ended_at: { sql: 'ds.ended_at', useDateOnly: true },
+  duration_sec: { sql: DS_SESSION_DURATION_SEC, useDateOnly: false },
+  items_count: { sql: DS_ITEMS_COUNT_SUBQUERY, useDateOnly: false },
+  called_count: { sql: DS_SUB_CALLED, useDateOnly: false },
+  connected_count: { sql: DS_SUB_CONNECTED, useDateOnly: false },
+  failed_count: { sql: DS_SUB_FAILED, useDateOnly: false },
+  queued_count: { sql: DS_SUB_QUEUED, useDateOnly: false },
+  user_session_no: { sql: 'ds.user_session_no', useDateOnly: false },
+  id: { sql: 'ds.id', useDateOnly: false },
+};
+
 function pushDialSessionsColumnFilter(where, params, rule) {
-  const { field, op, value } = rule;
+  const { field, op, value, value2 } = rule;
   const like = (v) => `%${v}%`;
   const starts = (v) => `${v}%`;
   const ends = (v) => `%${v}`;
+
+  const comparable = DS_COMPARABLE_COLS[field];
+  if (comparable && (isComparableColumnOp(op) || op === 'empty' || op === 'not_empty')) {
+    appendComparableColumnFilter(where, params, comparable.sql, op, value, value2, {
+      useDateOnly: comparable.useDateOnly,
+    });
+    return;
+  }
 
   const expr = () => {
     switch (field) {

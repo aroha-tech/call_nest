@@ -33,6 +33,9 @@ import {
   rupeeToPaise,
   safePaisePerMin,
 } from '../utils/telephonyMoneyUtils';
+import { LEDGER_ENTRY_TYPES, ledgerEntryTypeLabel } from '../utils/callCreditsDisplay';
+import { AdminListTable } from '../components/admin/AdminListTable';
+import listStyles from '../components/admin/adminDataList.module.scss';
 import { SeatLimitsSummary } from '../components/telephony/SeatLimitsSummary';
 import styles from './PlatformTenantTelephonyPage.module.scss';
 
@@ -690,8 +693,13 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
   const [debitNote, setDebitNote] = useState('');
   const [debitBusy, setDebitBusy] = useState(false);
 
-  const [ledger, setLedger] = useState({ rows: [], page: 1, total: 0, limit: 10 });
+  const [ledger, setLedger] = useState({ rows: [], page: 1, total: 0, limit: PAGE_SIZE });
+  const [ledgerLimit, setLedgerLimit] = useState(PAGE_SIZE);
   const [ledgerBusy, setLedgerBusy] = useState(false);
+  const [draftLedgerSearch, setDraftLedgerSearch] = useState('');
+  const [draftLedgerEntryType, setDraftLedgerEntryType] = useState('');
+  const [ledgerSearch, setLedgerSearch] = useState('');
+  const [ledgerEntryType, setLedgerEntryType] = useState('');
   const [planOptions, setPlanOptions] = useState([]);
 
   const loadEverything = useCallback(async () => {
@@ -701,7 +709,12 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
     try {
       const [billRes, ledgerRes, plansRes] = await Promise.all([
         tenantTelephonyAdminAPI.getTenantBilling(tenant.id),
-        tenantTelephonyAdminAPI.listLedger(tenant.id, { page: 1, limit: 10 }),
+        tenantTelephonyAdminAPI.listLedger(tenant.id, {
+          page: 1,
+          limit: ledgerLimit,
+          search: ledgerSearch || undefined,
+          entry_type: ledgerEntryType || undefined,
+        }),
         telephonyBillingPlansAdminAPI.getOptions().catch(() => ({ data: { data: [] } })),
       ]);
       setPlanOptions(plansRes.data?.data || []);
@@ -773,7 +786,7 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
         rows: ledgerRes.data?.data?.rows || [],
         page: ledgerRes.data?.data?.page || 1,
         total: ledgerRes.data?.data?.total || 0,
-        limit: ledgerRes.data?.data?.limit || 10,
+        limit: ledgerRes.data?.data?.limit || PAGE_SIZE,
       });
     } catch (e) {
       setError(e?.response?.data?.error || e.message || 'Failed to load tenant billing');
@@ -797,26 +810,48 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
     void loadEverything();
   }, [tenant?.id, loadEverything]);
 
-  async function changePage(nextPage) {
-    if (!tenant?.id) return;
-    setLedgerBusy(true);
-    try {
-      const res = await tenantTelephonyAdminAPI.listLedger(tenant.id, {
-        page: nextPage,
-        limit: ledger.limit,
-      });
-      setLedger({
-        rows: res.data?.data?.rows || [],
-        page: res.data?.data?.page || nextPage,
-        total: res.data?.data?.total || 0,
-        limit: res.data?.data?.limit || ledger.limit,
-      });
-    } catch (e) {
-      setError(e?.response?.data?.error || e.message || 'Failed to load ledger');
-    } finally {
-      setLedgerBusy(false);
-    }
-  }
+  const loadLedger = useCallback(
+    async (page = 1) => {
+      if (!tenant?.id) return;
+      setLedgerBusy(true);
+      try {
+        const res = await tenantTelephonyAdminAPI.listLedger(tenant.id, {
+          page,
+          limit: ledgerLimit,
+          search: ledgerSearch || undefined,
+          entry_type: ledgerEntryType || undefined,
+        });
+        setLedger({
+          rows: res.data?.data?.rows || [],
+          page: res.data?.data?.page || page,
+          total: res.data?.data?.total || 0,
+          limit: res.data?.data?.limit || ledgerLimit,
+        });
+      } catch (e) {
+        setError(e?.response?.data?.error || e.message || 'Failed to load ledger');
+      } finally {
+        setLedgerBusy(false);
+      }
+    },
+    [tenant?.id, ledgerSearch, ledgerEntryType, ledgerLimit]
+  );
+
+  const applyLedgerFilters = useCallback(() => {
+    setLedgerSearch(draftLedgerSearch.trim());
+    setLedgerEntryType(draftLedgerEntryType);
+  }, [draftLedgerSearch, draftLedgerEntryType]);
+
+  const resetLedgerFilters = useCallback(() => {
+    setDraftLedgerSearch('');
+    setDraftLedgerEntryType('');
+    setLedgerSearch('');
+    setLedgerEntryType('');
+  }, []);
+
+  useEffect(() => {
+    if (!tenant?.id || !data) return;
+    void loadLedger(1);
+  }, [ledgerSearch, ledgerEntryType, ledgerLimit, tenant?.id, data, loadLedger]);
 
   async function saveBilling() {
     if (!tenant?.id || !draft) return;
@@ -1260,55 +1295,81 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
             <SectionCard
               icon="receipt_long"
               title="Ledger"
-              description="Recent wallet movements: top-ups, per-minute debits, and adjustments."
+              description="Wallet movements: top-ups, plan credits, per-minute debits, and adjustments."
             >
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableHeaderCell>When</TableHeaderCell>
-                    <TableHeaderCell>Type</TableHeaderCell>
-                    <TableHeaderCell>Amount</TableHeaderCell>
-                    <TableHeaderCell>Balance after</TableHeaderCell>
-                    <TableHeaderCell>Call</TableHeaderCell>
-                    <TableHeaderCell>Note</TableHeaderCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {ledger.rows.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell>{formatDateTime(row.created_at)}</TableCell>
-                      <TableCell>
-                        <span className={styles.entryType}>{row.entry_type}</span>
-                      </TableCell>
-                      <TableCell
-                        className={Number(row.amount_paise) < 0 ? styles.amountNeg : styles.amountPos}
-                      >
-                        {formatPaiseAsInr(row.amount_paise)}
-                        {row.unit_qty != null ? (
-                          <span className={styles.muted}>
-                            {' '}
-                            ({row.unit_qty} min × {row.unit_rate_paise}p)
-                          </span>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>{formatPaiseAsInr(row.balance_after_paise)}</TableCell>
-                      <TableCell>{row.call_attempt_id || '—'}</TableCell>
-                      <TableCell>{row.note || '—'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {!ledger.rows.length && (
-                <p className={styles.muted}>No ledger entries yet.</p>
-              )}
-              <Pagination
+              <AdminListTable
+                filters={
+                  <Select
+                    label="Entry type"
+                    value={draftLedgerEntryType}
+                    onChange={setDraftLedgerEntryType}
+                    options={LEDGER_ENTRY_TYPES}
+                    searchable={false}
+                    compact
+                  />
+                }
+                onFilterApply={applyLedgerFilters}
+                onFilterReset={resetLedgerFilters}
+                search={ledgerSearch}
+                onSearch={(v) => {
+                  setLedgerSearch(v);
+                  setDraftLedgerSearch(v);
+                }}
+                searchPlaceholder="Search type, note, or call id… (press Enter)"
                 page={ledger.page}
                 totalPages={totalPages}
                 total={ledger.total}
                 limit={ledger.limit}
-                onPageChange={(p) => { if (!ledgerBusy) changePage(p); }}
-                hidePageSize
-              />
+                onPageChange={(p) => {
+                  if (!ledgerBusy) void loadLedger(p);
+                }}
+                onLimitChange={(lim) => {
+                  setLedgerLimit(lim);
+                }}
+                loading={ledgerBusy}
+                isEmpty={!ledgerBusy && ledger.rows.length === 0}
+                emptyIcon="💰"
+                emptyTitle={ledgerSearch || ledgerEntryType ? 'No ledger entries found' : 'No ledger entries yet'}
+                emptyDescription="Adjust filters or add wallet credits above."
+                skeletonColumns={6}
+              >
+                <Table variant="adminList">
+                  <TableHead>
+                    <TableRow>
+                      <TableHeaderCell>When</TableHeaderCell>
+                      <TableHeaderCell>Type</TableHeaderCell>
+                      <TableHeaderCell>Amount</TableHeaderCell>
+                      <TableHeaderCell>Balance after</TableHeaderCell>
+                      <TableHeaderCell>Call</TableHeaderCell>
+                      <TableHeaderCell>Note</TableHeaderCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {ledger.rows.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell>{formatDateTime(row.created_at)}</TableCell>
+                        <TableCell>
+                          <span className={styles.entryType}>{ledgerEntryTypeLabel(row.entry_type)}</span>
+                        </TableCell>
+                        <TableCell
+                          className={Number(row.amount_paise) < 0 ? styles.amountNeg : styles.amountPos}
+                        >
+                          {formatPaiseAsInr(row.amount_paise)}
+                          {row.unit_qty != null ? (
+                            <span className={styles.muted}>
+                              {' '}
+                              ({row.unit_qty} min × {row.unit_rate_paise}p)
+                            </span>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>{formatPaiseAsInr(row.balance_after_paise)}</TableCell>
+                        <TableCell>{row.call_attempt_id || '—'}</TableCell>
+                        <TableCell>{row.note || '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </AdminListTable>
             </SectionCard>
           ) : null}
 
@@ -1335,7 +1396,7 @@ export function TenantTelephonyBillingDetailView({ tenant, onSaved, onTenantMeta
 /* -------------------------------------------------------------------------- */
 /* Tenant list → opens dedicated billing page                                 */
 /* -------------------------------------------------------------------------- */
-function TenantBillingList({ onOpenTenant }) {
+export function TenantBillingList({ onOpenTenant }) {
   const [tenants, setTenants] = useState([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -1455,26 +1516,11 @@ function TenantBillingList({ onOpenTenant }) {
 /* -------------------------------------------------------------------------- */
 /* Page                                                                       */
 /* -------------------------------------------------------------------------- */
+/** @deprecated Use Admin → Billing → Tenant billing tab. Kept for route redirects. */
 export function PlatformTenantTelephonyPage() {
-  const [error, setError] = useState(null);
   const navigate = useNavigate();
-
-  return (
-    <div className={styles.page}>
-      <PageHeader
-        title="Tenant telephony & credits"
-        subtitle="Assign billing plans, manage per-tenant telephony mode, BYO accounts, and call credit wallets. Configure plans under Telephony plans; defaults under Settings → Default settings."
-      />
-
-      {error ? <Alert variant="error" className={styles.topAlert}>{error}</Alert> : null}
-
-      <TenantBillingList
-        onOpenTenant={(t) =>
-          navigate(`/admin/telephony-billing/tenant/${t.id}`, {
-            state: { name: t.name, slug: t.slug },
-          })
-        }
-      />
-    </div>
-  );
+  useEffect(() => {
+    navigate('/admin/billing', { replace: true });
+  }, [navigate]);
+  return null;
 }

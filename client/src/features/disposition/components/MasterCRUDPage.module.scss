@@ -47,6 +47,33 @@
   gap: $space-4;
 }
 
+.formCheckboxField {
+  display: flex;
+  flex-direction: column;
+  gap: $space-1;
+}
+
+.formCheckboxHint {
+  margin: 0;
+  padding-left: 21px;
+  font-size: $font-size-xs;
+  color: var(--color-text-muted);
+  line-height: $line-height-relaxed;
+}
+
+.formCheckboxError {
+  margin: 0;
+  padding-left: 21px;
+  font-size: $font-size-xs;
+  color: var(--color-danger);
+}
+
+.tableCheckboxCell {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
 // Split view layout
 .splitView {
   display: flex;

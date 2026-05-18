@@ -1,12 +1,11 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Alert } from '../components/ui/Alert';
 import { Tabs, TabList, Tab, TabPanel } from '../components/ui/Tabs';
 import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '../components/ui/Table';
-import { SearchInput } from '../components/ui/SearchInput';
-import { Pagination } from '../components/ui/Pagination';
 import { Badge } from '../components/ui/Badge';
 import { Skeleton } from '../components/ui/Skeleton';
 import { billingAPI } from '../services/billingAPI';
@@ -18,113 +17,37 @@ import {
 import { useCreditPurchaseCheckout } from '../hooks/useCreditPurchaseCheckout';
 import { useSeatPurchaseCheckout } from '../hooks/useSeatPurchaseCheckout';
 import { useTelephonySubscriptionCheckout } from '../hooks/useTelephonySubscriptionCheckout';
-import { formatPaiseAsInr } from '../utils/callCreditsDisplay';
+import { formatPaiseAsInr, ledgerEntryTypeLabel } from '../utils/callCreditsDisplay';
+import { BillingTablePreview } from '../components/billing/BillingTablePreview';
+import {
+  BILLING_PREVIEW_LIMIT,
+  BILLING_HISTORY_ROUTES,
+  formatBillingInr,
+  subscriptionTimeline,
+  paymentBadgeMeta,
+  subscriptionBadgeMeta,
+  cycleBadgeMeta,
+} from '../utils/billingDisplay';
 import { useAppSelector } from '../app/hooks';
 import { selectUser } from '../features/auth/authSelectors';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import { useTenant } from '../context/TenantContext';
 import { PRODUCT_DISPLAY_NAME } from '../config/productBrand';
 import { downloadPaymentInvoiceHtml } from '../utils/billingInvoiceDownload';
+import { PaymentResultModal } from '../components/billing/PaymentResultModal';
 import styles from './BillingPage.module.scss';
 import listStyles from '../components/admin/adminDataList.module.scss';
-
-const PAGE_SIZE = 20;
-
-function formatInr(paise) {
-  const n = Number(paise) / 100;
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(n);
-}
-
-function parseDbDate(s) {
-  if (!s) return null;
-  const str = String(s).trim();
-  const iso = str.includes('T') ? str : str.replace(' ', 'T');
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-/** Progress through billing period, days until renewal, urgency for messaging. */
-function subscriptionTimeline(current) {
-  if (!current) return null;
-  const start = parseDbDate(current.current_period_start);
-  const end = parseDbDate(current.current_period_end);
-  const now = Date.now();
-  if (!start || !end) return null;
-  const totalMs = end.getTime() - start.getTime();
-  const elapsedMs = now - start.getTime();
-  let pct = 0;
-  if (totalMs > 0) {
-    pct = Math.round(Math.min(100, Math.max(0, (elapsedMs / totalMs) * 100)));
-  }
-  const msDay = 86400000;
-  const rawDays = Math.ceil((end.getTime() - now) / msDay);
-  const expired = end.getTime() < now;
-  const daysLeft = expired ? 0 : Math.max(0, rawDays);
-  let urgency = 'ok';
-  if (expired) urgency = 'critical';
-  else if (rawDays <= 7) urgency = 'soon';
-  else if (rawDays <= 14) urgency = 'notice';
-
-  return {
-    pct: expired ? 100 : pct,
-    daysLeft,
-    expired,
-    urgency,
-    end,
-    start,
-  };
-}
-
-function paymentBadgeMeta(status) {
-  const s = String(status || '').toLowerCase();
-  switch (s) {
-    case 'captured':
-      return { label: 'Payment received', variant: 'success' };
-    case 'failed':
-      return { label: 'Payment failed', variant: 'danger' };
-    case 'refunded':
-      return { label: 'Refunded', variant: 'warning' };
-    case 'authorized':
-      return { label: 'Authorized', variant: 'info' };
-    case 'created':
-      return { label: 'Pending', variant: 'muted' };
-    default:
-      return { label: s ? s.replace(/_/g, ' ') : 'Unknown', variant: 'default' };
-  }
-}
-
-function subscriptionBadgeMeta(status) {
-  const s = String(status || '').toLowerCase();
-  switch (s) {
-    case 'active':
-      return { label: 'Active', variant: 'success' };
-    case 'expired':
-      return { label: 'Expired', variant: 'muted' };
-    case 'cancelled':
-      return { label: 'Cancelled', variant: 'warning' };
-    case 'pending':
-      return { label: 'Pending', variant: 'info' };
-    default:
-      return { label: s ? s.replace(/_/g, ' ') : '—', variant: 'default' };
-  }
-}
-
-function cycleBadgeMeta(timeline, subStatus) {
-  if (String(subStatus || '').toLowerCase() !== 'active') {
-    return { label: String(subStatus || 'inactive'), variant: 'muted' };
-  }
-  if (!timeline) return { label: 'Active', variant: 'success' };
-  if (timeline.expired) return { label: 'Renewal overdue', variant: 'danger' };
-  if (timeline.urgency === 'soon') return { label: 'Renews soon', variant: 'warning' };
-  if (timeline.urgency === 'notice') return { label: 'Active', variant: 'success' };
-  return { label: 'Active', variant: 'success' };
-}
-
 export function BillingPage() {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const user = useAppSelector(selectUser);
   const { tenantSlug } = useTenant();
   const { formatDateTime } = useDateTimeDisplay();
-  const [tab, setTab] = useState('plans');
+  const tabParam = searchParams.get('tab');
+  const tab = ['plans', 'payments', 'subscriptions', 'wallet'].includes(tabParam) ? tabParam : 'plans';
+  const setTab = (next) => {
+    setSearchParams(next === 'plans' ? {} : { tab: next }, { replace: true });
+  };
   const [plansSection, setPlansSection] = useState(TENANT_PLANS_SECTIONS.subscriptions);
   const [config, setConfig] = useState(null);
   const [plansView, setPlansView] = useState(null);
@@ -136,14 +59,17 @@ export function BillingPage() {
 
   const [payments, setPayments] = useState([]);
   const [payTotal, setPayTotal] = useState(0);
-  const [payPage, setPayPage] = useState(1);
-  const [payLimit] = useState(PAGE_SIZE);
-  const [paySearch, setPaySearch] = useState('');
+  const [payLoading, setPayLoading] = useState(false);
 
   const [subs, setSubs] = useState([]);
   const [subTotal, setSubTotal] = useState(0);
-  const [subPage, setSubPage] = useState(1);
-  const [subLimit] = useState(PAGE_SIZE);
+  const [subLoading, setSubLoading] = useState(false);
+
+  const [walletRows, setWalletRows] = useState([]);
+  const [walletTotal, setWalletTotal] = useState(0);
+  const [walletLoading, setWalletLoading] = useState(false);
+
+  const [paymentResult, setPaymentResult] = useState(null);
 
   const loadCore = useCallback(async () => {
     setLoading(true);
@@ -183,57 +109,110 @@ export function BillingPage() {
   }, []);
 
   const loadPayments = useCallback(async () => {
+    setPayLoading(true);
     try {
       const res = await billingAPI.listPayments({
-        page: payPage,
-        limit: payLimit,
-        search: paySearch || undefined,
+        page: 1,
+        limit: BILLING_PREVIEW_LIMIT,
       });
       setPayments(res.data?.data ?? []);
       setPayTotal(res.data?.total ?? 0);
     } catch (e) {
       setError(e.response?.data?.error || e.message || 'Failed to load payments');
+    } finally {
+      setPayLoading(false);
     }
-  }, [payPage, payLimit, paySearch]);
+  }, []);
 
   const loadSubs = useCallback(async () => {
+    setSubLoading(true);
     try {
-      const res = await billingAPI.listSubscriptions({ page: subPage, limit: subLimit });
+      const res = await billingAPI.listSubscriptions({
+        page: 1,
+        limit: BILLING_PREVIEW_LIMIT,
+      });
       setSubs(res.data?.data ?? []);
       setSubTotal(res.data?.total ?? 0);
     } catch (e) {
       setError(e.response?.data?.error || e.message || 'Failed to load subscriptions');
+    } finally {
+      setSubLoading(false);
     }
-  }, [subPage, subLimit]);
+  }, []);
+
+  const loadWallet = useCallback(async () => {
+    setWalletLoading(true);
+    try {
+      const res = await tenantTelephonyAPI.listLedger({
+        page: 1,
+        limit: BILLING_PREVIEW_LIMIT,
+      });
+      const payload = res.data?.data ?? {};
+      setWalletRows(payload.rows ?? []);
+      setWalletTotal(payload.total ?? 0);
+    } catch (e) {
+      setError(e.response?.data?.error || e.message || 'Failed to load wallet history');
+    } finally {
+      setWalletLoading(false);
+    }
+  }, []);
 
   const handlePurchaseSuccess = useCallback(async () => {
     await loadCore();
-    setTab('payments');
-    await loadPayments();
-  }, [loadCore, loadPayments]);
+    await Promise.all([loadPayments(), loadSubs(), loadWallet()]);
+  }, [loadCore, loadPayments, loadSubs, loadWallet]);
 
-  const { purchase: purchaseCredits, payingId: creditPayingId, payError } = useCreditPurchaseCheckout({
+  const {
+    purchase: purchaseCredits,
+    payingId: creditPayingId,
+    payError,
+    setPayError,
+  } = useCreditPurchaseCheckout({
     userEmail: user?.email,
     onSuccess: handlePurchaseSuccess,
+    onResult: (result) => setPaymentResult(result),
   });
 
   const {
     purchase: purchaseSeats,
     payingId: seatPayingId,
     payError: seatPayError,
+    setPayError: setSeatPayError,
   } = useSeatPurchaseCheckout({
     userEmail: user?.email,
     onSuccess: handlePurchaseSuccess,
+    onResult: (result) => setPaymentResult(result),
   });
 
   const {
     subscribe: subscribePlan,
     payingId: subscribingId,
     payError: subscribePayError,
+    setPayError: setSubscribePayError,
   } = useTelephonySubscriptionCheckout({
     userEmail: user?.email,
     onSuccess: handlePurchaseSuccess,
+    onResult: (result) => setPaymentResult(result),
   });
+
+  const clearPaymentErrors = useCallback(() => {
+    setPayError(null);
+    setSeatPayError(null);
+    setSubscribePayError(null);
+  }, [setPayError, setSeatPayError, setSubscribePayError]);
+
+  const closePaymentResult = useCallback(() => setPaymentResult(null), []);
+
+  const viewPaymentHistory = useCallback(() => {
+    closePaymentResult();
+    clearPaymentErrors();
+    navigate(BILLING_HISTORY_ROUTES.payments);
+  }, [closePaymentResult, clearPaymentErrors, navigate]);
+
+  const goToDashboard = useCallback(() => {
+    closePaymentResult();
+    navigate('/');
+  }, [closePaymentResult, navigate]);
 
   const onPurchaseCredits = useCallback(
     (plan) => purchaseCredits(plan, { razorpayConfigured: config?.razorpayConfigured }),
@@ -250,7 +229,7 @@ export function BillingPage() {
     (plan, { billingInterval = 'month' } = {}) =>
       subscribePlan(plan, {
         razorpayConfigured: config?.razorpayConfigured,
-        autoRenew: true,
+        autoRenew: false,
         billingInterval,
       }),
     [subscribePlan, config?.razorpayConfigured]
@@ -258,15 +237,16 @@ export function BillingPage() {
 
   useEffect(() => {
     loadCore();
-  }, [loadCore]);
+    void loadPayments();
+    void loadSubs();
+    void loadWallet();
+  }, [loadCore, loadPayments, loadSubs, loadWallet]);
 
   useEffect(() => {
-    if (tab === 'payments') loadPayments();
-  }, [tab, loadPayments]);
-
-  useEffect(() => {
-    if (tab === 'subscriptions') loadSubs();
-  }, [tab, loadSubs]);
+    if (plansSection === TENANT_PLANS_SECTIONS.credits) {
+      clearPaymentErrors();
+    }
+  }, [plansSection, clearPaymentErrors]);
 
   const timeline = useMemo(() => subscriptionTimeline(current), [current]);
   const cycleBadge = useMemo(() => cycleBadgeMeta(timeline, current?.status), [timeline, current?.status]);
@@ -305,14 +285,12 @@ export function BillingPage() {
     });
   };
 
-  const payTotalPages = Math.max(1, Math.ceil(payTotal / payLimit));
-  const subTotalPages = Math.max(1, Math.ceil(subTotal / subLimit));
 
   return (
     <div className={styles.page}>
       <PageHeader
         title="Plans & billing"
-        subtitle="Subscribe to credit-based or unlimited plans, top up call credits, buy seat add-ons, and pay securely with Razorpay."
+        subtitle="Subscribe to credit-based or unlimited plans, top up call credits, buy seat add-ons, and pay securely online."
       />
 
       {error && (
@@ -321,7 +299,7 @@ export function BillingPage() {
         </Alert>
       )}
       {(payError || seatPayError || subscribePayError) && (
-        <Alert variant="error" className={styles.mb}>
+        <Alert variant="error" display="inline" className={styles.mb}>
           {payError || seatPayError || subscribePayError}
         </Alert>
       )}
@@ -332,7 +310,7 @@ export function BillingPage() {
         <>
           {!config?.razorpayConfigured && (
             <div className={styles.configBanner}>
-              Payments are disabled until Razorpay keys are configured (server .env or Platform billing → Razorpay).
+              Online payments are not available yet. Contact your platform administrator if checkout does not work.
               For local dev, set RAZORPAY_DEV_MOCK=1 in server .env and restart the API.
             </div>
           )}
@@ -351,6 +329,11 @@ export function BillingPage() {
                       <Badge variant="success" size="md">
                         {formatPaiseAsInr(wallet.balance_paise)} available
                       </Badge>
+                      {current ? (
+                        <Badge variant="info" size="md">
+                          {current.plan_name}
+                        </Badge>
+                      ) : null}
                     </div>
                     <p className={listStyles.mutedSmall} style={{ margin: '12px 0 0', maxWidth: '520px', lineHeight: 1.55 }}>
                       Top up your wallet with credit packs below. Credits are used for connected outbound minutes on
@@ -362,6 +345,7 @@ export function BillingPage() {
                         variant="primary"
                         size="sm"
                         onClick={() => {
+                          clearPaymentErrors();
                           setTab('plans');
                           setPlansSection(TENANT_PLANS_SECTIONS.credits);
                         }}
@@ -373,7 +357,16 @@ export function BillingPage() {
                         variant="ghost"
                         size="sm"
                         className={styles.heroLinkBtn}
-                        onClick={() => setTab('payments')}
+                        onClick={() => navigate(BILLING_HISTORY_ROUTES.wallet)}
+                      >
+                        Wallet history
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className={styles.heroLinkBtn}
+                        onClick={() => navigate(BILLING_HISTORY_ROUTES.payments)}
                       >
                         Payment history
                       </Button>
@@ -439,7 +432,7 @@ export function BillingPage() {
                     <p className={listStyles.mutedSmall} style={{ margin: 0, maxWidth: '520px', lineHeight: 1.55 }}>
                       {plansView?.creditPurchaseReason ??
                         plansView?.eligibilityReason ??
-                        'Buy call credits with Razorpay when your workspace uses credit billing and platform calling.'}
+                        'Buy call credits when your workspace uses credit billing and platform calling.'}
                     </p>
                     <div className={styles.heroActions}>
                       <Button type="button" variant="primary" size="sm" onClick={() => setTab('plans')}>
@@ -486,7 +479,7 @@ export function BillingPage() {
             <div className={styles.statCard}>
               <span className={styles.statLabel}>Last payment</span>
               <span className={styles.statValue}>
-                {lastCapturedPayment ? formatInr(lastCapturedPayment.amount_paise) : '—'}
+                {lastCapturedPayment ? formatBillingInr(lastCapturedPayment.amount_paise) : '—'}
               </span>
               <span className={styles.statHint}>
                 {lastCapturedPayment
@@ -520,6 +513,9 @@ export function BillingPage() {
                   <Tab isActive={tab === 'subscriptions'} onClick={() => setTab('subscriptions')}>
                     Subscription history
                   </Tab>
+                  <Tab isActive={tab === 'wallet'} onClick={() => setTab('wallet')}>
+                    Wallet history
+                  </Tab>
                 </TabList>
               </div>
 
@@ -543,7 +539,10 @@ export function BillingPage() {
                       plansView?.creditPurchaseReason ?? plansView?.eligibilityReason
                     }
                     razorpayConfigured={config?.razorpayConfigured}
-                    payingId={creditPayingId || seatPayingId || subscribingId}
+                    subscriptionCyclesVisible={plansView?.subscriptionCyclesVisible}
+                    creditPayingId={creditPayingId}
+                    seatPayingId={seatPayingId}
+                    subscribePayingId={subscribingId}
                     onPurchase={onPurchaseCredits}
                     onPurchaseSeats={onPurchaseSeats}
                     seatPurchasePlans={plansView?.seatPurchasePlans ?? []}
@@ -551,25 +550,25 @@ export function BillingPage() {
                     seatPurchaseReason={plansView?.seatPurchaseReason}
                     seatLimits={plansView?.seatLimits}
                     onSubscribe={onSubscribePlan}
-                    subscribePayError={subscribePayError}
                   />
                 </div>
               </TabPanel>
 
               <TabPanel isActive={tab === 'payments'}>
-                <div className={styles.tableCard}>
-                  <div className={styles.tableToolbar}>
-                    <SearchInput
-                      value={paySearch}
-                      onSearch={(v) => {
-                        setPaySearch(v);
-                        setPayPage(1);
-                      }}
-                      placeholder="Search by payment or order id (Enter)"
-                    />
-                  </div>
-                  <div className={styles.tableScroll}>
-                    <Table>
+                <div className={styles.historyPreviewSection}>
+                  <BillingTablePreview
+                    total={payTotal}
+                    previewLimit={BILLING_PREVIEW_LIMIT}
+                    viewAllTo={BILLING_HISTORY_ROUTES.payments}
+                    viewAllLabel="View all payments"
+                    loading={payLoading}
+                    isEmpty={!payLoading && payments.length === 0}
+                    emptyIcon="💳"
+                    emptyTitle="No payments yet"
+                    emptyDescription="Successful payments appear here after checkout."
+                    skeletonColumns={6}
+                  >
+                    <Table variant="adminList">
                       <TableHead>
                         <TableRow>
                           <TableHeaderCell>Date</TableHeaderCell>
@@ -587,7 +586,7 @@ export function BillingPage() {
                             <TableRow key={row.id}>
                               <TableCell>{formatDateTime(row.created_at)}</TableCell>
                               <TableCell>{row.plan_name || '—'}</TableCell>
-                              <TableCell>{formatInr(row.amount_paise)}</TableCell>
+                              <TableCell>{formatBillingInr(row.amount_paise)}</TableCell>
                               <TableCell>
                                 <Badge variant={pm.variant} size="sm">
                                   {pm.label}
@@ -604,25 +603,25 @@ export function BillingPage() {
                         })}
                       </TableBody>
                     </Table>
-                  </div>
-                  {!payments.length && <p className={styles.empty}>No payments yet.</p>}
-                  <div className={listStyles.tableCardFooterPagination}>
-                    <Pagination
-                      page={payPage}
-                      totalPages={payTotalPages}
-                      total={payTotal}
-                      limit={payLimit}
-                      onPageChange={setPayPage}
-                      hidePageSize
-                    />
-                  </div>
+                  </BillingTablePreview>
                 </div>
               </TabPanel>
 
               <TabPanel isActive={tab === 'subscriptions'}>
-                <div className={styles.tableCard}>
-                  <div className={styles.tableScroll}>
-                    <Table>
+                <div className={styles.historyPreviewSection}>
+                  <BillingTablePreview
+                    total={subTotal}
+                    previewLimit={BILLING_PREVIEW_LIMIT}
+                    viewAllTo={BILLING_HISTORY_ROUTES.subscriptions}
+                    viewAllLabel="View all subscriptions"
+                    loading={subLoading}
+                    isEmpty={!subLoading && subs.length === 0}
+                    emptyIcon="📅"
+                    emptyTitle="No subscription history yet"
+                    emptyDescription="Past and current plan periods from telephony checkout."
+                    skeletonColumns={4}
+                  >
+                    <Table variant="adminList">
                       <TableHead>
                         <TableRow>
                           <TableHeaderCell>Period</TableHeaderCell>
@@ -651,18 +650,49 @@ export function BillingPage() {
                         })}
                       </TableBody>
                     </Table>
-                  </div>
-                  {!subs.length && <p className={styles.empty}>No subscription history yet.</p>}
-                  <div className={listStyles.tableCardFooterPagination}>
-                    <Pagination
-                      page={subPage}
-                      totalPages={subTotalPages}
-                      total={subTotal}
-                      limit={subLimit}
-                      onPageChange={setSubPage}
-                      hidePageSize
-                    />
-                  </div>
+                  </BillingTablePreview>
+                </div>
+              </TabPanel>
+
+              <TabPanel isActive={tab === 'wallet'}>
+                <div className={styles.historyPreviewSection}>
+                  <BillingTablePreview
+                    total={walletTotal}
+                    previewLimit={BILLING_PREVIEW_LIMIT}
+                    viewAllTo={BILLING_HISTORY_ROUTES.wallet}
+                    viewAllLabel="View all wallet transactions"
+                    loading={walletLoading}
+                    isEmpty={!walletLoading && walletRows.length === 0}
+                    emptyIcon="💰"
+                    emptyTitle="No wallet transactions yet"
+                    emptyDescription="Top-ups, plan credits, and call debits appear here."
+                    skeletonColumns={6}
+                  >
+                    <Table variant="adminList">
+                      <TableHead>
+                        <TableRow>
+                          <TableHeaderCell>When</TableHeaderCell>
+                          <TableHeaderCell>Type</TableHeaderCell>
+                          <TableHeaderCell>Amount</TableHeaderCell>
+                          <TableHeaderCell>Balance after</TableHeaderCell>
+                          <TableHeaderCell>Call</TableHeaderCell>
+                          <TableHeaderCell>Note</TableHeaderCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {walletRows.map((row) => (
+                          <TableRow key={row.id}>
+                            <TableCell>{formatDateTime(row.created_at)}</TableCell>
+                            <TableCell>{ledgerEntryTypeLabel(row.entry_type)}</TableCell>
+                            <TableCell>{formatPaiseAsInr(row.amount_paise)}</TableCell>
+                            <TableCell>{formatPaiseAsInr(row.balance_after_paise)}</TableCell>
+                            <TableCell>{row.call_attempt_id || '—'}</TableCell>
+                            <TableCell>{row.note || '—'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </BillingTablePreview>
                 </div>
               </TabPanel>
             </Tabs>
@@ -670,6 +700,19 @@ export function BillingPage() {
 
         </>
       )}
+
+      <PaymentResultModal
+        isOpen={!!paymentResult}
+        onClose={closePaymentResult}
+        status={paymentResult?.status}
+        planName={paymentResult?.planName}
+        amountPaise={paymentResult?.amountPaise}
+        purchaseKind={paymentResult?.purchaseKind}
+        errorMessage={paymentResult?.errorMessage}
+        onViewHistory={viewPaymentHistory}
+        onGoDashboard={goToDashboard}
+        onTryAgain={closePaymentResult}
+      />
     </div>
   );
 }

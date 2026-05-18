@@ -1,30 +1,59 @@
 import { useCallback, useState } from 'react';
 import { tenantTelephonyAPI } from '../services/tenantTelephonyAPI';
 import { PRODUCT_DISPLAY_NAME } from '../config/productBrand';
+import { buildPaymentResult, PAYMENT_PURCHASE_KIND } from '../utils/paymentResult';
+import {
+  loadRazorpayScript,
+  openRazorpayCheckout,
+  razorpayFailureMessage,
+} from '../utils/razorpayCheckout';
 
-function loadRazorpayScript() {
-  return new Promise((resolve, reject) => {
-    if (typeof window !== 'undefined' && window.Razorpay) {
-      resolve();
-      return;
-    }
-    const s = document.createElement('script');
-    s.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('Failed to load Razorpay'));
-    document.body.appendChild(s);
-  });
+function subscriptionAmountPaise(plan, data) {
+  if (data?.amount != null) return Number(data.amount);
+  return Number(plan?.sale_price_paise);
 }
 
 /**
  * Razorpay checkout for telephony subscription plans (one-time order or autopay subscription).
  */
-export function useTelephonySubscriptionCheckout({ userEmail, onSuccess } = {}) {
+export function useTelephonySubscriptionCheckout({ userEmail, onSuccess, onResult } = {}) {
   const [payingId, setPayingId] = useState(null);
   const [payError, setPayError] = useState(null);
 
+  const runVerifyAndFinish = useCallback(
+    async ({ verifyPayload, plan, data, emit }) => {
+      try {
+        await tenantTelephonyAPI.verifySubscriptionCheckout(verifyPayload);
+        emit(
+          buildPaymentResult({
+            status: 'success',
+            plan: data?.plan || plan,
+            amountPaise: subscriptionAmountPaise(plan, data),
+            purchaseKind: PAYMENT_PURCHASE_KIND.SUBSCRIPTION,
+          })
+        );
+        await onSuccess?.();
+      } catch (e) {
+        const msg = e.response?.data?.error || e.message || 'Verification failed';
+        setPayError(msg);
+        emit(
+          buildPaymentResult({
+            status: 'failed',
+            plan,
+            amountPaise: subscriptionAmountPaise(plan, data),
+            purchaseKind: PAYMENT_PURCHASE_KIND.SUBSCRIPTION,
+            errorMessage: msg,
+          })
+        );
+      } finally {
+        setPayingId(null);
+      }
+    },
+    [onSuccess]
+  );
+
   const subscribe = useCallback(
-    async (plan, { razorpayConfigured = true, autoRenew = true, billingInterval = 'month' } = {}) => {
+    async (plan, { razorpayConfigured = true, autoRenew = false, billingInterval = 'month' } = {}) => {
       setPayError(null);
       if (plan.is_free_trial === 1) {
         setPayError('Free trial is assigned by your platform administrator.');
@@ -35,7 +64,7 @@ export function useTelephonySubscriptionCheckout({ userEmail, onSuccess } = {}) 
         return;
       }
       if (!razorpayConfigured) {
-        setPayError('Razorpay is not configured. Contact your platform administrator.');
+        setPayError('Online payments are not configured. Contact your platform administrator.');
         return;
       }
       setPayingId(plan.id);
@@ -50,12 +79,23 @@ export function useTelephonySubscriptionCheckout({ userEmail, onSuccess } = {}) 
           throw new Error('No checkout session returned');
         }
 
+        const emit = (payload) => onResult?.(payload);
+        const amountPaise = subscriptionAmountPaise(plan, data);
+
         if (data.devMock && data.orderId) {
           await tenantTelephonyAPI.verifySubscriptionCheckout({
             razorpay_order_id: data.orderId,
             razorpay_payment_id: `dev_pay_${Date.now()}`,
             razorpay_signature: 'dev_mock',
           });
+          emit(
+            buildPaymentResult({
+              status: 'success',
+              plan: data.plan || plan,
+              amountPaise,
+              purchaseKind: PAYMENT_PURCHASE_KIND.SUBSCRIPTION,
+            })
+          );
           await onSuccess?.();
           setPayingId(null);
           return;
@@ -70,27 +110,53 @@ export function useTelephonySubscriptionCheckout({ userEmail, onSuccess } = {}) 
           modal: { ondismiss: () => setPayingId(null) },
         };
 
+        const onFailed = (response) => {
+          setPayingId(null);
+          const msg = razorpayFailureMessage(response);
+          setPayError(msg);
+          emit(
+            buildPaymentResult({
+              status: 'failed',
+              plan,
+              amountPaise,
+              purchaseKind: PAYMENT_PURCHASE_KIND.SUBSCRIPTION,
+              errorMessage: msg,
+            })
+          );
+        };
+
+        const onDismiss = () => {
+          setPayingId(null);
+          emit(
+            buildPaymentResult({
+              status: 'cancelled',
+              plan,
+              amountPaise,
+              purchaseKind: PAYMENT_PURCHASE_KIND.SUBSCRIPTION,
+            })
+          );
+        };
+
         if (data.checkoutType === 'subscription' && data.subscriptionId) {
-          const options = {
-            ...baseOptions,
-            subscription_id: data.subscriptionId,
-            handler: async (response) => {
-              try {
-                await tenantTelephonyAPI.verifySubscriptionCheckout({
+          openRazorpayCheckout({
+            options: {
+              ...baseOptions,
+              subscription_id: data.subscriptionId,
+            },
+            onPaid: (response) =>
+              runVerifyAndFinish({
+                verifyPayload: {
                   razorpay_subscription_id: response.razorpay_subscription_id,
                   razorpay_payment_id: response.razorpay_payment_id,
                   razorpay_signature: response.razorpay_signature,
-                });
-                await onSuccess?.();
-              } catch (e) {
-                setPayError(e.response?.data?.error || e.message || 'Verification failed');
-              } finally {
-                setPayingId(null);
-              }
-            },
-          };
-          const rzp = new window.Razorpay(options);
-          rzp.open();
+                },
+                plan,
+                data,
+                emit,
+              }),
+            onFailed,
+            onDismiss,
+          });
           return;
         }
 
@@ -98,34 +164,42 @@ export function useTelephonySubscriptionCheckout({ userEmail, onSuccess } = {}) 
           throw new Error('No order returned');
         }
 
-        const options = {
-          ...baseOptions,
-          amount: data.amount,
-          currency: data.currency || 'INR',
-          order_id: data.orderId,
-          handler: async (response) => {
-            try {
-              await tenantTelephonyAPI.verifySubscriptionCheckout({
+        openRazorpayCheckout({
+          options: {
+            ...baseOptions,
+            amount: data.amount,
+            currency: data.currency || 'INR',
+            order_id: data.orderId,
+          },
+          onPaid: (response) =>
+            runVerifyAndFinish({
+              verifyPayload: {
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
-              });
-              await onSuccess?.();
-            } catch (e) {
-              setPayError(e.response?.data?.error || e.message || 'Verification failed');
-            } finally {
-              setPayingId(null);
-            }
-          },
-        };
-        const rzp = new window.Razorpay(options);
-        rzp.open();
+              },
+              plan,
+              data,
+              emit,
+            }),
+          onFailed,
+          onDismiss,
+        });
       } catch (e) {
         setPayingId(null);
-        setPayError(e.response?.data?.error || e.message || 'Could not start checkout');
+        const msg = e.response?.data?.error || e.message || 'Could not start checkout';
+        setPayError(msg);
+        onResult?.(
+          buildPaymentResult({
+            status: 'failed',
+            plan,
+            purchaseKind: PAYMENT_PURCHASE_KIND.SUBSCRIPTION,
+            errorMessage: msg,
+          })
+        );
       }
     },
-    [userEmail, onSuccess]
+    [userEmail, onSuccess, onResult, runVerifyAndFinish]
   );
 
   return { subscribe, payingId, payError, setPayError };

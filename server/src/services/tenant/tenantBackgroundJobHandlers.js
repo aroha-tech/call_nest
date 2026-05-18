@@ -166,21 +166,28 @@ export async function runTenantBackgroundJobRow(jobRow) {
         let buf;
         if (payload.memoryImport) {
           buf = takeBackgroundImportBuffer(jobId);
-          if (!buf) {
-            const err = new Error(
-              'Import file is no longer in memory (API may have restarted). Please start the import again.'
-            );
-            err.status = 500;
-            throw err;
+        }
+        if (!buf) {
+          const inputPath =
+            payload.inputPath ||
+            payload.input_path ||
+            (typeof jobRow.artifact_path === 'string' && jobRow.artifact_path.trim()
+              ? jobRow.artifact_path.trim()
+              : null);
+          if (inputPath) {
+            try {
+              buf = await fs.readFile(inputPath);
+            } catch {
+              buf = null;
+            }
           }
-        } else {
-          const inputPath = payload.inputPath || payload.input_path;
-          if (!inputPath || typeof inputPath !== 'string') {
-            const err = new Error('Import job missing inputPath');
-            err.status = 500;
-            throw err;
-          }
-          buf = await fs.readFile(inputPath);
+        }
+        if (!buf) {
+          const err = new Error(
+            'Import file is no longer available (API may have restarted). Please start the import again.'
+          );
+          err.status = 500;
+          throw err;
         }
         await updateJobProgress(tenantId, jobId, {
           total: 0,

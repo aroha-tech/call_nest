@@ -126,6 +126,8 @@ function rowToFormFields(row, category) {
     gst_percent: row.gst_percent == null ? '18' : String(row.gst_percent),
     prices_include_gst: row.prices_include_gst !== 0 && row.prices_include_gst !== false,
     is_active: row.is_active === 1 || row.is_active === true,
+    visible_on_website: row.visible_on_website !== 0 && row.visible_on_website !== false,
+    visible_on_panel: row.visible_on_panel !== 0 && row.visible_on_panel !== false,
   };
   if (category === PLAN_CATEGORY.CREDIT_TOP_UP) {
     return { ...base, billing_interval: 'one_time' };
@@ -197,6 +199,8 @@ export function blankForm(category) {
     gst_percent: '18',
     prices_include_gst: true,
     is_active: true,
+    visible_on_website: true,
+    visible_on_panel: true,
   };
   if (category === PLAN_CATEGORY.CREDIT_TOP_UP) {
     return { ...base, billing_interval: 'one_time' };
@@ -292,6 +296,8 @@ export function formToPreviewPlan(form, editing) {
     unlimited_minutes_cap_per_month: safeNumber(form.unlimited_minutes_cap_per_month),
     sort_order: editing?.sort_order ?? 0,
     is_active: form.is_active ? 1 : 0,
+    visible_on_website: form.visible_on_website ? 1 : 0,
+    visible_on_panel: form.visible_on_panel ? 1 : 0,
   };
 }
 
@@ -317,6 +323,8 @@ export function formToBody(form, { isEdit }) {
     gst_percent: safeNumber(form.gst_percent) ?? 18,
     prices_include_gst: form.prices_include_gst ? 1 : 0,
     is_active: form.is_active ? 1 : 0,
+    visible_on_website: form.visible_on_website ? 1 : 0,
+    visible_on_panel: form.visible_on_panel ? 1 : 0,
   };
   if (!isEdit) body.code = String(form.code || '').trim();
 

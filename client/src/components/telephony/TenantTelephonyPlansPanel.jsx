@@ -37,6 +37,9 @@ export function TenantTelephonyPlansPanel({
   creditPurchaseReason = null,
   razorpayConfigured = true,
   payingId = null,
+  creditPayingId = null,
+  seatPayingId = null,
+  subscribePayingId = null,
   onPurchase,
   onPurchaseSeats,
   seatPurchasePlans = [],
@@ -44,12 +47,15 @@ export function TenantTelephonyPlansPanel({
   seatPurchaseReason = null,
   seatLimits = null,
   onSubscribe,
+  subscriptionCyclesVisible = null,
   preview = false,
   freePlanAdminOnly = true,
-  subscribePayError = null,
   activeSection: controlledSection,
   onSectionChange,
 }) {
+  const creditCheckoutId = creditPayingId ?? payingId;
+  const seatCheckoutId = seatPayingId ?? payingId;
+  const subscribeCheckoutId = subscribePayingId ?? payingId;
   const [internalSection, setInternalSection] = useState(SECTIONS.subscriptions);
   const activeSection = controlledSection ?? internalSection;
   const setActiveSection = onSectionChange ?? setInternalSection;
@@ -74,8 +80,7 @@ export function TenantTelephonyPlansPanel({
 
   const paymentBanner = !razorpayConfigured ? (
     <Alert variant="warning" className={styles.paymentBanner}>
-      Online checkout is disabled until Razorpay is configured (server .env or Platform billing →
-      Razorpay). For local development, set RAZORPAY_DEV_MOCK=1 in server .env and restart the API.
+      Online checkout is disabled until payments are configured by your platform administrator.
     </Alert>
   ) : null;
 
@@ -131,7 +136,6 @@ export function TenantTelephonyPlansPanel({
 
   return (
     <div className={styles.panel}>
-      {subscribePayError ? <Alert variant="error">{subscribePayError}</Alert> : null}
       {paymentBanner}
 
       {sectionTabs}
@@ -141,8 +145,8 @@ export function TenantTelephonyPlansPanel({
           <h3 className={styles.sectionTitle}>Credit-based & unlimited subscriptions</h3>
           <p className={styles.sectionHint}>
             {callBillingMode === 'unlimited'
-              ? 'Your workspace uses unlimited calling. Pick a plan and billing cycle — checkout opens Razorpay when payments are enabled.'
-              : 'Pay per minute from your wallet. Pick monthly, quarterly, 6-month, or yearly billing — checkout opens Razorpay when payments are enabled.'}
+              ? 'Your workspace uses unlimited calling. Pick a plan and billing cycle — secure checkout when payments are enabled.'
+              : 'Pay per minute from your wallet. Pick monthly, quarterly, 6-month, or yearly billing — secure checkout when payments are enabled.'}
           </p>
         </div>
         <TelephonySubscriptionCatalog
@@ -150,9 +154,10 @@ export function TenantTelephonyPlansPanel({
           assignedPlanId={catalogAssignedId}
           preview={preview}
           razorpayConfigured={razorpayConfigured}
-          payingId={payingId}
+          payingId={subscribeCheckoutId}
           onSubscribe={onSubscribe}
           freePlanAdminOnly={freePlanAdminOnly}
+          subscriptionCyclesVisible={subscriptionCyclesVisible}
         />
       </TabPanel>
 
@@ -174,9 +179,9 @@ export function TenantTelephonyPlansPanel({
             plans={creditPurchasePlans}
             preview={preview}
             razorpayConfigured={razorpayConfigured}
-            payingId={payingId}
+            payingId={creditCheckoutId}
             onPurchase={onPurchase}
-            emptyMessage="No call credit packs yet. Your platform admin can add them under Telephony plans → Credit top-up."
+            emptyMessage="No call credit packs yet. Your platform admin can add them under Admin → Product plans → Credit top-up."
           />
         ) : creditPurchaseReason ? (
           <Alert variant="info">{creditPurchaseReason}</Alert>
@@ -190,7 +195,7 @@ export function TenantTelephonyPlansPanel({
           <h3 className={styles.sectionTitle}>Seat & channel add-ons</h3>
           <p className={styles.sectionHint}>
             Buy extra admins, managers, agents, or unlimited-calling channels. One-time purchase per
-            seat — Razorpay checkout when payments are enabled.
+            seat — online checkout when payments are enabled.
           </p>
         </div>
         {seatLimits ? <SeatLimitsSummary seatLimits={seatLimits} compact /> : null}
@@ -199,10 +204,10 @@ export function TenantTelephonyPlansPanel({
             plans={seatPurchasePlans}
             preview={preview}
             razorpayConfigured={razorpayConfigured}
-            payingId={payingId}
+            payingId={seatCheckoutId}
             onPurchase={onPurchaseSeats}
             seatLimits={seatLimits}
-            emptyMessage="No seat add-on plans yet. Your platform admin can add them under Telephony plans → Seat add-ons."
+            emptyMessage="No seat add-on plans yet. Your platform admin can add them under Admin → Product plans → Seat add-ons."
           />
         ) : seatPurchaseReason ? (
           <Alert variant="info">{seatPurchaseReason}</Alert>

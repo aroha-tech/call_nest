@@ -75,6 +75,7 @@ import { PerformanceReportsPage } from '../pages/PerformanceReportsPage';
 import { NotificationsPage } from '../features/notifications/NotificationsPage';
 import { MeetingAttendeeEmailSettingsPage } from '../pages/MeetingAttendeeEmailSettingsPage';
 import { BillingPage } from '../pages/BillingPage';
+import { BillingHistoryPage } from '../pages/BillingHistoryPage';
 import { PlatformBillingPage } from '../pages/PlatformBillingPage';
 import { PlatformTenantTelephonyPage } from '../pages/PlatformTenantTelephonyPage';
 import { PlatformTenantTelephonyTenantPage } from '../pages/PlatformTenantTelephonyTenantPage';
@@ -827,6 +828,16 @@ function TenantRoutes() {
         }
       />
       <Route
+        path="/settings/billing/history/:section"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.SETTINGS_MANAGE}>
+            <AppShellLayout>
+              <BillingHistoryPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/settings/telephony"
         element={
           <ProtectedRoute
@@ -1003,6 +1014,16 @@ function PlatformRoutes() {
           <ProtectedRoute>
             <AppShellLayout>
               <PlatformDefaultSettingsPage />
+            </AppShellLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/billing/tenant/:tenantId"
+        element={
+          <ProtectedRoute>
+            <AppShellLayout>
+              <PlatformTenantTelephonyTenantPage />
             </AppShellLayout>
           </ProtectedRoute>
         }

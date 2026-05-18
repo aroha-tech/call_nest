@@ -10,6 +10,12 @@ import * as opportunitiesService from './opportunitiesService.js';
 import { loadDispositionCallApplyMeta } from './dispositionApplyDealHelper.js';
 import { safeLogTenantActivity } from './tenantActivityLogService.js';
 import { createAndDispatchNotification, listUserIdsByRoles } from './notificationService.js';
+import {
+  COLUMN_FILTER_OPS,
+  appendComparableColumnFilter,
+  appendTextColumnFilter,
+  isComparableColumnOp,
+} from '../../utils/columnFilterSqlHelpers.js';
 
 const CALL_ATTEMPT_IDS_CAP = 5000;
 
@@ -44,14 +50,7 @@ const CALL_ATTEMPTS_STANDARD_JOINS = `
   LEFT JOIN dispositions d ON d.id = cca.disposition_id AND d.tenant_id = cca.tenant_id AND d.is_deleted = 0
 `;
 
-const CH_COLUMN_FILTER_OPS = new Set([
-  'empty',
-  'not_empty',
-  'contains',
-  'not_contains',
-  'starts_with',
-  'ends_with',
-]);
+const CH_COLUMN_FILTER_OPS = COLUMN_FILTER_OPS;
 
 const CH_FILTER_FIELDS = new Set([
   'created_at',
@@ -93,18 +92,44 @@ export function normalizeCallHistoryColumnFilters(raw) {
     if (!CH_FILTER_FIELDS.has(field)) continue;
     if (!CH_COLUMN_FILTER_OPS.has(op)) continue;
     const value = item.value == null ? '' : String(item.value).trim();
-    if (value.length > 200) continue;
+    const value2 = item.value2 == null ? '' : String(item.value2).trim();
+    if (value.length > 200 || value2.length > 200) continue;
+    if (op === 'between') {
+      if (!value || !value2) continue;
+      byField.set(field, { field, op, value, value2 });
+      continue;
+    }
+    if (isComparableColumnOp(op)) {
+      if (!value) continue;
+      byField.set(field, { field, op, value });
+      continue;
+    }
     if (['contains', 'not_contains', 'starts_with', 'ends_with'].includes(op) && value === '') continue;
     byField.set(field, { field, op, value });
   }
   return [...byField.values()].slice(0, 12);
 }
 
+const CH_COMPARABLE_COLS = {
+  created_at: { sql: 'cca.created_at', useDateOnly: true },
+  started_at: { sql: 'cca.started_at', useDateOnly: true },
+  ended_at: { sql: 'cca.ended_at', useDateOnly: true },
+  duration_sec: { sql: 'COALESCE(cca.duration_sec, 0)', useDateOnly: false },
+};
+
 function pushCallHistoryColumnFilter(where, params, rule) {
-  const { field, op, value } = rule;
+  const { field, op, value, value2 } = rule;
   const like = (v) => `%${v}%`;
   const starts = (v) => `${v}%`;
   const ends = (v) => `%${v}`;
+
+  const comparable = CH_COMPARABLE_COLS[field];
+  if (comparable && (isComparableColumnOp(op) || op === 'empty' || op === 'not_empty')) {
+    appendComparableColumnFilter(where, params, comparable.sql, op, value, value2, {
+      useDateOnly: comparable.useDateOnly,
+    });
+    return;
+  }
 
   if (field === 'dial_session') {
     if (op === 'empty') {

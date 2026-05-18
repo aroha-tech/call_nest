@@ -14,6 +14,7 @@ import {
 import { computePlanChargePaise } from '../../utils/planTaxUtils.js';
 import { getSeatLimitsSummary } from '../billing/seatEntitlementService.js';
 import { listSeatPlansForTenant } from './seatPurchaseService.js';
+import { getSubscriptionCyclesVisible } from '../billing/platformSettingsService.js';
 
 export async function getPurchaseClientConfig() {
   return getClientRazorpayConfig();
@@ -86,18 +87,21 @@ export async function listTenantBillingPlansForTenant(tenantId) {
 
   const mode = String(tenant.call_billing_mode || 'credit');
 
+  const assignedId = tenant.telephony_billing_plan_id
+    ? Number(tenant.telephony_billing_plan_id)
+    : null;
+
   const rows = await query(
     `SELECT *
      FROM telephony_billing_plans
      WHERE deleted_at IS NULL AND is_active = 1
        AND plan_category = 'tenant_billing'
-     ORDER BY sort_order ASC, name ASC`
+       AND (visible_on_panel = 1 OR id = ?)
+     ORDER BY sort_order ASC, name ASC`,
+    [assignedId ?? 0]
   );
 
   let assignedPlan = null;
-  const assignedId = tenant.telephony_billing_plan_id
-    ? Number(tenant.telephony_billing_plan_id)
-    : null;
   if (assignedId) {
     const row = await findTelephonyPlanById(assignedId);
     if (row && !row.deleted_at && row.is_active) {
@@ -134,10 +138,14 @@ export async function getTenantPlansView(tenantId) {
   const subscriptionPlanId =
     telephonySubscription?.plan_id != null ? Number(telephonySubscription.plan_id) : null;
 
-  const purchaseConfig = await getPurchaseClientConfig();
+  const [purchaseConfig, subscriptionCyclesVisible] = await Promise.all([
+    getPurchaseClientConfig(),
+    getSubscriptionCyclesVisible(),
+  ]);
 
   return {
     ...purchaseConfig,
+    subscriptionCyclesVisible,
     callBillingMode: billing.callBillingMode,
     telephonyAccountMode: billing.telephonyAccountMode,
     assignedBillingPlan: billing.assignedPlan,

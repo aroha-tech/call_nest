@@ -27,6 +27,7 @@ import {
   TENANT_CATALOG_PREVIEW_HELP,
 } from '../constants/telephonyProductTypes';
 import { InfoHelpIcon, infoHelpHeadingRowClassName } from '../components/ui/InfoHelpIcon';
+import { SubscriptionCatalogSettingsCard } from '../components/telephony/SubscriptionCatalogSettingsCard';
 import listStyles from '../components/admin/adminDataList.module.scss';
 import styles from './PlatformTelephonyPlansPage.module.scss';
 
@@ -205,6 +206,7 @@ function PlansTab({ category }) {
   const [deleteItem, setDeleteItem] = useState(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [reorderBusy, setReorderBusy] = useState(false);
+  const [subscriptionCyclesVisible, setSubscriptionCyclesVisible] = useState(null);
 
   const totalPages = Math.max(1, Math.ceil(total / LIST_LIMIT));
   const listBusy = loading || refreshing;
@@ -265,10 +267,18 @@ function PlansTab({ category }) {
     purchasePlans: category === PLAN_CATEGORY.CREDIT_TOP_UP ? previewCatalogPlans : EMPTY_PLANS,
     seatPlans: category === PLAN_CATEGORY.SEAT_ADD_ON ? previewCatalogPlans : EMPTY_PLANS,
     billingPlanTypeFilter: '',
+    subscriptionCyclesVisible:
+      category === PLAN_CATEGORY.SUBSCRIPTION ? subscriptionCyclesVisible : null,
   };
 
   return (
     <div className={styles.tabPanel}>
+      {category === PLAN_CATEGORY.SUBSCRIPTION ? (
+        <SubscriptionCatalogSettingsCard
+          onError={setError}
+          onCyclesChange={setSubscriptionCyclesVisible}
+        />
+      ) : null}
       <Card className={styles.listCard}>
         <header className={styles.listHead}>
           <SectionTitleWithHelp title={title} helpMessage={sectionHelp} />
@@ -413,6 +423,8 @@ function PlansTab({ category }) {
 
 function TenantCatalogPreviewTab() {
   const [showPreview, setShowPreview] = useState(false);
+  const [error, setError] = useState(null);
+  const [subscriptionCyclesVisible, setSubscriptionCyclesVisible] = useState(null);
 
   const {
     plans: subscriptionPlans,
@@ -459,6 +471,11 @@ function TenantCatalogPreviewTab() {
 
   return (
     <div className={styles.tabPanel}>
+      <SubscriptionCatalogSettingsCard
+        onError={setError}
+        onCyclesChange={setSubscriptionCyclesVisible}
+      />
+      {error ? <Alert variant="error">{error}</Alert> : null}
       <Card className={styles.previewTabCard}>
         <header className={styles.previewTabHead}>
           <SectionTitleWithHelp
@@ -484,6 +501,7 @@ function TenantCatalogPreviewTab() {
           billingPlanTypeFilter=""
           loading={previewLoading}
           refreshing={previewRefreshing}
+          subscriptionCyclesVisible={subscriptionCyclesVisible}
         />
       </TenantPreviewSection>
     </div>
@@ -518,8 +536,8 @@ export function PlatformTelephonyPlansPage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        title="Telephony plans"
-        subtitle="Three products: subscription bundles (CRM + telephony + seats), one-time credit top-ups, and per-seat/channel add-ons."
+        title="Product plans"
+        subtitle="Subscription bundles (CRM + telephony + seats), one-time credit top-ups, and per-seat or channel add-ons."
       />
 
       <Tabs className={styles.tabs}>

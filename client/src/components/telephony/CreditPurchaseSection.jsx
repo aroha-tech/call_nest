@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Alert } from '../ui/Alert';
 import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
@@ -7,6 +7,7 @@ import { tenantTelephonyAPI } from '../../services/tenantTelephonyAPI';
 import { useCreditPurchaseCheckout } from '../../hooks/useCreditPurchaseCheckout';
 import { useSeatPurchaseCheckout } from '../../hooks/useSeatPurchaseCheckout';
 import { TenantTelephonyPlansPanel } from './TenantTelephonyPlansPanel';
+import { PaymentResultModal } from '../billing/PaymentResultModal';
 import styles from './CreditPurchaseSection.module.scss';
 
 /**
@@ -18,8 +19,10 @@ export function CreditPurchaseSection({
   showBillingLink = true,
   compact = false,
 }) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState(null);
+  const [paymentResult, setPaymentResult] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,6 +51,7 @@ export function CreditPurchaseSection({
       await load();
       await onWalletUpdated?.();
     },
+    onResult: (result) => setPaymentResult(result),
   });
 
   const {
@@ -61,6 +65,7 @@ export function CreditPurchaseSection({
       await load();
       await onWalletUpdated?.();
     },
+    onResult: (result) => setPaymentResult(result),
   });
 
   if (loading) {
@@ -92,8 +97,8 @@ export function CreditPurchaseSection({
 
       {!view.razorpayConfigured && view.creditPurchaseEligible ? (
         <Alert variant="warning" className={styles.alert}>
-          Online payments are not configured yet. Credit packs are visible but checkout needs Razorpay on the
-          server.
+          Online payments are not configured yet. Credit packs are visible but checkout is unavailable until
+          your platform enables payments.
         </Alert>
       ) : null}
 
@@ -121,6 +126,25 @@ export function CreditPurchaseSection({
           Payment history is on <Link to="/settings/billing">Plans &amp; billing</Link>.
         </p>
       ) : null}
+
+      <PaymentResultModal
+        isOpen={!!paymentResult}
+        onClose={() => setPaymentResult(null)}
+        status={paymentResult?.status}
+        planName={paymentResult?.planName}
+        amountPaise={paymentResult?.amountPaise}
+        purchaseKind={paymentResult?.purchaseKind}
+        errorMessage={paymentResult?.errorMessage}
+        onViewHistory={() => {
+          setPaymentResult(null);
+          navigate('/settings/billing', { state: { tab: 'payments' } });
+        }}
+        onGoDashboard={() => {
+          setPaymentResult(null);
+          navigate('/');
+        }}
+        onTryAgain={() => setPaymentResult(null)}
+      />
     </div>
   );
 }

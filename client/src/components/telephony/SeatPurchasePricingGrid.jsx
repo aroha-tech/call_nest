@@ -86,7 +86,7 @@ function SeatPlanCard({ plan, preview, razorpayConfigured, payingId, onPurchase 
                 ? 'Opening checkout…'
                 : !razorpayConfigured
                   ? 'Payments unavailable'
-                  : 'Pay with Razorpay'}
+                  : 'Pay now'}
           </Button>
         </PlanCardFooter>
       </div>
@@ -102,7 +102,7 @@ export function SeatPurchasePricingGrid({
   payingId = null,
   onPurchase,
   seatLimits = null,
-  emptyMessage = 'No seat add-on plans yet. Your platform admin can add them under Telephony plans → Seat add-ons.',
+  emptyMessage = 'No seat add-on plans yet. Your platform admin can add them under Admin → Product plans → Seat add-ons.',
 }) {
   const oneTimePlans = useMemo(
     () => plans.filter((p) => p.billing_interval === 'one_time' || !p.billing_interval),

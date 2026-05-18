@@ -212,6 +212,12 @@
   gap: $space-4;
 }
 
+.filterValueRange {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+}
+
 .inlineError {
   margin: 0;
   font-size: $font-size-xs;

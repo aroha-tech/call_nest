@@ -1,3 +1,5 @@
+@use '../../styles/variables' as *;
+
 .wrap {
   display: flex;
   flex-direction: column;
@@ -32,6 +34,12 @@
 
 .colVal {
   min-width: 0;
+}
+
+.valueRange {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
 }
 
 .colAct {

@@ -78,7 +78,7 @@ function CreditPackCard({ plan, preview, razorpayConfigured, payingId, onPurchas
                 ? 'Opening checkout…'
                 : !razorpayConfigured
                   ? 'Payments unavailable'
-                  : 'Pay with Razorpay'}
+                  : 'Pay now'}
           </Button>
         </PlanCardFooter>
       </div>
@@ -95,7 +95,7 @@ export function CreditPurchasePricingGrid({
   payingId = null,
   onPurchase,
   featuredIndex,
-  emptyMessage = 'No credit top-up packs yet. Your platform admin can add them under Telephony plans → Credit top-up.',
+  emptyMessage = 'No credit top-up packs yet. Your platform admin can add them under Admin → Product plans → Credit top-up.',
 }) {
   const oneTimePlans = useMemo(
     () => plans.filter((p) => p.billing_interval === 'one_time' || !p.billing_interval),

@@ -46,7 +46,7 @@ export const tenantTelephonyAPI = {
   getSubscriptionCurrent: () => axiosInstance.get(`${CREDITS}/subscription/current`),
   listSubscriptionHistory: (params = {}) =>
     axiosInstance.get(`${CREDITS}/subscription/history`, { params }),
-  createSubscriptionCheckout: (planId, { autoRenew = true, billingInterval = 'month' } = {}) =>
+  createSubscriptionCheckout: (planId, { autoRenew = false, billingInterval = 'month' } = {}) =>
     axiosInstance.post(`${CREDITS}/subscription/checkout`, {
       planId,
       autoRenew,
