@@ -1,0 +1,119 @@
+/* True black / white dialer chrome — not purple-tinted app theme */
+.root {
+  --dial-bg: #ffffff;
+  --dial-surface: #f5f5f5;
+  --dial-panel: #ffffff;
+  --dial-border: #d4d4d4;
+  --dial-text: #0a0a0a;
+  --dial-text-muted: #525252;
+  --dial-accent: #0066cc;
+  --dial-accent-soft: rgba(0, 102, 204, 0.1);
+  --dial-accent-border: rgba(0, 102, 204, 0.35);
+  --dial-success: #15803d;
+  --dial-danger: #dc2626;
+  --dial-live: #16a34a;
+  --dial-script-bg: #ffffff;
+  --dial-script-text: #0a0a0a;
+  --dial-hover: rgba(0, 0, 0, 0.04);
+  --dial-edge: #d4d4d4;
+  --dial-fg: var(--dial-text);
+  --dial-muted: var(--dial-text-muted);
+  --dial-surface-2: var(--dial-surface);
+  --dial-panel-head: var(--dial-surface);
+
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--dial-bg);
+  color: var(--dial-text);
+}
+
+.root[data-dialer-theme='dark'] {
+  --dial-bg: #0a0a0a;
+  --dial-surface: #141414;
+  --dial-panel: #1a1a1a;
+  --dial-border: #2e2e2e;
+  --dial-text: #fafafa;
+  --dial-text-muted: #a3a3a3;
+  --dial-accent: #3b9eff;
+  --dial-accent-soft: rgba(59, 158, 255, 0.12);
+  --dial-accent-border: rgba(59, 158, 255, 0.4);
+  --dial-success: #4ade80;
+  --dial-danger: #f87171;
+  --dial-live: #4ade80;
+  --dial-script-bg: #ffffff;
+  --dial-script-text: #0a0a0a;
+  --dial-hover: rgba(255, 255, 255, 0.06);
+  --dial-edge: #2e2e2e;
+}
+
+.appBar {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 0 16px;
+  height: 52px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--dial-border);
+  background: var(--dial-panel);
+}
+
+.appBarBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.brandMark {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dial-accent);
+}
+
+.brandDivider {
+  width: 1px;
+  height: 18px;
+  background: var(--dial-border);
+}
+
+.brandSubtitle {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--dial-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.appBarCenter {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: stretch;
+  padding: 0 20px;
+}
+
+.appBarActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.themeToggle {
+  flex-shrink: 0;
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}

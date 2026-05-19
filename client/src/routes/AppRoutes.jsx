@@ -618,7 +618,7 @@ function TenantRoutes() {
         path="/dialer/session/setup"
         element={
           <ProtectedRoute permission={PERMISSIONS.DIAL_EXECUTE}>
-            <StandalonePageLayout>
+            <StandalonePageLayout variant="dialer">
               <DialerSessionSetupPage />
             </StandalonePageLayout>
           </ProtectedRoute>
@@ -628,7 +628,7 @@ function TenantRoutes() {
         path="/dialer/session/:id"
         element={
           <ProtectedRoute permission={PERMISSIONS.DIAL_EXECUTE}>
-            <StandalonePageLayout>
+            <StandalonePageLayout variant="dialer">
               <DialerSessionPage />
             </StandalonePageLayout>
           </ProtectedRoute>

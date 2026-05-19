@@ -1,12 +1,9 @@
 import React, { useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import { useDialerCredits } from '../../hooks/useDialerCredits';
 import { usePermissions } from '../../hooks/usePermission';
 import { PERMISSIONS } from '../../utils/permissionUtils';
 import {
   computeCreditUsagePct,
-  formatMinutes,
-  formatPaiseAsInr,
   getUsageLevel,
 } from '../../utils/callCreditsDisplay';
 import styles from './DialerCreditsBar.module.scss';
@@ -24,12 +21,14 @@ function fillClass(level) {
 }
 
 /**
- * Compact telephony credits / usage strip for dialer pages.
- * @param {'default' | 'dark'} variant — dark matches DialerSessionPage cockpit
+ * Telephony credits for dialer pages.
+ * @param {'default' | 'dark'} variant
+ * @param {boolean} barOnly — inline header: progress bar only (no balance, settings, or extra stats)
  */
 export function DialerCreditsBar({
   variant = 'default',
   compact = false,
+  barOnly = false,
   refreshIntervalMs = 0,
   className = '',
 }) {
@@ -46,12 +45,6 @@ export function DialerCreditsBar({
     refreshIntervalMs,
   });
 
-  const canOpenSettings = canAny([
-    PERMISSIONS.BILLING_CREDITS_VIEW,
-    PERMISSIONS.SETTINGS_MANAGE,
-    PERMISSIONS.TELEPHONY_ACCOUNTS_MANAGE,
-  ]);
-
   const model = useMemo(() => {
     if (!balance?.config) return null;
     const cfg = balance.config;
@@ -67,18 +60,11 @@ export function DialerCreditsBar({
       const level = belowMin ? 'danger' : getUsageLevel(usedPct);
       return {
         mode: 'credit',
-        planLabel: 'Pay per minute',
-        balancePaise,
         belowMin,
-        minBal,
-        ratePaise: cfg.ratePaisePerMinute,
-        isBYO: cfg.isBYO,
-        monthSpend: usage?.this_month?.spend_paise || 0,
-        monthMinutes: usage?.this_month?.minutes || 0,
-        monthCalls: usage?.this_month?.calls || 0,
         usedPct,
         level,
         showUsageBar: usedPct != null,
+        barLabel: 'Credits',
       };
     }
 
@@ -86,14 +72,11 @@ export function DialerCreditsBar({
     const level = getUsageLevel(usedPct, { exceeded: cap?.exceeded });
     return {
       mode: 'unlimited',
-      planLabel: cap?.enabled ? 'Unlimited · capped' : 'Unlimited',
-      cap,
-      monthMinutes: usage?.this_month?.minutes || 0,
-      monthCalls: usage?.this_month?.calls || 0,
-      todayMinutes: usage?.today?.minutes || 0,
+      belowMin: cap?.exceeded,
       usedPct,
       level,
       showUsageBar: cap?.enabled && usedPct != null,
+      barLabel: cap?.enabled ? 'Monthly cap' : 'Usage',
     };
   }, [balance, usage]);
 
@@ -102,118 +85,75 @@ export function DialerCreditsBar({
 
   const barClass = [
     styles.bar,
-    variant === 'dark' ? styles.barDark : '',
-    compact ? styles.barCompact : '',
+    barOnly ? styles.barInline : '',
+    variant === 'dark' || barOnly ? styles.barDark : '',
+    compact && !barOnly ? styles.barCompact : '',
     className,
   ]
     .filter(Boolean)
     .join(' ');
 
+  if (barOnly) {
+    if (loading && !model) {
+      return (
+        <div className={barClass} role="status" aria-label="Credits">
+          <span className={styles.inlineLoading}>…</span>
+        </div>
+      );
+    }
+    if (!model) return null;
+
+    if (!model.showUsageBar) {
+      return (
+        <div className={barClass} role="status" aria-label="Credits">
+          <span className={styles.inlineLabel}>{model.barLabel}</span>
+          <span className={styles.inlineMuted}>No usage meter</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className={barClass} role="status" aria-label={`${model.barLabel} usage`}>
+        <span className={styles.inlineLabel}>{model.barLabel}</span>
+        <div className={styles.inlineTrackWrap}>
+          <div className={styles.track} aria-hidden>
+            <div
+              className={`${styles.fill} ${fillClass(model.level)}`}
+              style={{ width: `${Math.min(100, model.usedPct || 0)}%` }}
+            />
+          </div>
+        </div>
+        <span className={`${styles.inlinePct} ${pctClass(model.level)}`}>{model.usedPct}%</span>
+        {model.belowMin ? <span className={styles.inlineWarn}>Low</span> : null}
+      </div>
+    );
+  }
+
+  /* Legacy full strip — kept for non-dialer-flow pages if needed */
+  if (loading && !model) {
+    return (
+      <div className={barClass} role="status" aria-label="Call credits and usage">
+        <span className={styles.loading}>Loading credits…</span>
+      </div>
+    );
+  }
+
+  if (!model?.showUsageBar) return null;
+
   return (
     <div className={barClass} role="status" aria-label="Call credits and usage">
-      {loading && !model ? (
-        <span className={styles.loading}>Loading credits…</span>
-      ) : model ? (
-        <>
-          <div className={styles.group}>
-            <span className={styles.planBadge}>{model.planLabel}</span>
-            {model.mode === 'credit' ? (
-              <>
-                <div className={styles.stat}>
-                  <span className={styles.statLabel}>Balance</span>
-                  <span
-                    className={`${styles.statValue} ${model.belowMin ? styles.balanceLow : ''}`.trim()}
-                  >
-                    {formatPaiseAsInr(model.balancePaise)}
-                  </span>
-                  {model.belowMin ? (
-                    <span className={styles.statHint}>
-                      Below minimum {formatPaiseAsInr(model.minBal)} — calls blocked
-                    </span>
-                  ) : (
-                    <span className={styles.statHint}>
-                      {formatPaiseAsInr(model.ratePaise)} / min
-                      {model.isBYO ? ' · BYO fee' : ''}
-                    </span>
-                  )}
-                </div>
-                <span className={styles.divider} aria-hidden />
-                <div className={styles.stat}>
-                  <span className={styles.statLabel}>This month</span>
-                  <span className={styles.statValue}>
-                    {formatPaiseAsInr(model.monthSpend)}
-                  </span>
-                  <span className={styles.statHint}>
-                    {formatMinutes(model.monthMinutes)} · {model.monthCalls} calls
-                  </span>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className={styles.stat}>
-                  <span className={styles.statLabel}>This month</span>
-                  <span className={styles.statValue}>{formatMinutes(model.monthMinutes)}</span>
-                  <span className={styles.statHint}>{model.monthCalls} connected calls</span>
-                </div>
-                {model.cap?.enabled ? (
-                  <>
-                    <span className={styles.divider} aria-hidden />
-                    <div className={styles.stat}>
-                      <span className={styles.statLabel}>Monthly cap</span>
-                      <span className={styles.statValue}>
-                        {model.cap.used_minutes} / {model.cap.cap_minutes_per_month} min
-                      </span>
-                      {model.cap.exceeded ? (
-                        <span className={styles.statHint}>Cap reached — new calls blocked</span>
-                      ) : (
-                        <span className={styles.statHint}>
-                          {model.cap.remaining_minutes} min remaining
-                        </span>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <span className={styles.divider} aria-hidden />
-                    <div className={styles.stat}>
-                      <span className={styles.statLabel}>Today</span>
-                      <span className={styles.statValue}>{formatMinutes(model.todayMinutes)}</span>
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-          </div>
-
-          {model.showUsageBar ? (
-            <div className={styles.usageBlock}>
-              <div className={styles.usageHead}>
-                <span className={styles.statLabel}>
-                  {model.mode === 'credit' ? 'Credits used' : 'Cap usage'}
-                </span>
-                <span className={`${styles.usagePct} ${pctClass(model.level)}`}>
-                  {model.usedPct}%
-                </span>
-              </div>
-              <div className={styles.track} aria-hidden>
-                <div
-                  className={`${styles.fill} ${fillClass(model.level)}`}
-                  style={{ width: `${Math.min(100, model.usedPct || 0)}%` }}
-                />
-              </div>
-            </div>
-          ) : null}
-
-          {canOpenSettings ? (
-            <>
-              <span className={styles.spacer} />
-              <Link to="/settings/telephony" className={styles.settingsLink}>
-                Telephony settings
-              </Link>
-            </>
-          ) : null}
-        </>
-      ) : null}
+      <div className={styles.usageBlock}>
+        <div className={styles.usageHead}>
+          <span className={styles.statLabel}>{model.barLabel}</span>
+          <span className={`${styles.usagePct} ${pctClass(model.level)}`}>{model.usedPct}%</span>
+        </div>
+        <div className={styles.track} aria-hidden>
+          <div
+            className={`${styles.fill} ${fillClass(model.level)}`}
+            style={{ width: `${Math.min(100, model.usedPct || 0)}%` }}
+          />
+        </div>
+      </div>
     </div>
   );
 }

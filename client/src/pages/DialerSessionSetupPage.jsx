@@ -12,6 +12,8 @@ import { dialingSetsAPI, callScriptsAPI, dialingSetDispositionsAPI } from '../se
 import { templateVariablesAPI } from '../services/templateVariablesAPI';
 import { renderScriptHtml } from '../utils/callScriptHtml';
 import { DialerCreditsBar } from '../components/dialer/DialerCreditsBar';
+import { DialerFlowLayout } from '../components/dialer/DialerFlowLayout';
+import { getDialerTheme, persistDialerTheme } from '../components/dialer/dialerTheme';
 import styles from './DialerSessionSetupPage.module.scss';
 
 function pickDefaultId(list, isDefaultKey = 'is_default') {
@@ -41,9 +43,9 @@ export function DialerSessionSetupPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-
   const [dialingSets, setDialingSets] = useState([]);
   const [callScripts, setCallScripts] = useState([]);
+  const [dialerTheme, setDialerTheme] = useState(() => getDialerTheme());
 
   const dialingSetSelectOptions = useMemo(
     () => dialingSets.map((d) => ({ value: String(d.id), label: d.name || '—' })),
@@ -56,7 +58,6 @@ export function DialerSessionSetupPage() {
 
   const [dialingSetId, setDialingSetId] = useState(incoming.dialingSetId ? String(incoming.dialingSetId) : '');
   const [callScriptId, setCallScriptId] = useState(incoming.callScriptId ? String(incoming.callScriptId) : '');
-
   const [templateSample, setTemplateSample] = useState(null);
   const [scriptDetail, setScriptDetail] = useState(null);
   const [scriptPreviewLoading, setScriptPreviewLoading] = useState(false);
@@ -218,157 +219,130 @@ export function DialerSessionSetupPage() {
   }
 
   return (
-    <div className={styles.page}>
-      <header className={styles.topBar}>
-        <div className={styles.topBarLeft}>
-          <span className={styles.brandMark}>Dialer</span>
-          <span className={styles.topDivider} aria-hidden />
-          <h1 className={styles.topTitle}>New session</h1>
-        </div>
-        <Button variant="secondary" onClick={() => navigate('/dialer')}>
-          Back to leads
-        </Button>
-      </header>
+    <DialerFlowLayout
+      theme={dialerTheme}
+      onThemeChange={(t) => {
+        setDialerTheme(t);
+        persistDialerTheme(t);
+      }}
+      subtitle="New session"
+      credits={<DialerCreditsBar barOnly refreshIntervalMs={60000} />}
+    >
+      <div className={styles.workspace}>
+        {error ? (
+          <div className={styles.alertRow}>
+            <Alert variant="error">{error}</Alert>
+          </div>
+        ) : null}
 
-      <DialerCreditsBar refreshIntervalMs={60000} />
+        {loading ? (
+          <div className={styles.split} aria-busy="true">
+            <Skeleton height="100%" width="100%" />
+            <Skeleton height="100%" width="100%" />
+          </div>
+        ) : (
+          <div className={styles.split}>
+            <section className={styles.configPanel} aria-labelledby="setup-config-heading">
+              <h2 id="setup-config-heading" className={styles.panelTitle}>
+                Session settings
+              </h2>
+              <p className={styles.panelLead}>Dialing set, script, and queue size for this run.</p>
 
-      {error ? <Alert variant="error">{error}</Alert> : null}
-
-      {loading ? (
-        <div className={styles.layout} aria-busy="true" aria-label="Loading session setup">
-          <section className={styles.leftCol}>
-            <Skeleton width={120} height={22} style={{ borderRadius: 999 }} />
-            <Skeleton width="72%" height={28} style={{ marginTop: 12 }} />
-            <Skeleton width="100%" height={14} style={{ marginTop: 8 }} />
-            <Skeleton height={72} width="100%" style={{ borderRadius: 12, marginTop: 18 }} />
-            <div style={{ marginTop: 18, display: 'grid', gap: 16 }}>
-              <div style={{ display: 'grid', gap: 8 }}>
-                <Skeleton width={96} height={12} />
-                <Skeleton height={44} width="100%" />
-              </div>
-              <div style={{ display: 'grid', gap: 8 }}>
-                <Skeleton width={88} height={12} />
-                <Skeleton height={44} width="100%" />
-              </div>
-            </div>
-            <Skeleton width={112} height={40} style={{ borderRadius: 10, marginTop: 22 }} />
-          </section>
-          <aside className={styles.rightCol} aria-hidden>
-            <div className={styles.previewHeader}>
-              <Skeleton width={100} height={14} />
-              <Skeleton width={88} height={12} />
-            </div>
-            <Skeleton height={320} width="100%" style={{ borderRadius: 12, marginTop: 12 }} />
-            <Skeleton height={120} width="100%" style={{ borderRadius: 12, marginTop: 12 }} />
-          </aside>
-        </div>
-      ) : (
-        <div className={styles.layout}>
-          <section className={styles.leftCol} aria-labelledby="setup-config-heading">
-            <div className={styles.stepPill}>Step 1 · Configure</div>
-            <h2 id="setup-config-heading" className={styles.heading}>
-              Session settings
-            </h2>
-            <p className={styles.lead}>Choose the dialing set and script for this run. Preview updates on the right.</p>
-
-            <div className={styles.statCard}>
-              <div className={styles.statLabel}>Leads in queue</div>
-              <div className={styles.statValue}>{contactIds?.length || 0}</div>
-            </div>
-
-            <div className={styles.field}>
-              <Select
-                id="dialingSet"
-                label="Dialing set"
-                value={dialingSetId}
-                onChange={(e) => setDialingSetId(e.target.value)}
-                options={dialingSetSelectOptions}
-                placeholder="Select dialing set…"
-                selectClassName={styles.select}
-                labelClassName={styles.label}
-              />
-            </div>
-
-            <div className={styles.field}>
-              <Select
-                id="callScript"
-                label="Call script"
-                value={callScriptId}
-                onChange={(e) => setCallScriptId(e.target.value)}
-                options={callScriptSelectOptions}
-                placeholder="Select call script…"
-                selectClassName={styles.select}
-                labelClassName={styles.label}
-              />
-            </div>
-
-            <div className={styles.actions}>
-              <Button onClick={continueToPreflight} disabled={busy}>
-                {busy ? 'Creating session…' : 'Continue'}
-              </Button>
-            </div>
-          </section>
-
-          <aside className={styles.rightCol} aria-label="Preview">
-            <div className={styles.previewHeader}>
-              <span className={styles.previewTitle}>Live preview</span>
-              <span className={styles.previewHint}>Desktop layout</span>
-            </div>
-
-            <div className={styles.previewStack}>
-              <div className={styles.previewCard}>
-                <div className={styles.previewCardHead}>
-                  <span className={styles.previewCardTitle}>Call script</span>
-                  <span className={styles.previewCardMeta}>
-                    {scriptDetail?.script_name || selectedScriptMeta?.script_name || '—'}
-                  </span>
-                </div>
-                <div className={styles.previewCardBody}>
-                  {scriptPreviewLoading ? (
-                    <div className={styles.previewLoading}>
-                      <Spinner />
-                    </div>
-                  ) : (
-                    <div
-                      className={styles.scriptPreview}
-                      dangerouslySetInnerHTML={{ __html: scriptPreviewHtml }}
-                    />
-                  )}
-                </div>
+              <div className={styles.inlineStat}>
+                <span className={styles.inlineStatLabel}>Leads in queue</span>
+                <span className={styles.inlineStatValue}>{contactIds?.length || 0}</span>
               </div>
 
-              <div className={styles.previewCard}>
-                <div className={styles.previewCardHead}>
-                  <span className={styles.previewCardTitle}>Dialing set</span>
-                  <span className={styles.previewCardMeta}>
-                    {selectedDialingSet?.name || '—'}
-                  </span>
-                </div>
-                <div className={styles.previewCardBody}>
-                  {dispoLoading ? (
-                    <div className={styles.previewLoading}>
-                      <Spinner />
-                    </div>
-                  ) : dispositions.length === 0 ? (
-                    <p className={styles.previewEmpty}>No disposition buttons linked to this set yet.</p>
-                  ) : (
-                    <ul className={styles.dispoPreviewList}>
-                      {dispositions.map((row) => (
-                        <li key={row.id || `${row.disposition_id}-${row.order_index}`} className={styles.dispoPreviewItem}>
-                          <span className={styles.dispoPreviewName}>{row.disposition_name || row.name || 'Disposition'}</span>
-                          {row.next_action ? (
-                            <span className={styles.dispoPreviewHint}>{row.next_action}</span>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+              <div className={styles.field}>
+                <Select
+                  id="dialingSet"
+                  label="Dialing set"
+                  value={dialingSetId}
+                  onChange={(e) => setDialingSetId(e.target.value)}
+                  options={dialingSetSelectOptions}
+                  placeholder="Select dialing set…"
+                  selectClassName={styles.select}
+                  labelClassName={styles.label}
+                />
               </div>
-            </div>
-          </aside>
-        </div>
-      )}
-    </div>
+
+              <div className={styles.field}>
+                <Select
+                  id="callScript"
+                  label="Call script"
+                  value={callScriptId}
+                  onChange={(e) => setCallScriptId(e.target.value)}
+                  options={callScriptSelectOptions}
+                  placeholder="Select call script…"
+                  selectClassName={styles.select}
+                  labelClassName={styles.label}
+                />
+              </div>
+
+              <div className={styles.configActions}>
+                <Button onClick={continueToPreflight} disabled={busy}>
+                  {busy ? 'Creating session…' : 'Continue to review'}
+                </Button>
+              </div>
+            </section>
+
+            <section className={styles.previewPanel} aria-label="Workspace preview">
+              <div className={styles.previewGrid}>
+                <article className={styles.previewPane}>
+                  <header className={styles.paneHead}>
+                    <span className={styles.paneTitle}>Call script</span>
+                    <span className={styles.paneMeta}>
+                      {scriptDetail?.script_name || selectedScriptMeta?.script_name || '—'}
+                    </span>
+                  </header>
+                  <div className={styles.paneBody}>
+                    {scriptPreviewLoading ? (
+                      <div className={styles.paneLoading}>
+                        <Spinner />
+                      </div>
+                    ) : (
+                      <div
+                        className={styles.scriptPreview}
+                        dangerouslySetInnerHTML={{ __html: scriptPreviewHtml }}
+                      />
+                    )}
+                  </div>
+                </article>
+
+                <article className={styles.previewPane}>
+                  <header className={styles.paneHead}>
+                    <span className={styles.paneTitle}>Outcomes</span>
+                    <span className={styles.paneMeta}>{selectedDialingSet?.name || '—'}</span>
+                  </header>
+                  <div className={styles.paneBody}>
+                    {dispoLoading ? (
+                      <div className={styles.paneLoading}>
+                        <Spinner />
+                      </div>
+                    ) : dispositions.length === 0 ? (
+                      <p className={styles.paneEmpty}>No dispositions linked to this set.</p>
+                    ) : (
+                      <ul className={styles.outcomeList}>
+                        {dispositions.map((row) => (
+                          <li
+                            key={row.id || `${row.disposition_id}-${row.order_index}`}
+                            className={styles.outcomeItem}
+                          >
+                            <span>{row.disposition_name || row.name || 'Disposition'}</span>
+                            {row.next_action ? (
+                              <span className={styles.outcomeHint}>{row.next_action}</span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </article>
+              </div>
+            </section>
+          </div>
+        )}
+      </div>
+    </DialerFlowLayout>
   );
 }

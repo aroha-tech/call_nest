@@ -16,33 +16,95 @@
   padding: 18px;
 }
 
-/* Dedicated dark cockpit — reads as a pro dial session, not a generic form page */
+/* Pro dialer shell — theme via data-dialer-theme on the root */
 .dialerShell {
   --dialer-fg: #f1f5f9;
+  --dialer-fg-secondary: #cbd5e1;
   --dialer-muted: #94a3b8;
   --dialer-edge: rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
+  --dialer-surface: rgba(15, 23, 42, 0.55);
+  --dialer-surface-2: rgba(0, 0, 0, 0.28);
+  --dialer-panel-head: rgba(255, 255, 255, 0.03);
+  --dialer-hover: rgba(255, 255, 255, 0.06);
+  --dialer-accent-soft: rgba(99, 102, 241, 0.22);
+  --dialer-accent-border: rgba(129, 140, 248, 0.4);
+  --dialer-accent-fg: #c7d2fe;
+  --dialer-accent-glow: rgba(99, 102, 241, 0.35);
+  --dialer-success-soft: rgba(34, 197, 94, 0.2);
+  --dialer-success-border: rgba(74, 222, 128, 0.45);
+  --dialer-success-fg: #86efac;
+  --dialer-live: #4ade80;
+  --dialer-script-paper: #f8fafc;
+  --dialer-script-ink: #0f172a;
+  border-radius: 12px;
   overflow: hidden;
   color: var(--dialer-fg);
   background:
-    radial-gradient(120% 80% at 0% 0%, rgba(99, 102, 241, 0.2), transparent 50%),
-    radial-gradient(80% 60% at 100% 0%, rgba(34, 197, 94, 0.12), transparent 45%),
-    linear-gradient(180deg, #0f172a 0%, #0b1120 48%, #070b14 100%);
+    radial-gradient(100% 70% at 0% 0%, rgba(99, 102, 241, 0.14), transparent 48%),
+    radial-gradient(70% 50% at 100% 0%, rgba(34, 197, 94, 0.08), transparent 42%),
+    linear-gradient(180deg, #0f172a 0%, #0b1120 52%, #070b14 100%);
   border: 1px solid var(--dialer-edge);
   box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.5) inset,
-    0 28px 80px rgba(0, 0, 0, 0.45);
+    0 0 0 1px rgba(0, 0, 0, 0.4) inset,
+    0 20px 56px rgba(0, 0, 0, 0.38);
+}
+
+.dialerShell[data-dialer-theme='light'] {
+  --dialer-fg: #0f172a;
+  --dialer-fg-secondary: #334155;
+  --dialer-muted: #64748b;
+  --dialer-edge: rgba(15, 23, 42, 0.1);
+  --dialer-surface: #ffffff;
+  --dialer-surface-2: #f1f5f9;
+  --dialer-panel-head: #f8fafc;
+  --dialer-hover: rgba(15, 23, 42, 0.04);
+  --dialer-accent-soft: rgba(99, 102, 241, 0.1);
+  --dialer-accent-border: rgba(99, 102, 241, 0.28);
+  --dialer-accent-fg: #4338ca;
+  --dialer-accent-glow: rgba(99, 102, 241, 0.15);
+  --dialer-success-soft: rgba(34, 197, 94, 0.12);
+  --dialer-success-border: rgba(34, 197, 94, 0.35);
+  --dialer-success-fg: #15803d;
+  --dialer-live: #16a34a;
+  --dialer-script-paper: #ffffff;
+  --dialer-script-ink: #0f172a;
+  background:
+    radial-gradient(100% 70% at 0% 0%, rgba(99, 102, 241, 0.08), transparent 50%),
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 48%, #e2e8f0 100%);
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.06) inset,
+    0 16px 48px rgba(15, 23, 42, 0.12);
 }
 
 .dialerChromeBar {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--dialer-edge);
+  background: var(--dialer-surface-2);
+}
+
+.dialerChromeTop {
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px 16px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--dialer-edge);
-  background: rgba(0, 0, 0, 0.25);
+  gap: 10px 14px;
+  width: 100%;
+}
+
+.dialerChromeStepper {
+  flex: 1 1 200px;
+  max-width: min(520px, 100%);
+}
+
+.dialerChromeMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
 }
 
 .dialerChromeLeft {
@@ -62,9 +124,9 @@
 }
 
 .dialerChromeSession {
-  font-size: 15px;
-  font-weight: 950;
-  letter-spacing: -0.02em;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -156,28 +218,42 @@
 }
 
 .metricValue {
-  margin-top: 4px;
-  font-size: 15px;
-  font-weight: 900;
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
-.shellProgress {
-  padding: 12px 18px 10px;
+.shellProgressRow {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 8px 24px 8px 16px;
+  min-height: 44px;
+  flex-shrink: 0;
   border-bottom: 1px solid var(--dialer-edge);
+  background: var(--dial-surface, rgba(0, 0, 0, 0.12));
+}
+
+.shellProgressMain {
+  flex: 1 1 auto;
+  width: min(420px, 48vw);
+  max-width: 420px;
+  min-width: 260px;
 }
 
 .shellProgressText {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 12px;
-  font-size: 12px;
+  gap: 10px;
+  font-size: 11px;
   font-weight: 650;
-  color: #cbd5e1;
-  margin-bottom: 8px;
+  color: var(--dialer-muted, #a3a3a3);
+  margin-bottom: 4px;
+  line-height: 1.2;
 }
 
 .shellProgressPct {
@@ -185,14 +261,86 @@
   font-variant-numeric: tabular-nums;
   color: var(--dialer-muted);
   white-space: nowrap;
+  font-size: 10px;
 }
 
 .shellProgressBar {
-  height: 6px;
+  height: 5px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--dial-progress-track, #e5e5e5);
+  border: 1px solid var(--dial-progress-track-border, #d4d4d4);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
   overflow: hidden;
+}
+
+.shellProgressActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 12px;
+}
+
+.dialActionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid var(--dial-border, rgba(255, 255, 255, 0.12));
+  background: var(--dial-panel, rgba(0, 0, 0, 0.35));
+  color: var(--dial-text, #fafafa);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: var(--dial-hover, rgba(255, 255, 255, 0.08));
+    border-color: var(--dial-accent-border, rgba(59, 158, 255, 0.4));
+  }
+
+  &:disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--dial-accent, #3b9eff);
+    outline-offset: 2px;
+  }
+
+  svg {
+    width: 17px;
+    height: 17px;
+  }
+}
+
+.dialActionPrimary {
+  border-color: var(--dial-accent-border, rgba(59, 158, 255, 0.45));
+  background: var(--dial-accent, #3b9eff);
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.08);
+    background: var(--dial-accent, #3b9eff);
+  }
+}
+
+.dialActionStop {
+  border-color: rgba(248, 113, 113, 0.55);
+  background: linear-gradient(180deg, #f87171 0%, #dc2626 55%, #b91c1c 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.08);
+    background: linear-gradient(180deg, #f87171 0%, #dc2626 55%, #b91c1c 100%);
+  }
 }
 
 .shellProgressFill {
@@ -307,11 +455,11 @@
 }
 
 .activeCallName {
-  font-size: 1.25rem;
-  font-weight: 950;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
-  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--dialer-fg);
 }
 
 .activeCallSub {
@@ -345,11 +493,11 @@
 }
 
 .activeCallPhone {
-  font-size: 1.35rem;
-  font-weight: 900;
+  font-size: 1.05rem;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-  color: #f8fafc;
+  letter-spacing: 0.03em;
+  color: var(--dialer-fg);
 }
 
 .activeCallPhoneRowWrap {
@@ -439,71 +587,6 @@
   font-weight: 600;
   color: var(--color-text-primary, #0f172a);
   word-break: break-word;
-}
-
-.dialToolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 14px;
-  padding: 14px 18px 16px;
-  border-bottom: 1px solid var(--dialer-edge);
-  background: rgba(0, 0, 0, 0.18);
-}
-
-.dialToolbarControls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  padding: 4px;
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.28);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.dialToolbarControls :global(button) {
-  min-height: 42px;
-}
-
-.endSessionIconBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  min-height: 42px;
-  flex-shrink: 0;
-  padding: 0;
-  margin-left: 2px;
-  border: 1px solid rgba(248, 113, 113, 0.55);
-  border-radius: 10px;
-  cursor: pointer;
-  color: #fff;
-  background: linear-gradient(180deg, #f87171 0%, #dc2626 55%, #b91c1c 100%);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.22) inset,
-    0 6px 18px rgba(220, 38, 38, 0.45);
-  transition: filter 0.15s ease, transform 0.12s ease;
-}
-
-.endSessionIconBtn:hover:not(:disabled) {
-  filter: brightness(1.08);
-}
-
-.endSessionIconBtn:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.endSessionIconBtn:disabled {
-  opacity: 0.42;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.endSessionIconBtn:focus-visible {
-  outline: 2px solid #fca5a5;
-  outline-offset: 2px;
 }
 
 .preflightShellHint {
@@ -909,29 +992,46 @@
 
 .grid {
   display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr) minmax(280px, 340px);
-  gap: 16px;
-  align-items: start;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(240px, 300px);
+  gap: 10px;
+  align-items: stretch;
+  min-height: 0;
 }
 
 .left,
 .center,
 .right {
   min-width: 0;
+  min-height: 0;
 }
 
 .center {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
+}
+
+/* Queue above script so it is always visible without scrolling past script */
+.center .cardQueue {
+  order: 1;
+  flex: 0 0 auto;
+  max-height: min(36vh, 320px);
+}
+
+.center .cardScript {
+  order: 2;
+  flex: 1 1 auto;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
 }
 
 .card {
-  background: linear-gradient(165deg, rgba(255, 255, 255, 0.04) 0%, rgba(0, 0, 0, 0.12) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
+  background: var(--dialer-surface);
+  border: 1px solid var(--dialer-edge);
+  border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
 
 .cardContact {
@@ -1174,11 +1274,11 @@
 
 /* Light “paper” panel so rich-text (e.g. Quill) dark inline colors stay readable in any app theme */
 .scriptReadingSurface {
-  margin: 0 18px 22px;
-  border-radius: 14px;
-  background: #f8fafc;
-  color: #0f172a;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  margin: 0 12px 12px;
+  border-radius: 10px;
+  background: var(--dialer-script-paper);
+  color: var(--dialer-script-ink);
+  border: 1px solid var(--dialer-edge);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.75),
     0 1px 3px rgba(15, 23, 42, 0.06);
@@ -1300,7 +1400,14 @@
 
 .queueTableWrap {
   overflow: auto;
-  max-height: 44vh;
+  max-height: min(32vh, 280px);
+  flex: 1 1 auto;
+}
+
+.cardQueue {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .queueTable {
@@ -2028,5 +2135,278 @@
   font-size: 13px;
   opacity: 0.65;
   text-align: center;
+}
+
+.dialNotesRail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 12px 10px;
+}
+
+.dialNotesTab {
+  appearance: none;
+  border: 1px solid var(--dialer-edge);
+  background: var(--dialer-surface-2);
+  color: var(--dialer-muted);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+  padding: 6px 11px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    color: var(--dialer-fg);
+    border-color: var(--dialer-accent-border);
+  }
+}
+
+.dialNotesTabActive {
+  color: var(--dialer-fg);
+  background: var(--dialer-accent-soft);
+  border-color: var(--dialer-accent-border);
+}
+
+.dialNotesPanel {
+  padding: 0 12px 12px;
+}
+
+.dialerShell[data-dialer-theme='light'] .grid .card {
+  background: var(--dialer-surface);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+}
+
+.dialerShell[data-dialer-theme='light'] .dialerShell .grid .cardTitle,
+.dialerShell[data-dialer-theme='light'] .grid .queueTitle,
+.dialerShell[data-dialer-theme='light'] .grid .dispoTitle {
+  color: var(--dialer-fg);
+}
+
+.preflightCard {
+  margin: 0 12px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--dialer-edge);
+  background: var(--dialer-surface);
+}
+
+.summaryWrap {
+  margin: 0 12px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--dialer-edge);
+  background: var(--dialer-surface);
+}
+
+/* === Dialer flow layout (inherits --dial-* from DialerFlowLayout) === */
+.flowBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.preflightCenter,
+.summaryCenter {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: auto;
+}
+
+.preflightCenter .preflightCard {
+  width: min(720px, 100%);
+  margin: 0;
+  border: 1px solid var(--dial-border, #d4d4d4);
+  background: var(--dial-panel, #fff);
+  border-radius: 8px;
+}
+
+.summaryCenter .summaryWrap {
+  width: min(900px, 100%);
+  margin: 0;
+}
+
+.workspaceRoot {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--dial-bg, #0a0a0a);
+}
+
+.sessionMeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--dial-border, #2e2e2e);
+  background: var(--dial-panel, #1a1a1a);
+  flex-shrink: 0;
+}
+
+.sessionMetaScript {
+  font-size: 12px;
+  color: var(--dial-text-muted, #a3a3a3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 352px minmax(0, 1fr) 268px;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.colQueue,
+.colMain,
+.colSide {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.colQueue {
+  align-self: stretch;
+  min-height: 0;
+  max-height: none;
+}
+
+.colSide {
+  gap: 8px;
+}
+
+.colQueue .cardQueue {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--dial-panel, #1a1a1a);
+  border: 1px solid var(--dial-border, #2e2e2e);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.colMain,
+.colSide {
+  align-self: stretch;
+  min-height: 0;
+}
+
+.colMain .cardScript,
+.colSide .card {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--dial-panel, #1a1a1a);
+  border: 1px solid var(--dial-border, #2e2e2e);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.colQueue .queueHeader {
+  padding: 10px 12px;
+  gap: 8px;
+}
+
+.colQueue .queueTitle {
+  font-size: 10px;
+  letter-spacing: 0.07em;
+}
+
+.colQueue .queueHint {
+  font-size: 12px;
+}
+
+.colQueue .queueTableWrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+}
+
+.colQueue .queueTable {
+  font-size: 12px;
+}
+
+.colQueue .queueTable thead th {
+  padding: 8px 10px;
+  font-size: 10px;
+}
+
+.colQueue .queueTable tbody td {
+  padding: 8px 10px;
+}
+
+.colQueue .queueName {
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.colQueue .queueSub {
+  font-size: 11px;
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.colQueue .statePill {
+  padding: 3px 8px;
+  font-size: 10px;
+}
+
+.colMain .scriptReadingSurface {
+  flex: 1 1 auto;
+  margin: 0 8px 8px;
+  overflow: auto;
+}
+
+/* Map legacy dialer tokens to flow tokens inside workspace */
+.workspaceRoot,
+.flowBody {
+  --dialer-fg: var(--dial-text, #fafafa);
+  --dialer-muted: var(--dial-text-muted, #a3a3a3);
+  --dialer-edge: var(--dial-border, #2e2e2e);
+  --dialer-surface: var(--dial-panel, #1a1a1a);
+  --dial-progress-track: #e5e5e5;
+  --dial-progress-track-border: #d4d4d4;
+  color: var(--dial-text);
+}
+
+:global([data-dialer-theme='dark']) .workspaceRoot,
+:global([data-dialer-theme='dark']) .flowBody {
+  --dial-progress-track: #4a4a4a;
+  --dial-progress-track-border: #636363;
+}
+
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
+  .colQueue .cardQueue {
+    max-height: min(400px, 50vh);
+    flex: 0 0 auto;
+  }
 }
 
