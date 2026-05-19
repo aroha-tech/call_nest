@@ -1,3 +1,4 @@
+/* Dialer setup — uses --dial-* from DialerFlowLayout */
 .workspace {
   flex: 1 1 auto;
   min-height: 0;
@@ -6,6 +7,27 @@
   padding: 12px;
   gap: 10px;
   overflow: hidden;
+
+  /* React-select reads app input tokens — map to dialer surfaces */
+  --color-input-bg: var(--dial-panel, #ffffff);
+  --color-input-border: var(--dial-border, #d8dce8);
+  --color-input-border-hover: #b8b3d4;
+  --color-input-border-focus: #7c3aed;
+  --color-focus-ring: rgba(124, 58, 237, 0.2);
+  --color-text-primary: var(--dial-text, #120a47);
+  --color-text-muted: var(--dial-text-muted, #5c5678);
+  --color-bg-elevated: var(--dial-panel, #ffffff);
+}
+
+.workspace[data-dialer-theme='dark'] {
+  --color-input-bg: rgba(0, 0, 0, 0.28);
+  --color-input-border: rgba(255, 255, 255, 0.14);
+  --color-input-border-hover: rgba(255, 255, 255, 0.22);
+  --color-input-border-focus: #a78bfa;
+  --color-focus-ring: rgba(167, 139, 250, 0.22);
+  --color-text-primary: var(--dial-text, #f4f2ff);
+  --color-text-muted: var(--dial-text-muted, #8b85a8);
+  --color-bg-elevated: var(--dial-panel, #1a1830);
 }
 
 .alertRow {
@@ -33,88 +55,161 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--dial-border, #d4d4d4);
-  border-radius: 8px;
-  background: var(--dial-panel, #fff);
+  border: 1px solid var(--dial-border, #d8dce8);
+  border-radius: 12px;
+  background: var(--dial-panel, #ffffff);
   overflow: hidden;
+  box-shadow: 0 4px 16px rgba(18, 10, 71, 0.06);
+}
+
+.workspace[data-dialer-theme='dark'] .configPanel,
+.workspace[data-dialer-theme='dark'] .previewPanel {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
 }
 
 .panelTitle {
   margin: 0;
-  padding: 12px 14px 0;
-  font-size: 15px;
+  padding: 14px 16px 0;
+  font-size: 16px;
   font-weight: 700;
-  color: var(--dial-text, #0a0a0a);
+  color: var(--dial-text, #120a47);
 }
 
 .panelLead {
   margin: 0;
-  padding: 4px 14px 12px;
+  padding: 4px 16px 14px;
   font-size: 12px;
   line-height: 1.45;
-  color: var(--dial-text-muted, #525252);
-  border-bottom: 1px solid var(--dial-border, #d4d4d4);
+  color: var(--dial-text-muted, #5c5678);
+  border-bottom: 1px solid var(--dial-border, #d8dce8);
 }
 
 .inlineStat {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 12px 14px;
-  padding: 10px 12px;
-  border-radius: 6px;
-  background: var(--dial-surface, #f5f5f5);
-  border: 1px solid var(--dial-border, #d4d4d4);
+  margin: 14px 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--dial-surface, #f4f6fb);
+  border: 1px solid var(--dial-border, #d8dce8);
+}
+
+.inlineStatLead {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.iconWell {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &[data-tone='violet'] {
+    background: rgba(124, 58, 237, 0.12);
+    color: #7c3aed;
+  }
+
+  &[data-tone='green'] {
+    background: rgba(34, 197, 94, 0.12);
+    color: #15803d;
+  }
+}
+
+.workspace[data-dialer-theme='dark'] .iconWell[data-tone='violet'] {
+  background: rgba(124, 58, 237, 0.22);
+  color: #c4b5fd;
 }
 
 .inlineStatLabel {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--dial-text-muted, #525252);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--dial-text-muted, #5c5678);
 }
 
 .inlineStatValue {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  color: var(--dial-text, #0a0a0a);
+  color: var(--dial-text, #120a47);
 }
 
 .field {
-  padding: 0 14px;
-  margin-bottom: 10px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px 12px;
+  align-items: end;
+  padding: 0 16px;
+  margin-bottom: 12px;
+}
+
+.fieldIcon {
+  width: 36px;
+  height: 38px;
+  margin-bottom: 1px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(124, 58, 237, 0.1);
+  color: #6d28d9;
+  flex-shrink: 0;
+}
+
+.workspace[data-dialer-theme='dark'] .fieldIcon {
+  background: rgba(124, 58, 237, 0.2);
+  color: #c4b5fd;
+}
+
+.selectWrap {
+  min-width: 0;
 }
 
 .label {
   display: block;
-  font-size: 11px;
-  font-weight: 700;
-  margin-bottom: 4px;
-  color: var(--dial-text-muted, #525252);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--dial-text-muted, #5c5678);
 }
 
 .select :global(.cn-select__control) {
-  min-height: 38px;
-  height: 38px;
-  border-radius: 6px;
-  border: 1px solid var(--dial-border, #d4d4d4);
-  background: var(--dial-panel, #fff);
-  color: var(--dial-text, #0a0a0a);
-  font-size: 13px;
+  min-height: 40px;
+  border-radius: 8px;
+  border: 1px solid var(--dial-border, #d8dce8) !important;
+  background: var(--dial-panel, #fff) !important;
+  box-shadow: none !important;
+}
+
+.select :global(.cn-select__single-value) {
+  color: var(--dial-text, #120a47) !important;
+}
+
+.select :global(.cn-select__placeholder) {
+  color: var(--dial-text-muted, #8b85a8) !important;
+}
+
+.select :global(.cn-select__dropdown-indicator) {
+  color: var(--dial-text-muted, #5c5678) !important;
 }
 
 .configActions {
   margin-top: auto;
-  padding: 12px 14px 14px;
-  border-top: 1px solid var(--dial-border, #d4d4d4);
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--dial-border, #d8dce8);
 }
 
 .configActions :global(button) {
   width: 100%;
-  min-height: 40px;
+  min-height: 42px;
   font-weight: 700;
 }
 
@@ -124,7 +219,7 @@
   display: grid;
   grid-template-rows: 1fr 1fr;
   gap: 1px;
-  background: var(--dial-border, #d4d4d4);
+  background: var(--dial-border, #d8dce8);
 }
 
 .previewPane {
@@ -140,24 +235,57 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--dial-border, #d4d4d4);
-  background: var(--dial-surface, #f5f5f5);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--dial-border, #d8dce8);
+  background: var(--dial-surface, #f4f6fb);
   flex-shrink: 0;
 }
 
+.paneHeadLead {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.paneIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(124, 58, 237, 0.12);
+  color: #6d28d9;
+  flex-shrink: 0;
+
+  &[data-tone='green'] {
+    background: rgba(34, 197, 94, 0.12);
+    color: #15803d;
+  }
+}
+
+.workspace[data-dialer-theme='dark'] .paneIcon {
+  background: rgba(124, 58, 237, 0.22);
+  color: #c4b5fd;
+
+  &[data-tone='green'] {
+    background: rgba(34, 197, 94, 0.18);
+    color: #4ade80;
+  }
+}
+
 .paneTitle {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--dial-text-muted, #525252);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--dial-text, #120a47);
 }
 
 .paneMeta {
   font-size: 12px;
-  font-weight: 650;
-  color: var(--dial-text, #0a0a0a);
+  font-weight: 600;
+  color: var(--dial-text-muted, #5c5678);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -178,27 +306,32 @@
 }
 
 .scriptPreview {
-  padding: 12px 14px;
+  padding: 14px 16px;
   font-size: 13px;
-  line-height: 1.5;
-  color: var(--dial-script-text, #0a0a0a);
-  background: var(--dial-script-bg, #fff);
+  line-height: 1.55;
+  color: var(--dial-script-text, #120a47);
+  background: var(--dial-script-bg, #ffffff);
+}
+
+.workspace[data-dialer-theme='dark'] .scriptPreview {
+  background: #16142a;
+  color: #f4f2ff;
 }
 
 .paneEmpty {
   margin: 0;
-  padding: 14px;
+  padding: 14px 16px;
   font-size: 13px;
-  color: var(--dial-text-muted, #525252);
+  color: var(--dial-text-muted, #5c5678);
 }
 
 .outcomeList {
   list-style: none;
   margin: 0;
-  padding: 8px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .outcomeItem {
@@ -206,16 +339,51 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--dial-border, #d4d4d4);
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--dial-border, #d8dce8);
   font-size: 13px;
-  font-weight: 650;
-  background: var(--dial-surface, #f5f5f5);
+  font-weight: 600;
+  background: var(--dial-surface, #f8f9fc);
+  color: var(--dial-text, #120a47);
+}
+
+.outcomeLead {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.outcomeIcon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(124, 58, 237, 0.1);
+  color: #6d28d9;
+}
+
+.workspace[data-dialer-theme='dark'] .outcomeIcon {
+  background: rgba(124, 58, 237, 0.2);
+  color: #c4b5fd;
 }
 
 .outcomeHint {
   font-size: 11px;
-  color: var(--dial-text-muted, #525252);
+  font-weight: 500;
+  color: var(--dial-text-muted, #5c5678);
   white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.skelOutcomeList {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
 }

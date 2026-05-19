@@ -33,11 +33,32 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
-.root[data-dialer-theme='dark'] .btnActive,
+[data-dialer-theme='light'] .toggle,
+[data-dialer-theme='dark'] .toggle {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+[data-dialer-theme='light'] .btn,
+[data-dialer-theme='dark'] .btn {
+  color: rgba(255, 255, 255, 0.78);
+
+  &:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.12);
+  }
+}
+
+[data-dialer-theme='light'] .btnActive {
+  color: #5b21b6;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(18, 10, 71, 0.15);
+}
+
 [data-dialer-theme='dark'] .btnActive {
-  background: #262626;
-  color: #fafafa;
-  box-shadow: none;
+  color: #e9d5ff;
+  background: #1a1830;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
 .label {

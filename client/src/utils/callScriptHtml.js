@@ -95,3 +95,29 @@ export function renderScriptHtml(body, contact, agent, tenant, sampleMap) {
 
   return escapeHtml(substituted).replace(/\r\n|\r|\n/g, '<br/>');
 }
+
+/** Plain text for read-only dialer script textarea (preserves line breaks). */
+export function htmlToPlainText(html) {
+  const raw = String(html || '');
+  if (!raw.trim()) return '';
+  if (typeof DOMParser !== 'undefined') {
+    try {
+      const doc = new DOMParser().parseFromString(raw, 'text/html');
+      return (doc.body.textContent || '').replace(/\u00a0/g, ' ').trim();
+    } catch {
+      /* fall through */
+    }
+  }
+  return raw
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+}

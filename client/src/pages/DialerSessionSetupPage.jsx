@@ -13,12 +13,58 @@ import { templateVariablesAPI } from '../services/templateVariablesAPI';
 import { renderScriptHtml } from '../utils/callScriptHtml';
 import { DialerCreditsBar } from '../components/dialer/DialerCreditsBar';
 import { DialerFlowLayout } from '../components/dialer/DialerFlowLayout';
+import { DialerIcon, outcomeIconName } from '../components/dialer/DialerIcon';
 import { getDialerTheme, persistDialerTheme } from '../components/dialer/dialerTheme';
 import styles from './DialerSessionSetupPage.module.scss';
 
 function pickDefaultId(list, isDefaultKey = 'is_default') {
   const def = list.find((x) => Number(x?.[isDefaultKey]) === 1) || list[0] || null;
   return def?.id ? String(def.id) : '';
+}
+
+function SetupIconStat({ icon, label, value, tone = 'violet' }) {
+  return (
+    <div className={styles.inlineStat}>
+      <span className={styles.inlineStatLead}>
+        <span className={styles.iconWell} data-tone={tone} aria-hidden="true">
+          <DialerIcon name={icon} />
+        </span>
+        <span className={styles.inlineStatLabel}>{label}</span>
+      </span>
+      <span className={styles.inlineStatValue}>{value}</span>
+    </div>
+  );
+}
+
+function SetupSkeleton() {
+  return (
+    <div className={styles.split} aria-busy="true" aria-label="Loading session settings">
+      <div className={styles.configPanel}>
+        <Skeleton height={18} width="55%" />
+        <Skeleton height={12} width="80%" style={{ marginTop: 8 }} />
+        <Skeleton height={52} style={{ marginTop: 14, borderRadius: 10 }} />
+        <Skeleton height={56} style={{ marginTop: 12, borderRadius: 8 }} />
+        <Skeleton height={56} style={{ marginTop: 10, borderRadius: 8 }} />
+        <Skeleton height={40} style={{ marginTop: 'auto', borderRadius: 8 }} />
+      </div>
+      <div className={styles.previewPanel}>
+        <div className={styles.previewGrid}>
+          <div className={styles.previewPane}>
+            <Skeleton height={36} />
+            <Skeleton height="100%" style={{ margin: 12, borderRadius: 8, minHeight: 120 }} />
+          </div>
+          <div className={styles.previewPane}>
+            <Skeleton height={36} />
+            <div className={styles.skelOutcomeList}>
+              {Array.from({ length: 4 }, (_, i) => (
+                <Skeleton key={i} height={44} style={{ borderRadius: 8 }} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function DialerSessionSetupPage() {
@@ -228,7 +274,7 @@ export function DialerSessionSetupPage() {
       subtitle="New session"
       credits={<DialerCreditsBar barOnly refreshIntervalMs={60000} />}
     >
-      <div className={styles.workspace}>
+      <div className={styles.workspace} data-dialer-theme={dialerTheme}>
         {error ? (
           <div className={styles.alertRow}>
             <Alert variant="error">{error}</Alert>
@@ -236,10 +282,7 @@ export function DialerSessionSetupPage() {
         ) : null}
 
         {loading ? (
-          <div className={styles.split} aria-busy="true">
-            <Skeleton height="100%" width="100%" />
-            <Skeleton height="100%" width="100%" />
-          </div>
+          <SetupSkeleton />
         ) : (
           <div className={styles.split}>
             <section className={styles.configPanel} aria-labelledby="setup-config-heading">
@@ -248,12 +291,12 @@ export function DialerSessionSetupPage() {
               </h2>
               <p className={styles.panelLead}>Dialing set, script, and queue size for this run.</p>
 
-              <div className={styles.inlineStat}>
-                <span className={styles.inlineStatLabel}>Leads in queue</span>
-                <span className={styles.inlineStatValue}>{contactIds?.length || 0}</span>
-              </div>
+              <SetupIconStat icon="users" label="Leads in queue" value={contactIds?.length || 0} tone="violet" />
 
               <div className={styles.field}>
+                <span className={styles.fieldIcon} aria-hidden="true">
+                  <DialerIcon name="flag" />
+                </span>
                 <Select
                   id="dialingSet"
                   label="Dialing set"
@@ -263,10 +306,14 @@ export function DialerSessionSetupPage() {
                   placeholder="Select dialing set…"
                   selectClassName={styles.select}
                   labelClassName={styles.label}
+                  wrapperClassName={styles.selectWrap}
                 />
               </div>
 
               <div className={styles.field}>
+                <span className={styles.fieldIcon} aria-hidden="true">
+                  <DialerIcon name="fileText" />
+                </span>
                 <Select
                   id="callScript"
                   label="Call script"
@@ -276,6 +323,7 @@ export function DialerSessionSetupPage() {
                   placeholder="Select call script…"
                   selectClassName={styles.select}
                   labelClassName={styles.label}
+                  wrapperClassName={styles.selectWrap}
                 />
               </div>
 
@@ -290,7 +338,12 @@ export function DialerSessionSetupPage() {
               <div className={styles.previewGrid}>
                 <article className={styles.previewPane}>
                   <header className={styles.paneHead}>
-                    <span className={styles.paneTitle}>Call script</span>
+                    <span className={styles.paneHeadLead}>
+                      <span className={styles.paneIcon} aria-hidden="true">
+                        <DialerIcon name="fileText" />
+                      </span>
+                      <span className={styles.paneTitle}>Call script</span>
+                    </span>
                     <span className={styles.paneMeta}>
                       {scriptDetail?.script_name || selectedScriptMeta?.script_name || '—'}
                     </span>
@@ -311,7 +364,12 @@ export function DialerSessionSetupPage() {
 
                 <article className={styles.previewPane}>
                   <header className={styles.paneHead}>
-                    <span className={styles.paneTitle}>Outcomes</span>
+                    <span className={styles.paneHeadLead}>
+                      <span className={styles.paneIcon} data-tone="green" aria-hidden="true">
+                        <DialerIcon name="check" />
+                      </span>
+                      <span className={styles.paneTitle}>Outcomes</span>
+                    </span>
                     <span className={styles.paneMeta}>{selectedDialingSet?.name || '—'}</span>
                   </header>
                   <div className={styles.paneBody}>
@@ -328,7 +386,12 @@ export function DialerSessionSetupPage() {
                             key={row.id || `${row.disposition_id}-${row.order_index}`}
                             className={styles.outcomeItem}
                           >
-                            <span>{row.disposition_name || row.name || 'Disposition'}</span>
+                            <span className={styles.outcomeLead}>
+                              <span className={styles.outcomeIcon} aria-hidden="true">
+                                <DialerIcon name={outcomeIconName(row.next_action)} />
+                              </span>
+                              <span>{row.disposition_name || row.name || 'Disposition'}</span>
+                            </span>
                             {row.next_action ? (
                               <span className={styles.outcomeHint}>{row.next_action}</span>
                             ) : null}

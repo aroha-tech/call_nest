@@ -63,7 +63,7 @@ export function useSeatPurchaseCheckout({ userEmail, onSuccess, onResult } = {})
             description: planLabel,
             order_id: data.orderId,
             prefill: { email: userEmail || '' },
-            theme: { color: '#4f46e5' },
+            theme: { color: '#7c3aed' },
             modal: { ondismiss: () => setPayingId(null) },
           },
           onPaid: async (response) => {

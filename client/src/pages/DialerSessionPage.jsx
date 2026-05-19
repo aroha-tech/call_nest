@@ -17,7 +17,6 @@ import { callsAPI } from '../services/callsAPI';
 import { dialerSessionsAPI } from '../services/dialerSessionsAPI';
 import { dealsAPI } from '../services/dealsAPI';
 import { contactsAPI } from '../services/contactsAPI';
-import { phoneInsightAPI } from '../services/phoneInsightAPI';
 import { dialerWorkspaceConfigAPI, mergeDialerWorkspaceConfig } from '../services/dialerWorkspaceConfigAPI';
 import { selectPermissions } from '../features/auth/authSelectors';
 import { hasPermission, PERMISSIONS } from '../utils/permissionUtils';
@@ -25,7 +24,7 @@ import { templateVariablesAPI } from '../services/templateVariablesAPI';
 import { scheduleHubAPI } from '../services/scheduleHubAPI';
 import { meetingsAPI } from '../services/meetingsAPI';
 import { emailAccountsAPI } from '../services/emailAPI';
-import { extractTemplateKeys, renderScriptHtml } from '../utils/callScriptHtml';
+import { escapeHtml, extractTemplateKeys, htmlToPlainText, renderScriptHtml } from '../utils/callScriptHtml';
 import { useToast } from '../context/ToastContext';
 import { useDateTimeDisplay } from '../hooks/useDateTimeDisplay';
 import {
@@ -51,7 +50,9 @@ import {
 import { COMMON_TIMEZONE_OPTIONS } from '../utils/dateTimeDisplay';
 import { DialerCreditsBar } from '../components/dialer/DialerCreditsBar';
 import { DialerFlowLayout } from '../components/dialer/DialerFlowLayout';
+import { DialerIcon } from '../components/dialer/DialerIcon';
 import { getDialerTheme, persistDialerTheme } from '../components/dialer/dialerTheme';
+import { getNextActionLabel } from '../features/disposition/constants';
 import styles from './DialerSessionPage.module.scss';
 
 /** Display-only: maps `contact_phones.label` ENUM (and primary) to a short title. */
@@ -70,21 +71,37 @@ function formatPhoneLabel(raw) {
 
 /** Matches `contact_phones.label` ENUM — one row per type per contact. */
 const CONTACT_PHONE_LABEL_ENUM = ['mobile', 'home', 'work', 'whatsapp', 'other'];
+/** Collapsed queue preview rows before "View all". */
+const DIAL_QUEUE_PREVIEW_COUNT = 3;
 
-/** When the dialer default country code is national-only input, map to ISO for phone-insight API. */
-function defaultCountryIsoForPhoneInsight() {
-  const cc = String(DEFAULT_PHONE_COUNTRY_CODE || '').replace(/^\++/, '');
-  if (cc === '91') return 'IN';
-  if (cc === '1') return 'US';
-  if (cc === '44') return 'GB';
-  if (cc === '61') return 'AU';
-  if (cc === '49') return 'DE';
-  return undefined;
-}
-
-function formatPhoneInsightType(t) {
-  if (!t) return '—';
-  return String(t).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+/** Icon + short hint for disposition next-action (dialer outcomes column). */
+function dispositionNextActionMeta(disposition) {
+  if (disposition?.requires_deal_selection) {
+    return { icon: 'briefcase', hint: 'Choose pipeline' };
+  }
+  const na = String(disposition?.next_action || '')
+    .trim()
+    .toLowerCase();
+  switch (na) {
+    case 'next_number':
+      return { icon: 'phoneNext', hint: 'Next number on lead' };
+    case 'next_contact':
+      return { icon: 'user', hint: 'Next lead in queue' };
+    case 'stop':
+      return { icon: 'stop', hint: 'Stop dialing' };
+    case 'end_session':
+      return { icon: 'flag', hint: 'End session' };
+    case 'pause':
+      return { icon: 'pause', hint: 'Pause session' };
+    case 'stay':
+      return { icon: 'pin', hint: 'Stay on this lead' };
+    case 'schedule_callback':
+      return { icon: 'calendar', hint: 'Schedule callback' };
+    default:
+      return na
+        ? { icon: 'arrowRight', hint: getNextActionLabel(na) }
+        : { icon: null, hint: '' };
+  }
 }
 
 function formatDialerHistoryLine(row, formatDateTime) {
@@ -187,7 +204,200 @@ function Icon({ name }) {
       </svg>
     );
   }
+  if (name === 'chevronDown') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path {...stroke} d="M6 9l6 6 6-6" />
+      </svg>
+    );
+  }
+  if (name === 'chevronUp') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path {...stroke} d="M18 15l-6-6-6 6" />
+      </svg>
+    );
+  }
+  if (name === 'external') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path {...stroke} d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+        <path {...stroke} d="M15 3h6v6M10 14L21 3" />
+      </svg>
+    );
+  }
+  if (name === 'check') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path {...stroke} d="M20 6L9 17l-5-5" />
+      </svg>
+    );
+  }
+  if (name === 'x') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path {...stroke} d="M18 6L6 18M6 6l12 12" />
+      </svg>
+    );
+  }
+  if (name === 'user') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path {...stroke} d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle {...stroke} cx="12" cy="7" r="4" />
+      </svg>
+    );
+  }
+  if (name === 'phoneNext') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path
+          {...stroke}
+          d="M15.05 5A5 5 0 0 1 19 8.95M15.05 1A9 9 0 0 1 23 8.94M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"
+        />
+      </svg>
+    );
+  }
+  if (name === 'flag') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path {...stroke} d="M4 22V4" />
+        <path {...stroke} d="M4 5h12l-2 4 2 4H4" />
+      </svg>
+    );
+  }
+  if (name === 'pin') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path {...stroke} d="M12 22s7-4.35 7-11a7 7 0 1 0-14 0c0 6.65 7 11 7 11z" />
+        <circle {...stroke} cx="12" cy="11" r="2.5" />
+      </svg>
+    );
+  }
+  if (name === 'briefcase') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <rect {...stroke} x="2" y="7" width="20" height="14" rx="2" />
+        <path {...stroke} d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+      </svg>
+    );
+  }
+  if (name === 'calendar') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <rect {...stroke} x="3" y="4" width="18" height="18" rx="2" />
+        <path {...stroke} d="M16 2v4M8 2v4M3 10h18" />
+      </svg>
+    );
+  }
+  if (name === 'arrowRight') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path {...stroke} d="M5 12h14M13 6l6 6-6 6" />
+      </svg>
+    );
+  }
+  if (name === 'mail') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <rect {...stroke} x="3" y="5" width="18" height="14" rx="2" />
+        <path {...stroke} d="M3 7l9 6 9-6" />
+      </svg>
+    );
+  }
+  if (name === 'building') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path {...stroke} d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4" />
+      </svg>
+    );
+  }
+  if (name === 'clock') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <circle {...stroke} cx="12" cy="12" r="9" />
+        <path {...stroke} d="M12 7v5l3 2" />
+      </svg>
+    );
+  }
+  if (name === 'users') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path {...stroke} d="M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1" />
+        <circle {...stroke} cx="9" cy="7" r="3" />
+        <path {...stroke} d="M22 19v-1a3 3 0 0 0-2-2.83M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    );
+  }
+  if (name === 'link') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path {...stroke} d="M10 13a5 5 0 0 0 7.54.54l2.92-2.92a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+        <path {...stroke} d="M14 11a5 5 0 0 0-7.54-.54l-2.92 2.92a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+      </svg>
+    );
+  }
+  if (name === 'hourglass') {
+    return (
+      <svg {...common} aria-hidden="true">
+        <path {...stroke} d="M6 2h12M6 22h12M8 2v4l4 5-4 5v4M16 2v4l-4 5 4 5v4" />
+      </svg>
+    );
+  }
   return null;
+}
+
+function PreflightRow({ icon, label, value, tone = 'violet' }) {
+  return (
+    <div className={styles.preflightRow} data-tone={tone}>
+      <span className={styles.preflightIcon} aria-hidden="true">
+        <DialerIcon name={icon} size={20} />
+      </span>
+      <div className={styles.preflightRowCopy}>
+        <span className={styles.preflightKey}>{label}</span>
+        <span className={styles.preflightVal}>{value}</span>
+      </div>
+    </div>
+  );
+}
+
+function SummaryStatCard({ icon, label, value, tone = 'violet' }) {
+  return (
+    <div className={styles.summaryItem} data-tone={tone}>
+      <span className={styles.summaryIcon} aria-hidden="true">
+        <Icon name={icon} />
+      </span>
+      <div className={styles.summaryStatCopy}>
+        <div className={styles.summaryLabel}>{label}</div>
+        <div className={styles.summaryValue}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function MetricCell({ icon, label, value }) {
+  return (
+    <div className={styles.metricCell}>
+      <div className={styles.metricLabel}>
+        <span className={styles.metricLabelInner}>
+          {icon ? <Icon name={icon} /> : null}
+          <span>{label}</span>
+        </span>
+      </div>
+      <div className={styles.metricValue}>{value}</div>
+    </div>
+  );
+}
+
+function ContactMetaLabel({ icon, children }) {
+  return (
+    <dt className={styles.metaLabel}>
+      <span className={styles.metaLabelInner}>
+        {icon ? <Icon name={icon} /> : null}
+        <span>{children}</span>
+      </span>
+    </dt>
+  );
 }
 
 function normItemState(s) {
@@ -266,6 +476,8 @@ export function DialerSessionPage() {
   const [openDialContactNotes, setOpenDialContactNotes] = useState(true);
   const [openDialCallNotes, setOpenDialCallNotes] = useState(true);
   const [openDialPrevHistory, setOpenDialPrevHistory] = useState(true);
+  const [queueExpanded, setQueueExpanded] = useState(false);
+  const [queueShowAll, setQueueShowAll] = useState(false);
   const [contactNotesDraft, setContactNotesDraft] = useState('');
   const [callHistoryRows, setCallHistoryRows] = useState([]);
   const [savingDialCallNotes, setSavingDialCallNotes] = useState(false);
@@ -280,12 +492,6 @@ export function DialerSessionPage() {
     city: '',
   });
   const [savingContactEdit, setSavingContactEdit] = useState(false);
-  const [phoneInsightOpen, setPhoneInsightOpen] = useState(false);
-  const [phoneInsightKindLabel, setPhoneInsightKindLabel] = useState('');
-  const [phoneInsightQuery, setPhoneInsightQuery] = useState('');
-  const [phoneInsightLoading, setPhoneInsightLoading] = useState(false);
-  const [phoneInsightError, setPhoneInsightError] = useState('');
-  const [phoneInsightResult, setPhoneInsightResult] = useState(null);
   const [teamMembers, setTeamMembers] = useState([]);
   const [emailAccounts, setEmailAccounts] = useState([]);
   const [dispositionActionFlow, setDispositionActionFlow] = useState(null);
@@ -390,6 +596,20 @@ export function DialerSessionPage() {
       })),
     [session?.items]
   );
+  const queueHasMoreThanPreview = items.length > DIAL_QUEUE_PREVIEW_COUNT;
+  const queueDisplayItems = useMemo(() => {
+    if (!queueExpanded) return [];
+    if (queueShowAll) return items;
+    return items.slice(0, DIAL_QUEUE_PREVIEW_COUNT);
+  }, [items, queueExpanded, queueShowAll]);
+
+  const toggleQueueExpanded = useCallback(() => {
+    setQueueExpanded((expanded) => {
+      if (expanded) setQueueShowAll(false);
+      return !expanded;
+    });
+  }, []);
+
   const currentItem = useMemo(() => resolveCurrentItem(items), [items]);
 
   const lastAttemptId = useMemo(() => {
@@ -763,37 +983,6 @@ export function DialerSessionPage() {
     }
   }, [id]);
 
-  const closePhoneInsight = useCallback(() => {
-    setPhoneInsightOpen(false);
-    setPhoneInsightError('');
-    setPhoneInsightResult(null);
-    setPhoneInsightKindLabel('');
-    setPhoneInsightQuery('');
-    setPhoneInsightLoading(false);
-  }, []);
-
-  const openPhoneInsight = useCallback(async (phone, kindLabel) => {
-    const q = String(phone || '').trim();
-    if (!q) return;
-    setPhoneInsightOpen(true);
-    setPhoneInsightKindLabel(kindLabel || '');
-    setPhoneInsightQuery(q);
-    setPhoneInsightLoading(true);
-    setPhoneInsightError('');
-    setPhoneInsightResult(null);
-    try {
-      const looksIntl = q.startsWith('+') || q.startsWith('00');
-      const iso = looksIntl ? undefined : defaultCountryIsoForPhoneInsight();
-      const res = await phoneInsightAPI.get(q, iso);
-      setPhoneInsightResult(res?.data?.data ?? null);
-    } catch (e) {
-      setPhoneInsightError(e?.response?.data?.error || e?.message || 'Could not load number details');
-      setPhoneInsightResult(null);
-    } finally {
-      setPhoneInsightLoading(false);
-    }
-  }, []);
-
   const saveContactEdits = useCallback(async () => {
     const cid = contact?.id ?? currentItem?.contact_id;
     if (!cid) return;
@@ -922,6 +1111,58 @@ export function DialerSessionPage() {
     const used = extractTemplateKeys(scriptText);
     return used.filter((k) => !activeTemplateKeys.has(k));
   }, [session?.script?.script_body, activeTemplateKeys]);
+
+  const dialScriptRenderedHtml = useMemo(
+    () =>
+      renderScriptHtml(session?.script?.script_body, leadContact, user, tenant, templateSample),
+    [session?.script?.script_body, leadContact, user, tenant, templateSample]
+  );
+
+  const dialScriptPlainText = useMemo(
+    () => htmlToPlainText(dialScriptRenderedHtml),
+    [dialScriptRenderedHtml]
+  );
+
+  const openDialScriptPopout = useCallback(() => {
+    const html = String(dialScriptRenderedHtml || '').trim();
+    const plain = String(dialScriptPlainText || '').trim();
+    if (!html && !plain) return;
+
+    const bodyContent = html
+      ? html
+      : `<p>${escapeHtml(plain).replace(/\r\n|\r|\n/g, '<br />')}</p>`;
+
+    const title = escapeHtml(session?.script?.script_name || 'Call script');
+    const doc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${title}</title>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #f1f5f9; color: #0f172a; }
+    .wrap { max-width: 720px; margin: 24px auto; padding: 16px; }
+    .paper { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px 28px; line-height: 1.65; font-size: 15px; box-shadow: 0 1px 3px rgba(15,23,42,0.08); }
+    .paper p, .paper li, .paper span, .paper div { color: #0f172a; }
+    .paper a { color: #2563eb; }
+    ul, ol { padding-left: 1.35rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap"><div class="paper">${bodyContent}</div></div>
+</body>
+</html>`;
+
+    const blob = new Blob([doc], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const popup = window.open(url, '_blank', 'width=880,height=720');
+    if (!popup) {
+      URL.revokeObjectURL(url);
+      return;
+    }
+    window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
+  }, [dialScriptRenderedHtml, dialScriptPlainText, session?.script?.script_name]);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -1449,7 +1690,7 @@ export function DialerSessionPage() {
       {showErrorOutside ? <Alert variant={errorAlertVariant}>{error}</Alert> : null}
 
       {loading && !session ? (
-        <div className={styles.dialerShell} aria-busy="true" aria-label="Loading dialer workspace">
+        <div className={styles.dialerShell} data-dialer-theme={dialerTheme} aria-busy="true" aria-label="Loading dialer workspace">
           <header className={styles.dialerChromeBar}>
             <div className={styles.dialerChromeLeft}>
               <Skeleton inverse width={84} height={12} />
@@ -1485,20 +1726,21 @@ export function DialerSessionPage() {
               ))}
             </div>
           </div>
-          <div className={styles.dialerSkelWorkspace} aria-hidden>
-            <div className={styles.dialerSkelMain}>
-              <Skeleton inverse width={120} height={14} />
-              <Skeleton inverse width="85%" height={22} style={{ marginTop: 10 }} />
-              <Skeleton inverse width="100%" height={160} style={{ marginTop: 14, borderRadius: 12 }} />
-              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-                <Skeleton inverse width={112} height={40} style={{ borderRadius: 10 }} />
-                <Skeleton inverse width={96} height={40} style={{ borderRadius: 10 }} />
-              </div>
+          <div className={styles.dialerSkelGrid} aria-hidden>
+            <div className={styles.dialerSkelCol}>
+              <Skeleton inverse height={32} width="70%" style={{ borderRadius: 8 }} />
+              <Skeleton inverse height={120} style={{ marginTop: 10, borderRadius: 10 }} />
+              <Skeleton inverse height={80} style={{ marginTop: 10, borderRadius: 10 }} />
             </div>
-            <div className={styles.dialerSkelAside}>
-              <Skeleton inverse width="100%" height={14} />
-              <Skeleton inverse width="100%" height={220} style={{ marginTop: 12, borderRadius: 12 }} />
-              <Skeleton inverse width="100%" height={100} style={{ marginTop: 12, borderRadius: 12 }} />
+            <div className={styles.dialerSkelCol}>
+              <Skeleton inverse height={32} width="55%" style={{ borderRadius: 8 }} />
+              <Skeleton inverse height={140} style={{ marginTop: 10, borderRadius: 10 }} />
+              <Skeleton inverse height={100} style={{ marginTop: 10, borderRadius: 10 }} />
+            </div>
+            <div className={styles.dialerSkelCol}>
+              <Skeleton inverse height={32} width="60%" style={{ borderRadius: 8 }} />
+              <Skeleton inverse height={200} style={{ marginTop: 10, borderRadius: 10 }} />
+              <Skeleton inverse height={72} style={{ marginTop: 10, borderRadius: 10 }} />
             </div>
           </div>
         </div>
@@ -1507,6 +1749,7 @@ export function DialerSessionPage() {
       {session ? (
         <>
           {sessionEnded ? (
+            <div className={styles.summaryCenter}>
             <div className={styles.summaryWrap}>
               <div className={styles.summaryHero}>
                 <div className={styles.summaryHeroText}>
@@ -1518,63 +1761,64 @@ export function DialerSessionPage() {
                   <p className={styles.summarySub}>Here is how this run finished.</p>
                 </div>
                 <div className={styles.summaryHeroAside}>
-                  <div className={styles.summaryDurationLabel}>Session time</div>
+                  <div className={styles.summaryDurationLabel}>
+                    <Icon name="clock" />
+                    <span>Session time</span>
+                  </div>
                   <div className={styles.summaryDurationValue}>{formatTimerHms(durationMs)}</div>
                 </div>
               </div>
               <div className={styles.summaryGrid}>
-                <div className={styles.summaryItem}>
-                  <div className={styles.summaryLabel}>Total contacts</div>
-                  <div className={styles.summaryValue}>{totalCount}</div>
-                </div>
-                <div className={styles.summaryItem}>
-                  <div className={styles.summaryLabel}>Called</div>
-                  <div className={styles.summaryValue}>{calledCount}</div>
-                </div>
-                <div className={styles.summaryItem}>
-                  <div className={styles.summaryLabel}>Connected</div>
-                  <div className={styles.summaryValue}>{connectedCount}</div>
-                </div>
-                <div className={styles.summaryItem}>
-                  <div className={styles.summaryLabel}>Failed</div>
-                  <div className={styles.summaryValue}>{failedCount}</div>
-                </div>
-                <div className={styles.summaryItem}>
-                  <div className={styles.summaryLabel}>Queued left</div>
-                  <div className={styles.summaryValue}>{queuedCount}</div>
-                </div>
+                <SummaryStatCard icon="users" label="Total contacts" value={totalCount} tone="violet" />
+                <SummaryStatCard icon="phone" label="Called" value={calledCount} tone="violet" />
+                <SummaryStatCard icon="link" label="Connected" value={connectedCount} tone="green" />
+                <SummaryStatCard icon="x" label="Failed" value={failedCount} tone="red" />
+                <SummaryStatCard icon="hourglass" label="Queued left" value={queuedCount} tone="amber" />
               </div>
               <div className={styles.summaryActions}>
-                <Button onClick={leaveDialSession}>{leaveDialSessionDoneLabel}</Button>
+                <button type="button" className={styles.summaryDoneBtn} onClick={leaveDialSession}>
+                  {leaveDialSessionDoneLabel}
+                </button>
               </div>
+            </div>
             </div>
           ) : null}
 
           {view === 'preflight' && !sessionEnded ? (
             <div className={styles.preflightCenter}>
             <div className={styles.preflightCard}>
-              <div className={styles.preflightTitle}>Before you start</div>
+              <div className={styles.preflightHero}>
+                <div className={styles.preflightHeroText}>
+                  <p className={styles.preflightEyebrow}>Dialer session</p>
+                  <h2 className={styles.preflightTitle}>Before you start</h2>
+                  <p className={styles.preflightLead}>Confirm settings and compliance, then begin dialing.</p>
+                </div>
+              </div>
               <div className={styles.preflightBody}>
                 <div className={styles.preflightSection}>
-                  <div className={styles.preflightHeading}>Session settings</div>
-                  <div className={styles.preflightList}>
-                    <div>
-                      <span className={styles.preflightKey}>Dialing set</span>
-                      <span className={styles.preflightVal}>{session?.dialing_set_id ? 'Selected' : '—'}</span>
-                    </div>
-                    <div>
-                      <span className={styles.preflightKey}>Call script</span>
-                      <span className={styles.preflightVal}>{session?.script?.script_name || '—'}</span>
-                    </div>
-                    <div>
-                      <span className={styles.preflightKey}>Selected contacts</span>
-                      <span className={styles.preflightVal}>{totalCount}</span>
-                    </div>
+                  <h3 className={styles.preflightHeading}>Session settings</h3>
+                  <div className={styles.preflightRows}>
+                    <PreflightRow
+                      icon="flag"
+                      label="Dialing set"
+                      value={session?.dialing_set_id ? 'Selected' : '—'}
+                    />
+                    <PreflightRow
+                      icon="fileText"
+                      label="Call script"
+                      value={session?.script?.script_name || '—'}
+                    />
+                    <PreflightRow icon="users" label="Selected contacts" value={totalCount} />
                   </div>
                 </div>
 
                 <div className={styles.preflightSection}>
-                  <div className={styles.preflightHeading}>Legal & compliance</div>
+                  <h3 className={styles.preflightHeading}>
+                    <span className={styles.preflightHeadingIcon} aria-hidden="true">
+                      <DialerIcon name="shield" size={16} />
+                    </span>
+                    Legal & compliance
+                  </h3>
                   <ul className={styles.preflightBullets}>
                     <li>Only call leads you are authorized to contact.</li>
                     <li>Respect local DND/consent rules and your company’s policy.</li>
@@ -1583,7 +1827,9 @@ export function DialerSessionPage() {
                 </div>
 
                 <div className={styles.preflightActions}>
-                  <Button
+                  <button
+                    type="button"
+                    className={styles.preflightStartBtn}
                     onClick={callNext}
                     disabled={busy || session.status === 'paused' || callingCount > 0}
                     title={
@@ -1593,7 +1839,7 @@ export function DialerSessionPage() {
                     }
                   >
                     {busy ? 'Working…' : 'Start session'}
-                  </Button>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1603,36 +1849,23 @@ export function DialerSessionPage() {
           {sessionEnded || !dialWorkspaceUnlocked ? null : (
           <div className={styles.workspaceRoot}>
             <div className={styles.metricsStrip} role="group" aria-label="Session metrics">
-              <div className={styles.metricCell}>
-                <div className={styles.metricLabel}>Session time</div>
-                <div className={styles.metricValue}>{formatTimerHms(durationMs)}</div>
-              </div>
-              <div className={styles.metricCell}>
-                <div className={styles.metricLabel}>Lead #</div>
-                <div className={styles.metricValue}>
-                  {totalCount > 0 ? (currentContactNumber ? `${currentContactNumber} / ${totalCount}` : `— / ${totalCount}`) : '—'}
-                </div>
-              </div>
-              <div className={styles.metricCell}>
-                <div className={styles.metricLabel}>Completed</div>
-                <div className={styles.metricValue}>{completedCount}</div>
-              </div>
-              <div className={styles.metricCell}>
-                <div className={styles.metricLabel}>In queue</div>
-                <div className={styles.metricValue}>{queuedCount}</div>
-              </div>
-              <div className={styles.metricCell}>
-                <div className={styles.metricLabel}>Dials</div>
-                <div className={styles.metricValue}>{calledCount}</div>
-              </div>
-              <div className={styles.metricCell}>
-                <div className={styles.metricLabel}>Connected</div>
-                <div className={styles.metricValue}>{connectedCount}</div>
-              </div>
-              <div className={styles.metricCell}>
-                <div className={styles.metricLabel}>Failed</div>
-                <div className={styles.metricValue}>{failedCount}</div>
-              </div>
+              <MetricCell icon="clock" label="Session time" value={formatTimerHms(durationMs)} />
+              <MetricCell
+                icon="user"
+                label="Lead #"
+                value={
+                  totalCount > 0
+                    ? currentContactNumber
+                      ? `${currentContactNumber} / ${totalCount}`
+                      : `— / ${totalCount}`
+                    : '—'
+                }
+              />
+              <MetricCell icon="check" label="Completed" value={completedCount} />
+              <MetricCell icon="users" label="In queue" value={queuedCount} />
+              <MetricCell icon="phone" label="Dials" value={calledCount} />
+              <MetricCell icon="phoneNext" label="Connected" value={connectedCount} />
+              <MetricCell icon="x" label="Failed" value={failedCount} />
             </div>
 
             <div className={styles.shellProgressRow} role="region" aria-label="Queue progress and dial controls">
@@ -1760,24 +1993,6 @@ export function DialerSessionPage() {
                               {activeDialPhone || leadContact?.primary_phone || '—'}
                             </span>
                           </div>
-                          {activeDialPhone || leadContact?.primary_phone ? (
-                            <button
-                              type="button"
-                              className={styles.phoneInsightBtn}
-                              disabled={busy}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void openPhoneInsight(
-                                  activeDialPhone || leadContact?.primary_phone || '',
-                                  'Primary'
-                                );
-                              }}
-                              title="Number details (country, line type — offline)"
-                              aria-label="Number details"
-                            >
-                              <Icon name="info" />
-                            </button>
-                          ) : null}
                         </div>
                         {canAddPhoneNumber ? (
                           <div className={styles.activeCallAddPhoneWrap}>
@@ -1886,21 +2101,6 @@ export function DialerSessionPage() {
                                   ) : (
                                     <span className={chipClass}>{chipBody}</span>
                                   )}
-                                  {p.phone ? (
-                                    <button
-                                      type="button"
-                                      className={styles.phoneInsightBtn}
-                                      disabled={busy}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        void openPhoneInsight(p.phone, formatPhoneLabel(p.label));
-                                      }}
-                                      title="Number details (country, line type — offline)"
-                                      aria-label={`Number details for ${formatPhoneLabel(p.label)}`}
-                                    >
-                                      <Icon name="info" />
-                                    </button>
-                                  ) : null}
                                 </div>
                               </li>
                             );
@@ -1983,26 +2183,49 @@ export function DialerSessionPage() {
             {view === 'active' ? (
             <div className={styles.grid}>
             <aside className={styles.colQueue}>
-              <div className={`${styles.card} ${styles.cardQueue}`}>
-                <div className={styles.queueHeader}>
-                  <div className={styles.queueTitle}>Call queue</div>
-                  <div className={styles.queueHint}>{items.length} leads</div>
-                </div>
-                <div className={styles.queueTableWrap}>
+              <div className={styles.colPaneScroll}>
+              <div
+                className={`${styles.card} ${styles.cardQueue} ${
+                  queueExpanded ? styles.cardQueueExpanded : styles.cardQueueCollapsed
+                }`.trim()}
+              >
+                <button
+                  type="button"
+                  className={styles.queueHeaderToggle}
+                  onClick={toggleQueueExpanded}
+                  aria-expanded={queueExpanded}
+                  aria-controls="dial-call-queue-panel"
+                  title={queueExpanded ? 'Collapse call queue' : 'Expand call queue'}
+                >
+                  <span className={styles.queueTitle}>Call queue</span>
+                  <span className={styles.queueHeaderActions}>
+                    {queueExpanded ? (
+                      <Icon name="chevronUp" />
+                    ) : (
+                      <span className={styles.queueExpandIcon} aria-hidden>
+                        <Icon name="plus" />
+                      </span>
+                    )}
+                  </span>
+                </button>
+                {queueExpanded ? (
+                <>
+                <div
+                  id="dial-call-queue-panel"
+                  className={`${styles.queueTableWrapExpanded} ${
+                    queueShowAll ? styles.queueTableWrapScroll : ''
+                  }`.trim()}
+                >
                   <table className={`${styles.queueTable} ${styles.queueTableCompact}`}>
                     <thead>
                       <tr>
-                        <th className={styles.thOrder} style={{ width: 40 }}>
-                          #
-                        </th>
-                        <th>Lead</th>
-                        <th className={styles.thState} style={{ width: 88 }}>
-                          State
-                        </th>
+                        <th className={styles.thOrder}>#</th>
+                        <th className={styles.thLead}>Lead</th>
+                        <th className={styles.thState}>State</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {items.map((it) => (
+                      {queueDisplayItems.map((it) => (
                         <tr key={it.id} className={currentItem?.id === it.id ? styles.queueRowActive : undefined}>
                           <td>{it.order_index + 1}</td>
                           <td>
@@ -2035,6 +2258,199 @@ export function DialerSessionPage() {
                     </tbody>
                   </table>
                 </div>
+                {queueHasMoreThanPreview && !queueShowAll ? (
+                  <div className={styles.queueFooter}>
+                    <button
+                      type="button"
+                      className={styles.queueViewAllBtn}
+                      onClick={() => setQueueShowAll(true)}
+                    >
+                      View all ({items.length})
+                    </button>
+                  </div>
+                ) : null}
+                </>
+                ) : null}
+              </div>
+
+              <div className={`${styles.card} ${styles.cardContact}`}>
+                <div className={styles.contactCardHead}>
+                  <div className={styles.cardTitleInline}>Current contact</div>
+                  {canEditCurrentContactInDialer ? (
+                    <div className={styles.contactHeadActions}>
+                      {contactPanelEditing ? (
+                        <>
+                          <button
+                            type="button"
+                            className={`${styles.contactEditIconBtn} ${styles.contactEditIconBtnSave}`.trim()}
+                            onClick={() => void saveContactEdits()}
+                            disabled={busy || savingContactEdit}
+                            title="Save contact"
+                            aria-label="Save contact"
+                          >
+                            <Icon name="check" />
+                          </button>
+                          <button
+                            type="button"
+                            className={`${styles.contactEditIconBtn} ${styles.contactEditIconBtnCancel}`.trim()}
+                            onClick={() => setContactPanelEditing(false)}
+                            disabled={savingContactEdit || busy}
+                            title="Cancel editing"
+                            aria-label="Cancel editing"
+                          >
+                            <Icon name="x" />
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.contactEditIconBtn}
+                          onClick={openContactEdit}
+                          disabled={busy || contactDetailPending}
+                          title="Edit contact details"
+                          aria-label="Edit contact details"
+                        >
+                          <Icon name="pencil" />
+                        </button>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+                <div className={styles.contactHero}>
+                  <div className={styles.contactAvatar} aria-hidden="true">
+                    {contactInitial}
+                  </div>
+                  <div className={styles.contactHeroMain}>
+                    <div className={styles.contactName}>{leadContact?.display_name || '—'}</div>
+                    <div className={styles.contactHeroMeta}>
+                      {totalCount > 0 && currentContactNumber ? (
+                        <span className={styles.contactPosition}>
+                          Lead {currentContactNumber} of {totalCount}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+                {contactDetailPending ? (
+                  <p className={styles.contactSourceHint}>
+                    Name and phone come from the dial queue. Other fields appear when the contact record loads.
+                  </p>
+                ) : null}
+                <dl className={styles.contactMeta}>
+                  {contactPanelEditing ? (
+                    <div className={styles.contactRow}>
+                      <ContactMetaLabel icon="user">Display name</ContactMetaLabel>
+                      <dd className={styles.metaValue}>
+                        <Input
+                          value={contactEditDraft.display_name}
+                          onChange={(e) =>
+                            setContactEditDraft((d) => ({ ...d, display_name: e.target.value }))
+                          }
+                          disabled={busy || savingContactEdit}
+                          autoComplete="name"
+                        />
+                      </dd>
+                    </div>
+                  ) : null}
+                  <div className={styles.contactRow}>
+                    <ContactMetaLabel icon="phone">Phone numbers</ContactMetaLabel>
+                    <dd className={`${styles.metaValue} ${styles.phoneBlock}`}>
+                      {phonesList.length === 0 ? (
+                        <span>—</span>
+                      ) : (
+                        <div className={styles.phoneDisplayList}>
+                          {phonesList.map((p, idx) => {
+                            const sid = String(p.id ?? `${idx}-${p.phone}`);
+                            return (
+                              <div key={sid} className={styles.phoneDisplayItem}>
+                                <span className={styles.phoneDisplayType}>{formatPhoneLabel(p.label)}</span>
+                                <span className={styles.phoneDisplayValue}>{p.phone || '—'}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </dd>
+                  </div>
+                  <div className={styles.contactRow}>
+                    <ContactMetaLabel icon="mail">Email</ContactMetaLabel>
+                    <dd
+                      className={`${styles.metaValue} ${
+                        contactDetailPending && !leadContact?.email ? styles.metaPlaceholder : ''
+                      }`}
+                    >
+                      {contactPanelEditing ? (
+                        <Input
+                          type="email"
+                          value={contactEditDraft.email}
+                          onChange={(e) => setContactEditDraft((d) => ({ ...d, email: e.target.value }))}
+                          disabled={busy || savingContactEdit}
+                          autoComplete="email"
+                        />
+                      ) : (
+                        leadContact?.email || '—'
+                      )}
+                    </dd>
+                  </div>
+                  <div className={styles.contactRow}>
+                    <ContactMetaLabel icon="building">Company</ContactMetaLabel>
+                    <dd
+                      className={`${styles.metaValue} ${
+                        contactDetailPending && !leadContact?.company ? styles.metaPlaceholder : ''
+                      }`}
+                    >
+                      {contactPanelEditing ? (
+                        <Input
+                          value={contactEditDraft.company}
+                          onChange={(e) => setContactEditDraft((d) => ({ ...d, company: e.target.value }))}
+                          disabled={busy || savingContactEdit}
+                          autoComplete="organization"
+                        />
+                      ) : (
+                        leadContact?.company || '—'
+                      )}
+                    </dd>
+                  </div>
+                  <div className={styles.contactRow}>
+                    <ContactMetaLabel icon="briefcase">Job title</ContactMetaLabel>
+                    <dd
+                      className={`${styles.metaValue} ${
+                        contactDetailPending && !leadContact?.job_title ? styles.metaPlaceholder : ''
+                      }`}
+                    >
+                      {contactPanelEditing ? (
+                        <Input
+                          value={contactEditDraft.job_title}
+                          onChange={(e) => setContactEditDraft((d) => ({ ...d, job_title: e.target.value }))}
+                          disabled={busy || savingContactEdit}
+                          autoComplete="organization-title"
+                        />
+                      ) : (
+                        leadContact?.job_title || '—'
+                      )}
+                    </dd>
+                  </div>
+                  <div className={styles.contactRow}>
+                    <ContactMetaLabel icon="pin">City</ContactMetaLabel>
+                    <dd
+                      className={`${styles.metaValue} ${
+                        contactDetailPending && !leadContact?.city ? styles.metaPlaceholder : ''
+                      }`}
+                    >
+                      {contactPanelEditing ? (
+                        <Input
+                          value={contactEditDraft.city}
+                          onChange={(e) => setContactEditDraft((d) => ({ ...d, city: e.target.value }))}
+                          disabled={busy || savingContactEdit}
+                          autoComplete="address-level2"
+                        />
+                      ) : (
+                        leadContact?.city || '—'
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
               </div>
             </aside>
             <main className={styles.colMain}>
@@ -2092,14 +2508,9 @@ export function DialerSessionPage() {
                   </button>
                 </div>
 
+                <div className={styles.colPaneScroll}>
                 {dialWorkspaceTab === 'script' ? (
-                  <>
-                    <div className={styles.cardTitleRow}>
-                      <div className={styles.scriptTitleBlock}>
-                        <div className={styles.scriptEyebrow}>Call script</div>
-                        <div className={styles.scriptTitle}>{session?.script?.script_name || 'Script'}</div>
-                      </div>
-                    </div>
+                  <div className={styles.dialScriptTabLayout}>
                     {import.meta?.env?.DEV && missingTemplateKeys.length > 0 ? (
                       <div className={styles.devWarn} role="status">
                         <div className={styles.devWarnTitle}>Missing template variables</div>
@@ -2115,37 +2526,49 @@ export function DialerSessionPage() {
                         </div>
                       </div>
                     ) : null}
-                    <div className={styles.scriptReadingSurface}>
+                    <div className={styles.scriptPanel}>
                       {String(session?.script?.script_body || '').trim() ? (
-                        <div
-                          className={styles.scriptBody}
-                          dangerouslySetInnerHTML={{
-                            __html: renderScriptHtml(
-                              session?.script?.script_body,
-                              leadContact,
-                              user,
-                              tenant,
-                              templateSample
-                            ),
-                          }}
-                        />
-                      ) : (
-                        <div className={styles.scriptEmpty}>
-                          No script text is set for this session. Ask an admin to attach a call script to the dialing
-                          set.
+                        <div className={styles.scriptPanelBody} role="region" aria-label="Call script">
+                          <button
+                            type="button"
+                            className={styles.scriptPopoutBtn}
+                            onClick={openDialScriptPopout}
+                            disabled={!String(dialScriptPlainText || dialScriptRenderedHtml || '').trim()}
+                            title="Open script in new window"
+                            aria-label="Open script in new window"
+                          >
+                            <Icon name="external" />
+                          </button>
+                          {String(dialScriptRenderedHtml || '').trim() ? (
+                            <div
+                              className={styles.scriptBody}
+                              dangerouslySetInnerHTML={{ __html: dialScriptRenderedHtml }}
+                            />
+                          ) : (
+                            <pre className={styles.scriptBodyPlain}>{dialScriptPlainText}</pre>
+                          )}
                         </div>
+                      ) : (
+                        <div className={styles.scriptEmpty}>No script text is set for this session.</div>
                       )}
                     </div>
 
                     <div className={styles.dialNotesStack}>
-                      <div className={styles.dialCollapsible}>
+                      <div
+                        className={`${styles.dialCollapsible} ${
+                          openDialContactNotes ? styles.dialCollapsibleOpen : ''
+                        }`.trim()}
+                      >
                         <button
                           type="button"
                           className={styles.dialCollapsibleHead}
                           aria-expanded={openDialContactNotes}
                           onClick={() => setOpenDialContactNotes((v) => !v)}
                         >
-                          <span>Contact notes</span>
+                          <span className={styles.dialCollapsibleTitle}>
+                            <Icon name="pencil" />
+                            Contact notes
+                          </span>
                           <span className={styles.dialCollapsibleIcon} aria-hidden>
                             {openDialContactNotes ? '−' : '+'}
                           </span>
@@ -2181,14 +2604,21 @@ export function DialerSessionPage() {
                         ) : null}
                       </div>
 
-                      <div className={styles.dialCollapsible}>
+                      <div
+                        className={`${styles.dialCollapsible} ${
+                          openDialCallNotes ? styles.dialCollapsibleOpen : ''
+                        }`.trim()}
+                      >
                         <button
                           type="button"
                           className={styles.dialCollapsibleHead}
                           aria-expanded={openDialCallNotes}
                           onClick={() => setOpenDialCallNotes((v) => !v)}
                         >
-                          <span>Call notes</span>
+                          <span className={styles.dialCollapsibleTitle}>
+                            <Icon name="phone" />
+                            Call notes
+                          </span>
                           <span className={styles.dialCollapsibleIcon} aria-hidden>
                             {openDialCallNotes ? '−' : '+'}
                           </span>
@@ -2223,14 +2653,21 @@ export function DialerSessionPage() {
                         ) : null}
                       </div>
 
-                      <div className={styles.dialCollapsible}>
+                      <div
+                        className={`${styles.dialCollapsible} ${
+                          openDialPrevHistory ? styles.dialCollapsibleOpen : ''
+                        }`.trim()}
+                      >
                         <button
                           type="button"
                           className={styles.dialCollapsibleHead}
                           aria-expanded={openDialPrevHistory}
                           onClick={() => setOpenDialPrevHistory((v) => !v)}
                         >
-                          <span>Previous call notes</span>
+                          <span className={styles.dialCollapsibleTitle}>
+                            <Icon name="calendar" />
+                            Previous call notes
+                          </span>
                           <span className={styles.dialCollapsibleIcon} aria-hidden>
                             {openDialPrevHistory ? '−' : '+'}
                           </span>
@@ -2266,9 +2703,9 @@ export function DialerSessionPage() {
                         ) : null}
                       </div>
                     </div>
-                  </>
+                  </div>
                 ) : dialWorkspaceTab === 'activity' ? (
-                  <div className={styles.dialActivityPanel}>
+                  <div className={`${styles.dialTabPanel} ${styles.dialActivityPanel}`.trim()}>
                     <div className={styles.dialActivityTitle}>All dial attempts (this lead)</div>
                     <p className={styles.dialActivitySub}>
                       Newest first. Only attempts with a disposition and/or saved call notes (same as Previous call
@@ -2309,235 +2746,56 @@ export function DialerSessionPage() {
                 ) : (
                   <div className={styles.dialTabPlaceholder}>This tab is not available.</div>
                 )}
+                </div>
               </div>
 
             </main>
             <aside className={styles.colSide}>
-              <div className={`${styles.card} ${styles.cardContact}`}>
-                <div className={styles.contactCardHead}>
-                  <div className={styles.cardTitleInline}>Current contact</div>
-                  {canEditCurrentContactInDialer && !contactPanelEditing ? (
-                    <button
-                      type="button"
-                      className={styles.contactEditIconBtn}
-                      onClick={openContactEdit}
-                      disabled={busy || contactDetailPending}
-                      title="Edit contact details"
-                      aria-label="Edit contact details"
-                    >
-                      <Icon name="pencil" />
-                    </button>
-                  ) : null}
-                </div>
-                <div className={styles.contactHero}>
-                  <div className={styles.contactAvatar} aria-hidden="true">
-                    {contactInitial}
-                  </div>
-                  <div className={styles.contactHeroMain}>
-                    <div className={styles.contactName}>{leadContact?.display_name || '—'}</div>
-                    <div className={styles.contactHeroMeta}>
-                      {totalCount > 0 && currentContactNumber ? (
-                        <span className={styles.contactPosition}>
-                          Lead {currentContactNumber} of {totalCount}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-                {contactDetailPending ? (
-                  <p className={styles.contactSourceHint}>
-                    Name and phone come from the dial queue. Other fields appear when the contact record loads.
-                  </p>
-                ) : null}
-                <dl className={styles.contactMeta}>
-                  {contactPanelEditing ? (
-                    <div className={styles.contactRow}>
-                      <dt className={styles.metaLabel}>Display name</dt>
-                      <dd className={styles.metaValue}>
-                        <Input
-                          value={contactEditDraft.display_name}
-                          onChange={(e) =>
-                            setContactEditDraft((d) => ({ ...d, display_name: e.target.value }))
-                          }
-                          disabled={busy || savingContactEdit}
-                          autoComplete="name"
-                        />
-                      </dd>
-                    </div>
-                  ) : null}
-                  <div className={styles.contactRow}>
-                    <dt className={styles.metaLabel}>Phone numbers</dt>
-                    <dd className={`${styles.metaValue} ${styles.phoneBlock}`}>
-                      {phonesList.length === 0 ? (
-                        <span>—</span>
-                      ) : (
-                        <div className={styles.phoneDisplayList}>
-                          {phonesList.map((p, idx) => {
-                            const sid = String(p.id ?? `${idx}-${p.phone}`);
-                            return (
-                              <div key={sid} className={styles.phoneDisplayItem}>
-                                <span className={styles.phoneDisplayType}>{formatPhoneLabel(p.label)}</span>
-                                <span className={styles.phoneDisplayValueRow}>
-                                  <span className={styles.phoneDisplayValue}>{p.phone || '—'}</span>
-                                  {p.phone ? (
-                                    <button
-                                      type="button"
-                                      className={styles.phoneInsightBtn}
-                                      disabled={busy}
-                                      onClick={() => void openPhoneInsight(p.phone, formatPhoneLabel(p.label))}
-                                      title="Number details (country, line type — offline)"
-                                      aria-label={`Number details for ${formatPhoneLabel(p.label)}`}
-                                    >
-                                      <Icon name="info" />
-                                    </button>
-                                  ) : null}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </dd>
-                  </div>
-                  <div className={styles.contactRow}>
-                    <dt className={styles.metaLabel}>Email</dt>
-                    <dd
-                      className={`${styles.metaValue} ${
-                        contactDetailPending && !leadContact?.email ? styles.metaPlaceholder : ''
-                      }`}
-                    >
-                      {contactPanelEditing ? (
-                        <Input
-                          type="email"
-                          value={contactEditDraft.email}
-                          onChange={(e) => setContactEditDraft((d) => ({ ...d, email: e.target.value }))}
-                          disabled={busy || savingContactEdit}
-                          autoComplete="email"
-                        />
-                      ) : (
-                        leadContact?.email || '—'
-                      )}
-                    </dd>
-                  </div>
-                  <div className={styles.contactRow}>
-                    <dt className={styles.metaLabel}>Company</dt>
-                    <dd
-                      className={`${styles.metaValue} ${
-                        contactDetailPending && !leadContact?.company ? styles.metaPlaceholder : ''
-                      }`}
-                    >
-                      {contactPanelEditing ? (
-                        <Input
-                          value={contactEditDraft.company}
-                          onChange={(e) => setContactEditDraft((d) => ({ ...d, company: e.target.value }))}
-                          disabled={busy || savingContactEdit}
-                          autoComplete="organization"
-                        />
-                      ) : (
-                        leadContact?.company || '—'
-                      )}
-                    </dd>
-                  </div>
-                  <div className={styles.contactRow}>
-                    <dt className={styles.metaLabel}>Job title</dt>
-                    <dd
-                      className={`${styles.metaValue} ${
-                        contactDetailPending && !leadContact?.job_title ? styles.metaPlaceholder : ''
-                      }`}
-                    >
-                      {contactPanelEditing ? (
-                        <Input
-                          value={contactEditDraft.job_title}
-                          onChange={(e) => setContactEditDraft((d) => ({ ...d, job_title: e.target.value }))}
-                          disabled={busy || savingContactEdit}
-                          autoComplete="organization-title"
-                        />
-                      ) : (
-                        leadContact?.job_title || '—'
-                      )}
-                    </dd>
-                  </div>
-                  <div className={styles.contactRow}>
-                    <dt className={styles.metaLabel}>City</dt>
-                    <dd
-                      className={`${styles.metaValue} ${
-                        contactDetailPending && !leadContact?.city ? styles.metaPlaceholder : ''
-                      }`}
-                    >
-                      {contactPanelEditing ? (
-                        <Input
-                          value={contactEditDraft.city}
-                          onChange={(e) => setContactEditDraft((d) => ({ ...d, city: e.target.value }))}
-                          disabled={busy || savingContactEdit}
-                          autoComplete="address-level2"
-                        />
-                      ) : (
-                        leadContact?.city || '—'
-                      )}
-                    </dd>
-                  </div>
-                </dl>
-                {contactPanelEditing ? (
-                  <div className={styles.contactEditActions}>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => void saveContactEdits()}
-                      disabled={busy || savingContactEdit}
-                      loading={savingContactEdit}
-                    >
-                      Save
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      disabled={savingContactEdit || busy}
-                      onClick={() => setContactPanelEditing(false)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-
+              <div className={styles.colPaneScroll}>
               <div className={`${styles.card} ${styles.cardDispo}`}>
                 <div className={styles.dispoHeader}>
                   <div className={styles.dispoTitle}>Outcomes</div>
-                  <p className={styles.dispoSub}>
-                    After the call, pick a disposition to log and continue. Call notes are in the Script tab — they
-                    are sent with the disposition if you have not saved them already.
-                  </p>
                 </div>
                 <div className={styles.dispoList}>
                   {(session?.dispositions || []).length === 0 ? (
                     <div className={styles.dispoEmpty}>No dispositions configured for this dialing set.</div>
                   ) : (
-                    session.dispositions.map((d) => (
-                      <button
-                        key={d.id}
-                        type="button"
-                        className={styles.dispoBtn}
-                        disabled={busy}
-                        aria-disabled={!lastAttemptId}
-                        title={!lastAttemptId ? 'Call at least one lead first' : d.next_action || ''}
-                        onClick={() => onDispositionButtonClick(d)}
-                      >
-                        <span className={styles.dispoBtnBody}>
-                          <span className={styles.dispoBtnText}>
-                            <span className={styles.dispoBtnName}>{d.name}</span>
-                            {d.requires_deal_selection ? (
-                              <span className={styles.dispoBtnHint}>pick pipeline</span>
-                            ) : d.next_action ? (
-                              <span className={styles.dispoBtnHint}>{d.next_action}</span>
+                    session.dispositions.map((d) => {
+                      const nextMeta = dispositionNextActionMeta(d);
+                      const tip = !lastAttemptId
+                        ? 'Call at least one lead first'
+                        : nextMeta.hint
+                          ? `${d.name} — ${nextMeta.hint}`
+                          : d.name;
+                      return (
+                        <button
+                          key={d.id}
+                          type="button"
+                          className={styles.dispoBtn}
+                          disabled={busy}
+                          aria-disabled={!lastAttemptId}
+                          title={tip}
+                          onClick={() => onDispositionButtonClick(d)}
+                        >
+                          <span className={styles.dispoBtnInner}>
+                            {nextMeta.icon ? (
+                              <span className={styles.dispoBtnIconWrap} aria-hidden>
+                                <Icon name={nextMeta.icon} />
+                              </span>
                             ) : null}
+                            <span className={styles.dispoBtnCopy}>
+                              <span className={styles.dispoBtnLabel}>{d.name}</span>
+                              {nextMeta.hint ? (
+                                <span className={styles.dispoBtnActionHint}>{nextMeta.hint}</span>
+                              ) : null}
+                            </span>
                           </span>
-                          <span className={styles.dispoBtnChevron} aria-hidden="true" />
-                        </span>
-                      </button>
-                    ))
+                        </button>
+                      );
+                    })
                   )}
                 </div>
+              </div>
               </div>
             </aside>
           </div>
@@ -2545,80 +2803,6 @@ export function DialerSessionPage() {
           </div>
           )}
 
-          <Modal
-            isOpen={phoneInsightOpen}
-            onClose={closePhoneInsight}
-            title={`Number details${phoneInsightKindLabel ? ` — ${phoneInsightKindLabel}` : ''}`}
-            size="sm"
-            closeOnOverlay
-            closeOnEscape
-            footer={
-              <ModalFooter>
-                <Button variant="primary" type="button" onClick={closePhoneInsight}>
-                  Close
-                </Button>
-              </ModalFooter>
-            }
-          >
-            <p className={styles.phoneInsightModalHint}>
-              <strong>{phoneInsightQuery || '—'}</strong>
-              <br />
-              From the public numbering plan only (offline). Not live carrier or location data.
-            </p>
-            {phoneInsightLoading ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
-                <Spinner />
-              </div>
-            ) : phoneInsightError ? (
-              <Alert variant="error">{phoneInsightError}</Alert>
-            ) : phoneInsightResult && !phoneInsightResult.parseable ? (
-              <Alert variant="warning">This does not look like a phone number.</Alert>
-            ) : phoneInsightResult && phoneInsightResult.parseable ? (
-              <dl className={styles.phoneInsightDl}>
-                <dt className={styles.phoneInsightDt}>E.164</dt>
-                <dd className={styles.phoneInsightDd}>{phoneInsightResult.e164 || '—'}</dd>
-                <dt className={styles.phoneInsightDt}>Country (ISO)</dt>
-                <dd className={styles.phoneInsightDd}>
-                  {phoneInsightResult.country ||
-                    (Array.isArray(phoneInsightResult.possible_countries) &&
-                    phoneInsightResult.possible_countries.length
-                      ? phoneInsightResult.possible_countries.join(', ')
-                      : '—')}
-                </dd>
-                <dt className={styles.phoneInsightDt}>Calling code</dt>
-                <dd className={styles.phoneInsightDd}>+{phoneInsightResult.country_calling_code || '—'}</dd>
-                <dt className={styles.phoneInsightDt}>National number</dt>
-                <dd className={styles.phoneInsightDd}>{phoneInsightResult.national_number || '—'}</dd>
-                <dt className={styles.phoneInsightDt}>Line type</dt>
-                <dd className={styles.phoneInsightDd}>{formatPhoneInsightType(phoneInsightResult.number_type)}</dd>
-                <dt className={styles.phoneInsightDt}>Non-geographic</dt>
-                <dd className={styles.phoneInsightDd}>{phoneInsightResult.is_non_geographic ? 'Yes' : 'No'}</dd>
-                <dt className={styles.phoneInsightDt}>Possible / valid</dt>
-                <dd className={styles.phoneInsightDd}>
-                  {phoneInsightResult.is_possible ? 'Possible' : 'Not possible'}
-                  {' · '}
-                  {phoneInsightResult.is_valid ? 'Valid' : 'Invalid'}
-                  {phoneInsightResult.length_issue ? ` (${phoneInsightResult.length_issue})` : ''}
-                </dd>
-                {phoneInsightResult.extension ? (
-                  <>
-                    <dt className={styles.phoneInsightDt}>Extension</dt>
-                    <dd className={styles.phoneInsightDd}>{phoneInsightResult.extension}</dd>
-                  </>
-                ) : null}
-                {phoneInsightResult.carrier_dial_code ? (
-                  <>
-                    <dt className={styles.phoneInsightDt}>Carrier dial code</dt>
-                    <dd className={styles.phoneInsightDd}>{phoneInsightResult.carrier_dial_code}</dd>
-                  </>
-                ) : null}
-                <dt className={styles.phoneInsightDt}>International format</dt>
-                <dd className={styles.phoneInsightDd}>{phoneInsightResult.formats?.international || '—'}</dd>
-                <dt className={styles.phoneInsightDt}>National format</dt>
-                <dd className={styles.phoneInsightDd}>{phoneInsightResult.formats?.national || '—'}</dd>
-              </dl>
-            ) : null}
-          </Modal>
           <Modal
             isOpen={!!dealPickDispo}
             onClose={() => {

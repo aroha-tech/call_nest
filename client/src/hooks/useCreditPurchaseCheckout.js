@@ -62,7 +62,7 @@ export function useCreditPurchaseCheckout({ userEmail, onSuccess, onResult } = {
             description: data.plan?.name || plan.name,
             order_id: data.orderId,
             prefill: { email: userEmail || '' },
-            theme: { color: '#4f46e5' },
+            theme: { color: '#7c3aed' },
             modal: { ondismiss: () => setPayingId(null) },
           },
           onPaid: async (response) => {

@@ -33,7 +33,7 @@ export function getNotificationTone(moduleKey) {
   const k = String(moduleKey || '').toLowerCase();
   switch (k) {
     case 'meetings':
-      return { tone: 'meetings', iconBg: '#ede9fe', iconColor: '#6366f1' };
+      return { tone: 'meetings', iconBg: '#ede9fe', iconColor: '#7c3aed' };
     case 'schedule_hub':
       return { tone: 'schedule_hub', iconBg: '#e0f2fe', iconColor: '#0284c7' };
     case 'calling':

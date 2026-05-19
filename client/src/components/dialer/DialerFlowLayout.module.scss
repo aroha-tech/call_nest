@@ -1,50 +1,63 @@
-/* True black / white dialer chrome — not purple-tinted app theme */
+/* CallXTime brand dialer chrome — indigo → violet → magenta (logo X gradient) */
 .root {
-  --dial-bg: #ffffff;
-  --dial-surface: #f5f5f5;
+  --dial-brand-gradient: linear-gradient(90deg, #3730a3 0%, #5b21b6 34%, #7c3aed 58%, #c026d3 100%);
+  --dial-brand-gradient-soft: linear-gradient(
+    90deg,
+    rgba(55, 48, 163, 0.12) 0%,
+    rgba(124, 58, 237, 0.1) 50%,
+    rgba(192, 38, 211, 0.08) 100%
+  );
+  --dial-bg: #eef1f8;
+  --dial-surface: #f4f6fb;
   --dial-panel: #ffffff;
-  --dial-border: #d4d4d4;
-  --dial-text: #0a0a0a;
-  --dial-text-muted: #525252;
-  --dial-accent: #0066cc;
-  --dial-accent-soft: rgba(0, 102, 204, 0.1);
-  --dial-accent-border: rgba(0, 102, 204, 0.35);
+  --dial-border: #d8dce8;
+  --dial-text: #120a47;
+  --dial-text-muted: #5c5678;
+  --dial-accent: #6d28d9;
+  --dial-accent-soft: rgba(99, 102, 241, 0.1);
+  --dial-accent-border: rgba(91, 33, 182, 0.28);
+  --dial-shadow-sm: 0 1px 2px rgba(18, 10, 71, 0.06), 0 4px 12px rgba(55, 48, 163, 0.08);
+  --dial-shadow-md: 0 2px 4px rgba(18, 10, 71, 0.06), 0 12px 28px rgba(55, 48, 163, 0.12);
   --dial-success: #15803d;
   --dial-danger: #dc2626;
   --dial-live: #16a34a;
   --dial-script-bg: #ffffff;
-  --dial-script-text: #0a0a0a;
-  --dial-hover: rgba(0, 0, 0, 0.04);
-  --dial-edge: #d4d4d4;
+  --dial-script-text: #120a47;
+  --dial-hover: rgba(18, 10, 71, 0.04);
+  --dial-edge: #e2e0ea;
   --dial-fg: var(--dial-text);
   --dial-muted: var(--dial-text-muted);
   --dial-surface-2: var(--dial-surface);
   --dial-panel-head: var(--dial-surface);
 
-  min-height: 100vh;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--dial-bg);
   color: var(--dial-text);
 }
 
 .root[data-dialer-theme='dark'] {
-  --dial-bg: #0a0a0a;
-  --dial-surface: #141414;
-  --dial-panel: #1a1a1a;
-  --dial-border: #2e2e2e;
-  --dial-text: #fafafa;
-  --dial-text-muted: #a3a3a3;
-  --dial-accent: #3b9eff;
-  --dial-accent-soft: rgba(59, 158, 255, 0.12);
-  --dial-accent-border: rgba(59, 158, 255, 0.4);
+  --dial-bg: #080611;
+  --dial-surface: #12101f;
+  --dial-panel: #1a1830;
+  --dial-border: rgba(255, 255, 255, 0.08);
+  --dial-text: #f4f2ff;
+  --dial-text-muted: #8b85a8;
+  --dial-accent: #a78bfa;
+  --dial-accent-soft: rgba(167, 139, 250, 0.18);
+  --dial-accent-border: rgba(217, 70, 239, 0.35);
   --dial-success: #4ade80;
   --dial-danger: #f87171;
   --dial-live: #4ade80;
-  --dial-script-bg: #ffffff;
-  --dial-script-text: #0a0a0a;
+  --dial-script-bg: #16142a;
+  --dial-script-text: #f4f2ff;
   --dial-hover: rgba(255, 255, 255, 0.06);
-  --dial-edge: #2e2e2e;
+  --dial-edge: rgba(255, 255, 255, 0.08);
 }
 
 .appBar {
@@ -57,6 +70,28 @@
   flex-shrink: 0;
   border-bottom: 1px solid var(--dial-border);
   background: var(--dial-panel);
+  box-shadow: var(--dial-shadow-sm);
+}
+
+.root[data-dialer-theme='light'] .appBar,
+.root[data-dialer-theme='dark'] .appBar {
+  background: var(--dial-brand-gradient);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+
+  .brandMark,
+  .brandSubtitle {
+    color: #ffffff;
+  }
+
+  .brandDivider {
+    background: rgba(255, 255, 255, 0.35);
+  }
+}
+
+.root[data-dialer-theme='dark'] .brandMark {
+  color: #ffffff;
+  letter-spacing: 0.04em;
 }
 
 .appBarBrand {
@@ -70,7 +105,6 @@
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
   color: var(--dial-accent);
 }
 

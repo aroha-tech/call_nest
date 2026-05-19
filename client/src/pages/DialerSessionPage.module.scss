@@ -18,31 +18,31 @@
 
 /* Pro dialer shell — theme via data-dialer-theme on the root */
 .dialerShell {
-  --dialer-fg: #f1f5f9;
-  --dialer-fg-secondary: #cbd5e1;
-  --dialer-muted: #94a3b8;
+  --dialer-fg: #f4f2ff;
+  --dialer-fg-secondary: #b8b3d4;
+  --dialer-muted: #8b85a8;
   --dialer-edge: rgba(255, 255, 255, 0.08);
-  --dialer-surface: rgba(15, 23, 42, 0.55);
-  --dialer-surface-2: rgba(0, 0, 0, 0.28);
+  --dialer-surface: rgba(26, 24, 48, 0.72);
+  --dialer-surface-2: #12101f;
   --dialer-panel-head: rgba(255, 255, 255, 0.03);
   --dialer-hover: rgba(255, 255, 255, 0.06);
-  --dialer-accent-soft: rgba(99, 102, 241, 0.22);
-  --dialer-accent-border: rgba(129, 140, 248, 0.4);
-  --dialer-accent-fg: #c7d2fe;
-  --dialer-accent-glow: rgba(99, 102, 241, 0.35);
+  --dialer-accent-soft: rgba(167, 139, 250, 0.18);
+  --dialer-accent-border: rgba(217, 70, 239, 0.35);
+  --dialer-accent-fg: #e9d5ff;
+  --dialer-accent-glow: rgba(124, 58, 237, 0.35);
   --dialer-success-soft: rgba(34, 197, 94, 0.2);
   --dialer-success-border: rgba(74, 222, 128, 0.45);
   --dialer-success-fg: #86efac;
   --dialer-live: #4ade80;
-  --dialer-script-paper: #f8fafc;
-  --dialer-script-ink: #0f172a;
+  --dialer-script-paper: #ffffff;
+  --dialer-script-ink: #120a47;
   border-radius: 12px;
   overflow: hidden;
   color: var(--dialer-fg);
   background:
-    radial-gradient(100% 70% at 0% 0%, rgba(99, 102, 241, 0.14), transparent 48%),
-    radial-gradient(70% 50% at 100% 0%, rgba(34, 197, 94, 0.08), transparent 42%),
-    linear-gradient(180deg, #0f172a 0%, #0b1120 52%, #070b14 100%);
+    radial-gradient(100% 70% at 0% 0%, rgba(124, 58, 237, 0.16), transparent 48%),
+    radial-gradient(70% 50% at 100% 0%, rgba(217, 70, 239, 0.08), transparent 42%),
+    linear-gradient(180deg, #0f0d1a 0%, #0b0a12 52%, #080611 100%);
   border: 1px solid var(--dialer-edge);
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.4) inset,
@@ -50,30 +50,28 @@
 }
 
 .dialerShell[data-dialer-theme='light'] {
-  --dialer-fg: #0f172a;
-  --dialer-fg-secondary: #334155;
-  --dialer-muted: #64748b;
-  --dialer-edge: rgba(15, 23, 42, 0.1);
+  --dialer-fg: #120a47;
+  --dialer-fg-secondary: #4c4674;
+  --dialer-muted: #5c5678;
+  --dialer-edge: #d8dce8;
   --dialer-surface: #ffffff;
-  --dialer-surface-2: #f1f5f9;
-  --dialer-panel-head: #f8fafc;
-  --dialer-hover: rgba(15, 23, 42, 0.04);
-  --dialer-accent-soft: rgba(99, 102, 241, 0.1);
-  --dialer-accent-border: rgba(99, 102, 241, 0.28);
-  --dialer-accent-fg: #4338ca;
-  --dialer-accent-glow: rgba(99, 102, 241, 0.15);
+  --dialer-surface-2: #f4f6fb;
+  --dialer-panel-head: #ffffff;
+  --dialer-hover: rgba(18, 10, 71, 0.04);
+  --dialer-accent-soft: rgba(55, 48, 163, 0.1);
+  --dialer-accent-border: rgba(91, 33, 182, 0.28);
+  --dialer-accent-fg: #5b21b6;
+  --dialer-accent-glow: rgba(55, 48, 163, 0.12);
   --dialer-success-soft: rgba(34, 197, 94, 0.12);
   --dialer-success-border: rgba(34, 197, 94, 0.35);
   --dialer-success-fg: #15803d;
   --dialer-live: #16a34a;
   --dialer-script-paper: #ffffff;
-  --dialer-script-ink: #0f172a;
-  background:
-    radial-gradient(100% 70% at 0% 0%, rgba(99, 102, 241, 0.08), transparent 50%),
-    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 48%, #e2e8f0 100%);
+  --dialer-script-ink: #120a47;
+  background: #eef1f8;
   box-shadow:
-    0 0 0 1px rgba(15, 23, 42, 0.06) inset,
-    0 16px 48px rgba(15, 23, 42, 0.12);
+    0 0 0 1px rgba(18, 10, 71, 0.06) inset,
+    0 16px 48px rgba(55, 48, 163, 0.1);
 }
 
 .dialerChromeBar {
@@ -118,9 +116,8 @@
 .dialerChromeBadge {
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #a5b4fc;
+  letter-spacing: 0.02em;
+  color: #c4b5fd;
 }
 
 .dialerChromeSession {
@@ -142,7 +139,6 @@
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
   color: var(--dialer-muted);
   flex-shrink: 0;
 }
@@ -188,6 +184,7 @@
 }
 
 .metricsStrip {
+  flex-shrink: 0;
   display: flex;
   flex-wrap: nowrap;
   gap: 0;
@@ -202,7 +199,7 @@
   flex: 1 0 auto;
   min-width: 86px;
   padding: 6px 14px;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid var(--dialer-edge);
 }
 
 .metricCell:last-child {
@@ -210,20 +207,35 @@
 }
 
 .metricLabel {
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--dialer-muted);
+}
+
+.metricLabelInner {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  line-height: 1.3;
+
+  svg {
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+    color: #a78bfa;
+    opacity: 0.95;
+  }
 }
 
 .metricValue {
   margin-top: 2px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
   white-space: nowrap;
+  color: var(--dialer-fg);
 }
 
 .shellProgressRow {
@@ -238,10 +250,10 @@
 }
 
 .shellProgressMain {
-  flex: 1 1 auto;
-  width: min(420px, 48vw);
-  max-width: 420px;
-  min-width: 260px;
+  flex: 0 0 33.333%;
+  width: 33.333%;
+  max-width: 33.333%;
+  min-width: 0;
 }
 
 .shellProgressText {
@@ -301,7 +313,7 @@
 
   &:hover:not(:disabled) {
     background: var(--dial-hover, rgba(255, 255, 255, 0.08));
-    border-color: var(--dial-accent-border, rgba(59, 158, 255, 0.4));
+    border-color: var(--dial-accent-border, rgba(167, 139, 250, 0.4));
   }
 
   &:disabled {
@@ -310,7 +322,7 @@
   }
 
   &:focus-visible {
-    outline: 2px solid var(--dial-accent, #3b9eff);
+    outline: 2px solid var(--dial-accent, #a78bfa);
     outline-offset: 2px;
   }
 
@@ -321,13 +333,13 @@
 }
 
 .dialActionPrimary {
-  border-color: var(--dial-accent-border, rgba(59, 158, 255, 0.45));
-  background: var(--dial-accent, #3b9eff);
+  border-color: var(--dial-accent-border, rgba(167, 139, 250, 0.45));
+  background: var(--dial-accent, #7c3aed);
   color: #fff;
 
   &:hover:not(:disabled) {
     filter: brightness(1.08);
-    background: var(--dial-accent, #3b9eff);
+    background: var(--dial-accent, #7c3aed);
   }
 }
 
@@ -346,36 +358,43 @@
 .shellProgressFill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #6366f1, #22d3ee 50%, #22c55e);
-  box-shadow: 0 0 12px rgba(34, 197, 94, 0.35);
+  background: linear-gradient(90deg, #7c3aed 0%, #a855f7 48%, #d946ef 100%);
+  box-shadow: 0 0 12px rgba(217, 70, 239, 0.35);
   transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.dialerSkelWorkspace {
+.dialerSkelGrid {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 380px);
-  gap: 16px;
-  padding: 16px 18px 22px;
-  align-items: start;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(240px, 300px);
+  gap: 10px;
+  padding: 10px 12px 14px;
+  align-items: stretch;
 
-  @media (max-width: 900px) {
+  @media (max-width: 1100px) {
     grid-template-columns: 1fr;
   }
 }
 
-.dialerSkelMain {
+.dialerSkelCol {
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--dialer-edge, rgba(255, 255, 255, 0.08));
+  background: rgba(0, 0, 0, 0.12);
 }
 
-.dialerSkelAside {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
+.dialerShell[data-dialer-theme='light'] .dialerSkelCol {
+  background: #ffffff;
+  border-color: #d8dce8;
 }
 
 .activeCallStrip {
+  flex-shrink: 0;
   border-bottom: 1px solid var(--dialer-edge);
 }
 
@@ -408,11 +427,21 @@
 }
 
 .activeCallStripQueue {
-  background: linear-gradient(90deg, rgba(59, 130, 246, 0.22) 0%, rgba(15, 23, 42, 0.55) 100%);
+  background: linear-gradient(
+    105deg,
+    rgba(124, 58, 237, 0.42) 0%,
+    rgba(168, 85, 247, 0.28) 45%,
+    rgba(26, 24, 48, 0.92) 100%
+  );
 }
 
 .activeCallStripIdle {
-  background: rgba(0, 0, 0, 0.2);
+  background: linear-gradient(
+    105deg,
+    rgba(124, 58, 237, 0.38) 0%,
+    rgba(168, 85, 247, 0.22) 42%,
+    rgba(18, 16, 32, 0.88) 100%
+  );
 }
 
 .activeCallStripLeft {
@@ -424,8 +453,7 @@
 .activeCallLeadBadge {
   font-size: 11px;
   font-weight: 900;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   padding: 6px 11px;
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.35);
@@ -455,7 +483,7 @@
 }
 
 .activeCallName {
-  font-size: 1rem;
+  font-size: 14px;
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.25;
@@ -464,7 +492,7 @@
 
 .activeCallSub {
   margin-top: 4px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--dialer-muted);
   line-height: 1.35;
@@ -489,11 +517,11 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #a5b4fc;
+  color: #c4b5fd;
 }
 
 .activeCallPhone {
-  font-size: 1.05rem;
+  font-size: 14px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.03em;
@@ -526,15 +554,15 @@
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.06);
-  color: #c7d2fe;
+  color: #ddd6fe;
   cursor: pointer;
   transition:
     background 0.15s ease,
     border-color 0.15s ease;
 
   &:hover:not(:disabled) {
-    background: rgba(99, 102, 241, 0.25);
-    border-color: rgba(165, 180, 252, 0.4);
+    background: rgba(124, 58, 237, 0.25);
+    border-color: rgba(196, 181, 253, 0.4);
     color: #eef2ff;
   }
 
@@ -565,7 +593,7 @@
   margin: 0 0 14px;
   font-size: 12px;
   line-height: 1.45;
-  color: var(--color-text-secondary, #64748b);
+  color: var(--dialer-muted);
 }
 
 .phoneInsightDl {
@@ -579,13 +607,13 @@
 .phoneInsightDt {
   margin: 0;
   font-weight: 700;
-  color: var(--color-text-secondary, #64748b);
+  color: var(--dialer-muted);
 }
 
 .phoneInsightDd {
   margin: 0;
   font-weight: 600;
-  color: var(--color-text-primary, #0f172a);
+  color: var(--dialer-fg);
   word-break: break-word;
 }
 
@@ -690,8 +718,8 @@
 
 .dialerShell .grid .setBadge {
   color: #eef2ff;
-  background: rgba(99, 102, 241, 0.35);
-  border-color: rgba(165, 180, 252, 0.45);
+  background: rgba(124, 58, 237, 0.35);
+  border-color: rgba(196, 181, 253, 0.45);
 }
 
 .dialerShell .grid .setBadgeMuted {
@@ -727,8 +755,8 @@
 
 .dialerShell .grid .contactSourceHint {
   color: #e2e8f0;
-  background: rgba(99, 102, 241, 0.22);
-  border-color: rgba(165, 180, 252, 0.35);
+  background: rgba(124, 58, 237, 0.22);
+  border-color: rgba(196, 181, 253, 0.35);
 }
 
 .dialerShell .grid .queueHeader {
@@ -758,7 +786,7 @@
 }
 
 .dialerShell .grid .queueRowActive {
-  background: linear-gradient(90deg, rgba(99, 102, 241, 0.28), rgba(99, 102, 241, 0.08)) !important;
+  background: linear-gradient(90deg, rgba(124, 58, 237, 0.28), rgba(124, 58, 237, 0.08)) !important;
 }
 
 .dialerShell .grid .dispoHeader {
@@ -767,16 +795,9 @@
 }
 
 .dialerShell .grid .dispoBtn {
-  background: linear-gradient(165deg, rgba(99, 102, 241, 0.2) 0%, rgba(15, 23, 42, 0.5) 100%);
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-.dialerShell .grid .dispoBtnName {
-  color: #f1f5f9;
-}
-
-.dialerShell .grid .dispoBtnHint {
-  color: #94a3b8;
+  background: rgba(124, 58, 237, 0.24);
+  border-color: rgba(167, 139, 250, 0.45);
+  color: #eef2ff;
 }
 
 .dialerShell .grid .devWarn {
@@ -795,80 +816,185 @@
 }
 
 .preflightCard {
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
+  width: min(640px, 100%);
+  border-radius: 16px;
+  border: 1px solid var(--dial-border, rgba(255, 255, 255, 0.1));
+  background: var(--dial-panel, #1a1830);
   overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
+}
+
+.preflightHero {
+  padding: 22px 22px 18px;
+  background: var(--dial-brand-gradient, linear-gradient(90deg, #3730a3 0%, #5b21b6 34%, #7c3aed 58%, #c026d3 100%));
+  color: #ffffff;
+}
+
+.preflightEyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .preflightTitle {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-border-subtle);
-  font-weight: 950;
+  margin: 0 0 8px;
+  padding: 0;
+  border: none;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #ffffff;
+}
+
+.preflightLead {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.82);
+  max-width: 42ch;
 }
 
 .preflightBody {
-  padding: 12px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .preflightSection {
-  border: 1px solid var(--color-border-subtle);
+  border: 1px solid var(--dial-border, rgba(255, 255, 255, 0.1));
   border-radius: 12px;
-  padding: 10px 10px;
-  background: rgba(0, 0, 0, 0.12);
+  padding: 14px;
+  background: var(--dial-surface, #12101f);
 }
 
 .preflightHeading {
-  font-weight: 900;
-  font-size: 12px;
-  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--dial-text, #f4f2ff);
 }
 
-.preflightList {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-  font-size: 13px;
+.preflightHeadingIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(124, 58, 237, 0.2);
+  color: #c4b5fd;
+}
+
+.preflightRows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.preflightRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--dial-border, rgba(255, 255, 255, 0.08));
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.preflightIcon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(124, 58, 237, 0.18);
+  color: #c4b5fd;
+}
+
+.preflightRow[data-tone='green'] .preflightIcon {
+  background: rgba(34, 197, 94, 0.14);
+  color: #4ade80;
+}
+
+.preflightRowCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .preflightKey {
-  display: inline-block;
-  min-width: 120px;
-  opacity: 0.8;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dial-text-muted, #8b85a8);
 }
 
 .preflightVal {
-  font-weight: 850;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dial-text, #f4f2ff);
+  word-break: break-word;
 }
 
 .preflightBullets {
   margin: 0;
-  padding-left: 18px;
+  padding-left: 20px;
   font-size: 13px;
-  opacity: 0.9;
+  line-height: 1.5;
+  color: var(--dial-text-muted, #8b85a8);
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
 .preflightActions {
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.preflightStartBtn {
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  padding: 14px 28px;
+  min-width: min(100%, 240px);
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  color: #ffffff;
+  cursor: pointer;
+  background: var(--dial-brand-gradient, linear-gradient(90deg, #3730a3 0%, #5b21b6 34%, #7c3aed 58%, #c026d3 100%));
+  box-shadow: 0 8px 24px rgba(55, 48, 163, 0.28);
+  transition: filter 0.15s ease, transform 0.15s ease;
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 
 .summaryWrap {
-  max-width: 1100px;
-  margin: 0 auto;
-  border-radius: 18px;
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-surface);
+  width: min(920px, 100%);
+  margin: 0;
+  border-radius: 16px;
+  border: 1px solid var(--dial-border, rgba(255, 255, 255, 0.1));
+  background: var(--dial-panel, #1a1830);
   overflow: hidden;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.2) inset,
+    0 20px 56px rgba(0, 0, 0, 0.35);
 }
 
 .summaryHero {
@@ -876,9 +1002,10 @@
   grid-template-columns: 1fr auto;
   gap: 20px;
   align-items: center;
-  padding: 22px 22px 20px;
-  background: linear-gradient(125deg, rgba(99, 102, 241, 0.22), rgba(34, 197, 94, 0.12) 55%, transparent);
-  border-bottom: 1px solid var(--color-border-subtle);
+  padding: 24px 24px 22px;
+  background: var(--dial-brand-gradient, linear-gradient(90deg, #3730a3 0%, #5b21b6 34%, #7c3aed 58%, #c026d3 100%));
+  border-bottom: none;
+  color: #ffffff;
 }
 
 .summaryHeroText {
@@ -887,19 +1014,20 @@
 
 .summaryEyebrow {
   font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.75;
-  margin-bottom: 6px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: rgba(255, 255, 255, 0.78);
+  margin-bottom: 8px;
 }
 
 .summaryHeadline {
   margin: 0 0 8px;
-  font-size: 24px;
-  font-weight: 950;
+  font-size: clamp(20px, 2.4vw, 26px);
+  font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.2;
+  color: #ffffff;
 }
 
 .summaryStatus {
@@ -910,64 +1038,128 @@
   margin: 0;
   font-size: 14px;
   line-height: 1.5;
-  color: var(--color-text-secondary);
+  color: rgba(255, 255, 255, 0.82);
   max-width: 52ch;
 }
 
 .summaryHeroAside {
-  border-radius: 14px;
-  border: 1px solid var(--color-border-subtle);
-  background: rgba(0, 0, 0, 0.18);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
   padding: 14px 18px;
-  min-width: 160px;
+  min-width: 168px;
   text-align: right;
+  backdrop-filter: blur(6px);
 }
 
 .summaryDurationLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
   font-size: 11px;
-  font-weight: 800;
-  opacity: 0.75;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.82);
+
+  svg {
+    width: 14px;
+    height: 14px;
+    opacity: 0.9;
+  }
 }
 
 .summaryDurationValue {
   margin-top: 6px;
-  font-size: 22px;
-  font-weight: 950;
+  font-size: 24px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+  color: #ffffff;
 }
 
 .summaryGrid {
-  padding: 18px 18px 8px;
+  padding: 20px 20px 12px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
 .summaryItem {
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 14px;
-  padding: 14px 14px;
-  background: rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--dial-border, rgba(255, 255, 255, 0.1));
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--dial-surface, #12101f);
   min-width: 0;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      border-color: rgba(167, 139, 250, 0.35);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+    }
+  }
+}
+
+.summaryIcon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+.summaryItem[data-tone='violet'] .summaryIcon {
+  background: rgba(124, 58, 237, 0.16);
+  color: #a78bfa;
+}
+
+.summaryItem[data-tone='green'] .summaryIcon {
+  background: rgba(34, 197, 94, 0.14);
+  color: #4ade80;
+}
+
+.summaryItem[data-tone='red'] .summaryIcon {
+  background: rgba(239, 68, 68, 0.14);
+  color: #f87171;
+}
+
+.summaryItem[data-tone='amber'] .summaryIcon {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fbbf24;
+}
+
+.summaryStatCopy {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .summaryLabel {
-  font-size: 11px;
-  opacity: 0.75;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--dial-text-muted, #8b85a8);
+  line-height: 1.3;
 }
 
 .summaryValue {
-  margin-top: 8px;
-  font-size: 22px;
-  font-weight: 950;
+  margin-top: 4px;
+  font-size: 24px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+  color: var(--dial-text, #f4f2ff);
+  line-height: 1.15;
 }
 
 .summaryValueSmall {
@@ -979,15 +1171,36 @@
 }
 
 .summaryActions {
-  padding: 8px 18px 20px;
+  padding: 8px 20px 24px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
 }
 
-.summaryActions :global(button) {
-  min-width: 220px;
-  min-height: 46px;
-  font-weight: 900;
+.summaryDoneBtn {
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  padding: 14px 28px;
+  min-width: min(100%, 280px);
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  color: #ffffff;
+  cursor: pointer;
+  background: var(--dial-brand-gradient, linear-gradient(90deg, #3730a3 0%, #5b21b6 34%, #7c3aed 58%, #c026d3 100%));
+  box-shadow: 0 8px 24px rgba(55, 48, 163, 0.28);
+  transition: filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 28px rgba(55, 48, 163, 0.34);
+  }
+
+  &:focus-visible {
+    outline: 2px solid #c4b5fd;
+    outline-offset: 3px;
+  }
 }
 
 .grid {
@@ -1035,7 +1248,7 @@
 }
 
 .cardContact {
-  border-color: rgba(129, 140, 248, 0.15);
+  border-color: rgba(167, 139, 250, 0.15);
 }
 
 .contactCardHead {
@@ -1044,16 +1257,16 @@
   justify-content: space-between;
   gap: 10px;
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
+  border-bottom: 1px solid var(--dialer-panel-divider);
+  background: var(--dialer-panel-head-gradient);
+  color: var(--dialer-fg);
 }
 
 .cardTitleInline {
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.72;
+  letter-spacing: 0.01em;
+  color: var(--dialer-muted);
 }
 
 .contactEditIconBtn {
@@ -1061,9 +1274,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.06);
   color: inherit;
@@ -1072,9 +1285,14 @@
     background 0.15s ease,
     border-color 0.15s ease;
 
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
   &:hover:not(:disabled) {
-    background: rgba(99, 102, 241, 0.22);
-    border-color: rgba(165, 180, 252, 0.35);
+    background: rgba(124, 58, 237, 0.22);
+    border-color: rgba(196, 181, 253, 0.35);
   }
 
   &:disabled {
@@ -1083,11 +1301,27 @@
   }
 }
 
-.contactEditActions {
+.contactHeadActions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 16px 16px;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.contactEditIconBtnSave {
+  &:hover:not(:disabled) {
+    background: rgba(34, 197, 94, 0.22);
+    border-color: rgba(74, 222, 128, 0.4);
+    color: #bbf7d0;
+  }
+}
+
+.contactEditIconBtnCancel {
+  &:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(248, 113, 113, 0.4);
+    color: #fecaca;
+  }
 }
 
 .cardScript {
@@ -1104,23 +1338,23 @@
 
 .cardTitle {
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--dialer-panel-divider);
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.72;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
+  letter-spacing: 0.01em;
+  color: var(--dialer-muted);
+  background: var(--dialer-panel-head-gradient);
 }
 
 .cardTitleRow {
   padding: 16px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--dialer-panel-divider);
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 14px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent);
+  color: var(--dialer-fg);
+  background: var(--dialer-panel-head-gradient);
 }
 
 .scriptTitleBlock {
@@ -1130,8 +1364,7 @@
 .scriptEyebrow {
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   opacity: 0.5;
   margin-bottom: 4px;
 }
@@ -1150,8 +1383,8 @@
   letter-spacing: 0.04em;
   padding: 6px 11px;
   border-radius: 999px;
-  background: rgba(99, 102, 241, 0.2);
-  border: 1px solid rgba(165, 180, 252, 0.35);
+  background: rgba(124, 58, 237, 0.2);
+  border: 1px solid rgba(196, 181, 253, 0.35);
   color: inherit;
   font-variant-numeric: tabular-nums;
 }
@@ -1183,18 +1416,19 @@
 
 .contactAvatar {
   flex-shrink: 0;
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.25rem;
+  font-size: 15px;
   font-weight: 950;
   letter-spacing: -0.02em;
-  background: linear-gradient(145deg, rgba(99, 102, 241, 0.45), rgba(79, 70, 229, 0.25));
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  color: #ffffff;
+  background: linear-gradient(145deg, #5b21b6 0%, #7c3aed 52%, #c026d3 100%);
+  border: 1px solid rgba(91, 33, 182, 0.35);
+  box-shadow: 0 4px 14px rgba(55, 48, 163, 0.22);
 }
 
 .contactHeroMain {
@@ -1203,11 +1437,11 @@
 }
 
 .contactName {
-  font-weight: 950;
-  font-size: 1.15rem;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
-  color: var(--color-text-primary, inherit);
+  font-weight: 850;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--dialer-fg);
 }
 
 .contactSourceHint {
@@ -1216,9 +1450,9 @@
   font-size: 12px;
   line-height: 1.45;
   font-weight: 600;
-  color: var(--color-text-secondary, #64748b);
-  background: color-mix(in srgb, var(--color-primary-500, #6366f1) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-primary-500, #6366f1) 22%, transparent);
+  color: var(--dialer-fg-secondary);
+  background: color-mix(in srgb, var(--color-primary-500, #8b5cf6) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary-500, #8b5cf6) 22%, transparent);
   border-radius: 10px;
 }
 
@@ -1229,7 +1463,7 @@
 .contactPosition {
   font-size: 12px;
   font-weight: 700;
-  opacity: 0.65;
+  color: var(--dialer-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1240,34 +1474,48 @@
 
 .contactRow {
   display: grid;
-  grid-template-columns: 92px 1fr;
+  grid-template-columns: minmax(112px, 128px) 1fr;
   gap: 10px 14px;
   padding: 10px 16px;
-  border-top: 1px solid var(--color-border-subtle, rgba(15, 23, 42, 0.08));
+  border-top: 1px solid var(--dialer-panel-divider);
   align-items: baseline;
 }
 
 .metaLabel {
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary, #64748b);
+  letter-spacing: 0.01em;
+  color: var(--dialer-muted);
   opacity: 0.95;
   margin: 0;
 }
 
+.metaLabelInner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.3;
+
+  svg {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    color: var(--dial-accent, #a78bfa);
+    opacity: 0.9;
+  }
+}
+
 .metaValue {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 650;
   line-height: 1.45;
   word-break: break-word;
-  color: var(--color-text-primary, #0f172a);
+  color: var(--dialer-fg);
 }
 
 .metaPlaceholder {
-  color: var(--color-text-secondary, #64748b) !important;
+  color: var(--dialer-muted) !important;
   font-style: italic;
   font-weight: 600;
 }
@@ -1383,11 +1631,54 @@
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
 }
 
+.queueHeaderToggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  margin: 0;
+  border: none;
+  border-bottom: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary-500, #8b5cf6);
+    outline-offset: -2px;
+  }
+
+  .queueHeaderActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+    opacity: 0.75;
+  }
+}
+
+.cardQueueExpanded .queueHeaderToggle {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
 .queueTitle {
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   opacity: 0.72;
 }
 
@@ -1398,10 +1689,117 @@
   font-variant-numeric: tabular-nums;
 }
 
+.queueHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.queueExpandIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    opacity: 0.9;
+  }
+}
+
+.queueFooter {
+  flex-shrink: 0;
+}
+
+.queueViewAllBtn {
+  width: 100%;
+  margin: 0;
+  padding: 9px 12px;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: #c4b5fd;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: rgba(124, 58, 237, 0.14);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary-500, #8b5cf6);
+    outline-offset: -2px;
+  }
+}
+
+.queueTableWrapScroll {
+  max-height: 232px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+
+  .queueTable thead th {
+    position: sticky;
+    top: 0;
+  }
+}
+
+.queueExpandBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover {
+    background: rgba(124, 58, 237, 0.18);
+    border-color: rgba(196, 181, 253, 0.35);
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.queueTableWrapCollapsed {
+  overflow: visible;
+  max-height: none;
+  flex: 0 0 auto;
+}
+
+.queueTableWrapExpanded {
+  overflow: visible;
+  max-height: none;
+  flex: 0 0 auto;
+}
+
 .queueTableWrap {
-  overflow: auto;
-  max-height: min(32vh, 280px);
-  flex: 1 1 auto;
+  overflow: visible;
+  max-height: none;
+  flex: 0 0 auto;
 }
 
 .cardQueue {
@@ -1416,14 +1814,53 @@
   font-size: 13px;
 }
 
+.queueTableCompact {
+  table-layout: fixed;
+
+  .thOrder,
+  tbody td:first-child {
+    width: 2.25rem;
+    padding-left: 10px;
+    padding-right: 8px;
+  }
+
+  .thLead,
+  tbody td:nth-child(2) {
+    width: auto;
+    overflow: hidden;
+  }
+
+  .thState,
+  tbody td:last-child {
+    width: 6.75rem;
+    padding-left: 8px;
+    padding-right: 12px;
+    text-align: right;
+  }
+
+  thead .thState {
+    text-align: right !important;
+  }
+
+  .queueName,
+  .queueSub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .statePill {
+    margin-left: auto;
+  }
+}
+
 .queueTable thead th {
   position: sticky;
   top: 0;
   z-index: 1;
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   opacity: 0.55;
   background: color-mix(in srgb, var(--color-bg-elevated, var(--color-bg-surface)) 94%, transparent);
   backdrop-filter: blur(10px);
@@ -1486,8 +1923,8 @@
 }
 
 .queueRowActive {
-  background: linear-gradient(90deg, rgba(99, 102, 241, 0.18), rgba(99, 102, 241, 0.04)) !important;
-  box-shadow: inset 3px 0 0 var(--color-primary-500, #6366f1);
+  background: linear-gradient(90deg, rgba(124, 58, 237, 0.18), rgba(124, 58, 237, 0.04)) !important;
+  box-shadow: inset 3px 0 0 var(--color-primary-500, #8b5cf6);
 }
 
 .statePill {
@@ -1517,44 +1954,44 @@
 }
 
 .dispoHeader {
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--dialer-panel-divider);
+  background: var(--dialer-panel-head-gradient);
+  color: var(--dialer-fg);
 }
 
 .dispoTitle {
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.72;
+  letter-spacing: 0.01em;
+  color: var(--dialer-muted);
 }
 
 .dispoSub {
   margin: 8px 0 0;
   font-size: 12px;
   line-height: 1.45;
-  opacity: 0.62;
+  color: var(--dialer-muted);
   font-weight: 500;
 }
 
 .contactNotesBody {
   white-space: pre-wrap;
   word-break: break-word;
+  color: var(--dialer-fg);
 }
 
 .callNotesWrap {
   padding: 0 14px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--dialer-panel-divider);
 }
 
 .callNotesLabel {
   display: block;
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  opacity: 0.72;
+  letter-spacing: 0.01em;
+  color: var(--dialer-muted);
   margin-bottom: 6px;
 }
 
@@ -1562,7 +1999,7 @@
   margin: 0 0 8px;
   font-size: 11px;
   line-height: 1.45;
-  opacity: 0.55;
+  color: var(--dialer-muted);
   font-weight: 500;
 }
 
@@ -1575,20 +2012,20 @@
   font-size: 13px;
   line-height: 1.45;
   font-family: inherit;
-  color: inherit;
-  background: rgba(0, 0, 0, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--dialer-fg);
+  background: var(--dialer-input-bg);
+  border: 1px solid var(--dialer-input-border);
   border-radius: 12px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 
   &::placeholder {
-    color: rgba(148, 163, 184, 0.75);
+    color: var(--dialer-input-placeholder);
   }
 
   &:focus:not(:disabled) {
     outline: none;
-    border-color: rgba(165, 180, 252, 0.45);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    border-color: var(--dialer-accent-border);
+    box-shadow: 0 0 0 3px var(--dialer-accent-soft);
   }
 
   &:disabled {
@@ -1598,10 +2035,10 @@
 }
 
 .dispoList {
-  padding: 14px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .dispoEmpty {
@@ -1612,82 +2049,90 @@
 }
 
 .dispoBtn {
-  text-align: left;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
   width: 100%;
-  border-radius: 14px;
-  padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(165deg, rgba(99, 102, 241, 0.14) 0%, rgba(0, 0, 0, 0.12) 100%);
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--dialer-accent-border);
+  background: var(--dialer-accent-soft);
+  color: var(--dialer-fg);
   cursor: pointer;
-  color: inherit;
-  font: inherit;
-  transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &:focus-visible {
+    outline: 2px solid rgba(196, 181, 253, 0.65);
+    outline-offset: 2px;
+  }
 }
 
-.dispoBtnBody {
+.dispoBtnInner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 14px 14px 16px;
+  gap: 10px;
   width: 100%;
+  min-width: 0;
 }
 
-.dispoBtnText {
+.dispoBtnIconWrap {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+
+  svg {
+    width: 15px;
+    height: 15px;
+  }
+}
+
+.dispoBtnCopy {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
   min-width: 0;
+  text-align: left;
 }
 
-.dispoBtnChevron {
-  flex-shrink: 0;
-  width: 10px;
-  height: 10px;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  opacity: 0.45;
-  transform: rotate(-45deg);
-  margin-right: 4px;
+.dispoBtnLabel {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+  color: var(--dialer-fg);
+}
+
+.dispoBtnActionHint {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--dialer-muted);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .dispoBtn:hover:not(:disabled):not([aria-disabled='true']) {
-    transform: translateY(-2px);
-    border-color: rgba(165, 180, 252, 0.45);
-    box-shadow:
-      0 12px 32px rgba(99, 102, 241, 0.2),
-      0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    background: rgba(124, 58, 237, 0.34);
+    border-color: rgba(196, 181, 253, 0.55);
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.22);
   }
 }
 
-.dispoBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
+.dispoBtn:disabled,
 .dispoBtn[aria-disabled='true'] {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
-  transform: none;
-}
-
-.dispoBtnName {
-  font-weight: 850;
-  font-size: 14px;
-  letter-spacing: -0.01em;
-}
-
-.dispoBtnHint {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  opacity: 0.65;
-  font-variant-numeric: tabular-nums;
+  box-shadow: none;
 }
 
 .activeCallNumbersPanel {
@@ -1698,8 +2143,7 @@
 .activeCallNumbersTitle {
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--dialer-muted, #94a3b8);
   margin-bottom: 6px;
 }
@@ -1726,17 +2170,17 @@
   height: 36px;
   padding: 0;
   border-radius: 10px;
-  border: 1px dashed rgba(129, 140, 248, 0.45);
-  background: rgba(99, 102, 241, 0.12);
-  color: #c7d2fe;
+  border: 1px dashed rgba(167, 139, 250, 0.45);
+  background: rgba(124, 58, 237, 0.12);
+  color: #ddd6fe;
   cursor: pointer;
   transition:
     border-color 0.15s ease,
     background 0.15s ease;
 
   &:hover:not(:disabled) {
-    border-color: rgba(165, 180, 252, 0.65);
-    background: rgba(99, 102, 241, 0.22);
+    border-color: rgba(196, 181, 253, 0.65);
+    background: rgba(124, 58, 237, 0.22);
   }
 
   &:disabled {
@@ -1762,7 +2206,7 @@
   background: rgba(15, 23, 42, 0.98);
   box-shadow:
     0 16px 40px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(99, 102, 241, 0.12) inset;
+    0 0 0 1px rgba(124, 58, 237, 0.12) inset;
 }
 
 .activeCallAddPhoneSelect {
@@ -1822,7 +2266,6 @@
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--dialer-muted, #94a3b8);
 }
 
@@ -1846,13 +2289,13 @@
   width: 14px;
   height: 14px;
   opacity: 0.8;
-  color: #a5b4fc;
+  color: #c4b5fd;
 }
 
 .activeCallPhoneChipOn {
-  border-color: rgba(129, 140, 248, 0.6);
-  background: rgba(99, 102, 241, 0.2);
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.12);
+  border-color: rgba(167, 139, 250, 0.6);
+  background: rgba(124, 58, 237, 0.2);
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.12);
 }
 
 .activeCallPhoneChipNum {
@@ -1885,26 +2328,40 @@
 .phoneDisplayType {
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary, #64748b);
-}
-
-.dialerShell .phoneDisplayType {
-  color: #94a3b8;
+  letter-spacing: 0.01em;
+  color: var(--dialer-muted);
 }
 
 .phoneDisplayValue {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 650;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-  color: var(--color-text-primary, #0f172a);
+  letter-spacing: 0.01em;
+  color: var(--dialer-fg);
   word-break: break-all;
 }
 
-.dialerShell .phoneDisplayValue {
-  color: #f1f5f9;
+.cardContact .phoneInsightBtn {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+@media (max-width: 900px) {
+  .summaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .summaryGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 1100px) {
@@ -1914,8 +2371,8 @@
   .summaryHeroAside {
     text-align: left;
   }
-  .summaryGrid {
-    grid-template-columns: 1fr;
+  .summaryDurationLabel {
+    justify-content: flex-start;
   }
   .grid {
     grid-template-columns: 1fr;
@@ -1930,8 +2387,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 12px 16px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 16px 10px;
+  border-bottom: none;
 }
 
 .workspaceTab {
@@ -1941,8 +2398,7 @@
   color: var(--dialer-muted, #94a3b8);
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   padding: 10px 14px;
   border-radius: 10px 10px 0 0;
   cursor: pointer;
@@ -1955,23 +2411,240 @@
 }
 
 .workspaceTabActive {
-  color: #f1f5f9;
-  background: rgba(99, 102, 241, 0.18);
-  box-shadow: 0 -1px 0 rgba(165, 180, 252, 0.35) inset;
+  color: var(--dialer-accent-fg);
+  background: var(--dialer-accent-soft);
+  box-shadow: 0 -1px 0 var(--dialer-accent-border) inset;
 }
 
-.dialNotesStack {
-  padding: 0 16px 16px;
+.workspaceTabBar {
+  flex-shrink: 0;
+}
+
+.dialTabPanel {
+  padding: 12px 16px 16px;
+}
+
+.dialScriptTabLayout {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding: 0 0 8px;
+
+  .devWarn {
+    flex-shrink: 0;
+    margin: 0;
+  }
+}
+
+.colMain .cardScript > .colPaneScroll {
+  padding: 12px 12px 0;
+}
+
+/* Thumb-only scrollbar: hidden until the scroll area is hovered */
+@mixin dialer-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+
+  &:hover {
+    scrollbar-color: rgba(124, 58, 237, 0.85) transparent;
+  }
+
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 999px;
+    border: none;
+    min-height: 48px;
+    transition: background-color 0.15s ease;
+  }
+
+  &:hover::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6366f1 0%, #a855f7 55%, #c026d3 100%);
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #4f46e5 0%, #9333ea 55%, #db2777 100%);
+  }
+}
+
+/* One scroll per column — page stays fixed */
+.colPaneScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  @include dialer-scrollbar;
+}
+
+.colMain .colPaneScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.scriptPanel {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  border: 1px solid var(--dialer-edge, rgba(148, 163, 184, 0.28));
+  background: var(--dialer-script-paper, #ffffff);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.scriptPopoutBtn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  color: #334155;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: #fff;
+    border-color: rgba(124, 58, 237, 0.45);
+    color: #6d28d9;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.18);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  svg {
+    width: 15px;
+    height: 15px;
+  }
+}
+
+.scriptPanelBody {
+  position: relative;
+  resize: vertical;
+  min-height: 140px;
+  max-height: min(420px, 45vh);
+  overflow: auto;
+  margin: 0;
+  border: none;
+  background: var(--dialer-script-paper, #ffffff);
+  color: var(--dialer-script-ink, #120a47);
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+  overscroll-behavior: contain;
+  outline: none;
+  @include dialer-scrollbar;
+}
+
+.scriptPanelBody .scriptBody {
+  padding: 12px 48px 14px 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--dialer-script-ink, #120a47);
+  white-space: normal;
+  background: transparent;
+}
+
+.scriptPanelBody :global(p),
+.scriptPanelBody :global(li),
+.scriptPanelBody :global(span),
+.scriptPanelBody :global(strong),
+.scriptPanelBody :global(em),
+.scriptPanelBody :global(u),
+.scriptPanelBody :global(blockquote) {
+  color: var(--dialer-script-ink, #120a47) !important;
+}
+
+.scriptPanelBody :global(h1),
+.scriptPanelBody :global(h2),
+.scriptPanelBody :global(h3),
+.scriptPanelBody :global(h4) {
+  color: var(--dialer-script-ink, #120a47) !important;
+}
+
+.scriptPanelBody :global(a) {
+  color: #7c3aed !important;
+}
+
+.scriptPanelBody :global(ul),
+.scriptPanelBody :global(ol) {
+  margin: 0.5em 0;
+  padding-left: 1.35rem;
+}
+
+.scriptPanelBody :global(div[class*='ql-']) {
+  color: var(--dialer-script-ink, #120a47) !important;
+}
+
+.scriptPanelBody .scriptBody :global(div) {
+  color: var(--dialer-script-ink, #120a47) !important;
+}
+
+.scriptBodyPlain {
+  margin: 0;
+  padding: 12px 48px 14px 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  font-family: inherit;
+  color: var(--dialer-script-ink, #120a47);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: transparent;
+  border: none;
+}
+
+.scriptPanel .scriptEmpty {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: var(--dialer-muted, #475569);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dialNotesStack {
+  flex: 0 0 auto;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .dialCollapsible {
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex: 0 0 auto;
+  border: 1px solid var(--dialer-input-border);
   border-radius: 14px;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.18);
+  background: var(--dialer-collapsible-bg);
 }
 
 .dialCollapsibleHead {
@@ -1983,18 +2656,31 @@
   padding: 12px 14px;
   margin: 0;
   border: none;
-  background: rgba(255, 255, 255, 0.04);
-  color: inherit;
+  background: var(--dialer-panel-head-gradient);
+  color: var(--dialer-fg);
   font: inherit;
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   cursor: pointer;
   text-align: left;
 
   &:hover {
     background: rgba(255, 255, 255, 0.07);
+  }
+}
+
+.dialCollapsibleTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+
+  svg {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    opacity: 0.95;
   }
 }
 
@@ -2009,39 +2695,40 @@
 
 .dialCollapsibleBody {
   padding: 12px 14px 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid var(--dialer-panel-divider);
 }
 
 .dialCollapsibleHint {
   margin: 0 0 10px;
   font-size: 11px;
   line-height: 1.45;
-  opacity: 0.58;
+  color: var(--dialer-muted);
   font-weight: 500;
 }
 
 .dialCenterNotesArea {
   width: 100%;
   box-sizing: border-box;
-  min-height: 88px;
+  min-height: 80px;
   resize: vertical;
-  padding: 10px 12px;
-  font-size: 13px;
+  overflow: hidden;
+  padding: 9px 11px;
+  font-size: 12px;
   line-height: 1.45;
   font-family: inherit;
-  color: #f1f5f9;
-  background: rgba(0, 0, 0, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--dialer-fg);
+  background: var(--dialer-input-bg);
+  border: 1px solid var(--dialer-input-border);
   border-radius: 12px;
 
   &::placeholder {
-    color: rgba(148, 163, 184, 0.75);
+    color: var(--dialer-input-placeholder);
   }
 
   &:focus:not(:disabled) {
     outline: none;
-    border-color: rgba(165, 180, 252, 0.45);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    border-color: var(--dialer-accent-border);
+    box-shadow: 0 0 0 3px var(--dialer-accent-soft);
   }
 
   &:disabled {
@@ -2057,28 +2744,13 @@
 }
 
 .dialPrevHistoryScroll {
-  max-height: 220px;
-  overflow-y: auto;
-  overflow-x: hidden;
   padding: 8px 6px 8px 8px;
   margin: 0 -2px 0 0;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(0, 0, 0, 0.18);
-
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.35);
-    border-radius: 999px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 999px;
-  }
+  overflow-y: auto;
+  @include dialer-scrollbar;
 }
 
 .dialPrevHistoryList {
@@ -2093,17 +2765,17 @@
 .dialPrevHistoryItem {
   font-size: 12px;
   line-height: 1.45;
-  color: #e2e8f0;
+  color: var(--dialer-fg);
   padding: 8px 10px;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--dialer-collapsible-bg);
+  border: 1px solid var(--dialer-input-border);
   word-break: break-word;
 }
 
 .dialPrevHistoryCurrent {
-  border-color: rgba(129, 140, 248, 0.45);
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.15);
+  border-color: rgba(167, 139, 250, 0.45);
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.15);
 }
 
 .dialPrevHistoryEmpty {
@@ -2191,20 +2863,25 @@
   background: var(--dialer-surface);
 }
 
-.summaryWrap {
-  margin: 0 12px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--dialer-edge);
-  background: var(--dialer-surface);
-}
-
 /* === Dialer flow layout (inherits --dial-* from DialerFlowLayout) === */
 .flowBody {
   flex: 1 1 auto;
   min-height: 0;
+  height: 100%;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+
+  > :not(.workspaceRoot) {
+    flex-shrink: 0;
+  }
+
+  > .summaryCenter,
+  > .preflightCenter {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 }
 
 .preflightCenter,
@@ -2219,25 +2896,73 @@
 }
 
 .preflightCenter .preflightCard {
-  width: min(720px, 100%);
   margin: 0;
-  border: 1px solid var(--dial-border, #d4d4d4);
-  background: var(--dial-panel, #fff);
-  border-radius: 8px;
+}
+
+:global([data-dialer-theme='light']) {
+  .preflightCard {
+    background: #ffffff;
+    border-color: #d8dce8;
+    box-shadow: var(--dial-shadow-md, 0 2px 4px rgba(18, 10, 71, 0.06), 0 12px 28px rgba(55, 48, 163, 0.1));
+  }
+
+  .preflightSection {
+    background: #f8f9fc;
+    border-color: #e2e6f0;
+  }
+
+  .preflightRow {
+    background: #ffffff;
+    border-color: #e2e6f0;
+  }
+
+  .preflightIcon {
+    background: rgba(124, 58, 237, 0.1);
+    color: #6d28d9;
+  }
+
+  .preflightHeading {
+    color: #120a47;
+  }
+
+  .preflightKey {
+    color: #5c5678;
+  }
+
+  .preflightVal {
+    color: #120a47;
+  }
+
+  .preflightBullets {
+    color: #5c5678;
+  }
 }
 
 .summaryCenter .summaryWrap {
-  width: min(900px, 100%);
+  width: min(920px, 100%);
   margin: 0;
 }
 
 .workspaceRoot {
   flex: 1 1 auto;
   min-height: 0;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--dial-bg, #0a0a0a);
+}
+
+.workspaceRoot > .metricsStrip,
+.workspaceRoot > .shellProgressRow,
+.workspaceRoot > .activeCallStrip {
+  flex-shrink: 0;
+}
+
+.workspaceRoot > .grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .sessionMeta {
@@ -2260,7 +2985,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: 352px minmax(0, 1fr) 268px;
+  grid-template-columns: 380px minmax(0, 1fr) 336px;
   gap: 8px;
   flex: 1 1 auto;
   min-height: 0;
@@ -2281,16 +3006,31 @@
   align-self: stretch;
   min-height: 0;
   max-height: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.colQueue > .colPaneScroll {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .colSide {
-  gap: 8px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.colSide > .colPaneScroll {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .colQueue .cardQueue {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
-  max-height: none;
   display: flex;
   flex-direction: column;
   background: var(--dial-panel, #1a1a1a);
@@ -2299,16 +3039,36 @@
   overflow: hidden;
 }
 
-.colMain,
+.colQueue .cardQueueExpanded {
+  flex: 0 0 auto;
+}
+
+.colQueue .cardContact {
+  flex: 0 0 auto;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  background: var(--dial-panel, #1a1a1a);
+  border: 1px solid var(--dial-border, #2e2e2e);
+  border-radius: 8px;
+}
+
+.colMain {
+  align-self: stretch;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .colSide {
   align-self: stretch;
   min-height: 0;
+  overflow: hidden;
 }
 
-.colMain .cardScript,
-.colSide .card {
+.colMain .cardScript {
   flex: 1 1 auto;
   min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--dial-panel, #1a1a1a);
@@ -2317,14 +3077,23 @@
   overflow: hidden;
 }
 
-.colQueue .queueHeader {
+.colSide .card {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--dial-panel, #1a1a1a);
+  border: 1px solid var(--dial-border, #2e2e2e);
+  border-radius: 8px;
+  overflow: visible;
+}
+
+.colQueue .queueHeaderToggle {
   padding: 10px 12px;
-  gap: 8px;
 }
 
 .colQueue .queueTitle {
   font-size: 10px;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.01em;
 }
 
 .colQueue .queueHint {
@@ -2332,10 +3101,26 @@
 }
 
 .colQueue .queueTableWrap {
-  flex: 1 1 auto;
   min-height: 0;
+}
+
+.colQueue .queueTableWrapCollapsed {
+  flex: 0 0 auto;
   max-height: none;
-  overflow: auto;
+  overflow: visible;
+}
+
+.colQueue .queueTableWrapExpanded {
+  flex: 0 0 auto;
+  max-height: none;
+  overflow: visible;
+}
+
+.colQueue .queueTableWrapExpanded.queueTableWrapScroll {
+  max-height: 232px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  @include dialer-scrollbar;
 }
 
 .colQueue .queueTable {
@@ -2357,7 +3142,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 220px;
+  max-width: 100%;
 }
 
 .colQueue .queueSub {
@@ -2366,7 +3151,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 220px;
+  max-width: 100%;
 }
 
 .colQueue .statePill {
@@ -2374,39 +3159,901 @@
   font-size: 10px;
 }
 
-.colMain .scriptReadingSurface {
-  flex: 1 1 auto;
-  margin: 0 8px 8px;
-  overflow: auto;
+.colSide .cardDispo {
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
 /* Map legacy dialer tokens to flow tokens inside workspace */
 .workspaceRoot,
 .flowBody {
-  --dialer-fg: var(--dial-text, #fafafa);
-  --dialer-muted: var(--dial-text-muted, #a3a3a3);
-  --dialer-edge: var(--dial-border, #2e2e2e);
-  --dialer-surface: var(--dial-panel, #1a1a1a);
-  --dial-progress-track: #e5e5e5;
-  --dial-progress-track-border: #d4d4d4;
-  color: var(--dial-text);
+  --dialer-fg: var(--dial-text, #f4f2ff);
+  --dialer-fg-secondary: var(--dial-text-muted, #b8b3d4);
+  --dialer-muted: var(--dial-text-muted, #8b85a8);
+  --dialer-edge: var(--dial-border, rgba(255, 255, 255, 0.08));
+  --dialer-surface: var(--dial-panel, #1a1830);
+  --dialer-surface-2: var(--dial-surface, #12101f);
+  --dialer-panel-head: var(--dial-surface, #12101f);
+  --dialer-accent-soft: var(--dial-accent-soft, rgba(167, 139, 250, 0.18));
+  --dialer-accent-border: var(--dial-accent-border, rgba(217, 70, 239, 0.35));
+  --dialer-accent-fg: var(--dial-accent, #a78bfa);
+  --dialer-input-bg: rgba(0, 0, 0, 0.22);
+  --dialer-input-border: rgba(255, 255, 255, 0.12);
+  --dialer-input-placeholder: rgba(148, 163, 184, 0.75);
+  --dialer-panel-divider: rgba(255, 255, 255, 0.07);
+  --dialer-panel-head-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
+  --dialer-collapsible-bg: rgba(0, 0, 0, 0.18);
+  --dialer-script-paper: #16142a;
+  --dialer-script-ink: #f4f2ff;
+  --dial-progress-track: #3d3a52;
+  --dial-progress-track-border: #524f68;
+  --dial-font-body: 13px;
+  --dial-font-sm: 11px;
+  --dial-font-md: 12px;
+  --dial-font-lg: 14px;
+  color: var(--dialer-fg);
+  font-size: var(--dial-font-body);
+  line-height: 1.45;
 }
 
-:global([data-dialer-theme='dark']) .workspaceRoot,
-:global([data-dialer-theme='dark']) .flowBody {
-  --dial-progress-track: #4a4a4a;
-  --dial-progress-track-border: #636363;
+/* Medium typography — live workspace (avoids “zoomed” dialer) */
+.workspaceRoot {
+  .dialerChromeSession,
+  .dialerChromeScriptName {
+    font-size: var(--dial-font-md);
+  }
+
+  .shellProgressText {
+    font-size: 10px;
+  }
+
+  .contactHero {
+    padding: 12px 14px 10px;
+    gap: 12px;
+  }
+
+  .contactRow {
+    padding: 8px 14px;
+    grid-template-columns: 84px 1fr;
+  }
+
+  .contactSourceHint {
+    margin: 0 14px 10px;
+    padding: 8px 10px;
+    font-size: var(--dial-font-md);
+  }
+
+  .contactPosition {
+    font-size: var(--dial-font-md);
+  }
+
+  .contactName {
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .contactCardHead {
+    padding: 10px 12px;
+  }
+
+  .cardContact .phoneDisplayValue {
+    font-size: 11px;
+    font-weight: 650;
+  }
+
+  .cardContact .phoneDisplayList {
+    gap: 10px 16px;
+  }
+
+  .colQueue .queueTable,
+  .colQueue .queueName,
+  .colQueue .queueHint {
+    font-size: var(--dial-font-md);
+  }
+
+  .colQueue .queueSub {
+    font-size: var(--dial-font-sm);
+  }
+
+  .cardTitle {
+    padding: 12px 14px;
+    font-size: 10px;
+  }
+
+  .workspaceTab {
+    font-size: 11px;
+    padding: 8px 12px;
+  }
+
+  .dialCollapsibleHead {
+    padding: 10px 12px;
+    font-size: 10px;
+  }
+
+  .dialCollapsibleIcon {
+    font-size: 14px;
+  }
+
+  .dialCollapsibleHint {
+    font-size: 10px;
+  }
+
+  .dispoHeader {
+    padding: 12px 14px 10px;
+  }
+
+  .dispoList {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .dispoEmpty {
+    font-size: var(--dial-font-md);
+  }
+
+  .callNotesInput {
+    font-size: var(--dial-font-md);
+    min-height: 80px;
+    padding: 9px 11px;
+  }
+
+  .scriptPanelBody :global(h1) {
+    font-size: 1.2em !important;
+  }
+
+  .scriptPanelBody :global(h2) {
+    font-size: 1.12em !important;
+  }
+
+  .scriptPanelBody :global(h3),
+  .scriptPanelBody :global(h4) {
+    font-size: 1.05em !important;
+  }
+
+  /* Quill / rich-text often ships large inline sizes */
+  .scriptPanelBody .scriptBody :global([style*='font-size']) {
+    font-size: inherit !important;
+  }
+
+  .scriptPanelBody .scriptBody :global(.ql-size-large) {
+    font-size: 1.05em !important;
+  }
+
+  .scriptPanelBody .scriptBody :global(.ql-size-huge) {
+    font-size: 1.1em !important;
+  }
+}
+
+:global([data-dialer-theme='dark']) {
+  .workspaceRoot,
+  .flowBody {
+    --dialer-brand-gradient: var(--dial-brand-gradient);
+    --dialer-input-bg: rgba(0, 0, 0, 0.28);
+    --dialer-input-border: rgba(255, 255, 255, 0.12);
+    --dialer-input-placeholder: rgba(139, 133, 168, 0.85);
+    --dialer-panel-divider: rgba(255, 255, 255, 0.08);
+    --dialer-panel-head-gradient: var(--dial-brand-gradient);
+    --dialer-collapsible-bg: rgba(18, 16, 31, 0.92);
+    --dialer-accent-fg: #ffffff;
+    --dialer-accent-soft: rgba(255, 255, 255, 0.1);
+    --dialer-accent-border: rgba(255, 255, 255, 0.2);
+    --dial-progress-track: #3d3a52;
+    --dial-progress-track-border: #524f68;
+    --dialer-script-paper: #16142a;
+    --dialer-script-ink: #f4f2ff;
+  }
+
+  .workspaceRoot {
+    background: var(--dial-bg, #080611);
+  }
+
+  .metricsStrip {
+    background: var(--dial-panel, #1a1830);
+    border-bottom-color: var(--dial-border, rgba(255, 255, 255, 0.08));
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+  }
+
+  .shellProgressRow {
+    background: var(--dial-panel, #1a1830);
+    border-bottom-color: var(--dial-border, rgba(255, 255, 255, 0.08));
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  .metricLabelInner svg {
+    color: #c4b5fd;
+    opacity: 1;
+  }
+
+  .activeCallStripQueue,
+  .activeCallStripIdle,
+  .activeCallStripLive {
+    background: var(--dialer-brand-gradient);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  }
+
+  .activeCallName,
+  .activeCallPhone,
+  .activeCallNumbersTitle {
+    color: #ffffff;
+  }
+
+  .activeCallSub {
+    color: rgba(255, 255, 255, 0.82);
+  }
+
+  .activeCallLeadBadge {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #ffffff;
+  }
+
+  .activeCallPhoneRow {
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .activeCallPhoneChip,
+  .activeCallAddPhoneBtn {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.24);
+    color: #ffffff;
+  }
+
+  .activeCallPhoneChipOn {
+    background: rgba(255, 255, 255, 0.24);
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+
+  .phoneInsightBtn {
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+
+    &:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.18);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+  }
+
+  .metaLabelInner svg {
+    color: #c4b5fd;
+    opacity: 1;
+  }
+
+  .card {
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+    background: var(--dial-panel, #1a1830);
+  }
+
+  .contactCardHead,
+  .cardTitle,
+  .dispoHeader,
+  .queueHeader,
+  .queueHeaderToggle {
+    background: var(--dialer-brand-gradient);
+    border-bottom-color: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+  }
+
+  .cardTitleInline,
+  .queueTitle,
+  .dispoTitle {
+    color: rgba(255, 255, 255, 0.95);
+    opacity: 1;
+  }
+
+  .queueHint,
+  .dispoSub {
+    color: rgba(255, 255, 255, 0.78);
+    opacity: 1;
+  }
+
+  .contactEditIconBtn {
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
+
+  .contactEditIconBtnSave:hover:not(:disabled) {
+    background: rgba(34, 197, 94, 0.35);
+    border-color: rgba(255, 255, 255, 0.45);
+    color: #ffffff;
+  }
+
+  .contactEditIconBtnCancel:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.35);
+    border-color: rgba(255, 255, 255, 0.45);
+    color: #ffffff;
+  }
+
+  .metaValue :global(input) {
+    color: var(--dialer-fg) !important;
+    background-color: var(--dialer-input-bg) !important;
+    border-color: var(--dialer-input-border) !important;
+
+    &:focus {
+      border-color: #a78bfa !important;
+      box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.22) !important;
+    }
+  }
+
+  .workspaceTabBar {
+    background: var(--dialer-brand-gradient);
+    padding: 10px 14px 0;
+    border-radius: 0;
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .workspaceTab {
+    color: rgba(255, 255, 255, 0.72);
+    border-radius: 8px 8px 0 0;
+  }
+
+  .workspaceTabActive {
+    color: #e9d5ff;
+    background: var(--dial-panel, #1a1830);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.35);
+  }
+
+  .dialCollapsible {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: var(--dial-panel, #1a1830);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  }
+
+  .dialCollapsibleHead {
+    background: var(--dialer-brand-gradient);
+    color: #ffffff;
+
+    &:hover {
+      filter: brightness(1.06);
+    }
+  }
+
+  .dialCollapsibleTitle svg {
+    color: #ffffff;
+  }
+
+  .queueTable thead th {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--dialer-muted);
+    opacity: 1;
+    backdrop-filter: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .queueTable tbody td {
+    color: var(--dialer-fg);
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+    background: var(--dial-panel, #1a1830);
+  }
+
+  .queueTable tbody tr:hover {
+    background: rgba(124, 58, 237, 0.12);
+  }
+
+  .queueRowActive {
+    background: linear-gradient(90deg, rgba(124, 58, 237, 0.32), rgba(124, 58, 237, 0.08)) !important;
+    box-shadow: inset 3px 0 0 #a78bfa;
+  }
+
+  .queueSub,
+  .contactPosition,
+  .dialActivitySub,
+  .dialTabPlaceholder,
+  .dispoEmpty {
+    color: var(--dialer-muted);
+    opacity: 1;
+  }
+
+  .queueName,
+  .contactNotesBody,
+  .dialActivityTitle {
+    color: var(--dialer-fg);
+  }
+
+  .dispoBtn {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: var(--dialer-fg);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .dispoBtnLabel {
+    color: var(--dialer-fg);
+  }
+
+  .dispoBtnActionHint {
+    color: var(--dialer-muted);
+  }
+
+  .dispoBtnIconWrap {
+    background: var(--dialer-brand-gradient);
+    border-color: transparent;
+    color: #ffffff;
+  }
+
+  .dialPrevHistoryScroll {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  .dialPrevHistoryItem {
+    color: var(--dialer-fg);
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .scriptPopoutBtn {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--dialer-muted);
+
+    &:hover:not(:disabled) {
+      color: #e9d5ff;
+      border-color: rgba(167, 139, 250, 0.45);
+    }
+  }
+
+  .colMain .cardScript,
+  .colQueue .cardContact,
+  .colSide .card {
+    background: var(--dial-panel, #1a1830);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--dialer-fg);
+  }
+
+  .scriptPanel {
+    background: var(--dialer-script-paper);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 4px 16px rgba(0, 0, 0, 0.25);
+  }
+
+  .scriptPanelBody {
+    background: var(--dialer-script-paper);
+    color: var(--dialer-script-ink);
+  }
+
+  .scriptPanelBody .scriptBody,
+  .scriptPanelBody .scriptBodyPlain,
+  .scriptPanelBody .scriptBody :global(*:not(a)),
+  .scriptPanelBody :global(p),
+  .scriptPanelBody :global(li),
+  .scriptPanelBody :global(span),
+  .scriptPanelBody :global(strong),
+  .scriptPanelBody :global(em),
+  .scriptPanelBody :global(u),
+  .scriptPanelBody :global(blockquote),
+  .scriptPanelBody :global(h1),
+  .scriptPanelBody :global(h2),
+  .scriptPanelBody :global(h3),
+  .scriptPanelBody :global(h4),
+  .scriptPanelBody :global(div[class*='ql-']),
+  .scriptPanelBody .scriptBody :global(div) {
+    color: var(--dialer-script-ink) !important;
+  }
+
+  .scriptPanelBody :global(a) {
+    color: #c4b5fd !important;
+  }
+
+  .scriptPanel .scriptEmpty {
+    color: var(--dialer-muted);
+  }
+
+  .setBadge {
+    background: var(--dialer-brand-gradient);
+    border-color: transparent;
+    color: #ffffff;
+  }
+
+  .statePill {
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .queueExpandIcon {
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
+
+  .grid {
+    background: transparent;
+  }
+}
+
+:global([data-dialer-theme='light']) {
+  .workspaceRoot,
+  .flowBody {
+    --dialer-brand-gradient: var(--dial-brand-gradient);
+    --dialer-input-bg: #ffffff;
+    --dialer-input-border: #d4d0e4;
+    --dialer-input-placeholder: #8b85a8;
+    --dialer-panel-divider: rgba(18, 10, 71, 0.07);
+    --dialer-panel-head-gradient: var(--dial-brand-gradient);
+    --dialer-collapsible-bg: #ffffff;
+    --dialer-accent-fg: #ffffff;
+    --dialer-accent-soft: rgba(255, 255, 255, 0.18);
+    --dialer-accent-border: rgba(255, 255, 255, 0.35);
+    --dial-progress-track: #dce1ee;
+    --dial-progress-track-border: #c8cede;
+    --dialer-script-paper: #ffffff;
+    --dialer-script-ink: #120a47;
+  }
+
+  .workspaceRoot {
+    background: var(--dial-bg, #eef1f8);
+  }
+
+  .metricsStrip {
+    background: #ffffff;
+    border-bottom-color: #d8dce8;
+    box-shadow: 0 1px 0 rgba(18, 10, 71, 0.04);
+  }
+
+  .shellProgressRow {
+    background: #ffffff;
+    border-bottom-color: #d8dce8;
+    box-shadow: 0 1px 0 rgba(18, 10, 71, 0.04);
+  }
+
+  .activeCallStripQueue,
+  .activeCallStripIdle,
+  .activeCallStripLive {
+    background: var(--dialer-brand-gradient);
+    box-shadow: 0 6px 20px rgba(55, 48, 163, 0.22);
+  }
+
+  .activeCallName,
+  .activeCallPhone,
+  .activeCallNumbersTitle {
+    color: #ffffff;
+  }
+
+  .activeCallSub {
+    color: rgba(255, 255, 255, 0.82);
+  }
+
+  .activeCallLeadBadge {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.32);
+    color: #ffffff;
+  }
+
+  .activeCallPhoneRow {
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .activeCallPhoneChip,
+  .activeCallAddPhoneBtn {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #ffffff;
+  }
+
+  .activeCallPhoneChipOn {
+    background: rgba(255, 255, 255, 0.28);
+    border-color: rgba(255, 255, 255, 0.45);
+  }
+
+  .phoneInsightBtn {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+
+    &:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.22);
+      border-color: rgba(255, 255, 255, 0.45);
+    }
+  }
+
+  .contactAvatar {
+    background: linear-gradient(145deg, #5b21b6 0%, #7c3aed 52%, #c026d3 100%);
+    border-color: rgba(91, 33, 182, 0.35);
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(55, 48, 163, 0.2);
+  }
+
+  .metaLabelInner svg,
+  .metricLabelInner svg {
+    color: #6d28d9;
+  }
+
+  .card {
+    border-color: #d8dce8;
+    box-shadow: var(--dial-shadow-md, 0 2px 4px rgba(18, 10, 71, 0.06), 0 12px 28px rgba(55, 48, 163, 0.1));
+  }
+
+  .contactCardHead,
+  .cardTitle,
+  .dispoHeader,
+  .queueHeader,
+  .queueHeaderToggle {
+    background: var(--dialer-brand-gradient);
+    border-bottom-color: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+  }
+
+  .cardTitleInline,
+  .queueTitle,
+  .dispoTitle {
+    color: rgba(255, 255, 255, 0.95);
+    opacity: 1;
+  }
+
+  .queueHint,
+  .dispoSub {
+    color: rgba(255, 255, 255, 0.78);
+    opacity: 1;
+  }
+
+  .contactEditIconBtn {
+    border-color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+  }
+
+  .contactEditIconBtnSave:hover:not(:disabled) {
+    background: rgba(34, 197, 94, 0.35);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #ffffff;
+  }
+
+  .contactEditIconBtnCancel:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.35);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #ffffff;
+  }
+
+  .metaValue :global(input) {
+    color: #120a47 !important;
+    background-color: #ffffff !important;
+    border-color: #d4d0e4 !important;
+    box-shadow: 0 1px 2px rgba(18, 10, 71, 0.05);
+
+    &:focus {
+      border-color: #7c3aed !important;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.16) !important;
+    }
+  }
+
+  .workspaceTabBar {
+    background: var(--dialer-brand-gradient);
+    padding: 10px 14px 0;
+    border-radius: 0;
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.12);
+  }
+
+  .workspaceTab {
+    color: rgba(255, 255, 255, 0.72);
+    border-radius: 8px 8px 0 0;
+  }
+
+  .workspaceTabActive {
+    color: #5b21b6;
+    background: #ffffff;
+    box-shadow: 0 -2px 12px rgba(18, 10, 71, 0.12);
+  }
+
+  .dialCollapsible {
+    border-color: #d8dce8;
+    background: #ffffff;
+    box-shadow: var(--dial-shadow-sm);
+  }
+
+  .dialCollapsibleHead {
+    background: var(--dialer-brand-gradient);
+    color: #ffffff;
+
+    &:hover {
+      filter: brightness(1.05);
+    }
+  }
+
+  .dialCollapsibleTitle svg {
+    color: #ffffff;
+  }
+
+  .queueTable thead th {
+    background: #f0f2f8;
+    color: #5c5678;
+    opacity: 1;
+    backdrop-filter: none;
+    border-bottom: 1px solid #d8dce8;
+  }
+
+  .queueTable tbody td {
+    color: var(--dialer-fg);
+    border-bottom-color: rgba(18, 10, 71, 0.06);
+    background: #ffffff;
+  }
+
+  .queueTable tbody tr:hover {
+    background: rgba(55, 48, 163, 0.04);
+  }
+
+  .queueRowActive {
+    background: linear-gradient(90deg, rgba(55, 48, 163, 0.1), rgba(124, 58, 237, 0.05)) !important;
+    box-shadow: inset 3px 0 0 #5b21b6;
+  }
+
+  .queueSub,
+  .contactPosition,
+  .dialActivitySub,
+  .dialTabPlaceholder,
+  .dispoEmpty {
+    color: var(--dialer-muted);
+    opacity: 1;
+  }
+
+  .queueName,
+  .contactNotesBody,
+  .dialActivityTitle {
+    color: var(--dialer-fg);
+  }
+
+  .dispoBtn {
+    background: #ffffff;
+    border-color: #d8dce8;
+    color: #120a47;
+    box-shadow: 0 1px 2px rgba(18, 10, 71, 0.05), 0 4px 12px rgba(55, 48, 163, 0.06);
+  }
+
+  .dispoBtnLabel {
+    color: #120a47;
+  }
+
+  .dispoBtnActionHint {
+    color: #5c5678;
+  }
+
+  .dispoBtnIconWrap {
+    background: var(--dialer-brand-gradient);
+    border-color: transparent;
+    color: #ffffff;
+  }
+
+  .dialPrevHistoryScroll {
+    border-color: #d8dce8;
+    background: #f8f9fc;
+  }
+
+  .dialPrevHistoryItem {
+    color: var(--dialer-fg);
+    background: #ffffff;
+    border-color: #e2e6f0;
+  }
+
+  .scriptPanel {
+    border-color: #d8dce8;
+    box-shadow: var(--dial-shadow-sm);
+  }
+
+  .scriptPopoutBtn {
+    border-color: #d8dce8;
+    background: #ffffff;
+    color: #5c5678;
+
+    &:hover:not(:disabled) {
+      color: #5b21b6;
+      border-color: #a78bfa;
+    }
+  }
+
+  .colMain .cardScript,
+  .colQueue .cardContact,
+  .colSide .card {
+    background: #ffffff;
+    border-color: #d8dce8;
+    color: var(--dialer-fg);
+  }
+
+  .scriptPanel,
+  .scriptPanelBody {
+    background: #ffffff;
+    color: var(--dialer-script-ink);
+  }
+
+  .scriptPanelBody .scriptBody,
+  .scriptPanelBody .scriptBody :global(*:not(a)) {
+    color: var(--dialer-script-ink) !important;
+  }
+
+  .scriptPanelBody :global(a) {
+    color: #5b21b6 !important;
+  }
+
+  .scriptEmpty {
+    color: var(--dialer-muted);
+  }
+
+  .dialActivitySub,
+  .dialTabPlaceholder,
+  .dialPrevHistoryEmpty {
+    color: var(--dialer-muted);
+    opacity: 1;
+  }
+
+  .setBadge {
+    background: var(--dialer-brand-gradient);
+    border-color: transparent;
+    color: #ffffff;
+  }
+
+  .statePill {
+    border-color: #d8dce8;
+  }
+
+  .queueExpandIcon {
+    border-color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+  }
+
+  .grid {
+    background: transparent;
+  }
+
+  .summaryWrap {
+    background: #ffffff;
+    border-color: #d8dce8;
+    box-shadow: var(--dial-shadow-md, 0 2px 4px rgba(18, 10, 71, 0.06), 0 12px 28px rgba(55, 48, 163, 0.1));
+  }
+
+  .summaryItem {
+    background: #f8f9fc;
+    border-color: #e2e6f0;
+  }
+
+  .summaryItem[data-tone='violet'] .summaryIcon {
+    background: rgba(124, 58, 237, 0.1);
+    color: #6d28d9;
+  }
+
+  .summaryItem[data-tone='green'] .summaryIcon {
+    background: rgba(34, 197, 94, 0.12);
+    color: #15803d;
+  }
+
+  .summaryItem[data-tone='red'] .summaryIcon {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+  }
+
+  .summaryItem[data-tone='amber'] .summaryIcon {
+    background: rgba(245, 158, 11, 0.12);
+    color: #d97706;
+  }
+
+  .summaryLabel {
+    color: #5c5678;
+  }
+
+  .summaryValue {
+    color: #120a47;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :global([data-dialer-theme='light']) .dispoBtn:hover:not(:disabled):not([aria-disabled='true']) {
+    background: #ffffff;
+    border-color: #a78bfa;
+    box-shadow: 0 6px 18px rgba(55, 48, 163, 0.14);
+    transform: translateY(-1px);
+  }
+
+  :global([data-dialer-theme='dark']) .dispoBtn:hover:not(:disabled):not([aria-disabled='true']) {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(167, 139, 250, 0.45);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    transform: translateY(-1px);
+  }
 }
 
 @media (max-width: 1100px) {
   .grid {
     grid-template-columns: 1fr;
-    overflow: auto;
-  }
-
-  .colQueue .cardQueue {
-    max-height: min(400px, 50vh);
-    flex: 0 0 auto;
+    overflow: hidden;
   }
 }
 
